@@ -27,6 +27,15 @@ export class StateManager {
         this.eventBus.emit('object:deleted', objectId);
     }
 
+    updateObjectPosition(objectId, position) {
+        const object = this.state.objects.find(obj => obj.id === objectId);
+        if (object) {
+            object.position = position;
+            this.markDirty();
+            this.eventBus.emit('object:updated', { objectId, position });
+        }
+    }
+
     getObjects() {
         return [...this.state.objects];
     }

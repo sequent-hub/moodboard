@@ -46,7 +46,8 @@ export class SaveManager {
         });
         
         // Отслеживаем изменения объектов
-        this.eventBus.on('object:updated', () => {
+        this.eventBus.on('object:updated', (data) => {
+            console.log('🔄 Объект обновлен:', data.objectId, 'новая позиция:', data.position);
             this.markAsChanged();
         });
         

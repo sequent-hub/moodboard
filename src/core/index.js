@@ -235,13 +235,17 @@ export class CoreMoodBoard {
     }
 
     /**
-     * Обновление позиции объекта в PIXI
+     * Обновление позиции объекта в PIXI и состоянии
      */
     updateObjectPosition(objectId, position) {
         const pixiObject = this.pixi.objects.get(objectId);
         if (pixiObject) {
+            // Обновляем позицию в PIXI
             pixiObject.x = position.x;
             pixiObject.y = position.y;
+            
+            // Обновляем позицию в состоянии для автосохранения
+            this.state.updateObjectPosition(objectId, position);
         }
     }
 
@@ -262,6 +266,20 @@ export class CoreMoodBoard {
         // Уведомляем о создании объекта для автосохранения
         this.eventBus.emit('object:created', { objectId: objectData.id, objectData });
 
+        return objectData;
+    }
+
+    /**
+     * Создание объекта из полных данных (для загрузки с сервера)
+     */
+    createObjectFromData(objectData) {
+        // Используем существующие данные объекта (с его ID, размерами и т.д.)
+        this.state.addObject(objectData);
+        this.pixi.createObject(objectData);
+
+        // НЕ эмитируем object:created при загрузке, чтобы не запускать автосохранение
+        // Объекты уже сохранены в БД
+        
         return objectData;
     }
 

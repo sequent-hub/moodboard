@@ -61,8 +61,8 @@ export class MoodBoard {
             // Инициализируем UI
             this.initToolbar();
             
-            // Загружаем данные
-            this.dataManager.loadData(this.data);
+            // Загружаем данные (сначала пробуем загрузить с сервера, потом дефолтные)
+            await this.loadExistingBoard();
             
             console.log('MoodBoard initialized');
         } catch (error) {
@@ -175,6 +175,39 @@ export class MoodBoard {
      */
     exportBoard() {
         return this.actionHandler ? this.actionHandler.exportBoard() : null;
+    }
+    
+    /**
+     * Загрузка существующей доски с сервера
+     */
+    async loadExistingBoard() {
+        try {
+            const boardId = this.options.boardId;
+            
+            if (!boardId || !this.options.loadEndpoint) {
+                console.log('📋 Создаем новую доску (нет boardId или loadEndpoint)');
+                this.dataManager.loadData(this.data);
+                return;
+            }
+            
+            console.log(`🔄 Загружаем доску: ${boardId}`);
+            
+            // Пытаемся загрузить с сервера
+            const boardData = await this.coreMoodboard.saveManager.loadBoardData(boardId);
+            
+            if (boardData && boardData.objects) {
+                console.log(`✅ Доска загружена: ${boardData.objects.length} объектов`);
+                this.dataManager.loadData(boardData);
+            } else {
+                console.log('📋 Создаем новую доску (данные не найдены)');
+                this.dataManager.loadData(this.data);
+            }
+            
+        } catch (error) {
+            console.warn('⚠️ Ошибка загрузки доски, создаем новую:', error.message);
+            // Если загрузка не удалась, используем дефолтные данные
+            this.dataManager.loadData(this.data);
+        }
     }
     
     /**
