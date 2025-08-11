@@ -132,16 +132,18 @@ export class PixiEngine {
     /**
      * Обновить размер объекта
      */
-    updateObjectSize(objectId, size) {
+    updateObjectSize(objectId, size, objectType = null) {
         const pixiObject = this.objects.get(objectId);
         if (!pixiObject) return;
 
         // Сохраняем позицию
         const position = { x: pixiObject.x, y: pixiObject.y };
         
+        console.log(`🎨 Обновляем размер объекта ${objectId}, тип: ${objectType}`);
+        
         // Для Graphics объектов (рамки, фигуры) нужно пересоздать геометрию
         if (pixiObject instanceof PIXI.Graphics) {
-            this.recreateGraphicsObject(pixiObject, size, position);
+            this.recreateGraphicsObject(pixiObject, size, position, objectType);
         } 
         // Для Text объектов изменяем размер шрифта
         else if (pixiObject instanceof PIXI.Text) {
@@ -152,14 +154,14 @@ export class PixiEngine {
     /**
      * Пересоздать Graphics объект с новым размером
      */
-    recreateGraphicsObject(pixiObject, size, position) {
+    recreateGraphicsObject(pixiObject, size, position, objectType = null) {
         // Очищаем графику
         pixiObject.clear();
         
-        // Определяем тип объекта по цвету (примерное определение)
-        const isFrame = pixiObject.children.length === 0; // Рамка обычно пустая внутри
+        console.log(`🔄 Пересоздаем Graphics объект, тип: ${objectType}`);
         
-        if (isFrame) {
+        // Определяем что рисовать по типу объекта
+        if (objectType === 'frame') {
             // Рамка
             const borderWidth = 2;
             pixiObject.lineStyle(borderWidth, 0x333333, 1);
@@ -168,10 +170,23 @@ export class PixiEngine {
             const halfBorder = borderWidth / 2;
             pixiObject.drawRect(halfBorder, halfBorder, size.width - borderWidth, size.height - borderWidth);
             pixiObject.endFill();
-        } else {
-            // Фигура
+        } else if (objectType === 'shape') {
+            // Фигура (заполненная)
             pixiObject.beginFill(0x007ACC, 0.8);
             pixiObject.drawRect(0, 0, size.width, size.height);
+            pixiObject.endFill();
+        } else {
+            // Fallback - определяем по существующему содержимому (если тип не передан)
+            console.warn(`⚠️ Тип объекта не определен, используем fallback логику`);
+            
+            // Если есть только контур без заливки - это рамка
+            // Если есть заливка - это фигура
+            const borderWidth = 2;
+            pixiObject.lineStyle(borderWidth, 0x333333, 1);
+            pixiObject.beginFill(0xFFFFFF, 0.1);
+            
+            const halfBorder = borderWidth / 2;
+            pixiObject.drawRect(halfBorder, halfBorder, size.width - borderWidth, size.height - borderWidth);
             pixiObject.endFill();
         }
         

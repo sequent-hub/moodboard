@@ -406,10 +406,16 @@ export class SelectTool extends BaseTool {
             const finalSizeData = { objectId: this.dragTarget, size: null };
             this.emit('get:object:size', finalSizeData);
             
+            // Получаем финальную позицию
+            const finalPositionData = { objectId: this.dragTarget, position: null };
+            this.emit('get:object:position', finalPositionData);
+            
             this.emit('resize:end', { 
                 object: this.dragTarget,
                 oldSize: this.resizeStartBounds,
-                newSize: finalSizeData.size || this.resizeStartBounds
+                newSize: finalSizeData.size || this.resizeStartBounds,
+                oldPosition: this.resizeStartPosition,
+                newPosition: finalPositionData.position || this.resizeStartPosition
             });
         }
         
@@ -423,6 +429,7 @@ export class SelectTool extends BaseTool {
         this.resizeHandle = null;
         this.resizeStartBounds = null;
         this.resizeStartMousePos = null;
+        this.resizeStartPosition = null;
     }
     
     /**

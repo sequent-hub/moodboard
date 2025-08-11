@@ -26,21 +26,17 @@ export class ResizeObjectCommand extends BaseCommand {
     }
 
     _setSize(size) {
-        // Обновляем размер в PIXI
-        const pixiObject = this.coreMoodboard.pixi.objects.get(this.objectId);
-        if (pixiObject) {
-            // Для Graphics объектов нужно пересоздать геометрию
-            if (pixiObject.clear && pixiObject.drawRect) {
-                this.coreMoodboard.pixi.updateObjectSize(this.objectId, size);
-            } else if (pixiObject.style) {
-                // Для Text объектов
-                pixiObject.style.fontSize = Math.max(12, size.height / 3);
-            }
-        }
-        
-        // Обновляем размер в состоянии (без эмита события, чтобы не создавать новую команду)
+        // Получаем тип объекта из состояния
         const objects = this.coreMoodboard.state.state.objects;
         const object = objects.find(obj => obj.id === this.objectId);
+        const objectType = object ? object.type : null;
+        
+        console.log(`🔄 ResizeObjectCommand._setSize: объект ${this.objectId}, тип ${objectType}`);
+        
+        // Обновляем размер в PIXI с указанием типа
+        this.coreMoodboard.pixi.updateObjectSize(this.objectId, size, objectType);
+        
+        // Обновляем размер в состоянии (без эмита события, чтобы не создавать новую команду)
         if (object) {
             object.width = size.width;
             object.height = size.height;

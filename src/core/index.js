@@ -158,7 +158,12 @@ export class CoreMoodBoard {
 
         this.eventBus.on('tool:resize:update', (data) => {
             // Во время resize обновляем размер напрямую (без команды)
-            this.updateObjectSizeAndPositionDirect(data.object, data.size, data.position);
+            // Получаем тип объекта для правильного пересоздания
+            const objects = this.state.getObjects();
+            const object = objects.find(obj => obj.id === data.object);
+            const objectType = object ? object.type : null;
+            
+            this.updateObjectSizeAndPositionDirect(data.object, data.size, data.position, objectType);
         });
 
         this.eventBus.on('tool:resize:end', (data) => {
@@ -379,9 +384,9 @@ export class CoreMoodBoard {
      * Прямое обновление размера и позиции объекта (без команды)
      * Используется во время изменения размера для плавного изменения
      */
-    updateObjectSizeAndPositionDirect(objectId, size, position = null) {
+    updateObjectSizeAndPositionDirect(objectId, size, position = null, objectType = null) {
         // Обновляем размер в PIXI
-        this.pixi.updateObjectSize(objectId, size);
+        this.pixi.updateObjectSize(objectId, size, objectType);
         
         // Обновляем позицию если передана (для левых/верхних ручек)
         if (position) {
