@@ -117,6 +117,38 @@
     background: #ffe0b2;
 }
 
+/* Undo/Redo buttons */
+.moodboard-toolbar__button--undo {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.moodboard-toolbar__button--undo:hover:not(:disabled) {
+    background: #e1bee7;
+}
+
+.moodboard-toolbar__button--redo {
+    background: #e8f5e8;
+    color: #388e3c;
+}
+
+.moodboard-toolbar__button--redo:hover:not(:disabled) {
+    background: #c8e6c9;
+}
+
+/* Disabled state for undo/redo buttons */
+.moodboard-toolbar__button--disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: #f5f5f5 !important;
+    color: #999 !important;
+}
+
+.moodboard-toolbar--dark .moodboard-toolbar__button--disabled {
+    background: #2a2a2a !important;
+    color: #555 !important;
+}
+
 .moodboard-toolbar__button--clear {
     background: #ffebee;
     color: #d32f2f;

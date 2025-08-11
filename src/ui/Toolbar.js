@@ -10,6 +10,7 @@ export class Toolbar {
         
         this.createToolbar();
         this.attachEvents();
+        this.setupHistoryEvents();
     }
     
     /**
@@ -25,7 +26,10 @@ export class Toolbar {
             { id: 'shape', label: '🔶 Add Shape', type: 'shape' },
             { id: 'divider', type: 'divider' },
             { id: 'clear', label: '🗑️ Clear All', type: 'clear' },
-            { id: 'export', label: '💾 Export', type: 'export' }
+            { id: 'export', label: '💾 Export', type: 'export' },
+            { id: 'divider', type: 'divider' },
+            { id: 'undo', label: '↶ Undo', type: 'undo', disabled: true },
+            { id: 'redo', label: '↷ Redo', type: 'redo', disabled: true }
         ];
         
         tools.forEach(tool => {
@@ -52,6 +56,12 @@ export class Toolbar {
         button.dataset.tool = tool.type;
         button.dataset.toolId = tool.id;
         
+        // Устанавливаем disabled состояние если указано
+        if (tool.disabled) {
+            button.disabled = true;
+            button.classList.add('moodboard-toolbar__button--disabled');
+        }
+        
         return button;
     }
     
@@ -61,12 +71,25 @@ export class Toolbar {
     attachEvents() {
         this.element.addEventListener('click', (e) => {
             const button = e.target.closest('.moodboard-toolbar__button');
-            if (!button) return;
+            if (!button || button.disabled) return;
             
             const toolType = button.dataset.tool;
             const toolId = button.dataset.toolId;
             
-            // Эмитим событие для MoodBoardWorkspace
+            // Обрабатываем undo/redo отдельно
+            if (toolType === 'undo') {
+                this.eventBus.emit('keyboard:undo');
+                this.animateButton(button);
+                return;
+            }
+            
+            if (toolType === 'redo') {
+                this.eventBus.emit('keyboard:redo');
+                this.animateButton(button);
+                return;
+            }
+            
+            // Эмитим событие для других инструментов
             this.eventBus.emit('toolbar:action', {
                 type: toolType,
                 id: toolId,
@@ -107,6 +130,46 @@ export class Toolbar {
     }
     
     /**
+     * Настройка обработчиков событий истории
+     */
+    setupHistoryEvents() {
+        // Слушаем изменения истории для обновления кнопок undo/redo
+        this.eventBus.on('ui:update-history-buttons', (data) => {
+            this.updateHistoryButtons(data.canUndo, data.canRedo);
+        });
+    }
+    
+    /**
+     * Обновление состояния кнопок undo/redo
+     */
+    updateHistoryButtons(canUndo, canRedo) {
+        const undoButton = this.element.querySelector('[data-tool="undo"]');
+        const redoButton = this.element.querySelector('[data-tool="redo"]');
+        
+        if (undoButton) {
+            undoButton.disabled = !canUndo;
+            if (canUndo) {
+                undoButton.classList.remove('moodboard-toolbar__button--disabled');
+                undoButton.title = 'Отменить последнее действие (Ctrl+Z)';
+            } else {
+                undoButton.classList.add('moodboard-toolbar__button--disabled');
+                undoButton.title = 'Нет действий для отмены';
+            }
+        }
+        
+        if (redoButton) {
+            redoButton.disabled = !canRedo;
+            if (canRedo) {
+                redoButton.classList.remove('moodboard-toolbar__button--disabled');
+                redoButton.title = 'Повторить отмененное действие (Ctrl+Y)';
+            } else {
+                redoButton.classList.add('moodboard-toolbar__button--disabled');
+                redoButton.title = 'Нет действий для повтора';
+            }
+        }
+    }
+
+    /**
      * Очистка ресурсов
      */
     destroy() {
@@ -114,5 +177,8 @@ export class Toolbar {
             this.element.remove();
             this.element = null;
         }
+        
+        // Отписываемся от событий
+        this.eventBus.removeAllListeners('ui:update-history-buttons');
     }
 }
