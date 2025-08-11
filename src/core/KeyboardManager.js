@@ -314,32 +314,56 @@ export class KeyboardManager {
      * Регистрация стандартных горячих клавиш
      */
     registerDefaultShortcuts() {
-        // Undo/Redo
+        // Undo/Redo (латиница и кириллица)
         this.registerShortcut('ctrl+z', () => {
             this.eventBus.emit('keyboard:undo');
         }, { description: 'Отменить действие', preventDefault: true });
+        
+        this.registerShortcut('ctrl+я', () => { // русская 'я' на той же клавише что и 'z'
+            this.eventBus.emit('keyboard:undo');
+        }, { description: 'Отменить действие (рус)', preventDefault: true });
         
         this.registerShortcut('ctrl+shift+z', () => {
             this.eventBus.emit('keyboard:redo');
         }, { description: 'Повторить действие', preventDefault: true });
         
+        this.registerShortcut('ctrl+shift+я', () => {
+            this.eventBus.emit('keyboard:redo');
+        }, { description: 'Повторить действие (рус)', preventDefault: true });
+        
         this.registerShortcut('ctrl+y', () => {
             this.eventBus.emit('keyboard:redo');
         }, { description: 'Повторить действие (альтернативный)', preventDefault: true });
         
-        // Выделение
+        this.registerShortcut('ctrl+н', () => { // русская 'н' на той же клавише что и 'y'
+            this.eventBus.emit('keyboard:redo');
+        }, { description: 'Повторить действие (рус альт)', preventDefault: true });
+        
+        // Выделение (латиница и кириллица)
         this.registerShortcut('ctrl+a', () => {
             this.eventBus.emit('keyboard:select-all');
         }, { description: 'Выделить все', preventDefault: true });
         
-        // Копирование/Вставка
+        this.registerShortcut('ctrl+ф', () => { // русская 'ф' на той же клавише что и 'a'
+            this.eventBus.emit('keyboard:select-all');
+        }, { description: 'Выделить все (рус)', preventDefault: true });
+        
+        // Копирование/Вставка (латиница и кириллица)
         this.registerShortcut('ctrl+c', () => {
             this.eventBus.emit('keyboard:copy');
         }, { description: 'Копировать', preventDefault: true });
         
+        this.registerShortcut('ctrl+с', () => { // русская 'с' на той же клавише что и 'c'
+            this.eventBus.emit('keyboard:copy');
+        }, { description: 'Копировать (рус)', preventDefault: true });
+        
         this.registerShortcut('ctrl+v', () => {
             this.eventBus.emit('keyboard:paste');
         }, { description: 'Вставить', preventDefault: true });
+        
+        this.registerShortcut('ctrl+м', () => { // русская 'м' на той же клавише что и 'v'
+            this.eventBus.emit('keyboard:paste');
+        }, { description: 'Вставить (рус)', preventDefault: true });
         
         // Удаление
         this.registerShortcut('delete', () => {
@@ -355,18 +379,30 @@ export class KeyboardManager {
             this.eventBus.emit('keyboard:escape');
         }, { description: 'Отменить выделение', preventDefault: true });
         
-        // Инструменты
+        // Инструменты (латиница и кириллица)
         this.registerShortcut('v', () => {
             this.eventBus.emit('keyboard:tool-select', { tool: 'select' });
         }, { description: 'Выбрать инструмент выделения' });
+        
+        this.registerShortcut('м', () => { // русская 'м' на той же клавише что и 'v'
+            this.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+        }, { description: 'Выбрать инструмент выделения (рус)' });
         
         this.registerShortcut('t', () => {
             this.eventBus.emit('keyboard:tool-select', { tool: 'text' });
         }, { description: 'Выбрать инструмент текста' });
         
+        this.registerShortcut('е', () => { // русская 'е' на той же клавише что и 't'
+            this.eventBus.emit('keyboard:tool-select', { tool: 'text' });
+        }, { description: 'Выбрать инструмент текста (рус)' });
+        
         this.registerShortcut('r', () => {
             this.eventBus.emit('keyboard:tool-select', { tool: 'frame' });
         }, { description: 'Выбрать инструмент рамки' });
+        
+        this.registerShortcut('к', () => { // русская 'к' на той же клавише что и 'r'
+            this.eventBus.emit('keyboard:tool-select', { tool: 'frame' });
+        }, { description: 'Выбрать инструмент рамки (рус)' });
         
         // Перемещение стрелками
         this.registerShortcut('arrowup', (event) => {
