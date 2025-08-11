@@ -6,7 +6,7 @@ import { SaveManager } from './SaveManager.js';
 import { HistoryManager } from './HistoryManager.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
-import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand } from './commands/index.js';
+import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand } from './commands/index.js';
 
 export class CoreMoodBoard {
     constructor(container, options = {}) {
@@ -37,6 +37,9 @@ export class CoreMoodBoard {
         
         // Для отслеживания перетаскивания
         this.dragStartPosition = null;
+        
+        // Для отслеживания изменения размера
+        this.resizeStartSize = null;
 
         // Убираем автоматический вызов init() - будет вызываться вручную
     }
@@ -71,13 +74,14 @@ export class CoreMoodBoard {
         const canvasElement = this.pixi.app.view;
         
         // Создаем ToolManager
-        this.toolManager = new ToolManager(this.eventBus, canvasElement);
+        this.toolManager = new ToolManager(this.eventBus, canvasElement, this.pixi.app);
         
         // Регистрируем инструменты
         const selectTool = new SelectTool(this.eventBus);
         this.toolManager.registerTool(selectTool);
         
         // Активируем SelectTool по умолчанию
+        console.log('🔧 Активируем SelectTool с PIXI app:', !!this.pixi.app);
         this.toolManager.activateTool('select');
         
         // Подписываемся на события инструментов
@@ -142,9 +146,44 @@ export class CoreMoodBoard {
             }
         });
 
+        // События изменения размера
+        this.eventBus.on('tool:resize:start', (data) => {
+            // Сохраняем начальный размер для команды
+            const objects = this.state.getObjects();
+            const object = objects.find(obj => obj.id === data.object);
+            if (object) {
+                this.resizeStartSize = { width: object.width, height: object.height };
+            }
+        });
+
+        this.eventBus.on('tool:resize:update', (data) => {
+            // Во время resize обновляем размер напрямую (без команды)
+            this.updateObjectSizeAndPositionDirect(data.object, data.size, data.position);
+        });
+
+        this.eventBus.on('tool:resize:end', (data) => {
+            // В конце создаем одну команду изменения размера
+            if (this.resizeStartSize && data.oldSize && data.newSize) {
+                // Создаем команду только если размер действительно изменился
+                if (data.oldSize.width !== data.newSize.width || 
+                    data.oldSize.height !== data.newSize.height) {
+                    
+                    const command = new ResizeObjectCommand(
+                        this, 
+                        data.object, 
+                        data.oldSize, 
+                        data.newSize
+                    );
+                    this.history.executeCommand(command);
+                }
+            }
+            this.resizeStartSize = null;
+        });
+
         // Hit testing
         this.eventBus.on('tool:hit:test', (data) => {
             const result = this.pixi.hitTest(data.x, data.y);
+            console.log(`🔍 PixiEngine hitTest результат:`, result);
             data.result = result;
         });
 
@@ -153,6 +192,29 @@ export class CoreMoodBoard {
             const pixiObject = this.pixi.objects.get(data.objectId);
             if (pixiObject) {
                 data.position = { x: pixiObject.x, y: pixiObject.y };
+            }
+        });
+
+        // Получение PIXI объекта
+        this.eventBus.on('tool:get:object:pixi', (data) => {
+            console.log(`🔍 Запрос PIXI объекта для ${data.objectId}`);
+            console.log('📋 Доступные PIXI объекты:', Array.from(this.pixi.objects.keys()));
+            
+            const pixiObject = this.pixi.objects.get(data.objectId);
+            if (pixiObject) {
+                console.log(`✅ PIXI объект найден для ${data.objectId}`);
+                data.pixiObject = pixiObject;
+            } else {
+                console.log(`❌ PIXI объект НЕ найден для ${data.objectId}`);
+            }
+        });
+
+        // Получение размера объекта
+        this.eventBus.on('tool:get:object:size', (data) => {
+            const objects = this.state.getObjects();
+            const object = objects.find(obj => obj.id === data.objectId);
+            if (object) {
+                data.size = { width: object.width, height: object.height };
             }
         });
     }
@@ -309,6 +371,42 @@ export class CoreMoodBoard {
         const object = objects.find(obj => obj.id === objectId);
         if (object) {
             object.position = { ...position };
+            this.state.markDirty(); // Помечаем для автосохранения
+        }
+    }
+
+    /**
+     * Прямое обновление размера и позиции объекта (без команды)
+     * Используется во время изменения размера для плавного изменения
+     */
+    updateObjectSizeAndPositionDirect(objectId, size, position = null) {
+        // Обновляем размер в PIXI
+        this.pixi.updateObjectSize(objectId, size);
+        
+        // Обновляем позицию если передана (для левых/верхних ручек)
+        if (position) {
+            const pixiObject = this.pixi.objects.get(objectId);
+            if (pixiObject) {
+                console.log(`📍 Устанавливаем позицию объекта: (${position.x}, ${position.y})`);
+                pixiObject.x = position.x;
+                pixiObject.y = position.y;
+                
+                // Обновляем позицию в состоянии
+                const objects = this.state.state.objects;
+                const object = objects.find(obj => obj.id === objectId);
+                if (object) {
+                    object.position.x = position.x;
+                    object.position.y = position.y;
+                }
+            }
+        }
+        
+        // Обновляем размер в состоянии (без эмита события)
+        const objects = this.state.state.objects;
+        const object = objects.find(obj => obj.id === objectId);
+        if (object) {
+            object.width = size.width;
+            object.height = size.height;
             this.state.markDirty(); // Помечаем для автосохранения
         }
     }

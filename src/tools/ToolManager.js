@@ -2,9 +2,10 @@
  * Менеджер инструментов - управляет активными инструментами и переключением между ними
  */
 export class ToolManager {
-    constructor(eventBus, container) {
+    constructor(eventBus, container, pixiApp = null) {
         this.eventBus = eventBus;
         this.container = container; // DOM элемент для обработки событий
+        this.pixiApp = pixiApp; // PIXI Application для передачи в инструменты
         this.tools = new Map();
         this.activeTool = null;
         this.defaultTool = null;
@@ -45,7 +46,11 @@ export class ToolManager {
         
         // Активируем новый инструмент
         this.activeTool = tool;
-        this.activeTool.activate();
+        
+        // Передаем PIXI app в метод activate, если он поддерживается
+        if (typeof this.activeTool.activate === 'function') {
+            this.activeTool.activate(this.pixiApp);
+        }
         
         return true;
     }

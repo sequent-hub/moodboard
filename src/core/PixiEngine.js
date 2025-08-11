@@ -130,6 +130,70 @@ export class PixiEngine {
     }
 
     /**
+     * Обновить размер объекта
+     */
+    updateObjectSize(objectId, size) {
+        const pixiObject = this.objects.get(objectId);
+        if (!pixiObject) return;
+
+        // Сохраняем позицию
+        const position = { x: pixiObject.x, y: pixiObject.y };
+        
+        // Для Graphics объектов (рамки, фигуры) нужно пересоздать геометрию
+        if (pixiObject instanceof PIXI.Graphics) {
+            this.recreateGraphicsObject(pixiObject, size, position);
+        } 
+        // Для Text объектов изменяем размер шрифта
+        else if (pixiObject instanceof PIXI.Text) {
+            this.updateTextObjectSize(pixiObject, size);
+        }
+    }
+
+    /**
+     * Пересоздать Graphics объект с новым размером
+     */
+    recreateGraphicsObject(pixiObject, size, position) {
+        // Очищаем графику
+        pixiObject.clear();
+        
+        // Определяем тип объекта по цвету (примерное определение)
+        const isFrame = pixiObject.children.length === 0; // Рамка обычно пустая внутри
+        
+        if (isFrame) {
+            // Рамка
+            const borderWidth = 2;
+            pixiObject.lineStyle(borderWidth, 0x333333, 1);
+            pixiObject.beginFill(0xFFFFFF, 0.1);
+            
+            const halfBorder = borderWidth / 2;
+            pixiObject.drawRect(halfBorder, halfBorder, size.width - borderWidth, size.height - borderWidth);
+            pixiObject.endFill();
+        } else {
+            // Фигура
+            pixiObject.beginFill(0x007ACC, 0.8);
+            pixiObject.drawRect(0, 0, size.width, size.height);
+            pixiObject.endFill();
+        }
+        
+        // Восстанавливаем позицию
+        pixiObject.x = position.x;
+        pixiObject.y = position.y;
+    }
+
+    /**
+     * Обновить размер текстового объекта
+     */
+    updateTextObjectSize(textObject, size) {
+        // Для текстовых объектов адаптируем размер шрифта к новой высоте
+        const fontSize = Math.max(12, Math.min(size.height / 2, size.width / 8));
+        textObject.style.fontSize = fontSize;
+        
+        // Ограничиваем ширину текста
+        textObject.style.wordWrap = true;
+        textObject.style.wordWrapWidth = size.width - 10; // Небольшой отступ
+    }
+
+    /**
      * Поиск объекта в указанной позиции
      */
     hitTest(x, y) {

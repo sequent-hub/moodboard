@@ -1,4 +1,6 @@
 import { BaseTool } from '../BaseTool.js';
+import { ResizeHandles } from '../ResizeHandles.js';
+import * as PIXI from 'pixi.js';
 
 /**
  * Инструмент выделения и работы с объектами
@@ -22,7 +24,16 @@ export class SelectTool extends BaseTool {
         // Состояние изменения размера
         this.isResizing = false;
         this.resizeHandle = null;
-        this.originalBounds = null;
+        this.resizeStartBounds = null;
+        this.resizeStartMousePos = null;
+        this.resizeStartPosition = null;
+        
+        // Система ручек изменения размера
+        this.resizeHandles = null;
+        
+        // Текущие координаты мыши
+        this.currentX = 0;
+        this.currentY = 0;
         
         // Состояние поворота
         this.isRotating = false;
@@ -32,6 +43,37 @@ export class SelectTool extends BaseTool {
         // Состояние рамки выделения
         this.isBoxSelect = false;
         this.selectionBox = null;
+    }
+    
+    /**
+     * Активация инструмента
+     */
+    activate(app) {
+        super.activate();
+        console.log('🔧 SelectTool активирован, app:', !!app);
+        
+        // Инициализируем систему ручек изменения размера
+        if (!this.resizeHandles && app) {
+            console.log('✅ Создаем ResizeHandles');
+            this.resizeHandles = new ResizeHandles(app);
+        } else if (!app) {
+            console.log('❌ PIXI app не передан в activate');
+        } else {
+            console.log('ℹ️ ResizeHandles уже созданы');
+        }
+    }
+    
+    /**
+     * Деактивация инструмента
+     */
+    deactivate() {
+        super.deactivate();
+        
+        // Очищаем выделение и ручки
+        this.clearSelection();
+        if (this.resizeHandles) {
+            this.resizeHandles.hideHandles();
+        }
     }
     
     /**
@@ -50,6 +92,7 @@ export class SelectTool extends BaseTool {
         } else if (hitResult.type === 'rotate-handle') {
             this.startRotate(hitResult.object);
         } else if (hitResult.type === 'object') {
+            console.log(`🎯 Клик по объекту: ${hitResult.object}`);
             this.handleObjectSelect(hitResult.object, event);
         } else {
             // Клик по пустому месту - начинаем рамку выделения
@@ -62,6 +105,10 @@ export class SelectTool extends BaseTool {
      */
     onMouseMove(event) {
         super.onMouseMove(event);
+        
+        // Обновляем текущие координаты мыши
+        this.currentX = event.x;
+        this.currentY = event.y;
         
         if (this.isResizing) {
             this.updateResize(event);
@@ -132,15 +179,64 @@ export class SelectTool extends BaseTool {
      * Тестирование попадания курсора
      */
     hitTest(x, y) {
+        // Сначала проверяем ручки изменения размера (они имеют приоритет)
+        if (this.resizeHandles) {
+            const pixiObjectAtPoint = this.getPixiObjectAt(x, y);
+            
+            const handleInfo = this.resizeHandles.getHandleInfo(pixiObjectAtPoint);
+            if (handleInfo) {
+                console.log(`✅ Найдена ручка:`, handleInfo.type);
+                return {
+                    type: 'resize-handle',
+                    handle: handleInfo.type,
+                    object: handleInfo.targetObjectId,
+                    pixiObject: handleInfo.handle
+                };
+            }
+        }
+        
         // Получаем объекты из системы через событие
         const hitTestData = { x, y, result: null };
         this.emit('hit:test', hitTestData);
         
-        if (hitTestData.result) {
+        if (hitTestData.result && hitTestData.result.object) {
             return hitTestData.result;
         }
         
         return { type: 'empty' };
+    }
+    
+    /**
+     * Получить PIXI объект по координатам (для внутреннего использования)
+     */
+    getPixiObjectAt(x, y) {
+        if (!this.resizeHandles || !this.resizeHandles.app) return null;
+        
+        const point = new PIXI.Point(x, y);
+        
+        // Сначала ищем в контейнере ручек (приоритет)
+        if (this.resizeHandles.container.visible) {
+            for (let i = this.resizeHandles.container.children.length - 1; i >= 0; i--) {
+                const child = this.resizeHandles.container.children[i];
+                if (child.containsPoint && child.containsPoint(point)) {
+                    console.log(`🎯 Найдена ручка: ${child.name}`);
+                    return child;
+                }
+            }
+        }
+        
+        // Затем ищем в основной сцене
+        const stage = this.resizeHandles.app.stage;
+        for (let i = stage.children.length - 1; i >= 0; i--) {
+            const child = stage.children[i];
+            if (child !== this.resizeHandles.container && child.containsPoint && child.containsPoint(point)) {
+                console.log(`🎯 Найден объект сцены: ${child.constructor.name}`);
+                return child;
+            }
+        }
+        
+        console.log(`❌ Ничего не найдено под (${x}, ${y})`);
+        return null;
     }
     
     /**
@@ -196,13 +292,15 @@ export class SelectTool extends BaseTool {
         const newX = event.x - this.dragOffset.x;
         const newY = event.y - this.dragOffset.y;
         
-        // TODO: Применить к объекту новые координаты
-        // this.dragTarget.setPosition(newX, newY);
-        
         this.emit('drag:update', { 
             object: this.dragTarget, 
             position: { x: newX, y: newY } 
         });
+        
+        // Обновляем ручки во время перетаскивания
+        if (this.resizeHandles && this.selectedObjects.has(this.dragTarget)) {
+            this.resizeHandles.updateHandles();
+        }
     }
     
     /**
@@ -221,23 +319,81 @@ export class SelectTool extends BaseTool {
     /**
      * Начало изменения размера
      */
-    startResize(handle, object) {
+    startResize(handle, objectId) {
+        console.log(`🔧 Начинаем resize: ручка ${handle}, объект ${objectId}`);
+        
         this.isResizing = true;
         this.resizeHandle = handle;
-        // TODO: Сохранить исходные размеры объекта
+        this.dragTarget = objectId; // Используем dragTarget для совместимости
         
-        this.emit('resize:start', { object, handle });
+        // Получаем данные объекта для сохранения начального состояния
+        const sizeData = { objectId, size: null };
+        this.emit('get:object:size', sizeData);
+        
+        // Получаем начальную позицию объекта
+        const positionData = { objectId, position: null };
+        this.emit('get:object:position', positionData);
+        
+        this.resizeStartBounds = sizeData.size || { width: 100, height: 100 };
+        this.resizeStartMousePos = { x: this.currentX, y: this.currentY };
+        this.resizeStartPosition = positionData.position || { x: 0, y: 0 };
+        
+        console.log(`📐 Начальный размер:`, this.resizeStartBounds);
+        console.log(`📍 Начальная позиция мыши:`, this.resizeStartMousePos);
+        console.log(`📍 Начальная позиция объекта:`, this.resizeStartPosition);
+        
+        // Временно скрываем ручки во время resize
+        if (this.resizeHandles) {
+            this.resizeHandles.temporaryHide();
+        }
+        
+        this.emit('resize:start', { object: objectId, handle });
     }
     
     /**
      * Обновление изменения размера
      */
     updateResize(event) {
-        // TODO: Вычислить новые размеры на основе handle и позиции мыши
+        if (!this.isResizing || !this.resizeStartBounds || !this.resizeStartMousePos) return;
+        
+        // Вычисляем изменение позиции мыши
+        const deltaX = event.x - this.resizeStartMousePos.x;
+        const deltaY = event.y - this.resizeStartMousePos.y;
+        
+        // Проверяем, зажат ли Shift для пропорционального изменения размера
+        const maintainAspectRatio = event.originalEvent.shiftKey;
+        
+        // Вычисляем новые размеры в зависимости от типа ручки
+        const newSize = this.calculateNewSize(
+            this.resizeHandle, 
+            this.resizeStartBounds, 
+            deltaX, 
+            deltaY, 
+            maintainAspectRatio
+        );
+        
+        // Ограничиваем минимальный размер
+        newSize.width = Math.max(20, newSize.width);
+        newSize.height = Math.max(20, newSize.height);
+        
+        // Вычисляем новую абсолютную позицию для левых/верхних ручек
+        const positionOffset = this.calculatePositionOffset(
+            this.resizeHandle, 
+            this.resizeStartBounds, 
+            newSize
+        );
+        
+        // Вычисляем абсолютную позицию относительно начальной позиции
+        const newPosition = {
+            x: this.resizeStartPosition.x + positionOffset.x,
+            y: this.resizeStartPosition.y + positionOffset.y
+        };
+        
         this.emit('resize:update', { 
             object: this.dragTarget,
             handle: this.resizeHandle,
-            position: { x: event.x, y: event.y }
+            size: newSize,
+            position: newPosition
         });
     }
     
@@ -245,9 +401,28 @@ export class SelectTool extends BaseTool {
      * Завершение изменения размера
      */
     endResize() {
-        this.emit('resize:end', { object: this.dragTarget });
+        if (this.dragTarget && this.resizeStartBounds) {
+            // Получаем финальный размер
+            const finalSizeData = { objectId: this.dragTarget, size: null };
+            this.emit('get:object:size', finalSizeData);
+            
+            this.emit('resize:end', { 
+                object: this.dragTarget,
+                oldSize: this.resizeStartBounds,
+                newSize: finalSizeData.size || this.resizeStartBounds
+            });
+        }
+        
+        // Показываем ручки снова
+        if (this.resizeHandles) {
+            this.resizeHandles.temporaryShow();
+            this.resizeHandles.updateHandles(); // Обновляем позицию ручек
+        }
+        
         this.isResizing = false;
         this.resizeHandle = null;
+        this.resizeStartBounds = null;
+        this.resizeStartMousePos = null;
     }
     
     /**
@@ -364,19 +539,23 @@ export class SelectTool extends BaseTool {
      */
     
         addToSelection(object) {
+        console.log(`➕ Добавляем в выделение: ${object}`);
         this.selectedObjects.add(object);
         this.emit('selection:add', { object });
+        this.updateResizeHandles();
     }
 
     removeFromSelection(object) {
         this.selectedObjects.delete(object);
         this.emit('selection:remove', { object });
+        this.updateResizeHandles();
     }
 
     clearSelection() {
         const objects = Array.from(this.selectedObjects);
         this.selectedObjects.clear();
         this.emit('selection:clear', { objects });
+        this.updateResizeHandles();
     }
     
     selectAll() {
@@ -403,5 +582,143 @@ export class SelectTool extends BaseTool {
     
     hasSelection() {
         return this.selectedObjects.size > 0;
+    }
+    
+    /**
+     * Обновление ручек изменения размера
+     */
+    updateResizeHandles() {
+        if (!this.resizeHandles) {
+            console.log('❌ ResizeHandles не инициализированы');
+            return;
+        }
+        
+        console.log(`🔧 updateResizeHandles: выделено объектов ${this.selectedObjects.size}`);
+        
+        // Показываем ручки только для одного выделенного объекта
+        if (this.selectedObjects.size === 1) {
+            const objectId = Array.from(this.selectedObjects)[0];
+            const pixiObjectData = { objectId, pixiObject: null };
+            
+            console.log(`🎯 Получаем PIXI объект для ${objectId}`);
+            
+            // Получаем PIXI объект
+            this.emit('get:object:pixi', pixiObjectData);
+            
+            if (pixiObjectData.pixiObject) {
+                console.log(`✅ PIXI объект найден, показываем ручки`);
+                this.resizeHandles.showHandles(pixiObjectData.pixiObject, objectId);
+            } else {
+                console.log(`❌ PIXI объект не найден для ${objectId}`);
+            }
+        } else {
+            console.log('🔇 Скрываем ручки (нет выделения или несколько объектов)');
+            this.resizeHandles.hideHandles();
+        }
+    }
+    
+    /**
+     * Вычисляет новые размеры объекта на основе типа ручки и смещения мыши
+     */
+    calculateNewSize(handleType, startBounds, deltaX, deltaY, maintainAspectRatio) {
+        let newWidth = startBounds.width;
+        let newHeight = startBounds.height;
+        
+        console.log(`📐 calculateNewSize: ручка ${handleType}, delta(${deltaX}, ${deltaY}), начальный размер(${startBounds.width}, ${startBounds.height})`);
+        
+        // Вычисляем изменения в зависимости от типа ручки
+        switch (handleType) {
+            case 'nw': // Северо-запад - левый верхний угол
+                newWidth = startBounds.width - deltaX;  // влево = меньше ширина
+                newHeight = startBounds.height - deltaY; // вверх = меньше высота
+                break;
+            case 'n': // Север - верхняя сторона
+                newHeight = startBounds.height - deltaY; // вверх = меньше высота
+                break;
+            case 'ne': // Северо-восток - правый верхний угол
+                newWidth = startBounds.width + deltaX;   // вправо = больше ширина
+                newHeight = startBounds.height - deltaY; // вверх = меньше высота
+                break;
+            case 'e': // Восток - правая сторона
+                newWidth = startBounds.width + deltaX;   // вправо = больше ширина
+                break;
+            case 'se': // Юго-восток - правый нижний угол
+                newWidth = startBounds.width + deltaX;   // вправо = больше ширина
+                newHeight = startBounds.height + deltaY; // вниз = больше высота
+                break;
+            case 's': // Юг - нижняя сторона
+                newHeight = startBounds.height + deltaY; // вниз = больше высота
+                break;
+            case 'sw': // Юго-запад - левый нижний угол
+                newWidth = startBounds.width - deltaX;   // влево = меньше ширина
+                newHeight = startBounds.height + deltaY; // вниз = больше высота
+                break;
+            case 'w': // Запад - левая сторона
+                newWidth = startBounds.width - deltaX;   // влево = меньше ширина
+                break;
+        }
+        
+        console.log(`📊 Новый размер: (${newWidth}, ${newHeight})`);
+        
+        // Проблема: при изменении размера через левые/верхние ручки нужно также сдвигать позицию объекта!
+        // Но для простоты пока исправим только логику размера
+        
+        // Поддержка пропорционального изменения размера (Shift)
+        if (maintainAspectRatio) {
+            const aspectRatio = startBounds.width / startBounds.height;
+            
+            // Определяем, какую сторону использовать как основную
+            if (['nw', 'ne', 'sw', 'se'].includes(handleType)) {
+                // Угловые ручки - используем большее изменение
+                const widthChange = Math.abs(newWidth - startBounds.width);
+                const heightChange = Math.abs(newHeight - startBounds.height);
+                
+                if (widthChange > heightChange) {
+                    newHeight = newWidth / aspectRatio;
+                } else {
+                    newWidth = newHeight * aspectRatio;
+                }
+            } else if (['e', 'w'].includes(handleType)) {
+                // Горизонтальные ручки
+                newHeight = newWidth / aspectRatio;
+            } else if (['n', 's'].includes(handleType)) {
+                // Вертикальные ручки
+                newWidth = newHeight * aspectRatio;
+            }
+        }
+        
+        return {
+            width: Math.round(newWidth),
+            height: Math.round(newHeight)
+        };
+    }
+    
+    /**
+     * Вычисляет смещение позиции при изменении размера через левые/верхние ручки
+     */
+    calculatePositionOffset(handleType, startBounds, newSize) {
+        let offsetX = 0;
+        let offsetY = 0;
+        
+        // При изменении размера через левые ручки объект должен сдвинуться 
+        // так, чтобы правый край остался на месте
+        if (['nw', 'w', 'sw'].includes(handleType)) {
+            // Если размер уменьшился, объект сдвигается вправо
+            // Если размер увеличился, объект сдвигается влево
+            offsetX = -(newSize.width - startBounds.width);
+        }
+        
+        // При изменении размера через верхние ручки объект должен сдвинуться
+        // так, чтобы нижний край остался на месте  
+        if (['nw', 'n', 'ne'].includes(handleType)) {
+            // Если размер уменьшился, объект сдвигается вниз
+            // Если размер увеличился, объект сдвигается вверх
+            offsetY = -(newSize.height - startBounds.height);
+        }
+        
+        console.log(`📍 Position offset для ручки ${handleType}: (${offsetX}, ${offsetY})`);
+        console.log(`📊 Размер изменился с (${startBounds.width}, ${startBounds.height}) на (${newSize.width}, ${newSize.height})`);
+        
+        return { x: offsetX, y: offsetY };
     }
 }

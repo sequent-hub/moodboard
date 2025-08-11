@@ -157,7 +157,7 @@ export class BaseTool {
      */
     emit(eventName, data) {
         // Для событий, которые ожидают изменения data по ссылке, передаем data напрямую
-        if (eventName === 'hit:test' || eventName === 'get:object:position') {
+        if (eventName === 'hit:test' || eventName === 'get:object:position' || eventName === 'get:object:pixi' || eventName === 'get:object:size') {
             this.eventBus.emit(`tool:${eventName}`, data);
         } else {
             // Для остальных событий создаем новый объект с полем tool
