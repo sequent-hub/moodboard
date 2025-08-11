@@ -47,7 +47,7 @@ export class SaveManager {
         
         // Отслеживаем изменения объектов
         this.eventBus.on('object:updated', (data) => {
-            console.log('🔄 Объект обновлен:', data.objectId, 'новая позиция:', data.position);
+
             this.markAsChanged();
         });
         
@@ -58,7 +58,7 @@ export class SaveManager {
         
         // Отслеживаем прямые изменения состояния (для Undo/Redo)
         this.eventBus.on('state:changed', (data) => {
-            console.log('🔄 Состояние изменилось:', data.reason);
+
             this.markAsChanged();
         });
         
@@ -184,12 +184,7 @@ export class SaveManager {
             boardData: data
         };
 
-        console.log('🚀 Отправка данных на сервер:', {
-            endpoint: this.options.saveEndpoint,
-            boardId: requestBody.boardId,
-            dataSize: JSON.stringify(requestBody).length,
-            objectsCount: requestBody.boardData?.objects?.length || 0
-        });
+
 
         const response = await fetch(this.options.saveEndpoint, {
             method: 'POST',
@@ -243,7 +238,7 @@ export class SaveManager {
         
         // Повторная попытка сохранения
         if (this.retryCount < this.options.maxRetries) {
-            console.log(`Повторная попытка сохранения через ${this.options.retryDelay}мс (попытка ${this.retryCount + 1}/${this.options.maxRetries})`);
+
             
             setTimeout(() => {
                 this.saveImmediately(data);

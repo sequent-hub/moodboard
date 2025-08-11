@@ -18,13 +18,13 @@ export class MoveObjectCommand extends BaseCommand {
     execute() {
         // Устанавливаем новую позицию
         this._setPosition(this.newPosition);
-        console.log(`✅ Объект ${this.objectId} перемещен в (${this.newPosition.x}, ${this.newPosition.y})`);
+
     }
 
     undo() {
         // Возвращаем старую позицию
         this._setPosition(this.oldPosition);
-        console.log(`↶ Объект ${this.objectId} возвращен в (${this.oldPosition.x}, ${this.oldPosition.y})`);
+
     }
 
     _setPosition(position) {
@@ -65,6 +65,6 @@ export class MoveObjectCommand extends BaseCommand {
         this.description = `Переместить объект (${Math.round(this.oldPosition.x)}, ${Math.round(this.oldPosition.y)}) → (${Math.round(this.newPosition.x)}, ${Math.round(this.newPosition.y)})`;
         this.timestamp = otherCommand.timestamp; // Обновляем время последнего изменения
         
-        console.log(`🔗 Объединены команды перемещения для ${this.objectId}`);
+
     }
 }

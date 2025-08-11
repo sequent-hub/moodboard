@@ -16,13 +16,13 @@ export class CreateObjectCommand extends BaseCommand {
             // При redo - восстанавливаем объект
             this.coreMoodboard.state.addObject(this.objectData);
             this.coreMoodboard.pixi.createObject(this.objectData);
-            console.log('↷ Восстановлен объект:', this.objectData.id);
+
         } else {
             // При первом выполнении - создаем новый объект
             this.coreMoodboard.state.addObject(this.objectData);
             this.coreMoodboard.pixi.createObject(this.objectData);
             this.wasExecuted = true;
-            console.log('✅ Создан объект:', this.objectData.id);
+
         }
         
         this.coreMoodboard.eventBus.emit('object:created', { 
@@ -36,7 +36,7 @@ export class CreateObjectCommand extends BaseCommand {
         this.coreMoodboard.state.removeObject(this.objectData.id);
         this.coreMoodboard.pixi.removeObject(this.objectData.id);
         
-        console.log('↶ Удален объект:', this.objectData.id);
+
         
         this.coreMoodboard.eventBus.emit('object:deleted', { 
             objectId: this.objectData.id 

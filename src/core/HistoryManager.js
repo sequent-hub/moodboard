@@ -46,7 +46,7 @@ export class HistoryManager {
             return;
         }
 
-        console.log('📝 Выполняем команду:', command.toString());
+
 
         // Проверяем, можно ли объединить с последней командой
         const lastCommand = this.getLastCommand();
@@ -54,7 +54,7 @@ export class HistoryManager {
             lastCommand.canMergeWith(command) && 
             (command.timestamp - lastCommand.timestamp) < this.options.mergeTimeout) {
             
-            console.log('🔗 Объединяем команды:', lastCommand.type, '+', command.type);
+
             lastCommand.mergeWith(command);
             this.eventBus.emit('history:changed', {
                 canUndo: this.canUndo(),
@@ -90,7 +90,7 @@ export class HistoryManager {
             currentCommand: command.toString()
         });
 
-        console.log(`📚 История: ${this.currentIndex + 1}/${this.history.length} команд`);
+
     }
 
     /**
@@ -98,12 +98,12 @@ export class HistoryManager {
      */
     undo() {
         if (!this.canUndo()) {
-            console.log('❌ Нечего отменять');
+
             return false;
         }
 
         const command = this.history[this.currentIndex];
-        console.log('↶ Отменяем команду:', command.toString());
+
 
         this.isExecutingCommand = true;
         try {
@@ -117,7 +117,7 @@ export class HistoryManager {
                 lastUndone: command.toString()
             });
 
-            console.log(`📚 История после undo: ${this.currentIndex + 1}/${this.history.length} команд`);
+
             return true;
         } catch (error) {
             console.error('❌ Ошибка при отмене команды:', error);
@@ -132,13 +132,13 @@ export class HistoryManager {
      */
     redo() {
         if (!this.canRedo()) {
-            console.log('❌ Нечего повторять');
+
             return false;
         }
 
         this.currentIndex++;
         const command = this.history[this.currentIndex];
-        console.log('↷ Повторяем команду:', command.toString());
+
 
         this.isExecutingCommand = true;
         try {
@@ -151,7 +151,7 @@ export class HistoryManager {
                 lastRedone: command.toString()
             });
 
-            console.log(`📚 История после redo: ${this.currentIndex + 1}/${this.history.length} команд`);
+
             return true;
         } catch (error) {
             console.error('❌ Ошибка при повторе команды:', error);
@@ -197,7 +197,7 @@ export class HistoryManager {
             historySize: 0
         });
 
-        console.log('🗑️ История команд очищена');
+
     }
 
     /**
@@ -221,10 +221,13 @@ export class HistoryManager {
      * Вывести историю в консоль (для отладки)
      */
     debugHistory() {
-        console.log('📚 История команд:');
-        console.table(this.getHistoryInfo().commands);
-        console.log(`Текущая позиция: ${this.currentIndex + 1}/${this.history.length}`);
-        console.log(`Можно отменить: ${this.canUndo()}, Можно повторить: ${this.canRedo()}`);
+        // Отладочная информация об истории команд
+        const info = this.getHistoryInfo();
+        console.group('📚 История команд');
+        console.table(info.commands);
+        console.log(`Позиция: ${this.currentIndex + 1}/${this.history.length}`);
+        console.log(`Undo: ${this.canUndo()}, Redo: ${this.canRedo()}`);
+        console.groupEnd();
     }
 
     /**

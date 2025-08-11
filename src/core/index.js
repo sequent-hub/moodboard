@@ -57,7 +57,7 @@ export class CoreMoodBoard {
                 viewport: { x: 0, y: 0, zoom: 1 }
             });
 
-            console.log('MoodBoard initialized');
+
         } catch (error) {
             console.error('MoodBoard init failed:', error);
         }
@@ -86,7 +86,7 @@ export class CoreMoodBoard {
         this.setupSaveEvents();
         this.setupHistoryEvents();
         
-        console.log('Tools system initialized');
+
     }
 
     /**
@@ -95,16 +95,16 @@ export class CoreMoodBoard {
     setupToolEvents() {
         // События выделения
         this.eventBus.on('tool:selection:add', (data) => {
-            console.log('Object selected:', data.object);
+
         });
 
         this.eventBus.on('tool:selection:clear', (data) => {
-            console.log('Selection cleared');
+
         });
 
         // События перетаскивания
         this.eventBus.on('tool:drag:start', (data) => {
-            console.log('Drag started:', data.object);
+
             // Сохраняем начальную позицию для команды
             const pixiObject = this.pixi.objects.get(data.object);
             if (pixiObject) {
@@ -118,7 +118,7 @@ export class CoreMoodBoard {
         });
 
         this.eventBus.on('tool:drag:end', (data) => {
-            console.log('Drag ended:', data.object);
+
             // В конце создаем одну команду перемещения
             if (this.dragStartPosition) {
                 const pixiObject = this.pixi.objects.get(data.object);
@@ -223,11 +223,11 @@ export class CoreMoodBoard {
 
         // TODO: Реализовать копирование/вставку
         this.eventBus.on('keyboard:copy', () => {
-            console.log('Copy: будет реализовано позже');
+            // TODO: Реализовать копирование
         });
 
         this.eventBus.on('keyboard:paste', () => {
-            console.log('Paste: будет реализовано позже');
+            // TODO: Реализовать вставку
         });
 
         // Undo/Redo теперь обрабатывается в HistoryManager
@@ -245,7 +245,7 @@ export class CoreMoodBoard {
         // Обработка статуса сохранения
         this.eventBus.on('save:status-changed', (data) => {
             // Можно добавить UI индикатор статуса сохранения
-            console.log(`Save status: ${data.status}`, data.message);
+
         });
 
         // Обработка ошибок сохранения
@@ -256,7 +256,7 @@ export class CoreMoodBoard {
 
         // Обработка успешного сохранения
         this.eventBus.on('save:success', (data) => {
-            console.log('Data saved successfully at:', data.timestamp);
+
         });
     }
 
@@ -266,7 +266,7 @@ export class CoreMoodBoard {
     setupHistoryEvents() {
         // Следим за изменениями истории для обновления UI
         this.eventBus.on('history:changed', (data) => {
-            console.log(`📚 История изменена: можно отменить: ${data.canUndo}, можно повторить: ${data.canRedo}`);
+
             
             // Можно здесь обновить состояние кнопок Undo/Redo в UI
             this.eventBus.emit('ui:update-history-buttons', {

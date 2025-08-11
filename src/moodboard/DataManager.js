@@ -12,23 +12,20 @@ export class DataManager {
     loadData(data) {
         if (!data) return;
         
-        console.log('📥 DataManager загружает данные:', {
-            objects: data.objects?.length || 0,
-            viewport: !!data.viewport
-        });
+
         
         // Очищаем доску перед загрузкой
         this.clearBoard();
         
         // Загружаем объекты
         if (data.objects && Array.isArray(data.objects)) {
-            console.log('📦 Загружаем объекты:', data.objects.length);
+
             
             data.objects.forEach((objectData, index) => {
                 try {
                     // Используем полные данные объекта, включая ID
                     const createdObject = this.coreMoodboard.createObjectFromData(objectData);
-                    console.log(`✅ Объект ${index + 1}/${data.objects.length} загружен:`, objectData.type, objectData.id);
+
                 } catch (error) {
                     console.error(`❌ Ошибка загрузки объекта ${index + 1}:`, error, objectData);
                 }
@@ -40,7 +37,7 @@ export class DataManager {
             this.loadViewport(data.viewport);
         }
         
-        console.log('✅ DataManager завершил загрузку данных');
+
     }
     
     /**
@@ -48,7 +45,7 @@ export class DataManager {
      */
     loadViewport(viewport) {
         // TODO: Реализовать установку viewport
-        console.log('Loading viewport:', viewport);
+
         
         // Здесь будет код для установки позиции и зума canvas
         // this.coreMoodboard.setViewport(viewport.x, viewport.y, viewport.zoom);
@@ -79,7 +76,7 @@ export class DataManager {
         const objects = this.coreMoodboard.objects || [];
         objects.forEach(obj => this.coreMoodboard.deleteObject(obj.id));
         
-        console.log('Board cleared');
+
         return objects.length;
     }
     

@@ -26,7 +26,7 @@ export class DeleteObjectCommand extends BaseCommand {
         this.coreMoodboard.state.removeObject(this.objectId);
         this.coreMoodboard.pixi.removeObject(this.objectId);
         
-        console.log('✅ Удален объект:', this.objectId);
+
         
         this.coreMoodboard.eventBus.emit('object:deleted', { 
             objectId: this.objectId 
@@ -38,7 +38,7 @@ export class DeleteObjectCommand extends BaseCommand {
         this.coreMoodboard.state.addObject(this.objectData);
         this.coreMoodboard.pixi.createObject(this.objectData);
         
-        console.log('↶ Восстановлен объект:', this.objectId);
+
         
         this.coreMoodboard.eventBus.emit('object:created', { 
             objectId: this.objectId, 

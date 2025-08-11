@@ -18,10 +18,8 @@ export class PixiEngine {
 
         this.container.appendChild(this.app.view);
 
-        console.log('PIXI Engine initialized');
-        console.log('PIXI App dimensions:', this.app.view.width, 'x', this.app.view.height);
-        console.log('PIXI App stage:', this.app.stage);
-        console.log('Container:', this.container);
+
+
     }
 
     createObject(objectData) {
@@ -52,17 +50,13 @@ export class PixiEngine {
             // Убеждаемся, что объект может участвовать в hit testing
             if (pixiObject.beginFill) {
                 // Для Graphics объектов убеждаемся, что у них есть fill
-                console.log('Graphics object created');
+    
             }
 
             this.app.stage.addChild(pixiObject);
             this.objects.set(objectData.id, pixiObject);
 
-            console.log('Created object:', objectData.type);
-            console.log('Object position:', pixiObject.x, pixiObject.y);
-            console.log('Object dimensions:', pixiObject.width, pixiObject.height);
-            console.log('Stage children count:', this.app.stage.children.length);
-            console.log('PIXI object:', pixiObject);
+
         }
     }
 

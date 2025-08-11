@@ -433,7 +433,7 @@ export class KeyboardManager {
             });
         }, { description: 'Переместить вправо', preventDefault: true });
 
-        console.log('⌨️ Зарегистрированы стандартные горячие клавиши');
+
     }
 
     /**
