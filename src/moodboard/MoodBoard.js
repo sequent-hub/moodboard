@@ -1,5 +1,6 @@
 import { CoreMoodBoard } from '../core/index.js';
 import { Toolbar } from '../ui/Toolbar.js';
+import { SaveStatus } from '../ui/SaveStatus.js';
 import { WorkspaceManager } from './WorkspaceManager.js';
 import { DataManager } from './DataManager.js';
 import { ActionHandler } from './ActionHandler.js';
@@ -29,6 +30,7 @@ export class MoodBoard {
         // Основные компоненты
         this.coreMoodboard = null;
         this.toolbar = null;
+        this.saveStatus = null;
         
         // Менеджеры
         this.workspaceManager = new WorkspaceManager(this.container, this.options);
@@ -77,10 +79,12 @@ export class MoodBoard {
         
         const moodboardOptions = {
             boardId: this.options.boardId || 'workspace-board',
-            autoSave: this.options.autoSave || false,
             width: canvasSize.width,
             height: canvasSize.height,
-            backgroundColor: this.options.theme === 'dark' ? 0x2a2a2a : 0xF5F5F5
+            backgroundColor: this.options.theme === 'dark' ? 0x2a2a2a : 0xF5F5F5,
+            // Передаем только настройки эндпоинтов для автосохранения
+            saveEndpoint: this.options.saveEndpoint,
+            loadEndpoint: this.options.loadEndpoint
         };
         
         this.coreMoodboard = new CoreMoodBoard(this.canvasContainer, moodboardOptions);
@@ -95,6 +99,12 @@ export class MoodBoard {
             this.toolbarContainer, 
             this.coreMoodboard.eventBus,
             this.options.theme
+        );
+        
+        // Инициализируем индикатор сохранения (с фиксированными настройками)
+        this.saveStatus = new SaveStatus(
+            this.canvasContainer,
+            this.coreMoodboard.eventBus
         );
         
         // Подписываемся на события тулбара
@@ -173,6 +183,10 @@ export class MoodBoard {
     destroy() {
         if (this.toolbar) {
             this.toolbar.destroy();
+        }
+        
+        if (this.saveStatus) {
+            this.saveStatus.destroy();
         }
         
         if (this.coreMoodboard) {

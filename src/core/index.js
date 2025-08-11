@@ -2,6 +2,7 @@ import { PixiEngine } from './PixiEngine.js';
 import { StateManager } from './StateManager.js';
 import { EventBus } from './EventBus.js';
 import { KeyboardManager } from './KeyboardManager.js';
+import { SaveManager } from './SaveManager.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
 
@@ -28,6 +29,7 @@ export class CoreMoodBoard {
         this.state = new StateManager(this.eventBus);
         this.pixi = new PixiEngine(this.container, this.eventBus, this.options);
         this.keyboard = new KeyboardManager(this.eventBus);
+        this.saveManager = new SaveManager(this.eventBus, this.options);
         this.toolManager = null; // Инициализируется в init()
 
         // Убираем автоматический вызов init() - будет вызываться вручную
@@ -75,6 +77,7 @@ export class CoreMoodBoard {
         // Подписываемся на события инструментов
         this.setupToolEvents();
         this.setupKeyboardEvents();
+        this.setupSaveEvents();
         
         console.log('Tools system initialized');
     }
@@ -205,6 +208,33 @@ export class CoreMoodBoard {
     }
 
     /**
+     * Настройка обработчиков событий сохранения
+     */
+    setupSaveEvents() {
+        // Предоставляем данные для сохранения
+        this.eventBus.on('save:get-board-data', (requestData) => {
+            requestData.data = this.getBoardData();
+        });
+
+        // Обработка статуса сохранения
+        this.eventBus.on('save:status-changed', (data) => {
+            // Можно добавить UI индикатор статуса сохранения
+            console.log(`Save status: ${data.status}`, data.message);
+        });
+
+        // Обработка ошибок сохранения
+        this.eventBus.on('save:error', (data) => {
+            console.error('Save error:', data.error);
+            // Можно показать уведомление пользователю
+        });
+
+        // Обработка успешного сохранения
+        this.eventBus.on('save:success', (data) => {
+            console.log('Data saved successfully at:', data.timestamp);
+        });
+    }
+
+    /**
      * Обновление позиции объекта в PIXI
      */
     updateObjectPosition(objectId, position) {
@@ -229,12 +259,18 @@ export class CoreMoodBoard {
         this.state.addObject(objectData);
         this.pixi.createObject(objectData);
 
+        // Уведомляем о создании объекта для автосохранения
+        this.eventBus.emit('object:created', { objectId: objectData.id, objectData });
+
         return objectData;
     }
 
     deleteObject(objectId) {
         this.state.removeObject(objectId);
         this.pixi.removeObject(objectId);
+
+        // Уведомляем об удалении объекта для автосохранения
+        this.eventBus.emit('object:deleted', { objectId });
     }
 
     get objects() {
@@ -245,7 +281,15 @@ export class CoreMoodBoard {
         return this.state.serialize();
     }
 
+    /**
+     * Получение данных доски для сохранения
+     */
+    getBoardData() {
+        return this.state.serialize();
+    }
+
     destroy() {
+        this.saveManager.destroy();
         this.keyboard.destroy();
         this.pixi.destroy();
         this.eventBus.removeAllListeners();
