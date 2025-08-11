@@ -33,7 +33,8 @@ export class StateManager {
 
     serialize() {
         return {
-            board: { ...this.state.board, objects: this.state.objects }
+            ...this.state.board, 
+            objects: this.state.objects
         };
     }
 
