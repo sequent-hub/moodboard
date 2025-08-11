@@ -56,10 +56,13 @@ export class SaveManager {
             this.markAsChanged();
         });
         
-        // Отслеживаем перемещения объектов
-        this.eventBus.on('tool:drag:end', () => {
+        // Отслеживаем прямые изменения состояния (для Undo/Redo)
+        this.eventBus.on('state:changed', (data) => {
+            console.log('🔄 Состояние изменилось:', data.reason);
             this.markAsChanged();
         });
+        
+        // Отслеживание перемещений теперь происходит через команды и state:changed
         
         // Сохранение при закрытии страницы
         window.addEventListener('beforeunload', (e) => {

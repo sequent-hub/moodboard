@@ -49,6 +49,13 @@ export class StateManager {
 
     markDirty() {
         this.state.isDirty = true;
+        
+        // Уведомляем SaveManager о том, что состояние изменилось
+        // Это нужно для Undo/Redo операций
+        this.eventBus.emit('state:changed', {
+            reason: 'state_marked_dirty',
+            timestamp: Date.now()
+        });
     }
 
     isDirty() {

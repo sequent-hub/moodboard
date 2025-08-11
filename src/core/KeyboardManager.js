@@ -311,6 +311,96 @@ export class KeyboardManager {
     }
     
     /**
+     * Регистрация стандартных горячих клавиш
+     */
+    registerDefaultShortcuts() {
+        // Undo/Redo
+        this.registerShortcut('ctrl+z', () => {
+            this.eventBus.emit('keyboard:undo');
+        }, { description: 'Отменить действие', preventDefault: true });
+        
+        this.registerShortcut('ctrl+shift+z', () => {
+            this.eventBus.emit('keyboard:redo');
+        }, { description: 'Повторить действие', preventDefault: true });
+        
+        this.registerShortcut('ctrl+y', () => {
+            this.eventBus.emit('keyboard:redo');
+        }, { description: 'Повторить действие (альтернативный)', preventDefault: true });
+        
+        // Выделение
+        this.registerShortcut('ctrl+a', () => {
+            this.eventBus.emit('keyboard:select-all');
+        }, { description: 'Выделить все', preventDefault: true });
+        
+        // Копирование/Вставка
+        this.registerShortcut('ctrl+c', () => {
+            this.eventBus.emit('keyboard:copy');
+        }, { description: 'Копировать', preventDefault: true });
+        
+        this.registerShortcut('ctrl+v', () => {
+            this.eventBus.emit('keyboard:paste');
+        }, { description: 'Вставить', preventDefault: true });
+        
+        // Удаление
+        this.registerShortcut('delete', () => {
+            this.eventBus.emit('keyboard:delete');
+        }, { description: 'Удалить объект', preventDefault: true });
+        
+        this.registerShortcut('backspace', () => {
+            this.eventBus.emit('keyboard:delete');
+        }, { description: 'Удалить объект', preventDefault: true });
+        
+        // Отмена выделения
+        this.registerShortcut('escape', () => {
+            this.eventBus.emit('keyboard:escape');
+        }, { description: 'Отменить выделение', preventDefault: true });
+        
+        // Инструменты
+        this.registerShortcut('v', () => {
+            this.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+        }, { description: 'Выбрать инструмент выделения' });
+        
+        this.registerShortcut('t', () => {
+            this.eventBus.emit('keyboard:tool-select', { tool: 'text' });
+        }, { description: 'Выбрать инструмент текста' });
+        
+        this.registerShortcut('r', () => {
+            this.eventBus.emit('keyboard:tool-select', { tool: 'frame' });
+        }, { description: 'Выбрать инструмент рамки' });
+        
+        // Перемещение стрелками
+        this.registerShortcut('arrowup', (event) => {
+            this.eventBus.emit('keyboard:move', { 
+                direction: 'up', 
+                step: event.shiftKey ? 10 : 1 
+            });
+        }, { description: 'Переместить вверх', preventDefault: true });
+        
+        this.registerShortcut('arrowdown', (event) => {
+            this.eventBus.emit('keyboard:move', { 
+                direction: 'down', 
+                step: event.shiftKey ? 10 : 1 
+            });
+        }, { description: 'Переместить вниз', preventDefault: true });
+        
+        this.registerShortcut('arrowleft', (event) => {
+            this.eventBus.emit('keyboard:move', { 
+                direction: 'left', 
+                step: event.shiftKey ? 10 : 1 
+            });
+        }, { description: 'Переместить влево', preventDefault: true });
+        
+        this.registerShortcut('arrowright', (event) => {
+            this.eventBus.emit('keyboard:move', { 
+                direction: 'right', 
+                step: event.shiftKey ? 10 : 1 
+            });
+        }, { description: 'Переместить вправо', preventDefault: true });
+
+        console.log('⌨️ Зарегистрированы стандартные горячие клавиши');
+    }
+
+    /**
      * Очистка ресурсов
      */
     destroy() {

@@ -3,8 +3,10 @@ import { StateManager } from './StateManager.js';
 import { EventBus } from './EventBus.js';
 import { KeyboardManager } from './KeyboardManager.js';
 import { SaveManager } from './SaveManager.js';
+import { HistoryManager } from './HistoryManager.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
+import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand } from './commands/index.js';
 
 export class CoreMoodBoard {
     constructor(container, options = {}) {
@@ -30,7 +32,11 @@ export class CoreMoodBoard {
         this.pixi = new PixiEngine(this.container, this.eventBus, this.options);
         this.keyboard = new KeyboardManager(this.eventBus);
         this.saveManager = new SaveManager(this.eventBus, this.options);
+        this.history = new HistoryManager(this.eventBus);
         this.toolManager = null; // Инициализируется в init()
+        
+        // Для отслеживания перетаскивания
+        this.dragStartPosition = null;
 
         // Убираем автоматический вызов init() - будет вызываться вручную
     }
@@ -78,6 +84,7 @@ export class CoreMoodBoard {
         this.setupToolEvents();
         this.setupKeyboardEvents();
         this.setupSaveEvents();
+        this.setupHistoryEvents();
         
         console.log('Tools system initialized');
     }
@@ -98,15 +105,41 @@ export class CoreMoodBoard {
         // События перетаскивания
         this.eventBus.on('tool:drag:start', (data) => {
             console.log('Drag started:', data.object);
+            // Сохраняем начальную позицию для команды
+            const pixiObject = this.pixi.objects.get(data.object);
+            if (pixiObject) {
+                this.dragStartPosition = { x: pixiObject.x, y: pixiObject.y };
+            }
         });
 
         this.eventBus.on('tool:drag:update', (data) => {
-            // Обновляем позицию объекта в PIXI
-            this.updateObjectPosition(data.object, data.position);
+            // Во время перетаскивания обновляем позицию напрямую (без команды)
+            this.updateObjectPositionDirect(data.object, data.position);
         });
 
         this.eventBus.on('tool:drag:end', (data) => {
             console.log('Drag ended:', data.object);
+            // В конце создаем одну команду перемещения
+            if (this.dragStartPosition) {
+                const pixiObject = this.pixi.objects.get(data.object);
+                if (pixiObject) {
+                    const finalPosition = { x: pixiObject.x, y: pixiObject.y };
+                    
+                    // Создаем команду только если позиция действительно изменилась
+                    if (this.dragStartPosition.x !== finalPosition.x || 
+                        this.dragStartPosition.y !== finalPosition.y) {
+                        
+                        const command = new MoveObjectCommand(
+                            this, 
+                            data.object, 
+                            this.dragStartPosition, 
+                            finalPosition
+                        );
+                        this.history.executeCommand(command);
+                    }
+                }
+                this.dragStartPosition = null;
+            }
         });
 
         // Hit testing
@@ -197,14 +230,7 @@ export class CoreMoodBoard {
             console.log('Paste: будет реализовано позже');
         });
 
-        // TODO: Реализовать undo/redo
-        this.eventBus.on('keyboard:undo', () => {
-            console.log('Undo: будет реализовано позже');
-        });
-
-        this.eventBus.on('keyboard:redo', () => {
-            console.log('Redo: будет реализовано позже');
-        });
+        // Undo/Redo теперь обрабатывается в HistoryManager
     }
 
     /**
@@ -235,17 +261,55 @@ export class CoreMoodBoard {
     }
 
     /**
+     * Настройка обработчиков событий истории (undo/redo)
+     */
+    setupHistoryEvents() {
+        // Следим за изменениями истории для обновления UI
+        this.eventBus.on('history:changed', (data) => {
+            console.log(`📚 История изменена: можно отменить: ${data.canUndo}, можно повторить: ${data.canRedo}`);
+            
+            // Можно здесь обновить состояние кнопок Undo/Redo в UI
+            this.eventBus.emit('ui:update-history-buttons', {
+                canUndo: data.canUndo,
+                canRedo: data.canRedo
+            });
+        });
+    }
+
+    /**
      * Обновление позиции объекта в PIXI и состоянии
+     * Теперь работает через команды для поддержки Undo/Redo
      */
     updateObjectPosition(objectId, position) {
+        // Получаем старую позицию для команды
+        const pixiObject = this.pixi.objects.get(objectId);
+        if (!pixiObject) return;
+        
+        const oldPosition = { x: pixiObject.x, y: pixiObject.y };
+        
+        // Создаем и выполняем команду перемещения
+        const command = new MoveObjectCommand(this, objectId, oldPosition, position);
+        this.history.executeCommand(command);
+    }
+
+    /**
+     * Прямое обновление позиции объекта (без команды)
+     * Используется во время перетаскивания для плавного движения
+     */
+    updateObjectPositionDirect(objectId, position) {
+        // Обновляем позицию в PIXI
         const pixiObject = this.pixi.objects.get(objectId);
         if (pixiObject) {
-            // Обновляем позицию в PIXI
             pixiObject.x = position.x;
             pixiObject.y = position.y;
-            
-            // Обновляем позицию в состоянии для автосохранения
-            this.state.updateObjectPosition(objectId, position);
+        }
+        
+        // Обновляем позицию в состоянии (без эмита события)
+        const objects = this.state.state.objects;
+        const object = objects.find(obj => obj.id === objectId);
+        if (object) {
+            object.position = { ...position };
+            this.state.markDirty(); // Помечаем для автосохранения
         }
     }
 
@@ -260,11 +324,9 @@ export class CoreMoodBoard {
             created: new Date().toISOString()
         };
 
-        this.state.addObject(objectData);
-        this.pixi.createObject(objectData);
-
-        // Уведомляем о создании объекта для автосохранения
-        this.eventBus.emit('object:created', { objectId: objectData.id, objectData });
+        // Создаем и выполняем команду создания объекта
+        const command = new CreateObjectCommand(this, objectData);
+        this.history.executeCommand(command);
 
         return objectData;
     }
@@ -284,11 +346,9 @@ export class CoreMoodBoard {
     }
 
     deleteObject(objectId) {
-        this.state.removeObject(objectId);
-        this.pixi.removeObject(objectId);
-
-        // Уведомляем об удалении объекта для автосохранения
-        this.eventBus.emit('object:deleted', { objectId });
+        // Создаем и выполняем команду удаления объекта
+        const command = new DeleteObjectCommand(this, objectId);
+        this.history.executeCommand(command);
     }
 
     get objects() {
@@ -309,6 +369,7 @@ export class CoreMoodBoard {
     destroy() {
         this.saveManager.destroy();
         this.keyboard.destroy();
+        this.history.destroy();
         this.pixi.destroy();
         this.eventBus.removeAllListeners();
     }
