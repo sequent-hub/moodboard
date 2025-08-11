@@ -38,7 +38,9 @@ export class SelectTool extends BaseTool {
         // Состояние поворота
         this.isRotating = false;
         this.rotateCenter = null;
-        this.originalAngle = 0;
+        this.rotateStartAngle = 0;
+        this.rotateCurrentAngle = 0;
+        this.rotateStartMouseAngle = 0;
         
         // Состояние рамки выделения
         this.isBoxSelect = false;
@@ -182,12 +184,17 @@ export class SelectTool extends BaseTool {
         // Сначала проверяем ручки изменения размера (они имеют приоритет)
         if (this.resizeHandles) {
             const pixiObjectAtPoint = this.getPixiObjectAt(x, y);
+            console.log(`🔍 getPixiObjectAt(${x}, ${y}) нашел:`, pixiObjectAtPoint ? pixiObjectAtPoint.name || 'unnamed' : 'null');
             
             const handleInfo = this.resizeHandles.getHandleInfo(pixiObjectAtPoint);
             if (handleInfo) {
                 console.log(`✅ Найдена ручка:`, handleInfo.type);
+                
+                // Определяем тип ручки
+                const hitType = handleInfo.type === 'rotate' ? 'rotate-handle' : 'resize-handle';
+                
                 return {
-                    type: 'resize-handle',
+                    type: hitType,
                     handle: handleInfo.type,
                     object: handleInfo.targetObjectId,
                     pixiObject: handleInfo.handle
@@ -218,9 +225,22 @@ export class SelectTool extends BaseTool {
         if (this.resizeHandles.container.visible) {
             for (let i = this.resizeHandles.container.children.length - 1; i >= 0; i--) {
                 const child = this.resizeHandles.container.children[i];
+                
+                // Проверяем обычные объекты
                 if (child.containsPoint && child.containsPoint(point)) {
                     console.log(`🎯 Найдена ручка: ${child.name}`);
                     return child;
+                }
+                
+                // Специальная проверка для контейнеров (ручка вращения)
+                if (child instanceof PIXI.Container && child.children.length > 0) {
+                    // Проверяем границы контейнера
+                    const bounds = child.getBounds();
+                    if (point.x >= bounds.x && point.x <= bounds.x + bounds.width &&
+                        point.y >= bounds.y && point.y <= bounds.y + bounds.height) {
+                        console.log(`🎯 Найден контейнер: ${child.name}`);
+                        return child;
+                    }
                 }
             }
         }
@@ -435,21 +455,90 @@ export class SelectTool extends BaseTool {
     /**
      * Начало поворота
      */
-    startRotate(object) {
-        this.isRotating = true;
-        // TODO: Сохранить центр поворота и исходный угол
+    startRotate(objectId) {
+        console.log(`🔄 Начинаем вращение объекта ${objectId}`);
         
-        this.emit('rotate:start', { object });
+        this.isRotating = true;
+        this.dragTarget = objectId; // Используем dragTarget для совместимости
+        
+        // Получаем текущий угол объекта
+        const rotationData = { objectId, rotation: 0 };
+        this.emit('get:object:rotation', rotationData);
+        this.rotateStartAngle = rotationData.rotation || 0;
+        this.rotateCurrentAngle = this.rotateStartAngle;
+        
+        // Получаем позицию объекта для вычисления центра вращения
+        const positionData = { objectId, position: null };
+        this.emit('get:object:position', positionData);
+        
+        const sizeData = { objectId, size: null };
+        this.emit('get:object:size', sizeData);
+        
+        if (positionData.position && sizeData.size) {
+            // Центр объекта = позиция + половина размера
+            this.rotateCenter = {
+                x: positionData.position.x + sizeData.size.width / 2,
+                y: positionData.position.y + sizeData.size.height / 2
+            };
+            
+            // Вычисляем начальный угол мыши относительно центра
+            this.rotateStartMouseAngle = Math.atan2(
+                this.currentY - this.rotateCenter.y,
+                this.currentX - this.rotateCenter.x
+            );
+            
+            console.log(`📐 Центр вращения:`, this.rotateCenter);
+            console.log(`📐 Начальный угол объекта: ${this.rotateStartAngle}°`);
+            console.log(`📐 Начальный угол мыши: ${this.rotateStartMouseAngle * 180 / Math.PI}°`);
+        }
+        
+        // Временно скрываем ручки во время вращения
+        if (this.resizeHandles) {
+            this.resizeHandles.temporaryHide();
+        }
+        
+        this.emit('rotate:start', { object: objectId });
     }
     
     /**
      * Обновление поворота
      */
     updateRotate(event) {
-        // TODO: Вычислить угол поворота
+        if (!this.isRotating || !this.rotateCenter) return;
+        
+        // Вычисляем текущий угол мыши относительно центра объекта
+        const currentMouseAngle = Math.atan2(
+            event.y - this.rotateCenter.y,
+            event.x - this.rotateCenter.x
+        );
+        
+        // Вычисляем разность углов (сколько повернула мышь)
+        let deltaAngle = currentMouseAngle - this.rotateStartMouseAngle;
+        
+        // Нормализуем угол в диапазон -π до π
+        while (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
+        while (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
+        
+        // Конвертируем в градусы
+        let deltaAngleDegrees = deltaAngle * 180 / Math.PI;
+        
+        // Если зажат Shift - ступенчатое вращение (15° шаги)
+        if (event.originalEvent.shiftKey) {
+            deltaAngleDegrees = Math.round(deltaAngleDegrees / 15) * 15;
+        }
+        
+        // Вычисляем финальный угол объекта
+        this.rotateCurrentAngle = this.rotateStartAngle + deltaAngleDegrees;
+        
+        // Нормализуем угол объекта в диапазон 0-360°
+        while (this.rotateCurrentAngle < 0) this.rotateCurrentAngle += 360;
+        while (this.rotateCurrentAngle >= 360) this.rotateCurrentAngle -= 360;
+        
+        console.log(`🔄 Угол вращения: ${this.rotateCurrentAngle.toFixed(1)}° (delta: ${deltaAngleDegrees.toFixed(1)}°)`);
+        
         this.emit('rotate:update', { 
             object: this.dragTarget,
-            angle: 0 // TODO: вычислить угол
+            angle: this.rotateCurrentAngle
         });
     }
     
@@ -457,8 +546,27 @@ export class SelectTool extends BaseTool {
      * Завершение поворота
      */
     endRotate() {
-        this.emit('rotate:end', { object: this.dragTarget });
+        if (this.dragTarget && this.rotateStartAngle !== undefined) {
+            console.log(`🏁 Завершаем вращение: ${this.rotateStartAngle}° → ${this.rotateCurrentAngle}°`);
+            
+            this.emit('rotate:end', { 
+                object: this.dragTarget,
+                oldAngle: this.rotateStartAngle,
+                newAngle: this.rotateCurrentAngle
+            });
+        }
+        
+        // Показываем ручки снова
+        if (this.resizeHandles) {
+            this.resizeHandles.temporaryShow();
+            this.resizeHandles.updateHandles(); // Обновляем позицию ручек
+        }
+        
         this.isRotating = false;
+        this.rotateCenter = null;
+        this.rotateStartAngle = 0;
+        this.rotateCurrentAngle = 0;
+        this.rotateStartMouseAngle = 0;
     }
     
     /**

@@ -47,6 +47,24 @@ export class PixiEngine {
             pixiObject.eventMode = 'static'; // Исправляем deprecation warning
             pixiObject.cursor = 'pointer';
             
+            // Устанавливаем центр вращения в центр объекта
+            if (pixiObject.anchor !== undefined) {
+                // Для объектов с anchor (текст, спрайты)
+                pixiObject.anchor.set(0.5, 0.5);
+            } else if (pixiObject instanceof PIXI.Graphics) {
+                // Для Graphics объектов устанавливаем pivot в центр
+                const bounds = pixiObject.getBounds();
+                const pivotX = bounds.width / 2;
+                const pivotY = bounds.height / 2;
+                pixiObject.pivot.set(pivotX, pivotY);
+                
+                // Компенсируем смещение pivot, чтобы объект остался в той же позиции
+                pixiObject.x += pivotX;
+                pixiObject.y += pivotY;
+                
+                console.log(`🎯 Установлен pivot: (${pivotX}, ${pivotY}), скорректирована позиция`);
+            }
+            
             // Убеждаемся, что объект может участвовать в hit testing
             if (pixiObject.beginFill) {
                 // Для Graphics объектов убеждаемся, что у них есть fill
@@ -190,9 +208,14 @@ export class PixiEngine {
             pixiObject.endFill();
         }
         
-        // Восстанавливаем позицию
-        pixiObject.x = position.x;
-        pixiObject.y = position.y;
+        // Устанавливаем pivot в центр (для правильного вращения)
+        const pivotX = size.width / 2;
+        const pivotY = size.height / 2;
+        pixiObject.pivot.set(pivotX, pivotY);
+        
+        // Восстанавливаем позицию с компенсацией pivot
+        pixiObject.x = position.x + pivotX;
+        pixiObject.y = position.y + pivotY;
     }
 
     /**
@@ -206,6 +229,22 @@ export class PixiEngine {
         // Ограничиваем ширину текста
         textObject.style.wordWrap = true;
         textObject.style.wordWrapWidth = size.width - 10; // Небольшой отступ
+    }
+
+    /**
+     * Обновить угол поворота объекта
+     */
+    updateObjectRotation(objectId, angleDegrees) {
+        const pixiObject = this.objects.get(objectId);
+        if (!pixiObject) return;
+
+        // Конвертируем градусы в радианы
+        const angleRadians = angleDegrees * Math.PI / 180;
+        
+        console.log(`🔄 Поворачиваем PIXI объект ${objectId} на ${angleDegrees}° (${angleRadians} рад)`);
+        
+        // Применяем поворот
+        pixiObject.rotation = angleRadians;
     }
 
     /**

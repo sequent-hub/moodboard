@@ -24,18 +24,26 @@ export class ResizeHandles {
         this.handleHoverColor = 0x0099FF;
         this.borderColor = 0x007ACC;
         this.borderWidth = 1;
+        
+        // Настройки ручки вращения
+        this.rotateHandleSize = 20; // Увеличиваем размер фона
+        this.rotateHandleColor = 0x28A745; // Зеленый цвет
+        this.rotateHandleHoverColor = 0x34CE57;
+        this.rotateHandleOffset = 25; // Смещение от угла объекта
     }
     
     /**
      * Показать ручки для объекта
      */
     showHandles(pixiObject, objectId) {
+        console.log(`👁️ showHandles вызван для ${objectId}`);
         this.hideHandles();
         
         this.targetObject = pixiObject;
         this.targetObjectId = objectId;
         this.updateHandles();
         this.container.visible = true;
+        console.log(`👁️ Контейнер установлен как visible: ${this.container.visible}`);
     }
     
     /**
@@ -56,14 +64,58 @@ export class ResizeHandles {
         
         this.clearHandles();
         
-        // Получаем границы объекта
-        const bounds = this.targetObject.getBounds();
-        this.targetBounds = bounds;
+        // Получаем глобальные границы объекта для позиционирования контейнера
+        const globalBounds = this.targetObject.getBounds();
+        this.targetBounds = globalBounds;
+        
+        // Получаем локальные границы объекта (без учета трансформации)
+        const localBounds = this.targetObject.getLocalBounds();
+        
+        // Синхронизируем поворот контейнера ручек с объектом
+        if (this.targetObject.rotation !== undefined && this.targetObject.rotation !== 0) {
+            this.container.rotation = this.targetObject.rotation;
+            
+            // Вычисляем позицию левого верхнего угла объекта в мировых координатах
+            // Учитываем, что объект имеет pivot в центре
+            const objectCenterX = this.targetObject.x;
+            const objectCenterY = this.targetObject.y;
+            const objectPivotX = this.targetObject.pivot ? this.targetObject.pivot.x : 0;
+            const objectPivotY = this.targetObject.pivot ? this.targetObject.pivot.y : 0;
+            
+            // Позиция левого верхнего угла объекта = центр - pivot
+            const objectTopLeftX = objectCenterX - objectPivotX;
+            const objectTopLeftY = objectCenterY - objectPivotY;
+            
+            // Устанавливаем контейнер ручек так, чтобы он поворачивался вокруг центра объекта
+            this.container.x = objectCenterX;
+            this.container.y = objectCenterY;
+            this.container.pivot.set(objectPivotX, objectPivotY);
+            
+            console.log(`🔄 Поворот ручек: ${(this.targetObject.rotation * 180 / Math.PI).toFixed(1)}°, центр: (${objectCenterX}, ${objectCenterY}), pivot: (${objectPivotX}, ${objectPivotY})`);
+            
+            // Используем локальные границы для создания ручек
+            this.workingBounds = {
+                x: localBounds.x,
+                y: localBounds.y,
+                width: localBounds.width,
+                height: localBounds.height
+            };
+        } else {
+            // Сбрасываем поворот если объект не повернут
+            this.container.rotation = 0;
+            this.container.x = 0;
+            this.container.y = 0;
+            this.container.pivot.set(0, 0);
+            
+            // Используем глобальные границы
+            this.workingBounds = globalBounds;
+        }
         
         // Создаем рамку выделения
-        this.createSelectionBorder(bounds);
+        this.createSelectionBorder(this.workingBounds);
         
         // Создаем ручки по углам и сторонам
+        const bounds = this.workingBounds;
         const handlePositions = [
             { type: 'nw', x: bounds.x, y: bounds.y, cursor: 'nw-resize' },
             { type: 'n', x: bounds.x + bounds.width / 2, y: bounds.y, cursor: 'n-resize' },
@@ -80,6 +132,17 @@ export class ResizeHandles {
             this.handles.push(handle);
             this.container.addChild(handle);
         });
+        
+        // Создаем ручку вращения возле левого нижнего угла
+        const rotateHandle = this.createRotateHandle(
+            bounds.x - this.rotateHandleOffset, 
+            bounds.y + bounds.height + this.rotateHandleOffset
+        );
+        this.handles.push(rotateHandle);
+        this.container.addChild(rotateHandle);
+        
+        console.log(`🔄 Ручка вращения создана: x=${rotateHandle.x}, y=${rotateHandle.y}, visible=${rotateHandle.visible}, eventMode=${rotateHandle.eventMode}`);
+        console.log(`📦 Контейнер ручек: zIndex=${this.container.zIndex}, visible=${this.container.visible}, children=${this.container.children.length}`);
     }
     
     /**
@@ -158,6 +221,77 @@ export class ResizeHandles {
     }
     
     /**
+     * Создать ручку вращения с иконкой круговой стрелки
+     */
+    createRotateHandle(x, y) {
+        const container = new PIXI.Container();
+        
+        // Создаем круглый фон
+        const background = new PIXI.Graphics();
+        background.beginFill(this.rotateHandleColor);
+        background.lineStyle(1, 0xFFFFFF, 1);
+        background.drawCircle(0, 0, this.rotateHandleSize / 2);
+        background.endFill();
+        
+        // Создаем текстовую иконку (Unicode символ)
+        const icon = new PIXI.Text('↻', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: this.rotateHandleSize - 4,
+            fill: 0xFFFFFF,
+            align: 'center'
+        });
+        
+        // Центрируем иконку
+        icon.anchor.set(0.5, 0.5);
+        icon.x = 0;
+        icon.y = 0;
+        
+        // Добавляем элементы в контейнер
+        container.addChild(background);
+        container.addChild(icon);
+        
+        // Позиционируем
+        container.x = x;
+        container.y = y;
+        
+        // Настраиваем интерактивность
+        container.eventMode = 'static';
+        container.cursor = 'grab';
+        container.name = 'rotate-handle';
+        container.zIndex = 2000;
+        
+        // Сохраняем тип ручки
+        container.handleType = 'rotate';
+        container.targetObjectId = this.targetObjectId;
+        
+        // Сохраняем ссылки на элементы для изменения цвета
+        container._background = background;
+        container._icon = icon;
+        
+        // Эффекты при наведении
+        container.on('pointerover', () => {
+            background.clear();
+            background.beginFill(this.rotateHandleHoverColor);
+            background.lineStyle(1, 0xFFFFFF, 1);
+            background.drawCircle(0, 0, this.rotateHandleSize / 2);
+            background.endFill();
+            container.cursor = 'grab';
+        });
+        
+        container.on('pointerout', () => {
+            background.clear();
+            background.beginFill(this.rotateHandleColor);
+            background.lineStyle(1, 0xFFFFFF, 1);
+            background.drawCircle(0, 0, this.rotateHandleSize / 2);
+            background.endFill();
+        });
+        
+        return container;
+    }
+    
+
+    
+    /**
      * Очистить все ручки
      */
     clearHandles() {
@@ -167,10 +301,11 @@ export class ResizeHandles {
     }
     
     /**
-     * Проверить, является ли объект ручкой изменения размера
+     * Проверить, является ли объект ручкой изменения размера или вращения
      */
     isResizeHandle(pixiObject) {
-        return pixiObject && pixiObject.name && pixiObject.name.startsWith('resize-handle-');
+        return pixiObject && pixiObject.name && 
+               (pixiObject.name.startsWith('resize-handle-') || pixiObject.name === 'rotate-handle');
     }
     
     /**
@@ -192,6 +327,7 @@ export class ResizeHandles {
      * Временно скрыть ручки (например, во время перетаскивания)
      */
     temporaryHide() {
+        console.log(`🙈 temporaryHide вызван`);
         this.container.visible = false;
     }
     
@@ -199,6 +335,7 @@ export class ResizeHandles {
      * Показать ручки снова
      */
     temporaryShow() {
+        console.log(`👁️ temporaryShow вызван, targetObject: ${!!this.targetObject}`);
         if (this.targetObject) {
             this.container.visible = true;
         }

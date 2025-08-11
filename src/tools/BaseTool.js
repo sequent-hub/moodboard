@@ -157,14 +157,21 @@ export class BaseTool {
      */
     emit(eventName, data) {
         // Для событий, которые ожидают изменения data по ссылке, передаем data напрямую
-        if (eventName === 'hit:test' || eventName === 'get:object:position' || eventName === 'get:object:pixi' || eventName === 'get:object:size') {
+        if (eventName === 'hit:test' || eventName === 'get:object:position' || eventName === 'get:object:pixi' || eventName === 'get:object:size' || eventName === 'get:object:rotation') {
             this.eventBus.emit(`tool:${eventName}`, data);
         } else {
             // Для остальных событий создаем новый объект с полем tool
-            this.eventBus.emit(`tool:${eventName}`, {
+            const eventData = {
                 tool: this.name,
                 ...data
-            });
+            };
+            
+            // Отладка для событий вращения
+            if (eventName.includes('rotate')) {
+                console.log(`📡 BaseTool отправляет событие tool:${eventName}:`, eventData);
+            }
+            
+            this.eventBus.emit(`tool:${eventName}`, eventData);
         }
     }
     

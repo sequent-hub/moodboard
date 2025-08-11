@@ -195,6 +195,48 @@ export class CoreMoodBoard {
             this.resizeStartSize = null;
         });
 
+        // === ОБРАБОТЧИКИ СОБЫТИЙ ВРАЩЕНИЯ ===
+        
+        this.eventBus.on('tool:rotate:update', (data) => {
+            // Во время вращения обновляем угол напрямую
+            console.log(`🔄 Получено событие tool:rotate:update:`, data);
+            this.pixi.updateObjectRotation(data.object, data.angle);
+        });
+
+        this.eventBus.on('tool:rotate:end', (data) => {
+            // В конце создаем команду вращения для Undo/Redo
+            if (data.oldAngle !== undefined && data.newAngle !== undefined) {
+                // Создаем команду только если угол действительно изменился
+                if (Math.abs(data.oldAngle - data.newAngle) > 0.1) {
+                    console.log(`📝 Создаем RotateObjectCommand:`, {
+                        object: data.object,
+                        oldAngle: data.oldAngle,
+                        newAngle: data.newAngle
+                    });
+                    
+                    import('../core/commands/RotateObjectCommand.js').then(({ RotateObjectCommand }) => {
+                        const command = new RotateObjectCommand(
+                            data.object,
+                            data.oldAngle,
+                            data.newAngle
+                        );
+                        command.setEventBus(this.eventBus);
+                        this.history.executeCommand(command);
+                    });
+                }
+            }
+        });
+
+        // === ОБРАБОТЧИКИ КОМАНД ВРАЩЕНИЯ ===
+        
+        this.eventBus.on('object:rotate', (data) => {
+            // Обновляем угол в PIXI
+            this.pixi.updateObjectRotation(data.objectId, data.angle);
+            
+            // Обновляем данные в State
+            this.updateObjectRotationDirect(data.objectId, data.angle);
+        });
+
         // Hit testing
         this.eventBus.on('tool:hit:test', (data) => {
             const result = this.pixi.hitTest(data.x, data.y);
@@ -230,6 +272,17 @@ export class CoreMoodBoard {
             const object = objects.find(obj => obj.id === data.objectId);
             if (object) {
                 data.size = { width: object.width, height: object.height };
+            }
+        });
+
+        // Получение угла поворота объекта
+        this.eventBus.on('tool:get:object:rotation', (data) => {
+            const pixiObject = this.pixi.objects.get(data.objectId);
+            if (pixiObject) {
+                // Конвертируем радианы в градусы
+                data.rotation = pixiObject.rotation * 180 / Math.PI;
+            } else {
+                data.rotation = 0;
             }
         });
     }
@@ -387,6 +440,19 @@ export class CoreMoodBoard {
         if (object) {
             object.position = { ...position };
             this.state.markDirty(); // Помечаем для автосохранения
+        }
+    }
+
+    /**
+     * Обновить угол поворота объекта напрямую (без команды)
+     */
+    updateObjectRotationDirect(objectId, angle) {
+        const objects = this.state.getObjects();
+        const object = objects.find(obj => obj.id === objectId);
+        if (object) {
+            object.rotation = angle;
+            this.state.markDirty();
+            console.log(`🔄 Угол объекта ${objectId} обновлен: ${angle}°`);
         }
     }
 
