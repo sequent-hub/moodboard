@@ -30,15 +30,12 @@ export class ResizeHandles {
      * Показать ручки для объекта
      */
     showHandles(pixiObject, objectId) {
-        console.log(`🎯 ShowHandles для объекта ${objectId}:`, pixiObject);
         this.hideHandles();
         
         this.targetObject = pixiObject;
         this.targetObjectId = objectId;
         this.updateHandles();
         this.container.visible = true;
-        
-        console.log(`✅ Ручки созданы: ${this.handles.length}, контейнер видим: ${this.container.visible}`);
     }
     
     /**
@@ -82,7 +79,6 @@ export class ResizeHandles {
             const handle = this.createHandle(pos.type, pos.x, pos.y, pos.cursor);
             this.handles.push(handle);
             this.container.addChild(handle);
-            console.log(`✅ Создана ручка ${pos.type} в (${pos.x}, ${pos.y}), eventMode: ${handle.eventMode}`);
         });
     }
     
@@ -181,14 +177,10 @@ export class ResizeHandles {
      * Получить информацию о ручке
      */
     getHandleInfo(pixiObject) {
-        console.log(`🔍 getHandleInfo для объекта:`, pixiObject?.name || 'нет объекта');
-        
         if (!this.isResizeHandle(pixiObject)) {
-            console.log(`❌ Не является ручкой изменения размера`);
             return null;
         }
         
-        console.log(`✅ Это ручка типа: ${pixiObject.handleType}`);
         return {
             type: pixiObject.handleType,
             targetObjectId: pixiObject.targetObjectId,

@@ -600,26 +600,18 @@ export class SelectTool extends BaseTool {
             return;
         }
         
-        console.log(`🔧 updateResizeHandles: выделено объектов ${this.selectedObjects.size}`);
-        
         // Показываем ручки только для одного выделенного объекта
         if (this.selectedObjects.size === 1) {
             const objectId = Array.from(this.selectedObjects)[0];
             const pixiObjectData = { objectId, pixiObject: null };
             
-            console.log(`🎯 Получаем PIXI объект для ${objectId}`);
-            
             // Получаем PIXI объект
             this.emit('get:object:pixi', pixiObjectData);
             
             if (pixiObjectData.pixiObject) {
-                console.log(`✅ PIXI объект найден, показываем ручки`);
                 this.resizeHandles.showHandles(pixiObjectData.pixiObject, objectId);
-            } else {
-                console.log(`❌ PIXI объект не найден для ${objectId}`);
             }
         } else {
-            console.log('🔇 Скрываем ручки (нет выделения или несколько объектов)');
             this.resizeHandles.hideHandles();
         }
     }
@@ -630,8 +622,6 @@ export class SelectTool extends BaseTool {
     calculateNewSize(handleType, startBounds, deltaX, deltaY, maintainAspectRatio) {
         let newWidth = startBounds.width;
         let newHeight = startBounds.height;
-        
-        console.log(`📐 calculateNewSize: ручка ${handleType}, delta(${deltaX}, ${deltaY}), начальный размер(${startBounds.width}, ${startBounds.height})`);
         
         // Вычисляем изменения в зависимости от типа ручки
         switch (handleType) {
@@ -665,10 +655,7 @@ export class SelectTool extends BaseTool {
                 break;
         }
         
-        console.log(`📊 Новый размер: (${newWidth}, ${newHeight})`);
-        
-        // Проблема: при изменении размера через левые/верхние ручки нужно также сдвигать позицию объекта!
-        // Но для простоты пока исправим только логику размера
+
         
         // Поддержка пропорционального изменения размера (Shift)
         if (maintainAspectRatio) {

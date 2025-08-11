@@ -173,11 +173,21 @@ export class CoreMoodBoard {
                 if (data.oldSize.width !== data.newSize.width || 
                     data.oldSize.height !== data.newSize.height) {
                     
+                    console.log(`📝 Создаем ResizeObjectCommand:`, {
+                        object: data.object,
+                        oldSize: data.oldSize,
+                        newSize: data.newSize,
+                        oldPosition: data.oldPosition,
+                        newPosition: data.newPosition
+                    });
+                    
                     const command = new ResizeObjectCommand(
                         this, 
                         data.object, 
                         data.oldSize, 
-                        data.newSize
+                        data.newSize,
+                        data.oldPosition,
+                        data.newPosition
                     );
                     this.history.executeCommand(command);
                 }
