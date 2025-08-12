@@ -40,6 +40,9 @@ export class CoreMoodBoard {
         
         // Для отслеживания изменения размера
         this.resizeStartSize = null;
+        
+        // Буфер обмена для копирования/вставки
+        this.clipboard = null;
 
         // Убираем автоматический вызов init() - будет вызываться вручную
     }
@@ -367,13 +370,24 @@ export class CoreMoodBoard {
             }
         });
 
-        // TODO: Реализовать копирование/вставку
+        // Копирование выделенных объектов
         this.eventBus.on('keyboard:copy', () => {
-            // TODO: Реализовать копирование
+            if (this.toolManager.getActiveTool()?.name === 'select') {
+                const selectedObjects = this.toolManager.getActiveTool().selectedObjects;
+                if (selectedObjects.size > 0) {
+                    // Копируем первый выделенный объект (позже можно расширить для множественного выделения)
+                    const firstObjectId = Array.from(selectedObjects)[0];
+                    this.copyObject(firstObjectId);
+                }
+            }
         });
 
+        // Вставка объектов из буфера обмена
         this.eventBus.on('keyboard:paste', () => {
-            // TODO: Реализовать вставку
+            if (this.clipboard && this.clipboard.type === 'object') {
+                // Вставляем объект без указания позиции - PasteObjectCommand сам рассчитает смещение
+                this.pasteObject();
+            }
         });
 
         // Undo/Redo теперь обрабатывается в HistoryManager
@@ -528,6 +542,25 @@ export class CoreMoodBoard {
         this.history.executeCommand(command);
 
         return objectData;
+    }
+
+    /**
+     * Копирует выбранный объект в буфер обмена
+     */
+    async copyObject(objectId) {
+        const { CopyObjectCommand } = await import('./commands/CopyObjectCommand.js');
+        const command = new CopyObjectCommand(this, objectId);
+        command.execute(); // Копирование не добавляется в историю, так как не меняет состояние
+    }
+
+    /**
+     * Вставляет объект из буфера обмена
+     */
+    async pasteObject(position = null) {
+        const { PasteObjectCommand } = await import('./commands/PasteObjectCommand.js');
+        const command = new PasteObjectCommand(this, position);
+        command.setEventBus(this.eventBus);
+        this.history.executeCommand(command);
     }
 
     /**
