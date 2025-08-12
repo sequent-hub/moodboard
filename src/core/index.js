@@ -204,6 +204,7 @@ export class CoreMoodBoard {
         });
 
         this.eventBus.on('tool:rotate:end', (data) => {
+            console.log(`🎯 Получили событие tool:rotate:end:`, data);
             // В конце создаем команду вращения для Undo/Redo
             if (data.oldAngle !== undefined && data.newAngle !== undefined) {
                 // Создаем команду только если угол действительно изменился

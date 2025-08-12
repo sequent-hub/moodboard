@@ -8,6 +8,25 @@ export class BaseCommand {
         this.description = description;
         this.timestamp = Date.now();
         this.id = `cmd_${this.timestamp}_${Math.random().toString(36).substr(2, 9)}`;
+        this.eventBus = null;
+    }
+
+    /**
+     * Устанавливает EventBus для отправки событий
+     */
+    setEventBus(eventBus) {
+        this.eventBus = eventBus;
+    }
+
+    /**
+     * Отправляет событие через EventBus
+     */
+    emit(eventName, data) {
+        if (this.eventBus) {
+            this.eventBus.emit(eventName, data);
+        } else {
+            console.warn(`EventBus не установлен для команды ${this.id}`);
+        }
     }
 
     /**
