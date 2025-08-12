@@ -42,6 +42,18 @@ export class MoveObjectCommand extends BaseCommand {
             object.position = { ...position };
             this.coreMoodboard.state.markDirty();
         }
+        
+        // Уведомляем о том, что объект был изменен (для обновления ручек)
+        if (this.eventBus) {
+            console.log(`📡 MoveObjectCommand отправляет object:transform:updated для ${this.objectId}`);
+            this.eventBus.emit('object:transform:updated', {
+                objectId: this.objectId,
+                type: 'position',
+                position: position
+            });
+        } else {
+            console.warn(`❌ MoveObjectCommand: eventBus не установлен для ${this.objectId}`);
+        }
     }
 
     /**

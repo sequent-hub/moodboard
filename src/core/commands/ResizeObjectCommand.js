@@ -57,6 +57,19 @@ export class ResizeObjectCommand extends BaseCommand {
             object.height = size.height;
             this.coreMoodboard.state.markDirty();
         }
+        
+        // Уведомляем о том, что объект был изменен (для обновления ручек)
+        if (this.eventBus) {
+            console.log(`📡 ResizeObjectCommand отправляет object:transform:updated для ${this.objectId}`);
+            this.eventBus.emit('object:transform:updated', {
+                objectId: this.objectId,
+                type: 'resize',
+                size: size,
+                position: position
+            });
+        } else {
+            console.warn(`❌ ResizeObjectCommand: eventBus не установлен для ${this.objectId}`);
+        }
     }
 
     /**

@@ -80,6 +80,9 @@ export class CoreMoodBoard {
         const selectTool = new SelectTool(this.eventBus);
         this.toolManager.registerTool(selectTool);
         
+        // Сохраняем ссылку на selectTool для обновления ручек
+        this.selectTool = selectTool;
+        
         // Активируем SelectTool по умолчанию
         console.log('🔧 Активируем SelectTool с PIXI app:', !!this.pixi.app);
         this.toolManager.activateTool('select');
@@ -139,6 +142,7 @@ export class CoreMoodBoard {
                             this.dragStartPosition, 
                             finalPosition
                         );
+                        command.setEventBus(this.eventBus);
                         this.history.executeCommand(command);
                     }
                 }
@@ -189,6 +193,7 @@ export class CoreMoodBoard {
                         data.oldPosition,
                         data.newPosition
                     );
+                    command.setEventBus(this.eventBus);
                     this.history.executeCommand(command);
                 }
             }
@@ -236,6 +241,22 @@ export class CoreMoodBoard {
             
             // Обновляем данные в State
             this.updateObjectRotationDirect(data.objectId, data.angle);
+            
+            // Уведомляем о том, что объект был изменен (для обновления ручек)
+            this.eventBus.emit('object:transform:updated', {
+                objectId: data.objectId,
+                type: 'rotation',
+                angle: data.angle
+            });
+        });
+
+        // Обновляем ручки когда объект изменяется через команды (Undo/Redo)
+        this.eventBus.on('object:transform:updated', (data) => {
+            console.log(`🔄 Объект ${data.objectId} был изменен через команду, обновляем ручки`);
+            // Обновляем ручки если объект выделен
+            if (this.selectTool && this.selectTool.selectedObjects.has(data.objectId)) {
+                this.selectTool.updateResizeHandles();
+            }
         });
 
         // Hit testing
@@ -420,6 +441,7 @@ export class CoreMoodBoard {
         
         // Создаем и выполняем команду перемещения
         const command = new MoveObjectCommand(this, objectId, oldPosition, position);
+        command.setEventBus(this.eventBus);
         this.history.executeCommand(command);
     }
 
