@@ -56,7 +56,7 @@ export class SelectTool extends BaseTool {
         
         // Инициализируем систему ручек изменения размера
         if (!this.resizeHandles && app) {
-            console.log('✅ Создаем ResizeHandles');
+
             this.resizeHandles = new ResizeHandles(app);
         } else if (!app) {
             console.log('❌ PIXI app не передан в activate');
@@ -94,7 +94,7 @@ export class SelectTool extends BaseTool {
         } else if (hitResult.type === 'rotate-handle') {
             this.startRotate(hitResult.object);
         } else if (hitResult.type === 'object') {
-            console.log(`🎯 Клик по объекту: ${hitResult.object}`);
+
             this.handleObjectSelect(hitResult.object, event);
         } else {
             // Клик по пустому месту - начинаем рамку выделения
@@ -184,11 +184,11 @@ export class SelectTool extends BaseTool {
         // Сначала проверяем ручки изменения размера (они имеют приоритет)
         if (this.resizeHandles) {
             const pixiObjectAtPoint = this.getPixiObjectAt(x, y);
-            console.log(`🔍 getPixiObjectAt(${x}, ${y}) нашел:`, pixiObjectAtPoint ? pixiObjectAtPoint.name || 'unnamed' : 'null');
+
             
             const handleInfo = this.resizeHandles.getHandleInfo(pixiObjectAtPoint);
             if (handleInfo) {
-                console.log(`✅ Найдена ручка:`, handleInfo.type);
+
                 
                 // Определяем тип ручки
                 const hitType = handleInfo.type === 'rotate' ? 'rotate-handle' : 'resize-handle';
@@ -228,7 +228,7 @@ export class SelectTool extends BaseTool {
                 
                 // Проверяем обычные объекты
                 if (child.containsPoint && child.containsPoint(point)) {
-                    console.log(`🎯 Найдена ручка: ${child.name}`);
+
                     return child;
                 }
                 
@@ -238,7 +238,7 @@ export class SelectTool extends BaseTool {
                     const bounds = child.getBounds();
                     if (point.x >= bounds.x && point.x <= bounds.x + bounds.width &&
                         point.y >= bounds.y && point.y <= bounds.y + bounds.height) {
-                        console.log(`🎯 Найден контейнер: ${child.name}`);
+
                         return child;
                     }
                 }
@@ -250,7 +250,7 @@ export class SelectTool extends BaseTool {
         for (let i = stage.children.length - 1; i >= 0; i--) {
             const child = stage.children[i];
             if (child !== this.resizeHandles.container && child.containsPoint && child.containsPoint(point)) {
-                console.log(`🎯 Найден объект сцены: ${child.constructor.name}`);
+
                 return child;
             }
         }
@@ -632,23 +632,66 @@ export class SelectTool extends BaseTool {
     }
     
     /**
-     * Получение курсора для ресайз-хендла
+     * Создает кастомный курсор изменения размера, повернутый на нужный угол
      */
-    getResizeCursor(handle) {
-        const cursors = {
-            'nw': 'nw-resize',
-            'n': 'n-resize',
-            'ne': 'ne-resize',
-            'e': 'e-resize',
-            'se': 'se-resize',
-            's': 's-resize',
-            'sw': 'sw-resize',
-            'w': 'w-resize'
+    createRotatedResizeCursor(handleType, rotationDegrees) {
+        // Базовые углы для каждого типа ручки (в градусах)
+        const baseAngles = {
+            'e': 0,     // Восток - горизонтальная стрелка →
+            'se': 45,   // Юго-восток - диагональная стрелка ↘
+            's': 90,    // Юг - вертикальная стрелка ↓
+            'sw': 135,  // Юго-запад - диагональная стрелка ↙
+            'w': 180,   // Запад - горизонтальная стрелка ←
+            'nw': 225,  // Северо-запад - диагональная стрелка ↖
+            'n': 270,   // Север - вертикальная стрелка ↑
+            'ne': 315   // Северо-восток - диагональная стрелка ↗
         };
         
-        return cursors[handle] || 'default';
+        // Вычисляем итоговый угол: базовый угол ручки + поворот объекта
+        const totalAngle = (baseAngles[handleType] + rotationDegrees) % 360;
+        
+        // Создаем SVG курсор изменения размера, повернутый на нужный угол (белый, крупнее)
+        const svg = `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><g transform="rotate(${totalAngle} 16 16)"><path d="M4 16 L9 11 L9 13 L23 13 L23 11 L28 16 L23 21 L23 19 L9 19 L9 21 Z" fill="white" stroke="black" stroke-width="1"/></g></svg>`;
+        
+        // Используем encodeURIComponent вместо btoa для безопасного кодирования
+        const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+        
+        // Возвращаем CSS cursor с кастомным изображением (hotspot в центре 16x16)
+        return `url("${dataUrl}") 16 16, auto`;
+    }
+
+    /**
+     * Получение курсора для ресайз-хендла с учетом точного поворота объекта
+     */
+    getResizeCursor(handle) {
+        // Получаем ID выбранного объекта для определения его поворота
+        const selectedObject = Array.from(this.selectedObjects)[0];
+        if (!selectedObject) {
+            return 'default';
+        }
+        
+        // Получаем угол поворота объекта
+        const rotationData = { objectId: selectedObject, rotation: 0 };
+        this.emit('get:object:rotation', rotationData);
+        const objectRotation = rotationData.rotation || 0;
+        
+        // Создаем кастомный курсор, повернутый на точный угол объекта
+        return this.createRotatedResizeCursor(handle, objectRotation);
     }
     
+    /**
+     * Переопределяем setCursor для установки курсора на canvas
+     */
+    setCursor() {
+        if (this.resizeHandles && this.resizeHandles.app && this.resizeHandles.app.view) {
+            // Устанавливаем курсор на canvas, а не на body
+            this.resizeHandles.app.view.style.cursor = this.cursor;
+        } else {
+            // Fallback на базовую реализацию
+            super.setCursor();
+        }
+    }
+
     /**
      * Управление выделением
      */
