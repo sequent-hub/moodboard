@@ -58,11 +58,21 @@ export class PixiEngine {
                 const pivotY = bounds.height / 2;
                 pixiObject.pivot.set(pivotX, pivotY);
                 
-                // Компенсируем смещение pivot, чтобы объект остался в той же позиции
-                pixiObject.x += pivotX;
-                pixiObject.y += pivotY;
+                // Компенсируем смещение pivot, только если координаты еще НЕ были скомпенсированы
+                // Это проверяется по наличию transform.pivotCompensated
+                const needsCompensation = !objectData.transform || !objectData.transform.pivotCompensated;
                 
-                console.log(`🎯 Установлен pivot: (${pivotX}, ${pivotY}), скорректирована позиция`);
+                if (needsCompensation) {
+                    pixiObject.x += pivotX;
+                    pixiObject.y += pivotY;
+                }
+            }
+            
+            // Применяем поворот из сохраненного состояния
+            if (objectData.transform && objectData.transform.rotation !== undefined) {
+                // Преобразуем градусы в радианы (углы сохраняются в градусах)
+                const angleRadians = objectData.transform.rotation * Math.PI / 180;
+                pixiObject.rotation = angleRadians;
             }
             
             // Убеждаемся, что объект может участвовать в hit testing
@@ -240,8 +250,6 @@ export class PixiEngine {
 
         // Конвертируем градусы в радианы
         const angleRadians = angleDegrees * Math.PI / 180;
-        
-        console.log(`🔄 Поворачиваем PIXI объект ${objectId} на ${angleDegrees}° (${angleRadians} рад)`);
         
         // Применяем поворот
         pixiObject.rotation = angleRadians;

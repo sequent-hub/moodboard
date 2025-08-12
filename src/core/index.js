@@ -204,24 +204,18 @@ export class CoreMoodBoard {
         
         this.eventBus.on('tool:rotate:update', (data) => {
             // Во время вращения обновляем угол напрямую
-            console.log(`🔄 Получено событие tool:rotate:update:`, data);
             this.pixi.updateObjectRotation(data.object, data.angle);
         });
 
         this.eventBus.on('tool:rotate:end', (data) => {
-            console.log(`🎯 Получили событие tool:rotate:end:`, data);
             // В конце создаем команду вращения для Undo/Redo
             if (data.oldAngle !== undefined && data.newAngle !== undefined) {
                 // Создаем команду только если угол действительно изменился
                 if (Math.abs(data.oldAngle - data.newAngle) > 0.1) {
-                    console.log(`📝 Создаем RotateObjectCommand:`, {
-                        object: data.object,
-                        oldAngle: data.oldAngle,
-                        newAngle: data.newAngle
-                    });
                     
                     import('../core/commands/RotateObjectCommand.js').then(({ RotateObjectCommand }) => {
                         const command = new RotateObjectCommand(
+                            this,
                             data.object,
                             data.oldAngle,
                             data.newAngle
@@ -523,7 +517,10 @@ export class CoreMoodBoard {
             width: 100,
             height: 100,
             properties,
-            created: new Date().toISOString()
+            created: new Date().toISOString(),
+            transform: {
+                pivotCompensated: false  // Новые объекты еще не скомпенсированы
+            }
         };
 
         // Создаем и выполняем команду создания объекта

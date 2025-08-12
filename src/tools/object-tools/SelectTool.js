@@ -457,8 +457,6 @@ export class SelectTool extends BaseTool {
      * Начало поворота
      */
     startRotate(objectId) {
-        console.log(`🔄 Начинаем вращение объекта ${objectId}`);
-        
         this.isRotating = true;
         this.dragTarget = objectId; // Используем dragTarget для совместимости
         
@@ -488,9 +486,7 @@ export class SelectTool extends BaseTool {
                 this.currentX - this.rotateCenter.x
             );
             
-            console.log(`📐 Центр вращения:`, this.rotateCenter);
-            console.log(`📐 Начальный угол объекта: ${this.rotateStartAngle}°`);
-            console.log(`📐 Начальный угол мыши: ${this.rotateStartMouseAngle * 180 / Math.PI}°`);
+
         }
         
         // Ручки остаются видными во время вращения для лучшего UX
@@ -532,8 +528,6 @@ export class SelectTool extends BaseTool {
         while (this.rotateCurrentAngle < 0) this.rotateCurrentAngle += 360;
         while (this.rotateCurrentAngle >= 360) this.rotateCurrentAngle -= 360;
         
-        console.log(`🔄 Угол вращения: ${this.rotateCurrentAngle.toFixed(1)}° (delta: ${deltaAngleDegrees.toFixed(1)}°)`);
-        
         this.emit('rotate:update', { 
             object: this.dragTarget,
             angle: this.rotateCurrentAngle
@@ -550,8 +544,6 @@ export class SelectTool extends BaseTool {
      */
     endRotate() {
         if (this.dragTarget && this.rotateStartAngle !== undefined) {
-            console.log(`🏁 Завершаем вращение: ${this.rotateStartAngle}° → ${this.rotateCurrentAngle}°`);
-            
             this.emit('rotate:end', { 
                 object: this.dragTarget,
                 oldAngle: this.rotateStartAngle,

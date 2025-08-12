@@ -40,19 +40,23 @@ export class MoveObjectCommand extends BaseCommand {
         const object = objects.find(obj => obj.id === this.objectId);
         if (object) {
             object.position = { ...position };
+            
+            // Помечаем, что координаты уже скомпенсированы для pivot
+            if (!object.transform) {
+                object.transform = {};
+            }
+            object.transform.pivotCompensated = true;
+            
             this.coreMoodboard.state.markDirty();
         }
         
         // Уведомляем о том, что объект был изменен (для обновления ручек)
         if (this.eventBus) {
-            console.log(`📡 MoveObjectCommand отправляет object:transform:updated для ${this.objectId}`);
             this.eventBus.emit('object:transform:updated', {
                 objectId: this.objectId,
                 type: 'position',
                 position: position
             });
-        } else {
-            console.warn(`❌ MoveObjectCommand: eventBus не установлен для ${this.objectId}`);
         }
     }
 
