@@ -52,17 +52,16 @@ export class SelectTool extends BaseTool {
      */
     activate(app) {
         super.activate();
-        console.log('🔧 SelectTool активирован, app:', !!app);
         
         // Инициализируем систему ручек изменения размера
         if (!this.resizeHandles && app) {
-            console.log('✅ Создаем ResizeHandles');
             this.resizeHandles = new ResizeHandles(app);
-        } else if (!app) {
-            console.log('❌ PIXI app не передан в activate');
-        } else {
-            console.log('ℹ️ ResizeHandles уже созданы');
         }
+
+        // Подписываемся на события клика по объектам
+        this.eventBus.on('tool:object:clicked', (data) => {
+            this.handleObjectSelect(data.objectId, { x: data.position.x, y: data.position.y });
+        });
     }
     
     /**
@@ -94,8 +93,7 @@ export class SelectTool extends BaseTool {
         } else if (hitResult.type === 'rotate-handle') {
             this.startRotate(hitResult.object);
         } else if (hitResult.type === 'object') {
-            console.log(`🎯 Клик по объекту: ${hitResult.object}`);
-            this.handleObjectSelect(hitResult.object, event);
+                    this.handleObjectSelect(hitResult.object, event);
         } else {
             // Клик по пустому месту - начинаем рамку выделения
             this.startBoxSelect(event);
@@ -184,11 +182,8 @@ export class SelectTool extends BaseTool {
         // Сначала проверяем ручки изменения размера (они имеют приоритет)
         if (this.resizeHandles) {
             const pixiObjectAtPoint = this.getPixiObjectAt(x, y);
-            console.log(`🔍 getPixiObjectAt(${x}, ${y}) нашел:`, pixiObjectAtPoint ? pixiObjectAtPoint.name || 'unnamed' : 'null');
-            
             const handleInfo = this.resizeHandles.getHandleInfo(pixiObjectAtPoint);
             if (handleInfo) {
-                console.log(`✅ Найдена ручка:`, handleInfo.type);
                 
                 // Определяем тип ручки
                 const hitType = handleInfo.type === 'rotate' ? 'rotate-handle' : 'resize-handle';
@@ -221,14 +216,13 @@ export class SelectTool extends BaseTool {
         
         const point = new PIXI.Point(x, y);
         
-        // Сначала ищем в контейнере ручек (приоритет)
+        // Ищем в контейнере ручек (включая ручку поворота)
         if (this.resizeHandles.container.visible) {
             for (let i = this.resizeHandles.container.children.length - 1; i >= 0; i--) {
                 const child = this.resizeHandles.container.children[i];
                 
                 // Проверяем обычные объекты
                 if (child.containsPoint && child.containsPoint(point)) {
-                    console.log(`🎯 Найдена ручка: ${child.name}`);
                     return child;
                 }
                 
@@ -238,7 +232,6 @@ export class SelectTool extends BaseTool {
                     const bounds = child.getBounds();
                     if (point.x >= bounds.x && point.x <= bounds.x + bounds.width &&
                         point.y >= bounds.y && point.y <= bounds.y + bounds.height) {
-                        console.log(`🎯 Найден контейнер: ${child.name}`);
                         return child;
                     }
                 }
@@ -249,13 +242,13 @@ export class SelectTool extends BaseTool {
         const stage = this.resizeHandles.app.stage;
         for (let i = stage.children.length - 1; i >= 0; i--) {
             const child = stage.children[i];
-            if (child !== this.resizeHandles.container && child.containsPoint && child.containsPoint(point)) {
-                console.log(`🎯 Найден объект сцены: ${child.constructor.name}`);
+            // Исключаем контейнер ручек
+            if (child !== this.resizeHandles.container && 
+                child.containsPoint && child.containsPoint(point)) {
                 return child;
             }
         }
         
-        console.log(`❌ Ничего не найдено под (${x}, ${y})`);
         return null;
     }
     
@@ -358,11 +351,8 @@ export class SelectTool extends BaseTool {
         this.resizeStartMousePos = { x: this.currentX, y: this.currentY };
         this.resizeStartPosition = positionData.position || { x: 0, y: 0 };
         
-        console.log(`📐 Начальный размер:`, this.resizeStartBounds);
-        console.log(`📍 Начальная позиция мыши:`, this.resizeStartMousePos);
+
         console.log(`📍 Начальная позиция объекта:`, this.resizeStartPosition);
-        
-        // Ручки остаются видными во время resize для лучшего UX
         
         this.emit('resize:start', { object: objectId, handle });
     }
@@ -413,9 +403,9 @@ export class SelectTool extends BaseTool {
             position: newPosition
         });
         
-        // Обновляем ручки в реальном времени во время resize
+        // Обновляем рамку выделения в реальном времени
         if (this.resizeHandles) {
-            this.resizeHandles.updateHandles();
+            this.resizeHandles.updateSelectionBorderOnly();
         }
     }
     
@@ -441,9 +431,9 @@ export class SelectTool extends BaseTool {
             });
         }
         
-        // Обновляем позицию ручек после resize
+        // Обновляем позицию ручек после завершения изменения размера
         if (this.resizeHandles) {
-            this.resizeHandles.updateHandles(); // Обновляем позицию ручек
+            this.resizeHandles.updateHandles();
         }
         
         this.isResizing = false;
@@ -457,7 +447,7 @@ export class SelectTool extends BaseTool {
      * Начало поворота
      */
     startRotate(objectId) {
-        console.log(`🔄 Начинаем вращение объекта ${objectId}`);
+
         
         this.isRotating = true;
         this.dragTarget = objectId; // Используем dragTarget для совместимости
@@ -488,12 +478,10 @@ export class SelectTool extends BaseTool {
                 this.currentX - this.rotateCenter.x
             );
             
-            console.log(`📐 Центр вращения:`, this.rotateCenter);
-            console.log(`📐 Начальный угол объекта: ${this.rotateStartAngle}°`);
-            console.log(`📐 Начальный угол мыши: ${this.rotateStartMouseAngle * 180 / Math.PI}°`);
+
+            
+
         }
-        
-        // Ручки остаются видными во время вращения для лучшего UX
         
         this.emit('rotate:start', { object: objectId });
     }
@@ -532,16 +520,16 @@ export class SelectTool extends BaseTool {
         while (this.rotateCurrentAngle < 0) this.rotateCurrentAngle += 360;
         while (this.rotateCurrentAngle >= 360) this.rotateCurrentAngle -= 360;
         
-        console.log(`🔄 Угол вращения: ${this.rotateCurrentAngle.toFixed(1)}° (delta: ${deltaAngleDegrees.toFixed(1)}°)`);
+
         
         this.emit('rotate:update', { 
             object: this.dragTarget,
             angle: this.rotateCurrentAngle
         });
         
-        // Обновляем ручки в реальном времени во время поворота
+        // Обновляем рамку выделения в реальном времени
         if (this.resizeHandles) {
-            this.resizeHandles.updateHandles();
+            this.resizeHandles.updateSelectionBorderOnly();
         }
     }
     
@@ -550,7 +538,7 @@ export class SelectTool extends BaseTool {
      */
     endRotate() {
         if (this.dragTarget && this.rotateStartAngle !== undefined) {
-            console.log(`🏁 Завершаем вращение: ${this.rotateStartAngle}° → ${this.rotateCurrentAngle}°`);
+
             
             this.emit('rotate:end', { 
                 object: this.dragTarget,
@@ -559,9 +547,9 @@ export class SelectTool extends BaseTool {
             });
         }
         
-        // Обновляем позицию ручек после поворота
+        // Обновляем позицию ручек после завершения вращения
         if (this.resizeHandles) {
-            this.resizeHandles.updateHandles(); // Обновляем позицию ручек
+            this.resizeHandles.updateHandles();
         }
         
         this.isRotating = false;
@@ -656,6 +644,11 @@ export class SelectTool extends BaseTool {
      */
     
         addToSelection(object) {
+        if (this.selectedObjects.has(object)) {
+            console.log(`⚠️ Объект ${object} уже выделен`);
+            return; // Объект уже выделен
+        }
+        
         console.log(`➕ Добавляем в выделение: ${object}`);
         this.selectedObjects.add(object);
         this.emit('selection:add', { object });
@@ -719,7 +712,10 @@ export class SelectTool extends BaseTool {
             this.emit('get:object:pixi', pixiObjectData);
             
             if (pixiObjectData.pixiObject) {
+                console.log(`🎯 Показываем ручки для объекта ${objectId}`);
                 this.resizeHandles.showHandles(pixiObjectData.pixiObject, objectId);
+            } else {
+                console.log(`❌ PIXI объект не найден для ${objectId}`);
             }
         } else {
             this.resizeHandles.hideHandles();
