@@ -878,46 +878,59 @@ export class SelectTool extends BaseTool {
      * Вычисляет смещение позиции при изменении размера через левые/верхние ручки
      */
     calculatePositionOffset(handleType, startBounds, newSize, objectRotation = 0) {
-        let offsetX = 0;
-        let offsetY = 0;
-        
-        // Преобразуем тип ручки с учетом поворота объекта
-        const transformedHandleType = this.transformHandleType(handleType, objectRotation);
-        
-        // ВАЖНО: Объект теперь имеет pivot в центре, поэтому нужно адаптировать смещения
-        // Для центрированного pivot'а смещение = половина разности размеров
-        
+        // Вычисляем изменения размера
         const deltaWidth = newSize.width - startBounds.width;
         const deltaHeight = newSize.height - startBounds.height;
         
-        // При изменении размера через левые ручки объект должен сдвинуться 
-        // так, чтобы правый край остался на месте
-        if (['nw', 'w', 'sw'].includes(transformedHandleType)) {
-            // Для центрированного pivot сдвигаем на половину изменения размера влево
-            offsetX = -deltaWidth / 2;
+        // Определяем смещение в локальной системе координат объекта (до поворота)
+        let localOffsetX = 0;
+        let localOffsetY = 0;
+        
+        // В локальной системе координат (не повернутой) определяем смещение
+        // в зависимости от исходного типа ручки (до трансформации)
+        switch (handleType) {
+            case 'nw': // Левый верхний угол
+                localOffsetX = -deltaWidth / 2;  // Левый край неподвижен
+                localOffsetY = -deltaHeight / 2; // Верхний край неподвижен
+                break;
+            case 'n': // Верхняя сторона
+                localOffsetX = 0;                // Центр по горизонтали
+                localOffsetY = -deltaHeight / 2; // Верхний край неподвижен
+                break;
+            case 'ne': // Правый верхний угол
+                localOffsetX = deltaWidth / 2;   // Правый край неподвижен
+                localOffsetY = -deltaHeight / 2; // Верхний край неподвижен
+                break;
+            case 'e': // Правая сторона
+                localOffsetX = deltaWidth / 2;   // Правый край неподвижен
+                localOffsetY = 0;                // Центр по вертикали
+                break;
+            case 'se': // Правый нижний угол
+                localOffsetX = deltaWidth / 2;   // Правый край неподвижен
+                localOffsetY = deltaHeight / 2;  // Нижний край неподвижен
+                break;
+            case 's': // Нижняя сторона
+                localOffsetX = 0;                // Центр по горизонтали
+                localOffsetY = deltaHeight / 2;  // Нижний край неподвижен
+                break;
+            case 'sw': // Левый нижний угол
+                localOffsetX = -deltaWidth / 2;  // Левый край неподвижен
+                localOffsetY = deltaHeight / 2;  // Нижний край неподвижен
+                break;
+            case 'w': // Левая сторона
+                localOffsetX = -deltaWidth / 2;  // Левый край неподвижен
+                localOffsetY = 0;                // Центр по вертикали
+                break;
         }
         
-        // При изменении размера через правые ручки объект должен сдвинуться
-        // так, чтобы левый край остался на месте
-        if (['ne', 'e', 'se'].includes(transformedHandleType)) {
-            // Для центрированного pivot сдвигаем на половину изменения размера вправо
-            offsetX = deltaWidth / 2;
-        }
+        // Поворачиваем смещение на угол объекта для получения мирового смещения
+        const angleRad = objectRotation * Math.PI / 180;
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
         
-        // При изменении размера через верхние ручки объект должен сдвинуться
-        // так, чтобы нижний край остался на месте  
-        if (['nw', 'n', 'ne'].includes(transformedHandleType)) {
-            // Для центрированного pivot сдвигаем на половину изменения размера вверх
-            offsetY = -deltaHeight / 2;
-        }
+        const worldOffsetX = localOffsetX * cos - localOffsetY * sin;
+        const worldOffsetY = localOffsetX * sin + localOffsetY * cos;
         
-        // При изменении размера через нижние ручки объект должен сдвинуться
-        // так, чтобы верхний край остался на месте
-        if (['sw', 's', 'se'].includes(transformedHandleType)) {
-            // Для центрированного pivot сдвигаем на половину изменения размера вниз
-            offsetY = deltaHeight / 2;
-        }
-        
-        return { x: offsetX, y: offsetY };
+        return { x: worldOffsetX, y: worldOffsetY };
     }
 }
