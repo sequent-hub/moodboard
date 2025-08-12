@@ -393,11 +393,17 @@ export class SelectTool extends BaseTool {
         newSize.width = Math.max(20, newSize.width);
         newSize.height = Math.max(20, newSize.height);
         
+        // Получаем угол поворота для расчета смещения позиции
+        const rotationData = { objectId: this.dragTarget, rotation: 0 };
+        this.emit('get:object:rotation', rotationData);
+        const objectRotation = rotationData.rotation || 0;
+        
         // Вычисляем новую абсолютную позицию для левых/верхних ручек
         const positionOffset = this.calculatePositionOffset(
             this.resizeHandle, 
             this.resizeStartBounds, 
-            newSize
+            newSize,
+            objectRotation
         );
         
         // Вычисляем абсолютную позицию относительно начальной позиции
@@ -719,14 +725,50 @@ export class SelectTool extends BaseTool {
     }
     
     /**
+     * Преобразует тип ручки с учетом поворота объекта
+     */
+    transformHandleType(handleType, rotationDegrees) {
+        // Нормализуем угол поворота к диапазону 0-360
+        let angle = rotationDegrees % 360;
+        if (angle < 0) angle += 360;
+        
+        // Определяем количество поворотов на 90 градусов
+        const rotations = Math.round(angle / 90) % 4;
+        
+        if (rotations === 0) return handleType; // Нет поворота
+        
+        // Карта преобразований для каждого поворота на 90°
+        const transformMap = {
+            'nw': ['ne', 'se', 'sw', 'nw'],  // nw -> ne -> se -> sw -> nw
+            'n':  ['e',  's',  'w',  'n'],   // n -> e -> s -> w -> n
+            'ne': ['se', 'sw', 'nw', 'ne'],  // ne -> se -> sw -> nw -> ne
+            'e':  ['s',  'w',  'n',  'e'],   // e -> s -> w -> n -> e
+            'se': ['sw', 'nw', 'ne', 'se'],  // se -> sw -> nw -> ne -> se
+            's':  ['w',  'n',  'e',  's'],   // s -> w -> n -> e -> s
+            'sw': ['nw', 'ne', 'se', 'sw'],  // sw -> nw -> ne -> se -> sw
+            'w':  ['n',  'e',  's',  'w']    // w -> n -> e -> s -> w
+        };
+        
+        return transformMap[handleType] ? transformMap[handleType][rotations - 1] : handleType;
+    }
+
+    /**
      * Вычисляет новые размеры объекта на основе типа ручки и смещения мыши
      */
     calculateNewSize(handleType, startBounds, deltaX, deltaY, maintainAspectRatio) {
         let newWidth = startBounds.width;
         let newHeight = startBounds.height;
         
-        // Вычисляем изменения в зависимости от типа ручки
-        switch (handleType) {
+        // Получаем угол поворота объекта
+        const rotationData = { objectId: this.dragTarget, rotation: 0 };
+        this.emit('get:object:rotation', rotationData);
+        const objectRotation = rotationData.rotation || 0;
+        
+        // Преобразуем тип ручки с учетом поворота объекта
+        const transformedHandleType = this.transformHandleType(handleType, objectRotation);
+        
+        // Вычисляем изменения в зависимости от преобразованного типа ручки
+        switch (transformedHandleType) {
             case 'nw': // Северо-запад - левый верхний угол
                 newWidth = startBounds.width - deltaX;  // влево = меньше ширина
                 newHeight = startBounds.height - deltaY; // вверх = меньше высота
@@ -792,9 +834,12 @@ export class SelectTool extends BaseTool {
     /**
      * Вычисляет смещение позиции при изменении размера через левые/верхние ручки
      */
-    calculatePositionOffset(handleType, startBounds, newSize) {
+    calculatePositionOffset(handleType, startBounds, newSize, objectRotation = 0) {
         let offsetX = 0;
         let offsetY = 0;
+        
+        // Преобразуем тип ручки с учетом поворота объекта
+        const transformedHandleType = this.transformHandleType(handleType, objectRotation);
         
         // ВАЖНО: Объект теперь имеет pivot в центре, поэтому нужно адаптировать смещения
         // Для центрированного pivot'а смещение = половина разности размеров
@@ -804,35 +849,31 @@ export class SelectTool extends BaseTool {
         
         // При изменении размера через левые ручки объект должен сдвинуться 
         // так, чтобы правый край остался на месте
-        if (['nw', 'w', 'sw'].includes(handleType)) {
+        if (['nw', 'w', 'sw'].includes(transformedHandleType)) {
             // Для центрированного pivot сдвигаем на половину изменения размера влево
             offsetX = -deltaWidth / 2;
         }
         
         // При изменении размера через правые ручки объект должен сдвинуться
         // так, чтобы левый край остался на месте
-        if (['ne', 'e', 'se'].includes(handleType)) {
+        if (['ne', 'e', 'se'].includes(transformedHandleType)) {
             // Для центрированного pivot сдвигаем на половину изменения размера вправо
             offsetX = deltaWidth / 2;
         }
         
         // При изменении размера через верхние ручки объект должен сдвинуться
         // так, чтобы нижний край остался на месте  
-        if (['nw', 'n', 'ne'].includes(handleType)) {
+        if (['nw', 'n', 'ne'].includes(transformedHandleType)) {
             // Для центрированного pivot сдвигаем на половину изменения размера вверх
             offsetY = -deltaHeight / 2;
         }
         
         // При изменении размера через нижние ручки объект должен сдвинуться
         // так, чтобы верхний край остался на месте
-        if (['sw', 's', 'se'].includes(handleType)) {
+        if (['sw', 's', 'se'].includes(transformedHandleType)) {
             // Для центрированного pivot сдвигаем на половину изменения размера вниз
             offsetY = deltaHeight / 2;
         }
-        
-        console.log(`📍 Position offset для ручки ${handleType}: (${offsetX}, ${offsetY})`);
-        console.log(`📊 Размер изменился с (${startBounds.width}, ${startBounds.height}) на (${newSize.width}, ${newSize.height})`);
-        console.log(`📐 Delta: width=${deltaWidth}, height=${deltaHeight}`);
         
         return { x: offsetX, y: offsetY };
     }
