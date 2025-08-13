@@ -417,6 +417,41 @@ export class CoreMoodBoard {
             }
         });
 
+        // === Миникарта: данные и управление ===
+        // Синхронная выдача данных для миникарты (мир, вьюпорт, объекты)
+        this.eventBus.on('ui:minimap:get-data', (req) => {
+            const world = this.pixi.worldLayer || this.pixi.app.stage;
+            const viewEl = this.pixi.app.view;
+            const objects = this.state.state.objects || [];
+            req.world = {
+                x: world.x,
+                y: world.y,
+                scale: world.scale?.x || 1
+            };
+            req.view = {
+                width: viewEl.clientWidth,
+                height: viewEl.clientHeight
+            };
+            req.objects = objects.map(o => ({
+                id: o.id,
+                x: o.position?.x || 0,
+                y: o.position?.y || 0,
+                width: o.width || 0,
+                height: o.height || 0,
+                rotation: o.rotation || 0,
+                type: o.type || null
+            }));
+        });
+        // Центрирование основного вида на мировой точке
+        this.eventBus.on('ui:minimap:center-on', ({ worldX, worldY }) => {
+            const world = this.pixi.worldLayer || this.pixi.app.stage;
+            const viewW = this.pixi.app.view.clientWidth;
+            const viewH = this.pixi.app.view.clientHeight;
+            const s = world.scale?.x || 1;
+            world.x = viewW / 2 - worldX * s;
+            world.y = viewH / 2 - worldY * s;
+        });
+
         // Масштабирование колесом — глобально отрабатываем Ctrl+Wheel
         this.eventBus.on('tool:wheel:zoom', ({ x, y, delta }) => {
             const factor = 1 + (-delta) * 0.0015; // чувствительность
