@@ -152,7 +152,7 @@ export class CoreMoodBoard {
         this.eventBus.on('tool:group:drag:end', (data) => {
             // Создаем одну команду Move для каждого объекта
             for (const id of data.objects) {
-                const start = this._groupDragStart.get(id);
+                const start = this._groupDragStart?.get(id);
                 const pixiObject = this.pixi.objects.get(id);
                 if (!start || !pixiObject) continue;
                 const finalPosition = { x: pixiObject.x, y: pixiObject.y };

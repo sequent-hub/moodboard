@@ -152,7 +152,7 @@ export class SelectTool extends BaseTool {
     /**
      * Перемещение мыши
      */
-    onMouseMove(event) {
+		onMouseMove(event) {
         super.onMouseMove(event);
         
         // Обновляем текущие координаты мыши
@@ -163,7 +163,7 @@ export class SelectTool extends BaseTool {
             this.updateResize(event);
         } else if (this.isRotating) {
             this.updateRotate(event);
-        } else if (this.isDragging) {
+			} else if (this.isDragging || this.isGroupDragging) {
             this.updateDrag(event);
         } else if (this.isBoxSelect) {
             this.updateBoxSelect(event);
@@ -181,7 +181,7 @@ export class SelectTool extends BaseTool {
             this.endResize();
         } else if (this.isRotating) {
             this.endRotate();
-        } else if (this.isDragging) {
+        } else if (this.isDragging || this.isGroupDragging) {
             this.endDrag();
         } else if (this.isBoxSelect) {
             this.endBoxSelect();
@@ -1019,13 +1019,23 @@ export class SelectTool extends BaseTool {
         this.groupBoundsGraphics.beginFill(0x000000, 0);
         this.groupBoundsGraphics.drawRect(0, 0, Math.max(1, bounds.width), Math.max(1, bounds.height));
         this.groupBoundsGraphics.endFill();
-        this.groupBoundsGraphics.x = bounds.x;
-        this.groupBoundsGraphics.y = bounds.y;
+        // Размещаем графику в левом-верхнем углу группы
+        this.groupBoundsGraphics.position.set(bounds.x, bounds.y);
+        // Обновляем ручки, если показаны
+        if (this.resizeHandles) {
+            this.resizeHandles.updateHandles();
+        }
     }
 
     updateGroupBoundsGraphicsByTopLeft(topLeft) {
         if (!this.groupBoundsGraphics || !this.groupStartBounds) return;
         this.updateGroupBoundsGraphics({ x: topLeft.x, y: topLeft.y, width: this.groupStartBounds.width, height: this.groupStartBounds.height });
+        // Рисуем визуальную общую рамку одновременно
+        if (this.groupSelectionGraphics) {
+            this.groupSelectionGraphics.clear();
+            this.groupSelectionGraphics.lineStyle(1, 0x3B82F6, 0.9);
+            this.groupSelectionGraphics.drawRect(topLeft.x, topLeft.y, this.groupStartBounds.width, this.groupStartBounds.height);
+        }
     }
 
     startGroupDrag(event) {
@@ -1033,6 +1043,12 @@ export class SelectTool extends BaseTool {
         this.groupStartBounds = gb;
         this.groupDragOffset = { x: event.x - gb.x, y: event.y - gb.y };
         this.isGroupDragging = true;
+        this.isDragging = false; // отключаем одиночный drag, если был
+        // Обеспечиваем наличие невидимой геометрии и ручек на группе
+        this.ensureGroupBoundsGraphics(gb);
+        if (this.groupBoundsGraphics && this.resizeHandles) {
+            this.resizeHandles.showHandles(this.groupBoundsGraphics, this.groupId);
+        }
         const ids = Array.from(this.selectedObjects);
         this.emit('group:drag:start', { objects: ids });
     }
