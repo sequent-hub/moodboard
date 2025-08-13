@@ -217,8 +217,14 @@ export class MapPanel {
         ctx.save();
         ctx.translate(offsetX, offsetY);
         ctx.scale(scale, scale);
+        // Подготовим множество выделенных объектов
+        const selReq = { selection: [] };
+        this.eventBus.emit('tool:get:selection', selReq);
+        const selectedSet = new Set(selReq.selection || []);
+
+        // Сначала рисуем все объекты бледным
         ctx.strokeStyle = '#7b8794';
-        ctx.lineWidth = Math.max(0.5, 1 / (world.scale || 1));
+        ctx.lineWidth = Math.max(0.5, 1 / Math.max(scale, 0.0001));
         for (const o of objects) {
             const x = o.x - minX;
             const y = o.y - minY;
@@ -234,6 +240,30 @@ export class MapPanel {
                 ctx.restore();
             } else {
                 ctx.strokeRect(x, y, w, h);
+            }
+        }
+
+        // Поверх подсвечиваем выделенные объекты
+        if (selectedSet.size > 0) {
+            ctx.strokeStyle = '#3B82F6';
+            ctx.lineWidth = Math.max(1.5, 2 / Math.max(scale, 0.0001));
+            for (const o of objects) {
+                if (!selectedSet.has(o.id)) continue;
+                const x = o.x - minX;
+                const y = o.y - minY;
+                const w = Math.max(2, o.width);
+                const h = Math.max(2, o.height);
+                if (o.rotation) {
+                    ctx.save();
+                    const cx = x + w / 2;
+                    const cy = y + h / 2;
+                    ctx.translate(cx, cy);
+                    ctx.rotate((o.rotation * Math.PI) / 180);
+                    ctx.strokeRect(-w / 2, -h / 2, w, h);
+                    ctx.restore();
+                } else {
+                    ctx.strokeRect(x, y, w, h);
+                }
             }
         }
         ctx.restore();
