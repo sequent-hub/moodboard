@@ -125,6 +125,12 @@ export class CoreMoodBoard {
             });
         });
 
+        // Действия из UI контекстного меню
+        this.eventBus.on('ui:copy-object', ({ objectId }) => {
+            if (!objectId) return;
+            this.copyObject(objectId);
+        });
+
         // События перетаскивания
         this.eventBus.on('tool:drag:start', (data) => {
 

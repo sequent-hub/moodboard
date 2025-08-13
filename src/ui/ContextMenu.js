@@ -31,8 +31,8 @@ export class ContextMenu {
 
     attachEvents() {
         // Показ по событию из ядра
-        this.eventBus.on('ui:contextmenu:show', ({ x, y, context }) => {
-            this.show(x, y, context);
+        this.eventBus.on('ui:contextmenu:show', ({ x, y, context, targetId }) => {
+            this.show(x, y, context, targetId);
         });
 
         // Скрывать при клике вне меню или по Esc
@@ -50,7 +50,8 @@ export class ContextMenu {
         window.addEventListener('scroll', () => this.hide(), true);
     }
 
-    show(x, y) {
+    show(x, y, context = 'canvas', targetId = null) {
+        this.renderItems(context, targetId);
         this.element.style.left = `${x}px`;
         this.element.style.top = `${y}px`;
         this.element.style.display = 'block';
@@ -74,6 +75,44 @@ export class ContextMenu {
             this.element.style.left = `${left}px`;
             this.element.style.top = `${top}px`;
         }
+    }
+
+    renderItems(context, targetId) {
+        // Пока только для объекта: Копировать / Вставить
+        if (context === 'object') {
+            this.element.innerHTML = '';
+            const list = document.createElement('div');
+            list.className = 'moodboard-contextmenu__list';
+
+            const mkItem = (label, onClick) => {
+                const item = document.createElement('div');
+                item.className = 'moodboard-contextmenu__item';
+                item.textContent = label;
+                item.addEventListener('click', () => {
+                    this.hide();
+                    onClick();
+                });
+                return item;
+            };
+
+            // Копировать — копируем конкретный объект
+            list.appendChild(mkItem('Копировать', () => {
+                if (targetId) {
+                    this.eventBus.emit('ui:copy-object', { objectId: targetId });
+                }
+            }));
+
+            // Вставить — используем текущий буфер (объект/группа)
+            list.appendChild(mkItem('Вставить', () => {
+                this.eventBus.emit('keyboard:paste');
+            }));
+
+            this.element.appendChild(list);
+            return;
+        }
+
+        // По умолчанию — пусто
+        this.element.innerHTML = '<div style="padding:8px 12px; color:#888;">(пусто)</div>';
     }
 }
 

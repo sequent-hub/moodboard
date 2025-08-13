@@ -218,6 +218,15 @@
     line-height: 1.4;
 }
 
+.moodboard-contextmenu__item {
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.moodboard-contextmenu__item:hover {
+    background: #f5f5f5;
+}
+
 /* Status Animation */
 .moodboard-save-status.status-saving .save-icon {
     animation: spin 1s linear infinite;
