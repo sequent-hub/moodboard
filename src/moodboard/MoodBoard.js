@@ -1,6 +1,7 @@
 import { CoreMoodBoard } from '../core/index.js';
 import { Toolbar } from '../ui/Toolbar.js';
 import { SaveStatus } from '../ui/SaveStatus.js';
+import { Topbar } from '../ui/Topbar.js';
 import { ContextMenu } from '../ui/ContextMenu.js';
 import { WorkspaceManager } from './WorkspaceManager.js';
 import { DataManager } from './DataManager.js';
@@ -48,10 +49,11 @@ export class MoodBoard {
     async init() {
         try {
             // Создаем HTML структуру
-            const { workspace, toolbar, canvas } = this.workspaceManager.createWorkspaceStructure();
+            const { workspace, toolbar, canvas, topbar } = this.workspaceManager.createWorkspaceStructure();
             this.workspaceElement = workspace;
             this.toolbarContainer = toolbar;
             this.canvasContainer = canvas;
+            this.topbarContainer = topbar;
             
             // Инициализируем CoreMoodBoard
             await this.initCoreMoodBoard();
@@ -62,6 +64,7 @@ export class MoodBoard {
             
             // Инициализируем UI
             this.initToolbar();
+            this.initTopbar();
             this.initContextMenu();
             
             // Загружаем данные (сначала пробуем загрузить с сервера, потом дефолтные)
@@ -114,6 +117,14 @@ export class MoodBoard {
         this.coreMoodboard.eventBus.on('toolbar:action', (action) => {
             this.actionHandler.handleToolbarAction(action);
         });
+    }
+
+    initTopbar() {
+        this.topbar = new Topbar(
+            this.topbarContainer,
+            this.coreMoodboard.eventBus,
+            this.options.theme
+        );
     }
 
     initContextMenu() {

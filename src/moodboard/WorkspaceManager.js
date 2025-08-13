@@ -8,6 +8,7 @@ export class WorkspaceManager {
         this.workspaceElement = null;
         this.toolbarContainer = null;
         this.canvasContainer = null;
+        this.topbarContainer = null;
     }
     
     /**
@@ -29,16 +30,22 @@ export class WorkspaceManager {
         this.canvasContainer = document.createElement('div');
         this.canvasContainer.className = 'moodboard-workspace__canvas';
         this.canvasContainer.id = 'moodboard-canvas-' + Date.now();
+
+        // Создаем контейнер для верхней панели
+        this.topbarContainer = document.createElement('div');
+        this.topbarContainer.className = 'moodboard-workspace__topbar';
         
         // Собираем структуру (toolbar поверх canvas)
         this.workspaceElement.appendChild(this.canvasContainer);
         this.workspaceElement.appendChild(this.toolbarContainer);
+        this.workspaceElement.appendChild(this.topbarContainer);
         this.container.appendChild(this.workspaceElement);
         
         return {
             workspace: this.workspaceElement,
             toolbar: this.toolbarContainer,
-            canvas: this.canvasContainer
+            canvas: this.canvasContainer,
+            topbar: this.topbarContainer
         };
     }
     

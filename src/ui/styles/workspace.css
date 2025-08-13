@@ -31,6 +31,15 @@
     pointer-events: none; /* чтобы клики проходили, сами кнопки включим */
 }
 
+.moodboard-workspace__topbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 0; /* контейнер только для позиционирования, сам топбар абсолютный */
+    pointer-events: none;
+}
+
 /* Canvas Container */
 .moodboard-workspace__canvas {
     position: absolute;
@@ -224,6 +233,24 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 14px;
     line-height: 1.4;
+}
+
+/* Topbar */
+.moodboard-topbar {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    z-index: 3000;
+    pointer-events: auto;
 }
 
 .moodboard-contextmenu__item {
