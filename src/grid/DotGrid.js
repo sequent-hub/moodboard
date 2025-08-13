@@ -12,8 +12,9 @@ export class DotGrid extends BaseGrid {
         this.dotSize = options.dotSize || 2;
         this.dotStyle = options.dotStyle || 'circle'; // 'circle' | 'square'
         this.highlightIntersections = options.highlightIntersections ?? true;
-        this.intersectionSize = options.intersectionSize || 3;
-        this.intersectionColor = options.intersectionColor || 0x007bff;
+        // Пересечения делаем такими же, как обычные точки по умолчанию
+        this.intersectionSize = options.intersectionSize || this.dotSize;
+        this.intersectionColor = options.intersectionColor || this.color;
     }
     
     /**
@@ -50,11 +51,12 @@ export class DotGrid extends BaseGrid {
     drawIntersections() {
         const intersectionStep = this.size * 5;
         
-        this.graphics.beginFill(this.intersectionColor);
+        // Используем те же параметры, что и у обычных точек
+        this.graphics.beginFill(this.color);
         
         for (let x = 0; x <= this.width; x += intersectionStep) {
             for (let y = 0; y <= this.height; y += intersectionStep) {
-                this.drawDot(x, y, this.intersectionSize);
+                this.drawDot(x, y, this.dotSize);
             }
         }
         
@@ -100,6 +102,8 @@ export class DotGrid extends BaseGrid {
      */
     setDotSize(size) {
         this.dotSize = Math.max(1, size);
+        // Синхронизируем размер точек пересечений
+        this.intersectionSize = this.dotSize;
         this.updateVisual();
     }
     
@@ -118,6 +122,13 @@ export class DotGrid extends BaseGrid {
      */
     setHighlightIntersections(enabled) {
         this.highlightIntersections = enabled;
+        this.updateVisual();
+    }
+
+    // Делаем цвет пересечений таким же, как основной цвет
+    setColor(color) {
+        super.setColor(color);
+        this.intersectionColor = this.color;
         this.updateVisual();
     }
     

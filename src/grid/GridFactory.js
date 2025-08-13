@@ -1,5 +1,6 @@
 import { LineGrid } from './LineGrid.js';
 import { DotGrid } from './DotGrid.js';
+import { CrossGrid } from './CrossGrid.js';
 
 /**
  * Фабрика для создания различных типов сеток
@@ -10,7 +11,8 @@ export class GridFactory {
      */
     static gridTypes = {
         'line': LineGrid,
-        'dot': DotGrid
+        'dot': DotGrid,
+        'cross': CrossGrid
     };
     
     /**
@@ -80,6 +82,14 @@ export class GridFactory {
                 dotSize: 2,
                 dotStyle: 'circle',
                 highlightIntersections: true
+            },
+            cross: {
+                enabled: true,
+                size: 40,
+                color: 0xB0B0B0,
+                opacity: 0.5,
+                crossHalfSize: 4,
+                crossLineWidth: 1
             }
         };
         

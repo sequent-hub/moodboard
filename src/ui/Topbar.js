@@ -25,6 +25,7 @@ export class Topbar {
         const buttons = [
             { id: 'grid-line', icon: '▦', title: 'Сетка: линии', type: 'line' },
             { id: 'grid-dot', icon: '⋯', title: 'Сетка: точки', type: 'dot' },
+            { id: 'grid-cross', icon: '+', title: 'Сетка: крестики', type: 'cross' },
             { id: 'grid-off', icon: '⊘', title: 'Сетка: выкл', type: 'off' }
         ];
 
