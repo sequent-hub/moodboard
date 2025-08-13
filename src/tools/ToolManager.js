@@ -13,6 +13,8 @@ export class ToolManager {
         // Состояние для временных инструментов
         this.temporaryTool = null;
         this.previousTool = null;
+  this.spacePressed = false;
+  this.isMouseDown = false;
         
         this.initEventListeners();
     }
@@ -118,10 +120,17 @@ export class ToolManager {
         this.container.addEventListener('mousedown', (e) => this.handleMouseDown(e));
         this.container.addEventListener('mousemove', (e) => this.handleMouseMove(e));
         this.container.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        // Убираем отдельные слушатели aux-pan на контейнере, чтобы не дублировать mousedown/mouseup
 
         // Глобальные события мыши — чтобы корректно завершать drag/resize при отпускании за пределами холста
         document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-        document.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        document.addEventListener('mouseup', (e) => {
+            this.handleMouseUp(e);
+            // Гарантированно завершаем временный pan, даже если кнопка отпущена вне холста
+            if (this.temporaryTool === 'pan') {
+                this.handleAuxPanEnd(e);
+            }
+        });
         this.container.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
         this.container.addEventListener('wheel', (e) => this.handleMouseWheel(e));
         
@@ -151,6 +160,18 @@ export class ToolManager {
     
     handleMouseDown(e) {
         if (!this.activeTool) return;
+        this.isMouseDown = true;
+
+        // Если удерживается пробел + левая кнопка — сразу запускаем pan и не дергаем активный инструмент
+        if (this.spacePressed && e.button === 0) {
+            this.handleAuxPanStart(e);
+            return;
+        }
+        // Средняя кнопка — тоже панорамирование без дергания активного инструмента
+        if (e.button === 1) {
+            this.handleAuxPanStart(e);
+            return;
+        }
         
         const rect = this.container.getBoundingClientRect();
         const event = {
@@ -162,6 +183,47 @@ export class ToolManager {
         };
         
         this.activeTool.onMouseDown(event);
+    }
+
+    // Поддержка панорамирования средней кнопкой мыши без переключения инструмента
+    handleAuxPanStart(e) {
+        // Средняя кнопка (button === 1) или пробел зажат и левая кнопка
+        const isMiddle = e.button === 1;
+        const isSpaceLeft = e.button === 0 && this.spacePressed;
+        if (!isMiddle && !isSpaceLeft) return;
+
+        // Временная активация pan-инструмента
+        if (this.hasActiveTool('pan')) {
+            this.previousTool = this.activeTool?.name || null;
+            this.activateTemporaryTool('pan');
+            // Синтетический mousedown для запуска pan
+            const rect = this.container.getBoundingClientRect();
+            const event = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+                button: 0,
+                target: e.target,
+                originalEvent: e
+            };
+            this.activeTool.onMouseDown(event);
+        }
+    }
+
+    handleAuxPanEnd(e) {
+        // Завершаем временное панорамирование при отпускании средней/левой (с пробелом)
+        if (this.temporaryTool === 'pan') {
+            const rect = this.container.getBoundingClientRect();
+            const event = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+                button: 0,
+                target: e.target,
+                originalEvent: e
+            };
+            this.activeTool.onMouseUp(event);
+            this.returnToPreviousTool();
+            return;
+        }
     }
     
     handleMouseMove(e) {
@@ -175,11 +237,17 @@ export class ToolManager {
             originalEvent: e
         };
         
+        // Если временно активирован pan, проксируем движение именно ему
+        if (this.temporaryTool === 'pan' && this.activeTool?.name === 'pan') {
+            this.activeTool.onMouseMove(event);
+            return;
+        }
         this.activeTool.onMouseMove(event);
     }
     
     handleMouseUp(e) {
         if (!this.activeTool) return;
+        this.isMouseDown = false;
         
         const rect = this.container.getBoundingClientRect();
         const event = {
@@ -189,7 +257,10 @@ export class ToolManager {
             target: e.target,
             originalEvent: e
         };
-        
+        if (this.temporaryTool === 'pan') {
+            this.handleAuxPanEnd(e);
+            return;
+        }
         this.activeTool.onMouseUp(event);
     }
     
@@ -244,6 +315,11 @@ export class ToolManager {
         };
         
         this.activeTool.onKeyDown(event);
+
+        // Тоггл пробела для временного pan
+        if (e.key === ' ' && !e.repeat) {
+            this.spacePressed = true;
+        }
     }
     
     handleKeyUp(e) {
@@ -256,6 +332,19 @@ export class ToolManager {
         };
         
         this.activeTool.onKeyUp(event);
+
+        if (e.key === ' ') {
+            this.spacePressed = false;
+            // Если удерживали pan временно, вернуть инструмент
+            if (this.temporaryTool === 'pan') {
+                // Корректно завершим pan, если мышь ещё зажата
+                if (this.activeTool?.name === 'pan' && this.isMouseDown) {
+                    this.activeTool.onMouseUp({ x: 0, y: 0, button: 0, target: this.container, originalEvent: e });
+                }
+                this.returnToPreviousTool();
+                return;
+            }
+        }
     }
     
     /**
@@ -278,13 +367,6 @@ export class ToolManager {
         
         // Специальные горячие клавиши
         switch (e.key) {
-            case ' ': // Пробел - временный PanTool
-                if (!e.repeat) {
-                    this.activateTemporaryTool('pan');
-                }
-                e.preventDefault();
-                break;
-                
             case 'Escape': // Escape - возврат к default tool
                 this.activateDefaultTool();
                 e.preventDefault();

@@ -55,7 +55,7 @@ export class CoreMoodBoard {
             this.keyboard.startListening(); // Запускаем прослушивание клавиатуры
 
             // Инициализируем систему инструментов
-            this.initTools();
+            await this.initTools();
 
             // Инициализируем сетку (по умолчанию линейная)
             const canvasSize = this.workspaceSize?.() || { width: this.options.width, height: this.options.height };
@@ -113,7 +113,7 @@ export class CoreMoodBoard {
     /**
      * Инициализация системы инструментов
      */
-    initTools() {
+    async initTools() {
         // Получаем canvas элемент для обработки событий
         const canvasElement = this.pixi.app.view;
         // Хелпер для размера (используем в init)
@@ -125,6 +125,10 @@ export class CoreMoodBoard {
         // Регистрируем инструменты
         const selectTool = new SelectTool(this.eventBus);
         this.toolManager.registerTool(selectTool);
+        // Панорамирование — регистрируем статически
+        const panToolModule = await import('../tools/board-tools/PanTool.js');
+        const panTool = new panToolModule.PanTool(this.eventBus);
+        this.toolManager.registerTool(panTool);
         
         // Сохраняем ссылку на selectTool для обновления ручек
         this.selectTool = selectTool;
@@ -396,6 +400,37 @@ export class CoreMoodBoard {
             const pixiObject = this.pixi.objects.get(data.object);
             if (pixiObject) {
                 this.dragStartPosition = { x: pixiObject.x, y: pixiObject.y };
+            }
+        });
+
+        // Панорамирование холста
+        this.eventBus.on('tool:pan:update', ({ delta }) => {
+            // Смещаем всю сцену
+            const stage = this.pixi.app.stage;
+            stage.x += delta.x;
+            stage.y += delta.y;
+
+            // Обновляем отрисовку сетки как бесконечной плитки
+            if (this.grid && this.pixi?.app?.view) {
+                const view = this.pixi.app.view;
+                const vw = view.clientWidth || this.options.width;
+                const vh = view.clientHeight || this.options.height;
+                const cell = Math.max(1, this.grid.size || 20);
+                // Смещение сетки по модулю размера клетки
+                const mod = (v) => ((v % cell) + cell) % cell;
+                const gx = -mod(stage.x);
+                const gy = -mod(stage.y);
+                const gfx = this.grid.getPixiObject ? this.grid.getPixiObject() : null;
+                if (gfx) {
+                    gfx.x = gx;
+                    gfx.y = gy;
+                }
+                // Гарантируем покрытие экрана (с запасом в одну ячейку)
+                const needW = vw + cell;
+                const needH = vh + cell;
+                if (this.grid.width !== needW || this.grid.height !== needH) {
+                    this.grid.resize(needW, needH);
+                }
             }
         });
 
