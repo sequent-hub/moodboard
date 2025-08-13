@@ -6,6 +6,7 @@ export class ContextMenu {
         this.isVisible = false;
         this.lastX = 0;
         this.lastY = 0;
+        this.currentGridType = 'line';
 
         this.createElement();
         this.attachEvents();
@@ -35,6 +36,11 @@ export class ContextMenu {
         // Показ по событию из ядра
         this.eventBus.on('ui:contextmenu:show', ({ x, y, context, targetId }) => {
             this.show(x, y, context, targetId);
+        });
+
+        // Синхронизация активного типа сетки
+        this.eventBus.on('ui:grid:current', ({ type }) => {
+            if (type) this.currentGridType = type;
         });
 
         // Скрывать при клике вне меню или по Esc
@@ -206,6 +212,38 @@ export class ContextMenu {
                 this.eventBus.emit('ui:paste-at', { x: this.lastX, y: this.lastY });
             });
             list.appendChild(item);
+
+            // Разделитель
+            const divider = document.createElement('div');
+            divider.className = 'moodboard-contextmenu__divider';
+            list.appendChild(divider);
+
+            // Ряд кнопок сетки
+            const gridRow = document.createElement('div');
+            gridRow.className = 'moodboard-contextmenu__grid-row';
+            const buttons = [
+                { icon: '▦', type: 'line', title: 'Сетка: линии' },
+                { icon: '⋯', type: 'dot', title: 'Сетка: точки' },
+                { icon: '+', type: 'cross', title: 'Сетка: крестики' },
+                { icon: '⊘', type: 'off', title: 'Сетка: выкл' }
+            ];
+            buttons.forEach(cfg => {
+                const b = document.createElement('button');
+                b.className = 'moodboard-contextmenu__grid-button';
+                b.textContent = cfg.icon;
+                b.title = cfg.title;
+                b.dataset.grid = cfg.type;
+                if (cfg.type === this.currentGridType) {
+                    b.classList.add('moodboard-contextmenu__grid-button--active');
+                }
+                b.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.hide();
+                    this.eventBus.emit('ui:grid:change', { type: cfg.type });
+                });
+                gridRow.appendChild(b);
+            });
+            list.appendChild(gridRow);
             this.element.appendChild(list);
             return;
         }

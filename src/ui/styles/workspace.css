@@ -295,6 +295,38 @@
     font-size: 12px;
 }
 
+.moodboard-contextmenu__divider {
+    height: 1px;
+    background: #eee;
+    margin: 6px 0;
+}
+
+.moodboard-contextmenu__grid-row {
+    display: flex;
+    gap: 6px;
+    padding: 6px 8px 2px;
+}
+
+.moodboard-contextmenu__grid-button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    background: #f0f0f0;
+    color: #333;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.moodboard-contextmenu__grid-button:hover {
+    background: #e6e6e6;
+}
+
+.moodboard-contextmenu__grid-button--active {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
 /* Status Animation */
 .moodboard-save-status.status-saving .save-icon {
     animation: spin 1s linear infinite;
