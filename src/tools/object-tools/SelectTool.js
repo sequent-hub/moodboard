@@ -1379,6 +1379,14 @@ export class SelectTool extends BaseTool {
     getSelection() {
         return Array.from(this.selectedObjects);
     }
+
+    // Экспонируем выделение через EventBus для внешних слушателей (keyboard)
+    onActivate() {
+        // Подписка безопасна: EventBus простая шина, а вызов синхронный
+        this.eventBus.on('tool:get:selection', (data) => {
+            data.selection = this.getSelection();
+        });
+    }
     
     hasSelection() {
         return this.selectedObjects.size > 0;

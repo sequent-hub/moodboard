@@ -364,6 +364,32 @@ export class KeyboardManager {
         this.registerShortcut('ctrl+м', () => { // русская 'м' на той же клавише что и 'v'
             this.eventBus.emit('keyboard:paste');
         }, { description: 'Вставить (рус)', preventDefault: true });
+
+        // Слойность (латиница и русская раскладка)
+        this.registerShortcut(']', () => {
+            const data = { selection: [] };
+            this.eventBus.emit('tool:get:selection', data);
+            const id = data.selection?.[0];
+            if (id) this.eventBus.emit('ui:layer:bring-to-front', { objectId: id });
+        }, { description: 'На передний план', preventDefault: true });
+        this.registerShortcut('ctrl+]', () => {
+            const data = { selection: [] };
+            this.eventBus.emit('tool:get:selection', data);
+            const id = data.selection?.[0];
+            if (id) this.eventBus.emit('ui:layer:bring-forward', { objectId: id });
+        }, { description: 'Перенести вперёд', preventDefault: true });
+        this.registerShortcut('[', () => {
+            const data = { selection: [] };
+            this.eventBus.emit('tool:get:selection', data);
+            const id = data.selection?.[0];
+            if (id) this.eventBus.emit('ui:layer:send-to-back', { objectId: id });
+        }, { description: 'На задний план', preventDefault: true });
+        this.registerShortcut('ctrl+[', () => {
+            const data = { selection: [] };
+            this.eventBus.emit('tool:get:selection', data);
+            const id = data.selection?.[0];
+            if (id) this.eventBus.emit('ui:layer:send-backward', { objectId: id });
+        }, { description: 'Перенести назад', preventDefault: true });
         
         // Удаление
         this.registerShortcut('delete', () => {

@@ -182,6 +182,51 @@ export class CoreMoodBoard {
             }
         });
 
+        // Слойность: изменение порядка отрисовки (zIndex) с синхронизацией состояния
+        const applyZOrderFromState = () => {
+            const arr = this.state.state.objects || [];
+            // Устанавливаем zIndex по порядку в состоянии (объекты всегда < служебных элементов с высоким zIndex)
+            this.pixi.app.stage.sortableChildren = true;
+            for (let i = 0; i < arr.length; i++) {
+                const id = arr[i]?.id;
+                const pixi = id ? this.pixi.objects.get(id) : null;
+                if (pixi) pixi.zIndex = i; // объекты 0..N
+            }
+        };
+
+        const reorderInState = (id, mode) => {
+            const arr = this.state.state.objects || [];
+            const index = arr.findIndex(o => o.id === id);
+            if (index === -1) return;
+            const [item] = arr.splice(index, 1);
+            switch (mode) {
+                case 'front':
+                    arr.push(item);
+                    break;
+                case 'back':
+                    arr.unshift(item);
+                    break;
+                case 'forward':
+                    arr.splice(Math.min(index + 1, arr.length), 0, item);
+                    break;
+                case 'backward':
+                    arr.splice(Math.max(index - 1, 0), 0, item);
+                    break;
+            }
+            applyZOrderFromState();
+            this.state.markDirty();
+        };
+
+        const bringToFront = (id) => reorderInState(id, 'front');
+        const sendToBack = (id) => reorderInState(id, 'back');
+        const bringForward = (id) => reorderInState(id, 'forward');
+        const sendBackward = (id) => reorderInState(id, 'backward');
+
+        this.eventBus.on('ui:layer:bring-to-front', ({ objectId }) => bringToFront(objectId));
+        this.eventBus.on('ui:layer:bring-forward', ({ objectId }) => bringForward(objectId));
+        this.eventBus.on('ui:layer:send-backward', ({ objectId }) => sendBackward(objectId));
+        this.eventBus.on('ui:layer:send-to-back', ({ objectId }) => sendToBack(objectId));
+
         // События перетаскивания
         this.eventBus.on('tool:drag:start', (data) => {
 
