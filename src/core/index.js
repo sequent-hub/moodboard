@@ -6,7 +6,7 @@ import { SaveManager } from './SaveManager.js';
 import { HistoryManager } from './HistoryManager.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
-import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand } from './commands/index.js';
+import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand } from './commands/index.js';
 
 export class CoreMoodBoard {
     constructor(container, options = {}) {
@@ -150,17 +150,21 @@ export class CoreMoodBoard {
         });
 
         this.eventBus.on('tool:group:drag:end', (data) => {
-            // Создаем одну команду Move для каждого объекта
+            // Собираем один батч для истории
+            const moves = [];
             for (const id of data.objects) {
                 const start = this._groupDragStart?.get(id);
                 const pixiObject = this.pixi.objects.get(id);
                 if (!start || !pixiObject) continue;
                 const finalPosition = { x: pixiObject.x, y: pixiObject.y };
                 if (start.x !== finalPosition.x || start.y !== finalPosition.y) {
-                    const command = new MoveObjectCommand(this, id, start, finalPosition);
-                    command.setEventBus(this.eventBus);
-                    this.history.executeCommand(command);
+                    moves.push({ id, from: start, to: finalPosition });
                 }
+            }
+            if (moves.length > 0) {
+                const cmd = new GroupMoveCommand(this, moves);
+                cmd.setEventBus(this.eventBus);
+                this.history.executeCommand(cmd);
             }
             this._groupDragStart = null;
         });
