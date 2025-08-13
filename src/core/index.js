@@ -6,7 +6,7 @@ import { SaveManager } from './SaveManager.js';
 import { HistoryManager } from './HistoryManager.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
-import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand, GroupRotateCommand, GroupResizeCommand } from './commands/index.js';
+import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand, GroupRotateCommand, GroupResizeCommand, ReorderZCommand, GroupReorderZCommand } from './commands/index.js';
 import { generateObjectId } from '../utils/objectIdGenerator.js';
 
 export class CoreMoodBoard {
@@ -239,10 +239,46 @@ export class CoreMoodBoard {
         const bringForward = (id) => reorderInState(id, 'forward');
         const sendBackward = (id) => reorderInState(id, 'backward');
 
-        this.eventBus.on('ui:layer:bring-to-front', ({ objectId }) => bringToFront(objectId));
-        this.eventBus.on('ui:layer:bring-forward', ({ objectId }) => bringForward(objectId));
-        this.eventBus.on('ui:layer:send-backward', ({ objectId }) => sendBackward(objectId));
-        this.eventBus.on('ui:layer:send-to-back', ({ objectId }) => sendToBack(objectId));
+        this.eventBus.on('ui:layer:bring-to-front', ({ objectId }) => {
+            const arr = this.state.state.objects || [];
+            const from = arr.findIndex(o => o.id === objectId);
+            if (from === -1) return;
+            const to = arr.length - 1;
+            if (from === to) return;
+            const cmd = new ReorderZCommand(this, objectId, from, to);
+            cmd.setEventBus(this.eventBus);
+            this.history.executeCommand(cmd);
+        });
+        this.eventBus.on('ui:layer:bring-forward', ({ objectId }) => {
+            const arr = this.state.state.objects || [];
+            const from = arr.findIndex(o => o.id === objectId);
+            if (from === -1) return;
+            const to = Math.min(from + 1, arr.length - 1);
+            if (from === to) return;
+            const cmd = new ReorderZCommand(this, objectId, from, to);
+            cmd.setEventBus(this.eventBus);
+            this.history.executeCommand(cmd);
+        });
+        this.eventBus.on('ui:layer:send-backward', ({ objectId }) => {
+            const arr = this.state.state.objects || [];
+            const from = arr.findIndex(o => o.id === objectId);
+            if (from === -1) return;
+            const to = Math.max(from - 1, 0);
+            if (from === to) return;
+            const cmd = new ReorderZCommand(this, objectId, from, to);
+            cmd.setEventBus(this.eventBus);
+            this.history.executeCommand(cmd);
+        });
+        this.eventBus.on('ui:layer:send-to-back', ({ objectId }) => {
+            const arr = this.state.state.objects || [];
+            const from = arr.findIndex(o => o.id === objectId);
+            if (from === -1) return;
+            const to = 0;
+            if (from === to) return;
+            const cmd = new ReorderZCommand(this, objectId, from, to);
+            cmd.setEventBus(this.eventBus);
+            this.history.executeCommand(cmd);
+        });
 
         // Групповые операции слоя: перемещаем группу как единый блок, сохраняя внутренний порядок
         const getSelection = () => {
@@ -284,19 +320,31 @@ export class CoreMoodBoard {
         };
         this.eventBus.on('ui:layer-group:bring-to-front', () => {
             const ids = getSelection();
-            reorderGroupInState(ids, 'front');
+            if (ids.length === 0) return;
+            const cmd = new GroupReorderZCommand(this, ids, 'front');
+            cmd.setEventBus(this.eventBus);
+            this.history.executeCommand(cmd);
         });
         this.eventBus.on('ui:layer-group:bring-forward', () => {
             const ids = getSelection();
-            reorderGroupInState(ids, 'forward');
+            if (ids.length === 0) return;
+            const cmd = new GroupReorderZCommand(this, ids, 'forward');
+            cmd.setEventBus(this.eventBus);
+            this.history.executeCommand(cmd);
         });
         this.eventBus.on('ui:layer-group:send-backward', () => {
             const ids = getSelection();
-            reorderGroupInState(ids, 'backward');
+            if (ids.length === 0) return;
+            const cmd = new GroupReorderZCommand(this, ids, 'backward');
+            cmd.setEventBus(this.eventBus);
+            this.history.executeCommand(cmd);
         });
         this.eventBus.on('ui:layer-group:send-to-back', () => {
             const ids = getSelection();
-            reorderGroupInState(ids, 'back');
+            if (ids.length === 0) return;
+            const cmd = new GroupReorderZCommand(this, ids, 'back');
+            cmd.setEventBus(this.eventBus);
+            this.history.executeCommand(cmd);
         });
 
         // События перетаскивания

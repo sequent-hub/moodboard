@@ -9,3 +9,5 @@ export { PasteObjectCommand } from './PasteObjectCommand.js';
 export { GroupMoveCommand } from './GroupMoveCommand.js';
 export { GroupRotateCommand } from './GroupRotateCommand.js';
 export { GroupResizeCommand } from './GroupResizeCommand.js';
+export { ReorderZCommand } from './ReorderZCommand.js';
+export { GroupReorderZCommand } from './GroupReorderZCommand.js';
