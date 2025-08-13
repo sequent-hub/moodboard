@@ -113,6 +113,18 @@ export class CoreMoodBoard {
 
         });
 
+        // Показ контекстного меню (пока пустое) — передаем вверх координаты и контекст
+        this.eventBus.on('tool:context:menu:show', (data) => {
+            // Прокидываем событие для UI
+            this.eventBus.emit('ui:contextmenu:show', {
+                x: data.x,
+                y: data.y,
+                context: data.context, // 'canvas' | 'object' | 'group'
+                targetId: data.targetId || null,
+                items: [] // пока пусто
+            });
+        });
+
         // События перетаскивания
         this.eventBus.on('tool:drag:start', (data) => {
 

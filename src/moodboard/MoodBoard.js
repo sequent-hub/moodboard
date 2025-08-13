@@ -1,6 +1,7 @@
 import { CoreMoodBoard } from '../core/index.js';
 import { Toolbar } from '../ui/Toolbar.js';
 import { SaveStatus } from '../ui/SaveStatus.js';
+import { ContextMenu } from '../ui/ContextMenu.js';
 import { WorkspaceManager } from './WorkspaceManager.js';
 import { DataManager } from './DataManager.js';
 import { ActionHandler } from './ActionHandler.js';
@@ -31,6 +32,7 @@ export class MoodBoard {
         this.coreMoodboard = null;
         this.toolbar = null;
         this.saveStatus = null;
+        this.contextMenu = null;
         
         // Менеджеры
         this.workspaceManager = new WorkspaceManager(this.container, this.options);
@@ -60,6 +62,7 @@ export class MoodBoard {
             
             // Инициализируем UI
             this.initToolbar();
+            this.initContextMenu();
             
             // Загружаем данные (сначала пробуем загрузить с сервера, потом дефолтные)
             await this.loadExistingBoard();
@@ -111,6 +114,13 @@ export class MoodBoard {
         this.coreMoodboard.eventBus.on('toolbar:action', (action) => {
             this.actionHandler.handleToolbarAction(action);
         });
+    }
+
+    initContextMenu() {
+        this.contextMenu = new ContextMenu(
+            this.canvasContainer,
+            this.coreMoodboard.eventBus
+        );
     }
     
     /**

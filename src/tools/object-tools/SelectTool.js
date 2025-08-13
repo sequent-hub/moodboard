@@ -212,6 +212,28 @@ export class SelectTool extends BaseTool {
             this.editObject(hitResult.object);
         }
     }
+
+    /**
+     * Контекстное меню (правая кнопка) — пока пустое, только определяем контекст
+     */
+    onContextMenu(event) {
+        // Определяем, что под курсором
+        const hit = this.hitTest(event.x, event.y);
+        let context = 'canvas';
+        let targetId = null;
+        if (hit && hit.type === 'object' && hit.object) {
+            targetId = hit.object;
+            if (this.selectedObjects.has(targetId) && this.selectedObjects.size > 1) {
+                context = 'group';
+            } else {
+                context = 'object';
+            }
+        } else if (this.selectedObjects.size > 1) {
+            context = 'group';
+        }
+        // Сообщаем ядру/UI, что нужно показать контекстное меню (пока без пунктов)
+        this.emit('context:menu:show', { x: event.x, y: event.y, context, targetId });
+    }
     
     /**
      * Обработка клавиш

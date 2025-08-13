@@ -129,8 +129,20 @@ export class ToolManager {
         document.addEventListener('keydown', (e) => this.handleKeyDown(e));
         document.addEventListener('keyup', (e) => this.handleKeyUp(e));
         
-        // Предотвращаем контекстное меню
-        this.container.addEventListener('contextmenu', (e) => e.preventDefault());
+        // Контекстное меню: предотвращаем дефолт и пересылаем событие активному инструменту
+        this.container.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (!this.activeTool) return;
+            const rect = this.container.getBoundingClientRect();
+            const event = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+                originalEvent: e
+            };
+            if (typeof this.activeTool.onContextMenu === 'function') {
+                this.activeTool.onContextMenu(event);
+            }
+        });
     }
     
     /**
