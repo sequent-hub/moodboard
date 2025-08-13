@@ -18,11 +18,15 @@ export class PixiEngine {
 
         this.container.appendChild(this.app.view);
 
-        // Слой сетки под объектами
+        // Отдельные слои: сетка (не двигается) и мир с объектами (двигается)
         this.gridLayer = new PIXI.Container();
         this.gridLayer.zIndex = 0;
         this.app.stage.addChild(this.gridLayer);
-        this.app.stage.sortableChildren = true;
+
+        this.worldLayer = new PIXI.Container();
+        this.worldLayer.zIndex = 1;
+        this.worldLayer.sortableChildren = true;
+        this.app.stage.addChild(this.worldLayer);
 
 
 
@@ -88,7 +92,7 @@ export class PixiEngine {
 
             // Объекты над слоем сетки
             pixiObject.zIndex = (this.app.stage.children.length || 1) + 1;
-            this.app.stage.addChild(pixiObject);
+            this.worldLayer.addChild(pixiObject);
             this.objects.set(objectData.id, pixiObject);
 
 
@@ -102,6 +106,8 @@ export class PixiEngine {
         if (gridInstance && gridInstance.getPixiObject) {
             const g = gridInstance.getPixiObject();
             g.zIndex = 0;
+            g.x = 0;
+            g.y = 0;
             this.gridLayer.addChild(g);
         }
     }
@@ -170,7 +176,11 @@ export class PixiEngine {
     removeObject(objectId) {
         const pixiObject = this.objects.get(objectId);
         if (pixiObject) {
-            this.app.stage.removeChild(pixiObject);
+            if (this.worldLayer) {
+                this.worldLayer.removeChild(pixiObject);
+            } else {
+                this.app.stage.removeChild(pixiObject);
+            }
             this.objects.delete(objectId);
         }
     }
@@ -279,9 +289,10 @@ export class PixiEngine {
         // Получаем все объекты в позиции (PIXI автоматически учитывает трансформации)
         const point = new PIXI.Point(x, y);
         
-        // Проходим по всем объектам от верхних к нижним
-        for (let i = this.app.stage.children.length - 1; i >= 0; i--) {
-            const child = this.app.stage.children[i];
+        // Проходим по объектам в worldLayer от верхних к нижним
+        const container = this.worldLayer || this.app.stage;
+        for (let i = container.children.length - 1; i >= 0; i--) {
+            const child = container.children[i];
             if (child.containsPoint && child.containsPoint(point)) {
                 // Находим ID объекта
                 for (const [objectId, pixiObject] of this.objects.entries()) {
