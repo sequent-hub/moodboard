@@ -122,6 +122,49 @@ export class CoreMoodBoard {
             }
         });
 
+        // === ГРУППОВОЕ ПЕРЕТАСКИВАНИЕ ===
+        this.eventBus.on('tool:group:drag:start', (data) => {
+            // Сохраняем стартовые позиции
+            this._groupDragStart = new Map();
+            for (const id of data.objects) {
+                const pixiObject = this.pixi.objects.get(id);
+                if (pixiObject) this._groupDragStart.set(id, { x: pixiObject.x, y: pixiObject.y });
+            }
+        });
+
+        this.eventBus.on('tool:group:drag:update', (data) => {
+            const { dx, dy } = data.delta;
+            for (const id of data.objects) {
+                const pixiObject = this.pixi.objects.get(id);
+                if (!pixiObject) continue;
+                pixiObject.x = (this._groupDragStart.get(id)?.x || pixiObject.x) + dx;
+                pixiObject.y = (this._groupDragStart.get(id)?.y || pixiObject.y) + dy;
+                // Обновляем state
+                const obj = this.state.state.objects.find(o => o.id === id);
+                if (obj) {
+                    obj.position.x = pixiObject.x;
+                    obj.position.y = pixiObject.y;
+                }
+            }
+            this.state.markDirty();
+        });
+
+        this.eventBus.on('tool:group:drag:end', (data) => {
+            // Создаем одну команду Move для каждого объекта
+            for (const id of data.objects) {
+                const start = this._groupDragStart.get(id);
+                const pixiObject = this.pixi.objects.get(id);
+                if (!start || !pixiObject) continue;
+                const finalPosition = { x: pixiObject.x, y: pixiObject.y };
+                if (start.x !== finalPosition.x || start.y !== finalPosition.y) {
+                    const command = new MoveObjectCommand(this, id, start, finalPosition);
+                    command.setEventBus(this.eventBus);
+                    this.history.executeCommand(command);
+                }
+            }
+            this._groupDragStart = null;
+        });
+
         this.eventBus.on('tool:drag:update', (data) => {
             // Во время перетаскивания обновляем позицию напрямую (без команды)
             this.updateObjectPositionDirect(data.object, data.position);
@@ -186,6 +229,37 @@ export class CoreMoodBoard {
             if (object) {
                 this.resizeStartSize = { width: object.width, height: object.height };
             }
+        });
+
+        // === ГРУППОВОЙ RESIZE ===
+        this.eventBus.on('tool:group:resize:start', (data) => {
+            this._groupResizeStart = data.startBounds || null;
+            // Сохранять исходные размеры/позиции не обязательно, так как обновление происходит напрямую
+        });
+
+        this.eventBus.on('tool:group:resize:update', (data) => {
+            const { startBounds, newBounds, scale } = data;
+            const sx = scale?.x ?? (newBounds.width / startBounds.width);
+            const sy = scale?.y ?? (newBounds.height / startBounds.height);
+            const startLeft = startBounds.x;
+            const startTop = startBounds.y;
+            for (const id of data.objects) {
+                const obj = this.state.state.objects.find(o => o.id === id);
+                const pixiObject = this.pixi.objects.get(id);
+                if (!obj || !pixiObject) continue;
+                // Новая позиция рассчитывается от левого-верхнего угла группы
+                const relX = obj.position.x - startLeft;
+                const relY = obj.position.y - startTop;
+                const newPos = { x: newBounds.x + relX * sx, y: newBounds.y + relY * sy };
+                const newSize = { width: Math.max(10, (obj.width || pixiObject.width) * sx), height: Math.max(10, (obj.height || pixiObject.height) * sy) };
+                // Применяем к PIXI и state
+                this.updateObjectSizeAndPositionDirect(id, newSize, newPos, obj.type || null);
+            }
+        });
+
+        this.eventBus.on('tool:group:resize:end', (data) => {
+            // Можно создать батч-команды; для простоты пока оставим как есть (state уже обновлен)
+            this._groupResizeStart = null;
         });
 
         this.eventBus.on('tool:resize:update', (data) => {
@@ -255,6 +329,31 @@ export class CoreMoodBoard {
             }
         });
 
+        // === ГРУППОВОЙ ПОВОРОТ ===
+        this.eventBus.on('tool:group:rotate:start', (data) => {
+            // Сохраняем начальные углы
+            this._groupRotateStartAngles = new Map();
+            for (const id of data.objects) {
+                const pixiObject = this.pixi.objects.get(id);
+                const deg = pixiObject ? (pixiObject.rotation * 180 / Math.PI) : 0;
+                this._groupRotateStartAngles.set(id, deg);
+            }
+        });
+
+        this.eventBus.on('tool:group:rotate:update', (data) => {
+            for (const id of data.objects) {
+                const start = this._groupRotateStartAngles?.get(id) ?? 0;
+                const angle = start + data.angle;
+                this.pixi.updateObjectRotation(id, angle);
+                this.updateObjectRotationDirect(id, angle);
+            }
+        });
+
+        this.eventBus.on('tool:group:rotate:end', (data) => {
+            // Аналогично resize: можно оформить батч-команды; пока оставляем простое применение
+            this._groupRotateStartAngles = null;
+        });
+
         // === ОБРАБОТЧИКИ КОМАНД ВРАЩЕНИЯ ===
         
         this.eventBus.on('object:rotate', (data) => {
@@ -308,6 +407,20 @@ export class CoreMoodBoard {
             } else {
                 console.log(`❌ PIXI объект НЕ найден для ${data.objectId}`);
             }
+        });
+
+        // Получение списка всех объектов (с их PIXI и логическими границами)
+        this.eventBus.on('tool:get:all:objects', (data) => {
+            const result = [];
+            for (const [objectId, pixiObject] of this.pixi.objects.entries()) {
+                const bounds = pixiObject.getBounds();
+                result.push({
+                    id: objectId,
+                    pixi: pixiObject,
+                    bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
+                });
+            }
+            data.objects = result;
         });
 
         // Получение размера объекта
