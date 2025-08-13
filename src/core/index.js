@@ -1,4 +1,5 @@
 import { PixiEngine } from './PixiEngine.js';
+import * as PIXI from 'pixi.js';
 import { StateManager } from './StateManager.js';
 import { EventBus } from './EventBus.js';
 import { KeyboardManager } from './KeyboardManager.js';
@@ -139,7 +140,7 @@ export class CoreMoodBoard {
         
         // Подписываемся на события инструментов
         this.setupToolEvents();
-        this.setupKeyboardEvents();
+            this.setupKeyboardEvents();
         this.setupSaveEvents();
         this.setupHistoryEvents();
         
@@ -414,6 +415,25 @@ export class CoreMoodBoard {
                 stage.x += delta.x;
                 stage.y += delta.y;
             }
+        });
+
+        // Масштабирование колесом — глобально отрабатываем Ctrl+Wheel
+        this.eventBus.on('tool:wheel:zoom', ({ x, y, delta }) => {
+            const factor = 1 + (-delta) * 0.0015; // чувствительность
+            const world = this.pixi.worldLayer || this.pixi.app.stage;
+            const oldScale = world.scale.x || 1;
+            const newScale = Math.max(0.1, Math.min(5, oldScale * factor));
+            if (newScale === oldScale) return;
+            const globalPoint = new PIXI.Point(x, y);
+            // Локальная точка до зума
+            const localPoint = world.toLocal(globalPoint);
+            // Применяем новый масштаб
+            world.scale.set(newScale);
+            // Глобальная позиция той же локальной точки после зума
+            const newGlobal = world.toGlobal(localPoint);
+            // Сдвигаем мир так, чтобы точка под курсором осталась неподвижной
+            world.x += (globalPoint.x - newGlobal.x);
+            world.y += (globalPoint.y - newGlobal.y);
         });
 
         // === ГРУППОВОЕ ПЕРЕТАСКИВАНИЕ ===

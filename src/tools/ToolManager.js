@@ -291,7 +291,9 @@ export class ToolManager {
             originalEvent: e
         };
         
-        this.activeTool.onMouseWheel(event);
+        // Глобальный зум колесиком (без Ctrl) — предотвращаем дефолтный скролл страницы
+        this.eventBus.emit('tool:wheel:zoom', { x: event.x, y: event.y, delta: e.deltaY });
+        e.preventDefault();
         
         // Предотвращаем скроллинг страницы при зуме
         if (e.ctrlKey) {
