@@ -159,7 +159,7 @@ export class SelectTool extends BaseTool {
         this.currentX = event.x;
         this.currentY = event.y;
         
-        if (this.isResizing) {
+			if (this.isResizing || this.isGroupResizing) {
             this.updateResize(event);
 			} else if (this.isRotating || this.isGroupRotating) {
             this.updateRotate(event);
@@ -177,11 +177,11 @@ export class SelectTool extends BaseTool {
      * Отпускание кнопки мыши
      */
 		onMouseUp(event) {
-        if (this.isResizing) {
-            this.endResize();
-			} else if (this.isRotating || this.isGroupRotating) {
+        if (this.isResizing || this.isGroupResizing) {
+				this.endResize();
+        } else if (this.isRotating || this.isGroupRotating) {
             this.endRotate();
-        } else if (this.isDragging || this.isGroupDragging) {
+			} else if (this.isDragging || this.isGroupDragging) {
             this.endDrag();
         } else if (this.isBoxSelect) {
             this.endBoxSelect();
@@ -440,19 +440,12 @@ export class SelectTool extends BaseTool {
             this.isGroupResizing = true;
             this.groupStartBounds = this.computeGroupBounds();
             this.groupStartMouse = { x: this.currentX, y: this.currentY };
-            this.groupObjectsInitial = new Map();
+            // Снимок делается в Core для точности; здесь просто эмит старт
             const ids = Array.from(this.selectedObjects);
-            for (const id of ids) {
-                const posData = { objectId: id, position: null };
-                const sizeData = { objectId: id, size: null };
-                const rotData = { objectId: id, rotation: 0 };
-                this.emit('get:object:position', posData);
-                this.emit('get:object:size', sizeData);
-                this.emit('get:object:rotation', rotData);
-                this.groupObjectsInitial.set(id, { position: posData.position, size: sizeData.size, rotation: rotData.rotation || 0 });
-            }
-            this.emit('group:resize:start', { objects: ids, bounds: this.groupStartBounds, handle });
+            this.emit('group:resize:start', { objects: ids, startBounds: this.groupStartBounds, handle });
             this.resizeHandle = handle;
+            // Блокируем обычный флаг isResizing, чтобы не конфликтовало
+            this.isResizing = false;
             return;
         }
 
@@ -487,29 +480,72 @@ export class SelectTool extends BaseTool {
     updateResize(event) {
         // Групповой resize
         if (this.isGroupResizing && this.groupStartBounds && this.resizeHandle) {
+            const start = this.groupStartBounds;
             const deltaX = event.x - this.groupStartMouse.x;
             const deltaY = event.y - this.groupStartMouse.y;
+            const minW = 20;
+            const minH = 20;
+            let x = start.x;
+            let y = start.y;
+            let w = start.width;
+            let h = start.height;
 
-            const newSize = this.calculateNewSize(
-                this.resizeHandle,
-                { width: this.groupStartBounds.width, height: this.groupStartBounds.height },
-                deltaX,
-                deltaY,
-                event.originalEvent.shiftKey
-            );
-            const clamped = { width: Math.max(20, newSize.width), height: Math.max(20, newSize.height) };
-            const posOffset = this.calculatePositionOffset(
-                this.resizeHandle,
-                { width: this.groupStartBounds.width, height: this.groupStartBounds.height },
-                clamped,
-                0
-            );
-            const newTopLeft = { x: this.groupStartBounds.x + posOffset.x, y: this.groupStartBounds.y + posOffset.y };
-            const scale = { x: clamped.width / this.groupStartBounds.width, y: clamped.height / this.groupStartBounds.height };
+            switch (this.resizeHandle) {
+                case 'e':
+                    w = start.width + deltaX;
+                    break;
+                case 'w':
+                    w = start.width - deltaX;
+                    x = start.x + deltaX;
+                    break;
+                case 's':
+                    h = start.height + deltaY;
+                    break;
+                case 'n':
+                    h = start.height - deltaY;
+                    y = start.y + deltaY;
+                    break;
+                case 'se':
+                    w = start.width + deltaX;
+                    h = start.height + deltaY;
+                    break;
+                case 'ne':
+                    w = start.width + deltaX;
+                    h = start.height - deltaY;
+                    y = start.y + deltaY;
+                    break;
+                case 'sw':
+                    w = start.width - deltaX;
+                    x = start.x + deltaX;
+                    h = start.height + deltaY;
+                    break;
+                case 'nw':
+                    w = start.width - deltaX;
+                    x = start.x + deltaX;
+                    h = start.height - deltaY;
+                    y = start.y + deltaY;
+                    break;
+            }
 
+            // Минимальные размеры и коррекция позиции для левых/верхних ручек
+            if (w < minW) {
+                if (['w', 'sw', 'nw'].includes(this.resizeHandle)) {
+                    x += (w - minW);
+                }
+                w = minW;
+            }
+            if (h < minH) {
+                if (['n', 'ne', 'nw'].includes(this.resizeHandle)) {
+                    y += (h - minH);
+                }
+                h = minH;
+            }
+
+            const scale = { x: w / start.width, y: h / start.height };
             const ids = Array.from(this.selectedObjects);
-            this.emit('group:resize:update', { objects: ids, startBounds: this.groupStartBounds, newBounds: { x: newTopLeft.x, y: newTopLeft.y, width: clamped.width, height: clamped.height }, scale });
-            this.updateGroupBoundsGraphics({ x: newTopLeft.x, y: newTopLeft.y, width: clamped.width, height: clamped.height });
+            const newBounds = { x, y, width: w, height: h };
+            this.emit('group:resize:update', { objects: ids, startBounds: start, newBounds, scale });
+            this.updateGroupBoundsGraphics(newBounds);
             return;
         }
 
@@ -579,6 +615,17 @@ export class SelectTool extends BaseTool {
             this.groupStartBounds = null;
             this.groupStartMouse = null;
             this.groupObjectsInitial = null;
+            // Принудительно синхронизируем ручки и рамку после завершения, чтобы отлипли от курсора
+            const gb = this.computeGroupBounds();
+            this.ensureGroupBoundsGraphics(gb);
+            if (this.groupBoundsGraphics) {
+                this.groupBoundsGraphics.rotation = 0;
+                this.groupBoundsGraphics.pivot.set(0, 0);
+                this.groupBoundsGraphics.position.set(gb.x, gb.y);
+            }
+            if (this.resizeHandles) {
+                this.resizeHandles.showHandles(this.groupBoundsGraphics, this.groupId);
+            }
             return;
         }
         if (this.dragTarget && this.resizeStartBounds) {

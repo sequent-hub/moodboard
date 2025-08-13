@@ -114,10 +114,14 @@ export class ToolManager {
     initEventListeners() {
         if (!this.container) return;
         
-        // События мыши
+        // События мыши на контейнере
         this.container.addEventListener('mousedown', (e) => this.handleMouseDown(e));
         this.container.addEventListener('mousemove', (e) => this.handleMouseMove(e));
         this.container.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+
+        // Глобальные события мыши — чтобы корректно завершать drag/resize при отпускании за пределами холста
+        document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+        document.addEventListener('mouseup', (e) => this.handleMouseUp(e));
         this.container.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
         this.container.addEventListener('wheel', (e) => this.handleMouseWheel(e));
         
@@ -306,6 +310,8 @@ export class ToolManager {
             this.container.removeEventListener('wheel', this.handleMouseWheel);
             this.container.removeEventListener('contextmenu', (e) => e.preventDefault());
         }
+        document.removeEventListener('mousemove', this.handleMouseMove);
+        document.removeEventListener('mouseup', this.handleMouseUp);
         
         document.removeEventListener('keydown', this.handleKeyDown);
         document.removeEventListener('keyup', this.handleKeyUp);

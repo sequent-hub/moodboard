@@ -103,10 +103,15 @@ export class ResizeHandles {
         } else {
             // Сбрасываем поворот если объект не повернут
             this.container.rotation = 0;
-            // Контейнер позиционируем в левом-верхнем углу границ объекта
-            // Для одиночных объектов их x/y могут быть в центре (pivot), поэтому используем bounds.x/y
-            this.container.x = globalBounds.x;
-            this.container.y = globalBounds.y;
+            // Для группы используем координаты специального графического прямоугольника,
+            // для одиночных объектов — левый верх глобальных границ
+            if (this.targetObject.name === 'group-bounds') {
+                this.container.x = this.targetObject.x;
+                this.container.y = this.targetObject.y;
+            } else {
+                this.container.x = globalBounds.x;
+                this.container.y = globalBounds.y;
+            }
             this.container.pivot.set(0, 0);
             // Рабочие границы начинаются от (0,0) контейнера
             this.workingBounds = {

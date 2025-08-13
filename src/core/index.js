@@ -6,7 +6,7 @@ import { SaveManager } from './SaveManager.js';
 import { HistoryManager } from './HistoryManager.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
-import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand, GroupRotateCommand } from './commands/index.js';
+import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand, GroupRotateCommand, GroupResizeCommand } from './commands/index.js';
 
 export class CoreMoodBoard {
     constructor(container, options = {}) {
@@ -238,7 +238,19 @@ export class CoreMoodBoard {
         // === ГРУППОВОЙ RESIZE ===
         this.eventBus.on('tool:group:resize:start', (data) => {
             this._groupResizeStart = data.startBounds || null;
-            // Сохранять исходные размеры/позиции не обязательно, так как обновление происходит напрямую
+            // Сохраним начальные размеры и позиции, чтобы сформировать команду на end
+            this._groupResizeSnapshot = new Map();
+            for (const id of data.objects) {
+                const obj = this.state.state.objects.find(o => o.id === id);
+                const pixiObj = this.pixi.objects.get(id);
+                if (!obj || !pixiObj) continue;
+                this._groupResizeSnapshot.set(id, {
+                    size: { width: obj.width, height: obj.height },
+                    // Позицию берем из PIXI (центр с учетом pivot), чтобы избежать смещения при первом ресайзе
+                    position: { x: pixiObj.x, y: pixiObj.y },
+                    type: obj.type || null
+                });
+            }
         });
 
         this.eventBus.on('tool:group:resize:update', (data) => {
@@ -248,22 +260,51 @@ export class CoreMoodBoard {
             const startLeft = startBounds.x;
             const startTop = startBounds.y;
             for (const id of data.objects) {
-                const obj = this.state.state.objects.find(o => o.id === id);
-                const pixiObject = this.pixi.objects.get(id);
-                if (!obj || !pixiObject) continue;
-                // Новая позиция рассчитывается от левого-верхнего угла группы
-                const relX = obj.position.x - startLeft;
-                const relY = obj.position.y - startTop;
-                const newPos = { x: newBounds.x + relX * sx, y: newBounds.y + relY * sy };
-                const newSize = { width: Math.max(10, (obj.width || pixiObject.width) * sx), height: Math.max(10, (obj.height || pixiObject.height) * sy) };
-                // Применяем к PIXI и state
-                this.updateObjectSizeAndPositionDirect(id, newSize, newPos, obj.type || null);
+                const snap = this._groupResizeSnapshot?.get(id);
+                if (!snap) continue;
+                // Вычисления только от исходной (snapshot), чтобы избежать накопления ошибок
+                const pixiAtStart = snap.position; // центр с учетом pivot
+                // Пересчет центра относительно стартовой рамки, а затем новый центр
+                const relCenterX = pixiAtStart.x - (startLeft + startBounds.width / 2);
+                const relCenterY = pixiAtStart.y - (startTop + startBounds.height / 2);
+                const newCenter = {
+                    x: newBounds.x + newBounds.width / 2 + relCenterX * sx,
+                    y: newBounds.y + newBounds.height / 2 + relCenterY * sy
+                };
+                // Преобразуем центр в левый верх для state/PIXI (мы используем x/y как левый верх)
+                const newPos = { x: newCenter.x, y: newCenter.y };
+                const newSize = {
+                    width: Math.max(10, snap.size.width * sx),
+                    height: Math.max(10, snap.size.height * sy)
+                };
+                this.updateObjectSizeAndPositionDirect(id, newSize, newPos, snap.type || null);
             }
         });
 
         this.eventBus.on('tool:group:resize:end', (data) => {
-            // Можно создать батч-команды; для простоты пока оставим как есть (state уже обновлен)
+            // Сформируем батч-команду GroupResizeCommand
+            const changes = [];
+            for (const id of data.objects) {
+                const before = this._groupResizeSnapshot?.get(id);
+                const obj = this.state.state.objects.find(o => o.id === id);
+                if (!before || !obj) continue;
+                const afterSize = { width: obj.width, height: obj.height };
+                const afterPos = { x: obj.position.x, y: obj.position.y };
+                if (before.size.width !== afterSize.width || before.size.height !== afterSize.height || before.position.x !== afterPos.x || before.position.y !== afterPos.y) {
+                    changes.push({ id, fromSize: before.size, toSize: afterSize, fromPos: before.position, toPos: afterPos, type: before.type });
+                }
+            }
+            if (changes.length > 0) {
+                const cmd = new GroupResizeCommand(this, changes);
+                cmd.setEventBus(this.eventBus);
+                this.history.executeCommand(cmd);
+            }
             this._groupResizeStart = null;
+            this._groupResizeSnapshot = null;
+            // Обновляем UI рамки с ручками
+            if (this.selectTool && this.selectTool.selectedObjects.size > 1) {
+                this.selectTool.updateResizeHandles();
+            }
         });
 
         this.eventBus.on('tool:resize:update', (data) => {
@@ -638,7 +679,7 @@ export class CoreMoodBoard {
      * Используется во время перетаскивания для плавного движения
      */
     updateObjectPositionDirect(objectId, position) {
-        // Обновляем позицию в PIXI
+        // Обновляем позицию в PIXI — координаты трактуем как левый верх объекта
         const pixiObject = this.pixi.objects.get(objectId);
         if (pixiObject) {
             pixiObject.x = position.x;
@@ -673,15 +714,19 @@ export class CoreMoodBoard {
      */
     updateObjectSizeAndPositionDirect(objectId, size, position = null, objectType = null) {
         // Обновляем размер в PIXI
+        const pixiObject = this.pixi.objects.get(objectId);
+        const prevPosition = pixiObject ? { x: pixiObject.x, y: pixiObject.y } : null;
         this.pixi.updateObjectSize(objectId, size, objectType);
         
         // Обновляем позицию если передана (для левых/верхних ручек)
         if (position) {
-            const pixiObject = this.pixi.objects.get(objectId);
-            if (pixiObject) {
+            const pixiObject2 = this.pixi.objects.get(objectId);
+            if (pixiObject2) {
                 console.log(`📍 Устанавливаем позицию объекта: (${position.x}, ${position.y})`);
-                pixiObject.x = position.x;
-                pixiObject.y = position.y;
+                // Если pixiObject был и мы только что пересоздавали геометрию, могли потерять центр.
+                // Ставим позицию как есть (левый верх) — в PixiEngine пересоздание больше не трогает позицию.
+                pixiObject2.x = position.x;
+                pixiObject2.y = position.y;
                 
                 // Обновляем позицию в состоянии
                 const objects = this.state.state.objects;

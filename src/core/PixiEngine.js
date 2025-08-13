@@ -77,8 +77,7 @@ export class PixiEngine {
             
             // Убеждаемся, что объект может участвовать в hit testing
             if (pixiObject.beginFill) {
-                // Для Graphics объектов убеждаемся, что у них есть fill
-    
+                // no-op
             }
 
             this.app.stage.addChild(pixiObject);
@@ -200,7 +199,7 @@ export class PixiEngine {
             pixiObject.endFill();
         } else if (objectType === 'shape') {
             // Фигура (заполненная)
-            pixiObject.beginFill(0x007ACC, 0.8);
+            pixiObject.beginFill(0x3b82f6, 1);
             pixiObject.drawRect(0, 0, size.width, size.height);
             pixiObject.endFill();
         } else {
@@ -222,10 +221,7 @@ export class PixiEngine {
         const pivotX = size.width / 2;
         const pivotY = size.height / 2;
         pixiObject.pivot.set(pivotX, pivotY);
-        
-        // Восстанавливаем позицию с компенсацией pivot
-        pixiObject.x = position.x + pivotX;
-        pixiObject.y = position.y + pivotY;
+        // Позицию не меняем здесь; она будет установлена вызывающей стороной
     }
 
     /**
