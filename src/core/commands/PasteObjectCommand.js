@@ -1,4 +1,5 @@
 import { BaseCommand } from './BaseCommand.js';
+import { generateObjectId } from '../../utils/objectIdGenerator.js';
 
 /**
  * Команда вставки объекта
@@ -24,8 +25,13 @@ export class PasteObjectCommand extends BaseCommand {
         // Создаем новый объект на основе скопированного
         this.newObjectData = JSON.parse(JSON.stringify(originalData));
         
-        // Генерируем новый ID
-        this.newObjectId = 'obj_' + Date.now() + '_copy';
+        // Генерируем уникальный ID с проверкой коллизий
+        const exists = (id) => {
+            const inState = (this.coreMoodboard.state.state.objects || []).some(o => o.id === id);
+            const inPixi = this.coreMoodboard.pixi?.objects?.has ? this.coreMoodboard.pixi.objects.has(id) : false;
+            return inState || inPixi;
+        };
+        this.newObjectId = generateObjectId(exists);
         this.newObjectData.id = this.newObjectId;
         
         // Сохраняем ID оригинального объекта для отслеживания копий

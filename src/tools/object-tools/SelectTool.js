@@ -22,6 +22,11 @@ export class SelectTool extends BaseTool {
 		this.clonePending = false;   // ожидаем подтверждение создания копии
 		this.cloneRequested = false; // запрос на создание копии уже отправлен
 		this.cloneSourceId = null;   // исходный объект для копии
+		// Групповой Alt-клон
+		this.isAltGroupCloneMode = false;
+		this.groupClonePending = false;
+		this.groupCloneOriginalIds = [];
+		this.groupCloneMap = null; // { originalId: newId }
         
         // Состояние перетаскивания
         this.isDragging = false;
@@ -73,6 +78,13 @@ export class SelectTool extends BaseTool {
 				if (!this.isAltCloneMode || !this.clonePending) return;
 				if (!data || data.originalId !== this.cloneSourceId) return;
 				this.onDuplicateReady(data.newId);
+			});
+			// Групповой клон готов
+			this.eventBus.on('tool:group:duplicate:ready', (data) => {
+				// data: { map: { [originalId]: newId } }
+				if (!this.isAltGroupCloneMode || !this.groupClonePending) return;
+				if (!data || !data.map) return;
+				this.onGroupDuplicateReady(data.map);
 			});
 		}
     }
@@ -302,8 +314,7 @@ export class SelectTool extends BaseTool {
             }
         }
         
-        console.log(`❌ Ничего не найдено под (${x}, ${y})`);
-        return null;
+		return null;
     }
     
     /**
@@ -363,6 +374,15 @@ export class SelectTool extends BaseTool {
     updateDrag(event) {
         // Перетаскивание группы
         if (this.isGroupDragging && this.groupStartBounds && this.groupDragOffset) {
+            // Если Alt зажат и клон группы ещё не запрошен — запускаем групповой клон
+            if (event.originalEvent && event.originalEvent.altKey && !this.isAltGroupCloneMode && !this.groupClonePending) {
+                this.isAltGroupCloneMode = true;
+                this.groupClonePending = true;
+                this.groupCloneOriginalIds = Array.from(this.selectedObjects);
+                // Запрашиваем групповой клон на текущих позициях
+                this.emit('group:duplicate:request', { objects: this.groupCloneOriginalIds });
+                return; // дождемся маппинга и переключимся
+            }
             const newTopLeft = {
                 x: event.x - this.groupDragOffset.x,
                 y: event.y - this.groupDragOffset.y
@@ -416,6 +436,10 @@ export class SelectTool extends BaseTool {
         if (this.isGroupDragging) {
             const ids = Array.from(this.selectedObjects);
             this.emit('group:drag:end', { objects: ids });
+            this.isAltGroupCloneMode = false;
+            this.groupClonePending = false;
+            this.groupCloneOriginalIds = [];
+            this.groupCloneMap = null;
         } else if (this.dragTarget) {
             this.emit('drag:end', { object: this.dragTarget });
         }
@@ -1120,6 +1144,29 @@ export class SelectTool extends BaseTool {
         }
         const ids = Array.from(this.selectedObjects);
         this.emit('group:drag:start', { objects: ids });
+    }
+
+    /**
+     * Переключение на клон группы после готовности
+     */
+    onGroupDuplicateReady(idMap) {
+        this.groupClonePending = false;
+        this.groupCloneMap = idMap;
+        // Формируем новое выделение из клонов
+        const newIds = [];
+        for (const orig of this.groupCloneOriginalIds) {
+            const nid = idMap[orig];
+            if (nid) newIds.push(nid);
+        }
+        if (newIds.length > 0) {
+            this.setSelection(newIds);
+            // Пересчитываем стартовые параметры для продолжения drag
+            const gb = this.computeGroupBounds();
+            this.groupStartBounds = gb;
+            this.groupDragOffset = { x: this.currentX - gb.x, y: this.currentY - gb.y };
+            // Сообщаем ядру о старте drag для новых объектов, чтобы зафиксировать начальные позиции
+            this.emit('group:drag:start', { objects: newIds });
+        }
     }
     
     /**

@@ -7,6 +7,7 @@ import { HistoryManager } from './HistoryManager.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
 import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand, GroupRotateCommand, GroupResizeCommand } from './commands/index.js';
+import { generateObjectId } from '../utils/objectIdGenerator.js';
 
 export class CoreMoodBoard {
     constructor(container, options = {}) {
@@ -124,7 +125,7 @@ export class CoreMoodBoard {
 
         // === ГРУППОВОЕ ПЕРЕТАСКИВАНИЕ ===
         this.eventBus.on('tool:group:drag:start', (data) => {
-            // Сохраняем стартовые позиции
+            // Сохраняем стартовые позиции для текущей группы
             this._groupDragStart = new Map();
             for (const id of data.objects) {
                 const pixiObject = this.pixi.objects.get(id);
@@ -218,6 +219,44 @@ export class CoreMoodBoard {
 
             // Вызываем вставку с конкретной позицией (там рассчитается ID и пр.)
             this.pasteObject(position);
+        });
+
+        // Запрос на групповое дублирование
+        this.eventBus.on('tool:group:duplicate:request', (data) => {
+            const originals = (data.objects || []).filter((id) => this.state.state.objects.some(o => o.id === id));
+            const total = originals.length;
+            if (total === 0) {
+                this.eventBus.emit('tool:group:duplicate:ready', { map: {} });
+                return;
+            }
+            const idMap = {};
+            let remaining = total;
+            const tempHandlers = new Map();
+            const onPasted = (originalId) => (payload) => {
+                if (payload.originalId !== originalId) return;
+                idMap[originalId] = payload.newId;
+                // Снять локального слушателя
+                const h = tempHandlers.get(originalId);
+                if (h) this.eventBus.off('object:pasted', h);
+                remaining -= 1;
+                if (remaining === 0) {
+                    this.eventBus.emit('tool:group:duplicate:ready', { map: idMap });
+                }
+            };
+            // Дублируем по одному, используя текущие позиции как стартовые
+            for (const originalId of originals) {
+                const obj = this.state.state.objects.find(o => o.id === originalId);
+                if (!obj) continue;
+                // Подписываемся на ответ именно для этого оригинала
+                const handler = onPasted(originalId);
+                tempHandlers.set(originalId, handler);
+                this.eventBus.on('object:pasted', handler);
+                // Кладем в clipboard объект, затем вызываем PasteObjectCommand с текущей позицией
+                this.clipboard = { type: 'object', data: JSON.parse(JSON.stringify(obj)) };
+                const cmd = new PasteObjectCommand(this, { x: obj.position.x, y: obj.position.y });
+                cmd.setEventBus(this.eventBus);
+                this.history.executeCommand(cmd);
+            }
         });
 
         // Когда объект вставлен (из PasteObjectCommand) — сообщаем SelectTool
@@ -466,7 +505,6 @@ export class CoreMoodBoard {
         // Hit testing
         this.eventBus.on('tool:hit:test', (data) => {
             const result = this.pixi.hitTest(data.x, data.y);
-            console.log(`🔍 PixiEngine hitTest результат:`, result);
             data.result = result;
         });
 
@@ -538,13 +576,11 @@ export class CoreMoodBoard {
             }
         });
 
-        // Удаление выделенных объектов
+        // Удаление выделенных объектов (делаем копию списка, чтобы избежать мутаций во время удаления)
         this.eventBus.on('keyboard:delete', () => {
             if (this.toolManager.getActiveTool()?.name === 'select') {
-                const selectedObjects = this.toolManager.getActiveTool().selectedObjects;
-                for (const objectId of selectedObjects) {
-                    this.deleteObject(objectId);
-                }
+                const ids = Array.from(this.toolManager.getActiveTool().selectedObjects);
+                ids.forEach((objectId) => this.deleteObject(objectId));
                 this.toolManager.getActiveTool().clearSelection();
             }
         });
@@ -749,8 +785,13 @@ export class CoreMoodBoard {
     }
 
     createObject(type, position, properties = {}) {
+        const exists = (id) => {
+            const inState = (this.state.state.objects || []).some(o => o.id === id);
+            const inPixi = this.pixi?.objects?.has ? this.pixi.objects.has(id) : false;
+            return inState || inPixi;
+        };
         const objectData = {
-            id: 'obj_' + Date.now(),
+            id: generateObjectId(exists),
             type,
             position,
             width: 100,
