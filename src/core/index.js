@@ -627,23 +627,84 @@ export class CoreMoodBoard {
             }
         });
 
-        // Копирование выделенных объектов
+        // Копирование выделенных объектов (поддержка группы)
         this.eventBus.on('keyboard:copy', () => {
-            if (this.toolManager.getActiveTool()?.name === 'select') {
-                const selectedObjects = this.toolManager.getActiveTool().selectedObjects;
-                if (selectedObjects.size > 0) {
-                    // Копируем первый выделенный объект (позже можно расширить для множественного выделения)
-                    const firstObjectId = Array.from(selectedObjects)[0];
-                    this.copyObject(firstObjectId);
-                }
+            if (this.toolManager.getActiveTool()?.name !== 'select') return;
+            const selected = Array.from(this.toolManager.getActiveTool().selectedObjects || []);
+            if (selected.length === 0) return;
+            if (selected.length === 1) {
+                // Одиночный объект — используем существующую команду
+                this.copyObject(selected[0]);
+                return;
             }
+            // Группа — кладем в буфер набор объектов
+            const objects = this.state.state.objects || [];
+            const groupData = selected
+                .map(id => objects.find(o => o.id === id))
+                .filter(Boolean)
+                .map(o => JSON.parse(JSON.stringify(o)));
+            if (groupData.length === 0) return;
+            this.clipboard = {
+                type: 'group',
+                data: groupData,
+                meta: { pasteCount: 0 }
+            };
         });
 
-        // Вставка объектов из буфера обмена
+        // Вставка объектов из буфера обмена (поддержка группы)
         this.eventBus.on('keyboard:paste', () => {
-            if (this.clipboard && this.clipboard.type === 'object') {
-                // Вставляем объект без указания позиции - PasteObjectCommand сам рассчитает смещение
+            if (!this.clipboard) return;
+            if (this.clipboard.type === 'object') {
+                // Одиночная вставка
                 this.pasteObject();
+                return;
+            }
+            if (this.clipboard.type === 'group') {
+                const group = this.clipboard;
+                const data = Array.isArray(group.data) ? group.data : [];
+                if (data.length === 0) return;
+                // Инкрементируем смещение группы при каждом paste
+                const offsetStep = 25;
+                group.meta = group.meta || { pasteCount: 0 };
+                group.meta.pasteCount = (group.meta.pasteCount || 0) + 1;
+                const dx = offsetStep * group.meta.pasteCount;
+                const dy = offsetStep * group.meta.pasteCount;
+                // Подготовим сбор новых id через единый временный слушатель
+                let pending = data.length;
+                const newIds = [];
+                const onPasted = (payload) => {
+                    if (!payload || !payload.newId) return;
+                    newIds.push(payload.newId);
+                    pending -= 1;
+                    if (pending === 0) {
+                        this.eventBus.off('object:pasted', onPasted);
+                        // Выделяем новую группу и показываем рамку с ручками
+                        if (this.selectTool && newIds.length > 0) {
+                            requestAnimationFrame(() => {
+                                this.selectTool.setSelection(newIds);
+                                this.selectTool.updateResizeHandles();
+                            });
+                        }
+                    }
+                };
+                this.eventBus.on('object:pasted', onPasted);
+
+                // Вставляем каждый объект группы, сохраняя относительное расположение + общее смещение
+                for (const original of data) {
+                    const cloned = JSON.parse(JSON.stringify(original));
+                    const targetPos = {
+                        x: (cloned.position?.x || 0) + dx,
+                        y: (cloned.position?.y || 0) + dy
+                    };
+                    // Используем существующую логику PasteObjectCommand поверх clipboard типа object
+                    this.clipboard = { type: 'object', data: cloned };
+                    const cmd = new PasteObjectCommand(this, targetPos);
+                    cmd.setEventBus(this.eventBus);
+                    this.history.executeCommand(cmd);
+                }
+                // После вставки возвращаем clipboard к группе, чтобы можно было ещё раз вставлять с новым смещением
+                this.clipboard = group;
+                // Рамка появится по завершении обработки всех событий object:pasted
             }
         });
 
