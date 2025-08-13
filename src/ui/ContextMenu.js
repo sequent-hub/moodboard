@@ -4,6 +4,8 @@ export class ContextMenu {
         this.eventBus = eventBus;
         this.element = null;
         this.isVisible = false;
+        this.lastX = 0;
+        this.lastY = 0;
 
         this.createElement();
         this.attachEvents();
@@ -51,6 +53,8 @@ export class ContextMenu {
     }
 
     show(x, y, context = 'canvas', targetId = null) {
+        this.lastX = x;
+        this.lastY = y;
         this.renderItems(context, targetId);
         this.element.style.left = `${x}px`;
         this.element.style.top = `${y}px`;
@@ -104,9 +108,25 @@ export class ContextMenu {
 
             // Вставить — используем текущий буфер (объект/группа)
             list.appendChild(mkItem('Вставить', () => {
-                this.eventBus.emit('keyboard:paste');
+                this.eventBus.emit('ui:paste-at', { x: this.lastX, y: this.lastY });
             }));
 
+            this.element.appendChild(list);
+            return;
+        }
+
+        if (context === 'canvas') {
+            this.element.innerHTML = '';
+            const list = document.createElement('div');
+            list.className = 'moodboard-contextmenu__list';
+            const item = document.createElement('div');
+            item.className = 'moodboard-contextmenu__item';
+            item.textContent = 'Вставить';
+            item.addEventListener('click', () => {
+                this.hide();
+                this.eventBus.emit('ui:paste-at', { x: this.lastX, y: this.lastY });
+            });
+            list.appendChild(item);
             this.element.appendChild(list);
             return;
         }

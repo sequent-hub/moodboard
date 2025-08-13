@@ -131,6 +131,57 @@ export class CoreMoodBoard {
             this.copyObject(objectId);
         });
 
+        this.eventBus.on('ui:paste-at', ({ x, y }) => {
+            if (!this.clipboard) return;
+            if (this.clipboard.type === 'object') {
+                this.pasteObject({ x, y });
+            } else if (this.clipboard.type === 'group') {
+                // Вставляем группу с сохранением относительных позиций относительно клика
+                const group = this.clipboard;
+                const data = Array.isArray(group.data) ? group.data : [];
+                if (data.length === 0) return;
+                // Вычисляем топ-левт группы для относительного смещения клик-точки
+                let minX = Infinity, minY = Infinity;
+                data.forEach(o => {
+                    if (!o || !o.position) return;
+                    minX = Math.min(minX, o.position.x);
+                    minY = Math.min(minY, o.position.y);
+                });
+                if (!isFinite(minX) || !isFinite(minY)) return;
+                const baseX = minX, baseY = minY;
+                const newIds = [];
+                let pending = data.length;
+                const onPasted = (payload) => {
+                    if (!payload || !payload.newId) return;
+                    newIds.push(payload.newId);
+                    pending -= 1;
+                    if (pending === 0) {
+                        this.eventBus.off('object:pasted', onPasted);
+                        requestAnimationFrame(() => {
+                            if (this.selectTool && newIds.length > 0) {
+                                this.selectTool.setSelection(newIds);
+                                this.selectTool.updateResizeHandles();
+                            }
+                        });
+                    }
+                };
+                this.eventBus.on('object:pasted', onPasted);
+                data.forEach(orig => {
+                    const cloned = JSON.parse(JSON.stringify(orig));
+                    const targetPos = {
+                        x: x + (cloned.position.x - baseX),
+                        y: y + (cloned.position.y - baseY)
+                    };
+                    this.clipboard = { type: 'object', data: cloned };
+                    const cmd = new PasteObjectCommand(this, targetPos);
+                    cmd.setEventBus(this.eventBus);
+                    this.history.executeCommand(cmd);
+                });
+                // Возвращаем clipboard к группе для повторных вставок
+                this.clipboard = group;
+            }
+        });
+
         // События перетаскивания
         this.eventBus.on('tool:drag:start', (data) => {
 
