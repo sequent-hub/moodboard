@@ -86,6 +86,10 @@
     font-size: 12px;
 }
 
+.moodboard-zoombar__label-value {
+    color: #333;
+}
+
 .moodboard-zoombar__menu {
     position: absolute;
     right: 0;

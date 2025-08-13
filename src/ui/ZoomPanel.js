@@ -21,12 +21,16 @@ export class ZoomPanel {
 
         const label = document.createElement('span');
         label.className = 'moodboard-zoombar__label';
-        label.textContent = '100%';
+        const value = document.createElement('span');
+        value.className = 'moodboard-zoombar__label-value';
+        value.textContent = '100%';
         const caret = document.createElement('span');
         caret.className = 'moodboard-zoombar__label-caret';
         caret.textContent = '▾';
+        label.appendChild(value);
         label.appendChild(caret);
         this.labelEl = label;
+        this.valueEl = value;
 
         const zoomInBtn = document.createElement('button');
         zoomInBtn.className = 'moodboard-zoombar__button';
@@ -67,7 +71,7 @@ export class ZoomPanel {
         });
 
         this.eventBus.on('ui:zoom:percent', ({ percentage }) => {
-            if (this.labelEl) this.labelEl.textContent = `${percentage}%`;
+            if (this.valueEl) this.valueEl.textContent = `${percentage}%`;
         });
     }
 
