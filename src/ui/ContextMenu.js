@@ -88,10 +88,17 @@ export class ContextMenu {
             const list = document.createElement('div');
             list.className = 'moodboard-contextmenu__list';
 
-            const mkItem = (label, onClick) => {
+            const mkItem = (label, shortcut, onClick) => {
                 const item = document.createElement('div');
                 item.className = 'moodboard-contextmenu__item';
-                item.textContent = label;
+                const left = document.createElement('span');
+                left.className = 'moodboard-contextmenu__label';
+                left.textContent = label;
+                const right = document.createElement('span');
+                right.className = 'moodboard-contextmenu__shortcut';
+                right.textContent = shortcut || '';
+                item.appendChild(left);
+                item.appendChild(right);
                 item.addEventListener('click', () => {
                     this.hide();
                     onClick();
@@ -100,14 +107,14 @@ export class ContextMenu {
             };
 
             // Копировать — копируем конкретный объект
-            list.appendChild(mkItem('Копировать', () => {
+            list.appendChild(mkItem('Копировать', 'Ctrl+C', () => {
                 if (targetId) {
                     this.eventBus.emit('ui:copy-object', { objectId: targetId });
                 }
             }));
 
             // Вставить — используем текущий буфер (объект/группа)
-            list.appendChild(mkItem('Вставить', () => {
+            list.appendChild(mkItem('Вставить', 'Ctrl+V', () => {
                 this.eventBus.emit('ui:paste-at', { x: this.lastX, y: this.lastY });
             }));
 
@@ -121,7 +128,14 @@ export class ContextMenu {
             list.className = 'moodboard-contextmenu__list';
             const item = document.createElement('div');
             item.className = 'moodboard-contextmenu__item';
-            item.textContent = 'Вставить';
+            const left = document.createElement('span');
+            left.className = 'moodboard-contextmenu__label';
+            left.textContent = 'Вставить';
+            const right = document.createElement('span');
+            right.className = 'moodboard-contextmenu__shortcut';
+            right.textContent = 'Ctrl+V';
+            item.appendChild(left);
+            item.appendChild(right);
             item.addEventListener('click', () => {
                 this.hide();
                 this.eventBus.emit('ui:paste-at', { x: this.lastX, y: this.lastY });
