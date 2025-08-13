@@ -136,6 +136,43 @@ export class ContextMenu {
             return;
         }
 
+        if (context === 'group') {
+            this.element.innerHTML = '';
+            const list = document.createElement('div');
+            list.className = 'moodboard-contextmenu__list';
+
+            const mkItem = (label, shortcut, onClick) => {
+                const item = document.createElement('div');
+                item.className = 'moodboard-contextmenu__item';
+                const left = document.createElement('span');
+                left.className = 'moodboard-contextmenu__label';
+                left.textContent = label;
+                const right = document.createElement('span');
+                right.className = 'moodboard-contextmenu__shortcut';
+                right.textContent = shortcut || '';
+                item.appendChild(left);
+                item.appendChild(right);
+                item.addEventListener('click', () => {
+                    this.hide();
+                    onClick();
+                });
+                return item;
+            };
+
+            // Копировать группу — берём текущее выделение
+            list.appendChild(mkItem('Копировать', 'Ctrl+C', () => {
+                this.eventBus.emit('ui:copy-group');
+            }));
+
+            // Вставить — вставляет из group/object буфера в точку клика
+            list.appendChild(mkItem('Вставить', 'Ctrl+V', () => {
+                this.eventBus.emit('ui:paste-at', { x: this.lastX, y: this.lastY });
+            }));
+
+            this.element.appendChild(list);
+            return;
+        }
+
         if (context === 'canvas') {
             this.element.innerHTML = '';
             const list = document.createElement('div');

@@ -131,6 +131,23 @@ export class CoreMoodBoard {
             this.copyObject(objectId);
         });
 
+        this.eventBus.on('ui:copy-group', () => {
+            if (this.toolManager.getActiveTool()?.name !== 'select') return;
+            const selected = Array.from(this.toolManager.getActiveTool().selectedObjects || []);
+            if (selected.length <= 1) return;
+            const objects = this.state.state.objects || [];
+            const groupData = selected
+                .map(id => objects.find(o => o.id === id))
+                .filter(Boolean)
+                .map(o => JSON.parse(JSON.stringify(o)));
+            if (groupData.length === 0) return;
+            this.clipboard = {
+                type: 'group',
+                data: groupData,
+                meta: { pasteCount: 0 }
+            };
+        });
+
         this.eventBus.on('ui:paste-at', ({ x, y }) => {
             if (!this.clipboard) return;
             if (this.clipboard.type === 'object') {
