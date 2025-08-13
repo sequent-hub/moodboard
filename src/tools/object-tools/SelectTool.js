@@ -161,7 +161,7 @@ export class SelectTool extends BaseTool {
         
         if (this.isResizing) {
             this.updateResize(event);
-        } else if (this.isRotating) {
+			} else if (this.isRotating || this.isGroupRotating) {
             this.updateRotate(event);
 			} else if (this.isDragging || this.isGroupDragging) {
             this.updateDrag(event);
@@ -176,10 +176,10 @@ export class SelectTool extends BaseTool {
     /**
      * Отпускание кнопки мыши
      */
-    onMouseUp(event) {
+		onMouseUp(event) {
         if (this.isResizing) {
             this.endResize();
-        } else if (this.isRotating) {
+			} else if (this.isRotating || this.isGroupRotating) {
             this.endRotate();
         } else if (this.isDragging || this.isGroupDragging) {
             this.endDrag();
@@ -619,6 +619,7 @@ export class SelectTool extends BaseTool {
         if (objectId === this.groupId && this.selectedObjects.size > 1) {
             this.isGroupRotating = true;
             const gb = this.computeGroupBounds();
+            this.groupRotateBounds = gb;
             this.rotateCenter = { x: gb.x + gb.width / 2, y: gb.y + gb.height / 2 };
             this.rotateStartAngle = 0;
             this.rotateCurrentAngle = 0;
@@ -626,6 +627,22 @@ export class SelectTool extends BaseTool {
                 this.currentY - this.rotateCenter.y,
                 this.currentX - this.rotateCenter.x
             );
+            // Настраиваем целевой прямоугольник для ручек: центр в pivot для корректного вращения
+            this.ensureGroupBoundsGraphics(gb);
+            if (this.groupBoundsGraphics) {
+                this.groupBoundsGraphics.pivot.set(gb.width / 2, gb.height / 2);
+                this.groupBoundsGraphics.position.set(this.rotateCenter.x, this.rotateCenter.y);
+                this.groupBoundsGraphics.rotation = 0;
+            }
+            // Подгоняем визуальную рамку под центр
+            if (this.groupSelectionGraphics) {
+                this.groupSelectionGraphics.pivot.set(0, 0);
+                this.groupSelectionGraphics.position.set(0, 0);
+                this.groupSelectionGraphics.clear();
+                this.groupSelectionGraphics.lineStyle(1, 0x3B82F6, 1);
+                // Нарисуем пока осевую рамку, вращение применим в update
+                this.groupSelectionGraphics.drawRect(gb.x, gb.y, gb.width, gb.height);
+            }
             const ids = Array.from(this.selectedObjects);
             this.emit('group:rotate:start', { objects: ids, center: this.rotateCenter });
             return;
@@ -688,6 +705,16 @@ export class SelectTool extends BaseTool {
             this.rotateCurrentAngle = deltaAngleDegrees;
             const ids = Array.from(this.selectedObjects);
             this.emit('group:rotate:update', { objects: ids, center: this.rotateCenter, angle: this.rotateCurrentAngle });
+        // Вращаем общую рамку (groupBoundsGraphics) вокруг центра — это и есть рамка с ручками
+            const angleRad = this.rotateCurrentAngle * Math.PI / 180;
+        if (this.groupBoundsGraphics && this.groupRotateBounds) {
+            this.groupBoundsGraphics.pivot.set(this.groupRotateBounds.width / 2, this.groupRotateBounds.height / 2);
+            this.groupBoundsGraphics.position.set(this.rotateCenter.x, this.rotateCenter.y);
+            this.groupBoundsGraphics.rotation = angleRad;
+            if (this.resizeHandles) {
+                this.resizeHandles.updateHandles();
+            }
+        }
             return;
         }
         if (!this.isRotating || !this.rotateCenter) return;
@@ -739,10 +766,24 @@ export class SelectTool extends BaseTool {
             const ids = Array.from(this.selectedObjects);
             this.emit('group:rotate:end', { objects: ids, angle: this.rotateCurrentAngle });
             this.isGroupRotating = false;
+            // После финализации пересчитываем осевые границы группы и
+            // перестраиваем рамку с ручками в осевом виде (rotation=0)
+            const gb = this.computeGroupBounds();
+            this.ensureGroupBoundsGraphics(gb);
+            if (this.groupBoundsGraphics) {
+                this.groupBoundsGraphics.rotation = 0;
+                this.groupBoundsGraphics.pivot.set(0, 0);
+                this.groupBoundsGraphics.position.set(gb.x, gb.y);
+            }
+            // Обновляем ручки на новых границах
+            if (this.resizeHandles) {
+                this.resizeHandles.showHandles(this.groupBoundsGraphics, this.groupId);
+            }
             this.rotateCenter = null;
             this.rotateStartAngle = 0;
             this.rotateCurrentAngle = 0;
             this.rotateStartMouseAngle = 0;
+            this.groupRotateBounds = null;
             return;
         }
         if (this.dragTarget && this.rotateStartAngle !== undefined) {
@@ -931,28 +972,10 @@ export class SelectTool extends BaseTool {
             this.removeGroupSelectionGraphics();
             return;
         }
-
-        // Создаем или очищаем графику
-        if (!this.groupSelectionGraphics) {
-            this.groupSelectionGraphics = new PIXI.Graphics();
-            this.groupSelectionGraphics.name = 'group-selection';
-            this.groupSelectionGraphics.zIndex = 1500; // ниже box-select (2000), выше объектов
-            this.app.stage.addChild(this.groupSelectionGraphics);
-            this.app.stage.sortableChildren = true;
-        } else if (!this.groupSelectionGraphics.parent) {
-            this.app.stage.addChild(this.groupSelectionGraphics);
-        }
-
-        this.groupSelectionGraphics.clear();
-        // Рисуем только обводку, без fill, чтобы избежать «синего квадрата»
-        this.groupSelectionGraphics.lineStyle(1, 0x3B82F6, 1);
-
-        // Получаем bounds всех объектов
+        // Получаем bounds всех объектов и отрисовываем контур на groupBoundsGraphics (одна рамка с ручками)
         const request = { objects: [] };
         this.emit('get:all:objects', request);
         const idToBounds = new Map(request.objects.map(o => [o.id, o.bounds]));
-
-        // Вычисляем единую рамку, охватывающую все выбранные объекты
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for (const id of selectedIds) {
             const b = idToBounds.get(id);
@@ -963,9 +986,9 @@ export class SelectTool extends BaseTool {
             maxY = Math.max(maxY, b.y + b.height);
         }
         if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
-            this.groupSelectionGraphics.drawRect(minX, minY, maxX - minX, maxY - minY);
-            // Синхронизируем геометрию для ручек на группе
-            this.ensureGroupBoundsGraphics({ x: minX, y: minY, width: maxX - minX, height: maxY - minY });
+            const gb = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+            this.ensureGroupBoundsGraphics(gb);
+            this.updateGroupBoundsGraphics(gb);
         }
     }
 
@@ -973,11 +996,10 @@ export class SelectTool extends BaseTool {
      * Удаляет графику множественного выделения
      */
     removeGroupSelectionGraphics() {
-        if (this.groupSelectionGraphics && this.groupSelectionGraphics.parent) {
-            this.groupSelectionGraphics.parent.removeChild(this.groupSelectionGraphics);
-            this.groupSelectionGraphics.destroy();
+        if (this.groupBoundsGraphics) {
+            this.groupBoundsGraphics.clear();
+            this.groupBoundsGraphics.rotation = 0;
         }
-        this.groupSelectionGraphics = null;
     }
 
     /**
