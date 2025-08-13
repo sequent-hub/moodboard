@@ -944,7 +944,8 @@ export class SelectTool extends BaseTool {
         }
 
         this.groupSelectionGraphics.clear();
-        this.groupSelectionGraphics.lineStyle(1, 0x3B82F6, 0.9);
+        // Рисуем только обводку, без fill, чтобы избежать «синего квадрата»
+        this.groupSelectionGraphics.lineStyle(1, 0x3B82F6, 1);
 
         // Получаем bounds всех объектов
         const request = { objects: [] };
@@ -1014,9 +1015,8 @@ export class SelectTool extends BaseTool {
     updateGroupBoundsGraphics(bounds) {
         if (!this.groupBoundsGraphics) return;
         this.groupBoundsGraphics.clear();
-        // Невидимая геометрия, чтобы ResizeHandles работали поверх
-        this.groupBoundsGraphics.lineStyle(0, 0x000000, 0);
-        this.groupBoundsGraphics.beginFill(0x000000, 0);
+        // Прозрачная заливка (alpha ~0), чтобы getBounds() давал корректные размеры и не было артефактов
+        this.groupBoundsGraphics.beginFill(0x000000, 0.001);
         this.groupBoundsGraphics.drawRect(0, 0, Math.max(1, bounds.width), Math.max(1, bounds.height));
         this.groupBoundsGraphics.endFill();
         // Размещаем графику в левом-верхнем углу группы
@@ -1209,15 +1209,24 @@ export class SelectTool extends BaseTool {
             if (pixiObjectData.pixiObject) {
                 this.resizeHandles.showHandles(pixiObjectData.pixiObject, objectId);
             }
-        } else {
+        } else if (this.selectedObjects.size >= 2) {
             // Для группы: создаем невидимый прямоугольник и вешаем на него ручки
             const gb = this.computeGroupBounds();
+            // Если границы пока невалидны (например, временно пусты во время box-select), скрываем
+            if (gb.width <= 0 || gb.height <= 0) {
+                this.resizeHandles.hideHandles();
+                return;
+            }
             this.ensureGroupBoundsGraphics(gb);
             if (this.groupBoundsGraphics) {
                 this.resizeHandles.showHandles(this.groupBoundsGraphics, this.groupId);
             }
             // Общая рамка группы для визуализации
             this.drawGroupSelectionGraphics();
+        } else {
+            // Нет выделения
+            this.resizeHandles.hideHandles();
+            this.removeGroupSelectionGraphics();
         }
     }
 

@@ -65,7 +65,7 @@ export class ResizeHandles {
         this.clearHandles();
         
         // Получаем глобальные границы объекта для позиционирования контейнера
-        const globalBounds = this.targetObject.getBounds();
+        let globalBounds = this.targetObject.getBounds();
         this.targetBounds = globalBounds;
         
         // Получаем локальные границы объекта (без учета трансформации)
@@ -103,28 +103,41 @@ export class ResizeHandles {
         } else {
             // Сбрасываем поворот если объект не повернут
             this.container.rotation = 0;
-            this.container.x = 0;
-            this.container.y = 0;
+            // Контейнер позиционируем в левом-верхнем углу targetObject (или его bounds)
+            // Если targetObject — специальный прямоугольник группы (Graphics без внутреннего смещения), 
+            // его x/y уже равны левому-верхнему; используем их напрямую.
+            this.container.x = this.targetObject.x ?? globalBounds.x;
+            this.container.y = this.targetObject.y ?? globalBounds.y;
             this.container.pivot.set(0, 0);
-            
-            // Используем глобальные границы
-            this.workingBounds = globalBounds;
+            // Рабочие границы начинаются от (0,0) контейнера
+            this.workingBounds = {
+                x: 0,
+                y: 0,
+                width: globalBounds.width,
+                height: globalBounds.height
+            };
         }
         
         // Создаем рамку выделения
         this.createSelectionBorder(this.workingBounds);
         
-        // Создаем ручки по углам и сторонам
+        // Создаем ручки по углам и сторонам относительно workingBounds (локальные координаты контейнера)
         const bounds = this.workingBounds;
+        const x0 = bounds.x;
+        const y0 = bounds.y;
+        const x1 = bounds.x + bounds.width;
+        const y1 = bounds.y + bounds.height;
+        const cx = bounds.x + bounds.width / 2;
+        const cy = bounds.y + bounds.height / 2;
         const handlePositions = [
-            { type: 'nw', x: bounds.x, y: bounds.y, cursor: 'nw-resize' },
-            { type: 'n', x: bounds.x + bounds.width / 2, y: bounds.y, cursor: 'n-resize' },
-            { type: 'ne', x: bounds.x + bounds.width, y: bounds.y, cursor: 'ne-resize' },
-            { type: 'e', x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2, cursor: 'e-resize' },
-            { type: 'se', x: bounds.x + bounds.width, y: bounds.y + bounds.height, cursor: 'se-resize' },
-            { type: 's', x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height, cursor: 's-resize' },
-            { type: 'sw', x: bounds.x, y: bounds.y + bounds.height, cursor: 'sw-resize' },
-            { type: 'w', x: bounds.x, y: bounds.y + bounds.height / 2, cursor: 'w-resize' }
+            { type: 'nw', x: x0, y: y0, cursor: 'nw-resize' },
+            { type: 'n',  x: cx, y: y0, cursor: 'n-resize' },
+            { type: 'ne', x: x1, y: y0, cursor: 'ne-resize' },
+            { type: 'e',  x: x1, y: cy, cursor: 'e-resize' },
+            { type: 'se', x: x1, y: y1, cursor: 'se-resize' },
+            { type: 's',  x: cx, y: y1, cursor: 's-resize' },
+            { type: 'sw', x: x0, y: y1, cursor: 'sw-resize' },
+            { type: 'w',  x: x0, y: cy, cursor: 'w-resize' }
         ];
         
         handlePositions.forEach(pos => {
@@ -133,9 +146,9 @@ export class ResizeHandles {
             this.container.addChild(handle);
         });
         
-        // Создаем ручку вращения возле левого нижнего угла
+        // Создаем ручку вращения возле левого НИЖНЕГО угла рамки
         const rotateHandle = this.createRotateHandle(
-            bounds.x - this.rotateHandleOffset, 
+            bounds.x, 
             bounds.y + bounds.height + this.rotateHandleOffset
         );
         this.handles.push(rotateHandle);

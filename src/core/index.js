@@ -6,7 +6,7 @@ import { SaveManager } from './SaveManager.js';
 import { HistoryManager } from './HistoryManager.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
-import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand } from './commands/index.js';
+import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand, GroupRotateCommand } from './commands/index.js';
 
 export class CoreMoodBoard {
     constructor(container, options = {}) {
@@ -335,27 +335,65 @@ export class CoreMoodBoard {
 
         // === ГРУППОВОЙ ПОВОРОТ ===
         this.eventBus.on('tool:group:rotate:start', (data) => {
-            // Сохраняем начальные углы
-            this._groupRotateStartAngles = new Map();
+            // Сохраняем начальные углы и позиции
+            this._groupRotateStart = new Map();
             for (const id of data.objects) {
                 const pixiObject = this.pixi.objects.get(id);
                 const deg = pixiObject ? (pixiObject.rotation * 180 / Math.PI) : 0;
-                this._groupRotateStartAngles.set(id, deg);
+                const pos = pixiObject ? { x: pixiObject.x, y: pixiObject.y } : { x: 0, y: 0 };
+                this._groupRotateStart.set(id, { angle: deg, position: pos });
             }
+            // Центр вращения группы
+            this._groupRotateCenter = data.center;
         });
 
         this.eventBus.on('tool:group:rotate:update', (data) => {
+            // Поворачиваем каждый объект вокруг общего центра с сохранением относительного смещения
+            const center = this._groupRotateCenter || { x: 0, y: 0 };
+            const rad = (data.angle || 0) * Math.PI / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
             for (const id of data.objects) {
-                const start = this._groupRotateStartAngles?.get(id) ?? 0;
-                const angle = start + data.angle;
-                this.pixi.updateObjectRotation(id, angle);
-                this.updateObjectRotationDirect(id, angle);
+                const start = this._groupRotateStart?.get(id);
+                if (!start) continue;
+                const startAngle = start.angle;
+                const newAngle = startAngle + data.angle;
+                // Пересчет позиции относительно центра
+                const relX = start.position.x - center.x;
+                const relY = start.position.y - center.y;
+                const newX = center.x + relX * cos - relY * sin;
+                const newY = center.y + relX * sin + relY * cos;
+                // Применяем
+                // Сначала позиция, затем угол (для корректной визуализации ручек)
+                this.updateObjectPositionDirect(id, { x: newX, y: newY });
+                this.pixi.updateObjectRotation(id, newAngle);
+                this.updateObjectRotationDirect(id, newAngle);
             }
+            // Сообщаем UI обновить ручки, если активна рамка группы
+            this.eventBus.emit('object:transform:updated', { objectId: '__group__', type: 'rotation' });
         });
 
         this.eventBus.on('tool:group:rotate:end', (data) => {
-            // Аналогично resize: можно оформить батч-команды; пока оставляем простое применение
-            this._groupRotateStartAngles = null;
+            // Оформляем как батч-команду GroupRotateCommand
+            const center = this._groupRotateCenter || { x: 0, y: 0 };
+            const changes = [];
+            for (const id of data.objects) {
+                const start = this._groupRotateStart?.get(id);
+                const pixiObject = this.pixi.objects.get(id);
+                if (!start || !pixiObject) continue;
+                const toAngle = pixiObject.rotation * 180 / Math.PI;
+                const toPos = { x: pixiObject.x, y: pixiObject.y };
+                if (Math.abs(start.angle - toAngle) > 0.1 || Math.abs(start.position.x - toPos.x) > 0.1 || Math.abs(start.position.y - toPos.y) > 0.1) {
+                    changes.push({ id, fromAngle: start.angle, toAngle, fromPos: start.position, toPos });
+                }
+            }
+            if (changes.length > 0) {
+                const cmd = new GroupRotateCommand(this, changes);
+                cmd.setEventBus(this.eventBus);
+                this.history.executeCommand(cmd);
+            }
+            this._groupRotateStart = null;
+            this._groupRotateCenter = null;
         });
 
         // === ОБРАБОТЧИКИ КОМАНД ВРАЩЕНИЯ ===

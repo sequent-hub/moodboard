@@ -7,3 +7,4 @@ export { ResizeObjectCommand } from './ResizeObjectCommand.js';
 export { CopyObjectCommand } from './CopyObjectCommand.js';
 export { PasteObjectCommand } from './PasteObjectCommand.js';
 export { GroupMoveCommand } from './GroupMoveCommand.js';
+export { GroupRotateCommand } from './GroupRotateCommand.js';
