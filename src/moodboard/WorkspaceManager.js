@@ -30,9 +30,9 @@ export class WorkspaceManager {
         this.canvasContainer.className = 'moodboard-workspace__canvas';
         this.canvasContainer.id = 'moodboard-canvas-' + Date.now();
         
-        // Собираем структуру
-        this.workspaceElement.appendChild(this.toolbarContainer);
+        // Собираем структуру (toolbar поверх canvas)
         this.workspaceElement.appendChild(this.canvasContainer);
+        this.workspaceElement.appendChild(this.toolbarContainer);
         this.container.appendChild(this.workspaceElement);
         
         return {

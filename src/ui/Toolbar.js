@@ -21,15 +21,15 @@ export class Toolbar {
         this.element.className = `moodboard-toolbar moodboard-toolbar--${this.theme}`;
         
         const tools = [
-            { id: 'frame', label: '🖼️ Add Frame', type: 'frame' },
-            { id: 'text', label: '📝 Add Text', type: 'simple-text' },
-            { id: 'shape', label: '🔶 Add Shape', type: 'shape' },
+            { id: 'frame', icon: '🖼️', title: 'Добавить рамку', type: 'frame' },
+            { id: 'text', icon: '📝', title: 'Добавить текст', type: 'simple-text' },
+            { id: 'shape', icon: '🔶', title: 'Добавить фигуру', type: 'shape' },
             { id: 'divider', type: 'divider' },
-            { id: 'clear', label: '🗑️ Clear All', type: 'clear' },
-            { id: 'export', label: '💾 Export', type: 'export' },
+            { id: 'clear', icon: '🗑️', title: 'Очистить холст', type: 'clear' },
+            { id: 'export', icon: '💾', title: 'Экспорт', type: 'export' },
             { id: 'divider', type: 'divider' },
-            { id: 'undo', label: '↶ Undo', type: 'undo', disabled: true },
-            { id: 'redo', label: '↷ Redo', type: 'redo', disabled: true }
+            { id: 'undo', icon: '↶', title: 'Отменить (Ctrl+Z)', type: 'undo', disabled: true },
+            { id: 'redo', icon: '↷', title: 'Повторить (Ctrl+Y)', type: 'redo', disabled: true }
         ];
         
         tools.forEach(tool => {
@@ -52,9 +52,10 @@ export class Toolbar {
     createButton(tool) {
         const button = document.createElement('button');
         button.className = `moodboard-toolbar__button moodboard-toolbar__button--${tool.id}`;
-        button.textContent = tool.label;
+        button.textContent = tool.icon || '';
         button.dataset.tool = tool.type;
         button.dataset.toolId = tool.id;
+        if (tool.title) button.title = tool.title;
         
         // Устанавливаем disabled состояние если указано
         if (tool.disabled) {
