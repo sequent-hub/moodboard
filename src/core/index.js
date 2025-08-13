@@ -434,6 +434,17 @@ export class CoreMoodBoard {
             // Сдвигаем мир так, чтобы точка под курсором осталась неподвижной
             world.x += (globalPoint.x - newGlobal.x);
             world.y += (globalPoint.y - newGlobal.y);
+            this.eventBus.emit('ui:zoom:percent', { percentage: Math.round(newScale * 100) });
+        });
+
+        // Кнопки зума из UI
+        this.eventBus.on('ui:zoom:in', () => {
+            const center = new PIXI.Point(this.pixi.app.view.clientWidth / 2, this.pixi.app.view.clientHeight / 2);
+            this.eventBus.emit('tool:wheel:zoom', { x: center.x, y: center.y, delta: -120 });
+        });
+        this.eventBus.on('ui:zoom:out', () => {
+            const center = new PIXI.Point(this.pixi.app.view.clientWidth / 2, this.pixi.app.view.clientHeight / 2);
+            this.eventBus.emit('tool:wheel:zoom', { x: center.x, y: center.y, delta: 120 });
         });
 
         // === ГРУППОВОЕ ПЕРЕТАСКИВАНИЕ ===

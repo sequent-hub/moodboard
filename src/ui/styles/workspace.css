@@ -40,6 +40,42 @@
     pointer-events: none;
 }
 
+/* Right top zoom panel container (reuses topbar container area) */
+.moodboard-zoombar {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    z-index: 3000;
+    pointer-events: auto;
+}
+
+.moodboard-zoombar__button {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: #f0f0f0;
+    color: #333;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.moodboard-zoombar__button:hover { background: #e6e6e6; }
+
+.moodboard-zoombar__label {
+    min-width: 48px;
+    text-align: center;
+    font-size: 14px;
+}
+
 /* Canvas Container */
 .moodboard-workspace__canvas {
     position: absolute;
@@ -270,6 +306,25 @@
 
 .moodboard-topbar__button:hover {
     background: #e6e6e6;
+}
+
+.moodboard-topbar__zoom {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 8px;
+}
+
+.moodboard-topbar__button--zoom {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+}
+
+.moodboard-topbar__zoom-label {
+    min-width: 48px;
+    text-align: center;
+    font-size: 14px;
 }
 
 .moodboard-topbar__button--active {

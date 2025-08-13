@@ -38,6 +38,8 @@ export class Topbar {
             this.element.appendChild(btn);
         });
 
+        // (кнопки зума вынесены в отдельную панель справа)
+
         this.container.appendChild(this.element);
     }
 
@@ -50,6 +52,8 @@ export class Topbar {
             this.eventBus.emit('ui:grid:change', { type });
             this.setActive(type);
         });
+
+        // Зум обрабатывается в отдельной панели
     }
 
     setActive(type) {

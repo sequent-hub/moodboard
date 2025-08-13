@@ -2,6 +2,7 @@ import { CoreMoodBoard } from '../core/index.js';
 import { Toolbar } from '../ui/Toolbar.js';
 import { SaveStatus } from '../ui/SaveStatus.js';
 import { Topbar } from '../ui/Topbar.js';
+import { ZoomPanel } from '../ui/ZoomPanel.js';
 import { ContextMenu } from '../ui/ContextMenu.js';
 import { WorkspaceManager } from './WorkspaceManager.js';
 import { DataManager } from './DataManager.js';
@@ -65,6 +66,7 @@ export class MoodBoard {
             // Инициализируем UI
             this.initToolbar();
             this.initTopbar();
+            this.initZoombar();
             this.initContextMenu();
             
             // Загружаем данные (сначала пробуем загрузить с сервера, потом дефолтные)
@@ -124,6 +126,14 @@ export class MoodBoard {
             this.topbarContainer,
             this.coreMoodboard.eventBus,
             this.options.theme
+        );
+    }
+
+    initZoombar() {
+        // Рисуем панель зума поверх холста (в том же контейнере, что и topbar)
+        this.zoombar = new ZoomPanel(
+            this.topbarContainer,
+            this.coreMoodboard.eventBus
         );
     }
 
