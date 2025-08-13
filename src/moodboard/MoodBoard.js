@@ -3,6 +3,7 @@ import { Toolbar } from '../ui/Toolbar.js';
 import { SaveStatus } from '../ui/SaveStatus.js';
 import { Topbar } from '../ui/Topbar.js';
 import { ZoomPanel } from '../ui/ZoomPanel.js';
+import { MapPanel } from '../ui/MapPanel.js';
 import { ContextMenu } from '../ui/ContextMenu.js';
 import { WorkspaceManager } from './WorkspaceManager.js';
 import { DataManager } from './DataManager.js';
@@ -67,6 +68,7 @@ export class MoodBoard {
             this.initToolbar();
             this.initTopbar();
             this.initZoombar();
+            this.initMapbar();
             this.initContextMenu();
             
             // Загружаем данные (сначала пробуем загрузить с сервера, потом дефолтные)
@@ -133,6 +135,14 @@ export class MoodBoard {
         // Рисуем панель зума поверх холста (в том же контейнере, что и topbar)
         this.zoombar = new ZoomPanel(
             this.topbarContainer,
+            this.coreMoodboard.eventBus
+        );
+    }
+
+    initMapbar() {
+        // Рисуем панель карты в правом нижнем углу (внутри workspace контейнера)
+        this.mapbar = new MapPanel(
+            this.workspaceElement,
             this.coreMoodboard.eventBus
         );
     }
