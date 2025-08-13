@@ -1,6 +1,5 @@
 import { LineGrid } from './LineGrid.js';
 import { DotGrid } from './DotGrid.js';
-import { IsometricGrid } from './IsometricGrid.js';
 
 /**
  * Фабрика для создания различных типов сеток
@@ -11,8 +10,7 @@ export class GridFactory {
      */
     static gridTypes = {
         'line': LineGrid,
-        'dot': DotGrid,
-        'isometric': IsometricGrid
+        'dot': DotGrid
     };
     
     /**
@@ -82,14 +80,6 @@ export class GridFactory {
                 dotSize: 2,
                 dotStyle: 'circle',
                 highlightIntersections: true
-            },
-            isometric: {
-                enabled: true,
-                size: 30,
-                color: 0xE0E0E0,
-                opacity: 0.5,
-                lineWidth: 1,
-                angle: 30
             }
         };
         
@@ -149,21 +139,7 @@ export class GridFactory {
                 dotStyle: 'square'
             },
             
-            // Изометрические сетки
-            'iso-standard': {
-                type: 'isometric',
-                size: 30,
-                color: 0x007bff,
-                opacity: 0.4,
-                angle: 30
-            },
-            'iso-steep': {
-                type: 'isometric',
-                size: 25,
-                color: 0x28a745,
-                opacity: 0.5,
-                angle: 45
-            }
+            // (изометрическая сетка удалена)
         };
         
         const preset = presets[presetName];
@@ -181,8 +157,7 @@ export class GridFactory {
     static getAvailablePresets() {
         return [
             'fine-line', 'standard-line', 'coarse-line',
-            'fine-dots', 'standard-dots', 'bold-dots',
-            'iso-standard', 'iso-steep'
+            'fine-dots', 'standard-dots', 'bold-dots'
         ];
     }
 }

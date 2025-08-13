@@ -69,6 +69,32 @@ export class CoreMoodBoard {
             });
             this.grid.updateVisual();
             this.pixi.setGrid(this.grid);
+            this.eventBus.emit('ui:grid:current', { type: 'line' });
+
+            // Смена вида сетки из UI
+            this.eventBus.on('ui:grid:change', ({ type }) => {
+                const size = this.workspaceSize?.() || { width: this.options.width, height: this.options.height };
+                if (type === 'off') {
+                    this.grid?.setEnabled(false);
+                    this.grid?.updateVisual();
+                    this.pixi.setGrid(this.grid);
+                    return;
+                }
+                const options = {
+                    ...GridFactory.getDefaultOptions(type),
+                    enabled: true,
+                    width: size.width,
+                    height: size.height
+                };
+                try {
+                    this.grid = GridFactory.createGrid(type, options);
+                    this.grid.updateVisual();
+                    this.pixi.setGrid(this.grid);
+                    this.eventBus.emit('ui:grid:current', { type });
+                } catch (e) {
+                    console.warn('Unknown grid type:', type);
+                }
+            });
 
             // Создаем пустую доску для демо
             this.state.loadBoard({
