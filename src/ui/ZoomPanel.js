@@ -4,6 +4,7 @@ export class ZoomPanel {
         this.eventBus = eventBus;
         this.element = null;
         this.labelEl = null;
+        this.menuEl = null;
         this.create();
         this.attach();
     }
@@ -21,6 +22,10 @@ export class ZoomPanel {
         const label = document.createElement('span');
         label.className = 'moodboard-zoombar__label';
         label.textContent = '100%';
+        const caret = document.createElement('span');
+        caret.className = 'moodboard-zoombar__label-caret';
+        caret.textContent = '▾';
+        label.appendChild(caret);
         this.labelEl = label;
 
         const zoomInBtn = document.createElement('button');
@@ -45,9 +50,54 @@ export class ZoomPanel {
             else if (action === 'zoom-out') this.eventBus.emit('ui:zoom:out');
         });
 
+        // Выпадающее меню по клику на процент
+        this.labelEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (this.menuEl) {
+                this.hideMenu();
+            } else {
+                this.showMenu();
+            }
+        });
+
+        document.addEventListener('mousedown', (e) => {
+            if (!this.menuEl) return;
+            if (this.element.contains(e.target)) return;
+            this.hideMenu();
+        });
+
         this.eventBus.on('ui:zoom:percent', ({ percentage }) => {
             if (this.labelEl) this.labelEl.textContent = `${percentage}%`;
         });
+    }
+
+    showMenu() {
+        this.menuEl = document.createElement('div');
+        this.menuEl.className = 'moodboard-zoombar__menu';
+        this.menuEl.innerHTML = '';
+
+        const addItem = (label, onClick) => {
+            const item = document.createElement('div');
+            item.className = 'moodboard-zoombar__menu-item';
+            item.textContent = label;
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.hideMenu();
+                onClick();
+            });
+            this.menuEl.appendChild(item);
+        };
+
+        addItem('По размеру экрана', () => this.eventBus.emit('ui:zoom:fit'));
+        addItem('К выделению', () => this.eventBus.emit('ui:zoom:selection'));
+        addItem('100%', () => this.eventBus.emit('ui:zoom:reset'));
+
+        this.element.appendChild(this.menuEl);
+    }
+
+    hideMenu() {
+        if (this.menuEl) this.menuEl.remove();
+        this.menuEl = null;
     }
 
     destroy() {

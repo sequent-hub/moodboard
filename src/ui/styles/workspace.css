@@ -74,7 +74,37 @@
     min-width: 48px;
     text-align: center;
     font-size: 14px;
+    cursor: pointer;
+    color: #333;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
+
+.moodboard-zoombar__label-caret {
+    color: #999;
+    font-size: 12px;
+}
+
+.moodboard-zoombar__menu {
+    position: absolute;
+    right: 0;
+    top: 49px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    padding: 6px 0;
+    min-width: 180px;
+    z-index: 3100;
+}
+
+.moodboard-zoombar__menu-item {
+    padding: 8px 12px;
+    font-size: 14px;
+    cursor: pointer;
+}
+.moodboard-zoombar__menu-item:hover { background: #f5f5f5; }
 
 /* Canvas Container */
 .moodboard-workspace__canvas {

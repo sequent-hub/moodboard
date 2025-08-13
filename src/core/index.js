@@ -446,6 +446,78 @@ export class CoreMoodBoard {
             const center = new PIXI.Point(this.pixi.app.view.clientWidth / 2, this.pixi.app.view.clientHeight / 2);
             this.eventBus.emit('tool:wheel:zoom', { x: center.x, y: center.y, delta: 120 });
         });
+        this.eventBus.on('ui:zoom:reset', () => {
+            const world = this.pixi.worldLayer || this.pixi.app.stage;
+            const center = new PIXI.Point(this.pixi.app.view.clientWidth / 2, this.pixi.app.view.clientHeight / 2);
+            // Сброс масштаба к 1 с центрированием
+            const oldScale = world.scale.x || 1;
+            const newScale = 1;
+            const globalPoint = center;
+            const localPoint = world.toLocal(globalPoint);
+            world.scale.set(newScale);
+            const newGlobal = world.toGlobal(localPoint);
+            world.x += (globalPoint.x - newGlobal.x);
+            world.y += (globalPoint.y - newGlobal.y);
+            this.eventBus.emit('ui:zoom:percent', { percentage: 100 });
+        });
+        this.eventBus.on('ui:zoom:fit', () => {
+            // Fit to screen: берем bbox всех объектов
+            const objs = this.state.state.objects || [];
+            if (objs.length === 0) return;
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (const o of objs) {
+                minX = Math.min(minX, o.position.x);
+                minY = Math.min(minY, o.position.y);
+                maxX = Math.max(maxX, o.position.x + (o.width || 0));
+                maxY = Math.max(maxY, o.position.y + (o.height || 0));
+            }
+            const bboxW = Math.max(1, maxX - minX);
+            const bboxH = Math.max(1, maxY - minY);
+            const viewW = this.pixi.app.view.clientWidth;
+            const viewH = this.pixi.app.view.clientHeight;
+            const padding = 40;
+            const scaleX = (viewW - padding) / bboxW;
+            const scaleY = (viewH - padding) / bboxH;
+            const newScale = Math.max(0.1, Math.min(5, Math.min(scaleX, scaleY)));
+            const world = this.pixi.worldLayer || this.pixi.app.stage;
+            // Центрируем bbox к центру экрана
+            const worldCenterX = minX + bboxW / 2;
+            const worldCenterY = minY + bboxH / 2;
+            world.scale.set(newScale);
+            world.x = viewW / 2 - worldCenterX * newScale;
+            world.y = viewH / 2 - worldCenterY * newScale;
+            this.eventBus.emit('ui:zoom:percent', { percentage: Math.round(newScale * 100) });
+        });
+        this.eventBus.on('ui:zoom:selection', () => {
+            // Zoom to selection: берем bbox выделенных
+            const selected = this.selectTool ? Array.from(this.selectTool.selectedObjects || []) : [];
+            if (!selected || selected.length === 0) return;
+            const objs = this.state.state.objects || [];
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (const o of objs) {
+                if (!selected.includes(o.id)) continue;
+                minX = Math.min(minX, o.position.x);
+                minY = Math.min(minY, o.position.y);
+                maxX = Math.max(maxX, o.position.x + (o.width || 0));
+                maxY = Math.max(maxY, o.position.y + (o.height || 0));
+            }
+            if (!isFinite(minX)) return;
+            const bboxW = Math.max(1, maxX - minX);
+            const bboxH = Math.max(1, maxY - minY);
+            const viewW = this.pixi.app.view.clientWidth;
+            const viewH = this.pixi.app.view.clientHeight;
+            const padding = 40;
+            const scaleX = (viewW - padding) / bboxW;
+            const scaleY = (viewH - padding) / bboxH;
+            const newScale = Math.max(0.1, Math.min(5, Math.min(scaleX, scaleY)));
+            const world = this.pixi.worldLayer || this.pixi.app.stage;
+            const worldCenterX = minX + bboxW / 2;
+            const worldCenterY = minY + bboxH / 2;
+            world.scale.set(newScale);
+            world.x = viewW / 2 - worldCenterX * newScale;
+            world.y = viewH / 2 - worldCenterY * newScale;
+            this.eventBus.emit('ui:zoom:percent', { percentage: Math.round(newScale * 100) });
+        });
 
         // === ГРУППОВОЕ ПЕРЕТАСКИВАНИЕ ===
         this.eventBus.on('tool:group:drag:start', (data) => {
