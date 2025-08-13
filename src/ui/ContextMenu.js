@@ -169,6 +169,20 @@ export class ContextMenu {
                 this.eventBus.emit('ui:paste-at', { x: this.lastX, y: this.lastY });
             }));
 
+            // Слойность для группы (двигаем все выбранные объекты)
+            list.appendChild(mkItem('На передний план', ']', () => {
+                this.eventBus.emit('ui:layer-group:bring-to-front');
+            }));
+            list.appendChild(mkItem('Перенести вперёд', 'Ctrl+]', () => {
+                this.eventBus.emit('ui:layer-group:bring-forward');
+            }));
+            list.appendChild(mkItem('Перенести назад', 'Ctrl+[', () => {
+                this.eventBus.emit('ui:layer-group:send-backward');
+            }));
+            list.appendChild(mkItem('На задний план', '[', () => {
+                this.eventBus.emit('ui:layer-group:send-to-back');
+            }));
+
             this.element.appendChild(list);
             return;
         }

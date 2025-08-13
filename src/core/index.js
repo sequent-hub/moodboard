@@ -244,6 +244,61 @@ export class CoreMoodBoard {
         this.eventBus.on('ui:layer:send-backward', ({ objectId }) => sendBackward(objectId));
         this.eventBus.on('ui:layer:send-to-back', ({ objectId }) => sendToBack(objectId));
 
+        // Групповые операции слоя: перемещаем группу как единый блок, сохраняя внутренний порядок
+        const getSelection = () => {
+            const ids = this.toolManager.getActiveTool()?.name === 'select'
+                ? Array.from(this.toolManager.getActiveTool().selectedObjects || [])
+                : [];
+            return ids;
+        };
+        const reorderGroupInState = (ids, mode) => {
+            const arr = this.state.state.objects || [];
+            if (ids.length === 0 || arr.length === 0) return;
+            const selectedSet = new Set(ids);
+            // Сохраняем относительный порядок выбранных и остальных
+            const selectedItems = arr.filter(o => selectedSet.has(o.id));
+            const others = arr.filter(o => !selectedSet.has(o.id));
+            // Позиция блока среди "others" равна числу остальных до минимального индекса выбранных
+            const indices = arr.map((o, i) => ({ id: o.id, i })).filter(p => selectedSet.has(p.id)).map(p => p.i).sort((a,b)=>a-b);
+            const minIdx = indices[0];
+            const othersBefore = arr.slice(0, minIdx).filter(o => !selectedSet.has(o.id)).length;
+            let insertPos = othersBefore;
+            switch (mode) {
+                case 'front':
+                    insertPos = others.length; // в конец
+                    break;
+                case 'back':
+                    insertPos = 0; // в начало
+                    break;
+                case 'forward':
+                    insertPos = Math.min(othersBefore + 1, others.length);
+                    break;
+                case 'backward':
+                    insertPos = Math.max(othersBefore - 1, 0);
+                    break;
+            }
+            const newArr = [...others.slice(0, insertPos), ...selectedItems, ...others.slice(insertPos)];
+            this.state.state.objects = newArr;
+            applyZOrderFromState();
+            this.state.markDirty();
+        };
+        this.eventBus.on('ui:layer-group:bring-to-front', () => {
+            const ids = getSelection();
+            reorderGroupInState(ids, 'front');
+        });
+        this.eventBus.on('ui:layer-group:bring-forward', () => {
+            const ids = getSelection();
+            reorderGroupInState(ids, 'forward');
+        });
+        this.eventBus.on('ui:layer-group:send-backward', () => {
+            const ids = getSelection();
+            reorderGroupInState(ids, 'backward');
+        });
+        this.eventBus.on('ui:layer-group:send-to-back', () => {
+            const ids = getSelection();
+            reorderGroupInState(ids, 'back');
+        });
+
         // События перетаскивания
         this.eventBus.on('tool:drag:start', (data) => {
 
