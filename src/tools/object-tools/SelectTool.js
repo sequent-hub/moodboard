@@ -502,8 +502,8 @@ export class SelectTool extends BaseTool {
      * Обновление изменения размера
      */
     updateResize(event) {
-        // Групповой resize
-        if (this.isGroupResizing && this.groupStartBounds && this.resizeHandle) {
+		// Групповой resize
+		if (this.isGroupResizing && this.groupStartBounds && this.resizeHandle) {
             const start = this.groupStartBounds;
             const deltaX = event.x - this.groupStartMouse.x;
             const deltaY = event.y - this.groupStartMouse.y;
@@ -513,6 +513,9 @@ export class SelectTool extends BaseTool {
             let y = start.y;
             let w = start.width;
             let h = start.height;
+
+			// Пропорциональный ресайз с Shift
+			const maintainAspectRatio = !!(event.originalEvent && event.originalEvent.shiftKey);
 
             switch (this.resizeHandle) {
                 case 'e':
@@ -550,6 +553,62 @@ export class SelectTool extends BaseTool {
                     y = start.y + deltaY;
                     break;
             }
+
+			// Если зажат Shift — сохраняем исходные пропорции группы
+			if (maintainAspectRatio && start.height !== 0) {
+				const ar = start.width / start.height;
+				if (['nw','ne','sw','se'].includes(this.resizeHandle)) {
+					const widthChange = Math.abs(w - start.width);
+					const heightChange = Math.abs(h - start.height);
+					if (widthChange > heightChange) {
+						// Корректируем высоту по ширине
+						h = w / ar;
+						// Если тянем верхние ручки — двигаем y, чтобы верх оставался закреплен
+						if (['n','ne','nw'].includes(this.resizeHandle)) {
+							y = start.y + (start.height - h);
+						} else {
+							y = start.y;
+						}
+					} else {
+						// Корректируем ширину по высоте
+						w = h * ar;
+						// Если тянем левые ручки — двигаем x, чтобы левый край оставался закреплен
+						if (['w','sw','nw'].includes(this.resizeHandle)) {
+							x = start.x + (start.width - w);
+						} else {
+							x = start.x;
+						}
+					}
+				} else if (['e','w'].includes(this.resizeHandle)) {
+					// Горизонтальные ручки — ширина задает высоту
+					h = w / ar;
+					// Верхний край корректируем, если тянем верх
+					if (['n'].includes(this.resizeHandle)) {
+						y = start.y + (start.height - h);
+					} else {
+						y = start.y;
+					}
+					// Если тянем левую — корректируем x уже задан во время переключения ручки
+					if (this.resizeHandle === 'w') {
+						x = start.x + (start.width - w);
+					} else {
+						x = start.x;
+					}
+				} else if (['n','s'].includes(this.resizeHandle)) {
+					// Вертикальные ручки — высота задает ширину
+					w = h * ar;
+					if (this.resizeHandle === 'n') {
+						y = start.y + (start.height - h);
+					} else {
+						y = start.y;
+					}
+					if (['w'].includes(this.resizeHandle)) {
+						x = start.x + (start.width - w);
+					} else {
+						x = start.x;
+					}
+				}
+			}
 
             // Минимальные размеры и коррекция позиции для левых/верхних ручек
             if (w < minW) {
