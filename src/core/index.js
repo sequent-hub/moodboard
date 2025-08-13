@@ -6,7 +6,7 @@ import { SaveManager } from './SaveManager.js';
 import { HistoryManager } from './HistoryManager.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
-import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand } from './commands/index.js';
+import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand } from './commands/index.js';
 
 export class CoreMoodBoard {
     constructor(container, options = {}) {
@@ -151,6 +151,31 @@ export class CoreMoodBoard {
                 }
                 this.dragStartPosition = null;
             }
+        });
+
+        // === ДУБЛИРОВАНИЕ ЧЕРЕЗ ALT-ПЕРЕТАСКИВАНИЕ ===
+        // Запрос на создание дубликата от SelectTool
+        this.eventBus.on('tool:duplicate:request', (data) => {
+            const { originalId, position } = data || {};
+            if (!originalId) return;
+            // Находим исходный объект в состоянии
+            const objects = this.state.state.objects;
+            const original = objects.find(obj => obj.id === originalId);
+            if (!original) return;
+
+            // Сохраняем копию в буфер обмена, чтобы переиспользовать PasteObjectCommand
+            this.clipboard = {
+                type: 'object',
+                data: JSON.parse(JSON.stringify(original))
+            };
+
+            // Вызываем вставку с конкретной позицией (там рассчитается ID и пр.)
+            this.pasteObject(position);
+        });
+
+        // Когда объект вставлен (из PasteObjectCommand) — сообщаем SelectTool
+        this.eventBus.on('object:pasted', ({ originalId, newId }) => {
+            this.eventBus.emit('tool:duplicate:ready', { originalId, newId });
         });
 
         // События изменения размера
@@ -556,8 +581,7 @@ export class CoreMoodBoard {
     /**
      * Вставляет объект из буфера обмена
      */
-    async pasteObject(position = null) {
-        const { PasteObjectCommand } = await import('./commands/PasteObjectCommand.js');
+    pasteObject(position = null) {
         const command = new PasteObjectCommand(this, position);
         command.setEventBus(this.eventBus);
         this.history.executeCommand(command);

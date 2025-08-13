@@ -15,6 +15,13 @@ export class SelectTool extends BaseTool {
         // Состояние выделения
         this.selectedObjects = new Set();
         this.isMultiSelect = false;
+		
+		// Режим Alt-клонирования при перетаскивании
+		// Если Alt зажат при начале drag, создаем копию и перетаскиваем именно её
+		this.isAltCloneMode = false; // активен ли режим Alt-клона
+		this.clonePending = false;   // ожидаем подтверждение создания копии
+		this.cloneRequested = false; // запрос на создание копии уже отправлен
+		this.cloneSourceId = null;   // исходный объект для копии
         
         // Состояние перетаскивания
         this.isDragging = false;
@@ -45,6 +52,17 @@ export class SelectTool extends BaseTool {
         // Состояние рамки выделения
         this.isBoxSelect = false;
         this.selectionBox = null;
+
+		// Подписка на событие готовности дубликата (от Core)
+		// Когда PasteObjectCommand завершится, ядро сообщит newId
+		if (this.eventBus) {
+			this.eventBus.on('tool:duplicate:ready', (data) => {
+				// data: { originalId, newId }
+				if (!this.isAltCloneMode || !this.clonePending) return;
+				if (!data || data.originalId !== this.cloneSourceId) return;
+				this.onDuplicateReady(data.newId);
+			});
+		}
     }
     
     /**
@@ -94,7 +112,7 @@ export class SelectTool extends BaseTool {
         } else if (hitResult.type === 'rotate-handle') {
             this.startRotate(hitResult.object);
         } else if (hitResult.type === 'object') {
-
+            // Начинаем обычный drag исходника; Alt-режим включим на лету при движении
             this.handleObjectSelect(hitResult.object, event);
         } else {
             // Клик по пустому месту - начинаем рамку выделения
@@ -307,6 +325,23 @@ export class SelectTool extends BaseTool {
      * Обновление перетаскивания
      */
     updateDrag(event) {
+        // Если во время обычного перетаскивания зажали Alt — включаем режим клонирования на лету
+        if (this.isDragging && !this.isAltCloneMode && event.originalEvent && event.originalEvent.altKey) {
+            this.isAltCloneMode = true;
+            this.cloneSourceId = this.dragTarget;
+            this.clonePending = true;
+            // Запрашиваем текущую позицию исходного объекта
+            const positionData = { objectId: this.cloneSourceId, position: null };
+            this.emit('get:object:position', positionData);
+            // Сообщаем ядру о необходимости создать дубликат у позиции исходного объекта
+            this.emit('duplicate:request', {
+                originalId: this.cloneSourceId,
+                position: positionData.position || { x: event.x, y: event.y }
+            });
+            // Не сбрасываем dragTarget, чтобы исходник продолжал двигаться до появления копии
+            // Визуально это ок: копия появится и захватит drag в onDuplicateReady
+        }
+        // Если ожидаем создание копии — продолжаем двигать текущую цель (исходник)
         if (!this.dragTarget) return;
         
         const newX = event.x - this.dragOffset.x;
@@ -334,6 +369,10 @@ export class SelectTool extends BaseTool {
         this.isDragging = false;
         this.dragTarget = null;
         this.dragOffset = { x: 0, y: 0 };
+		// Сбрасываем состояние Alt-клона
+		this.isAltCloneMode = false;
+		this.clonePending = false;
+		this.cloneSourceId = null;
     }
     
     /**
@@ -765,6 +804,64 @@ export class SelectTool extends BaseTool {
         } else {
             this.resizeHandles.hideHandles();
         }
+    }
+
+    /**
+     * Подготовка перетаскивания с созданием копии при зажатом Alt
+     */
+    prepareAltCloneDrag(objectId, event) {
+        // Очищаем текущее выделение и выделяем исходный объект
+        this.clearSelection();
+        this.addToSelection(objectId);
+
+        // Включаем режим Alt-клона и запрашиваем дубликат у ядра
+        this.isAltCloneMode = true;
+        this.clonePending = true;
+        this.cloneSourceId = objectId;
+
+        // Сохраняем текущее положение курсора
+        this.currentX = event.x;
+        this.currentY = event.y;
+
+        // Запрашиваем текущую позицию исходного объекта
+        const positionData = { objectId, position: null };
+        this.emit('get:object:position', positionData);
+
+        // Сообщаем ядру о необходимости создать дубликат у позиции исходного объекта
+        this.emit('duplicate:request', {
+            originalId: objectId,
+            position: positionData.position || { x: event.x, y: event.y }
+        });
+
+        // Помечаем, что находимся в состоянии drag, но цели пока нет — ждём newId
+        this.isDragging = true;
+        this.dragTarget = null;
+    }
+
+    /**
+     * Когда ядро сообщило о создании дубликата — переключаем drag на новый объект
+     */
+    onDuplicateReady(newObjectId) {
+        this.clonePending = false;
+        
+        // Переключаем выделение на новый объект
+        this.clearSelection();
+        this.addToSelection(newObjectId);
+
+        // Устанавливаем цель перетаскивания — новый объект
+        this.dragTarget = newObjectId;
+
+		// ВАЖНО: не пересчитываем dragOffset — сохраняем исходное смещение курсора
+		// Это гарантирует, что курсор останется в той же точке относительно объекта
+
+		// Сообщаем о старте перетаскивания для истории (Undo/Redo)
+		this.emit('drag:start', { object: newObjectId, position: { x: this.currentX, y: this.currentY } });
+
+		// Мгновенно обновляем позицию под курсор
+		this.updateDrag({ x: this.currentX, y: this.currentY });
+
+        // Обновляем ручки
+        this.updateResizeHandles();
     }
     
     /**
