@@ -18,6 +18,12 @@ export class PixiEngine {
 
         this.container.appendChild(this.app.view);
 
+        // Слой сетки под объектами
+        this.gridLayer = new PIXI.Container();
+        this.gridLayer.zIndex = 0;
+        this.app.stage.addChild(this.gridLayer);
+        this.app.stage.sortableChildren = true;
+
 
 
     }
@@ -80,10 +86,23 @@ export class PixiEngine {
                 // no-op
             }
 
+            // Объекты над слоем сетки
+            pixiObject.zIndex = (this.app.stage.children.length || 1) + 1;
             this.app.stage.addChild(pixiObject);
             this.objects.set(objectData.id, pixiObject);
 
 
+        }
+    }
+
+    // Добавление/обновление сетки в gridLayer
+    setGrid(gridInstance) {
+        if (!this.gridLayer) return;
+        this.gridLayer.removeChildren();
+        if (gridInstance && gridInstance.getPixiObject) {
+            const g = gridInstance.getPixiObject();
+            g.zIndex = 0;
+            this.gridLayer.addChild(g);
         }
     }
 

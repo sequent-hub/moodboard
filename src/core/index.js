@@ -7,6 +7,7 @@ import { HistoryManager } from './HistoryManager.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
 import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand, GroupRotateCommand, GroupResizeCommand, ReorderZCommand, GroupReorderZCommand } from './commands/index.js';
+import { GridFactory } from '../grid/GridFactory.js';
 import { generateObjectId } from '../utils/objectIdGenerator.js';
 
 export class CoreMoodBoard {
@@ -56,6 +57,19 @@ export class CoreMoodBoard {
             // Инициализируем систему инструментов
             this.initTools();
 
+            // Инициализируем сетку (по умолчанию линейная)
+            const canvasSize = this.workspaceSize?.() || { width: this.options.width, height: this.options.height };
+            this.grid = GridFactory.createGrid('line', {
+                enabled: true,
+                size: 20,
+                width: canvasSize.width,
+                height: canvasSize.height,
+                color: 0xE6E6E6,
+                opacity: 0.5
+            });
+            this.grid.updateVisual();
+            this.pixi.setGrid(this.grid);
+
             // Создаем пустую доску для демо
             this.state.loadBoard({
                 id: this.options.boardId || 'demo',
@@ -76,6 +90,8 @@ export class CoreMoodBoard {
     initTools() {
         // Получаем canvas элемент для обработки событий
         const canvasElement = this.pixi.app.view;
+        // Хелпер для размера (используем в init)
+        this.workspaceSize = () => ({ width: canvasElement.clientWidth, height: canvasElement.clientHeight });
         
         // Создаем ToolManager
         this.toolManager = new ToolManager(this.eventBus, canvasElement, this.pixi.app);
