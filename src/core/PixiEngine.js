@@ -1,7 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { FrameObject } from '../objects/FrameObject.js';
-import { ShapeObject } from '../objects/ShapeObject.js';
-import { DrawingObject } from '../objects/DrawingObject.js';
+import { ObjectFactory } from '../objects/ObjectFactory.js';
 
 export class PixiEngine {
     constructor(container, eventBus, options) {
@@ -40,57 +38,20 @@ export class PixiEngine {
     createObject(objectData) {
         let pixiObject;
 
-        switch (objectData.type) {
-            case 'frame': {
-                const frame = new FrameObject(objectData);
-                pixiObject = frame.getPixi();
-                // Сохраняем метаданные и ссылку на инстанс для делегирования операций
-                const prevMb = pixiObject._mb || {};
-                pixiObject._mb = {
-                    ...prevMb,
-                    objectId: objectData.id,
-                    type: objectData.type,
-                    properties: objectData.properties || {},
-                    instance: frame
-                };
-                break;
-            }
-            case 'simple-text':
-            case 'text':
-                pixiObject = this.createText(objectData);
-                break;
-            case 'shape': {
-                const shape = new ShapeObject(objectData);
-                pixiObject = shape.getPixi();
-                const prevMb = pixiObject._mb || {};
-                pixiObject._mb = {
-                    ...prevMb,
-                    objectId: objectData.id,
-                    type: objectData.type,
-                    properties: objectData.properties || {},
-                    instance: shape
-                };
-                break;
-            }
-            case 'emoji':
-                pixiObject = this.createEmoji(objectData);
-                break;
-            case 'drawing': {
-                const drawing = new DrawingObject(objectData);
-                pixiObject = drawing.getPixi();
-                const prevMb = pixiObject._mb || {};
-                pixiObject._mb = {
-                    ...prevMb,
-                    objectId: objectData.id,
-                    type: objectData.type,
-                    properties: objectData.properties || {},
-                    instance: drawing
-                };
-                break;
-            }
-            default:
-                console.warn(`Unknown object type: ${objectData.type}`);
-                pixiObject = this.createDefaultObject(objectData);
+        const instance = ObjectFactory.create(objectData.type, objectData);
+        if (instance) {
+            pixiObject = instance.getPixi();
+            const prevMb = pixiObject._mb || {};
+            pixiObject._mb = {
+                ...prevMb,
+                objectId: objectData.id,
+                type: objectData.type,
+                properties: objectData.properties || {},
+                instance
+            };
+        } else {
+            console.warn(`Unknown object type: ${objectData.type}`);
+            pixiObject = this.createDefaultObject(objectData);
         }
 
         if (pixiObject) {
@@ -183,26 +144,7 @@ export class PixiEngine {
         return text;
     }
 
-    createEmoji(objectData) {
-        const content = objectData.properties?.content || '🙂';
-        const baseSize = objectData.properties?.fontSize || 48;
-        const style = new PIXI.TextStyle({ fontFamily: 'Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial', fontSize: baseSize });
-        const text = new PIXI.Text(content, style);
-        // Anchor по умолчанию (0,0), чтобы позиция в state была левым верхом (как у остальных объектов)
-        text.anchor.set(0, 0);
-        // Нормализуем масштаб на основе заданной ширины/высоты объекта (state.width/height)
-        const targetW = objectData.width || baseSize;
-        const targetH = objectData.height || baseSize;
-        const bounds = text.getLocalBounds();
-        const scaleX = targetW / (bounds.width || 1);
-        const scaleY = targetH / (bounds.height || 1);
-        // Используем равномерное масштабирование, чтобы не искажать смайл
-        const s = Math.min(scaleX, scaleY);
-        text.scale.set(s, s);
-        // Сохраним базовый размер для корректного ресайза
-        text._mb = { ...(text._mb || {}), baseW: bounds.width, baseH: bounds.height };
-        return text;
-    }
+    // createEmoji удалён — логика вынесена в EmojiObject
 
     createShape(objectData) {
         const graphics = new PIXI.Graphics();
@@ -304,17 +246,13 @@ export class PixiEngine {
         console.log(`🎨 Обновляем размер объекта ${objectId}, тип: ${objectType}`);
         
         // Для Graphics объектов (рамки, фигуры) нужно пересоздать геометрию
-        if (pixiObject instanceof PIXI.Graphics) {
-            const meta = pixiObject._mb || {};
-            if ((meta.type === 'frame' || meta.type === 'shape') && meta.instance) {
-                meta.instance.updateSize(size);
-            } else {
-                this.recreateGraphicsObject(pixiObject, size, position, objectType);
-            }
+        // Делегируем изменение размера объекту, если есть инстанс с updateSize
+        const meta = pixiObject._mb || {};
+        if (meta.instance && typeof meta.instance.updateSize === 'function') {
+            meta.instance.updateSize(size);
         } else if (pixiObject instanceof PIXI.Text) {
             const prevPos = { x: pixiObject.x, y: pixiObject.y };
             this.updateTextLikeSize(pixiObject, size);
-            // Возвращаем левый-верх к прежнему/переданному значению
             if (position) {
                 pixiObject.x = position.x;
                 pixiObject.y = position.y;
@@ -322,12 +260,9 @@ export class PixiEngine {
                 pixiObject.x = prevPos.x;
                 pixiObject.y = prevPos.y;
             }
-        } else {
-            // Делегируем, если это кастомный объект с инстансом
-            const meta = pixiObject._mb || {};
-            if (meta.instance && typeof meta.instance.updateSize === 'function') {
-                meta.instance.updateSize(size);
-            }
+        } else if (pixiObject instanceof PIXI.Graphics) {
+            // Fallback для устаревших объектов без инстанса
+            this.recreateGraphicsObject(pixiObject, size, position, objectType);
         }
     }
 
