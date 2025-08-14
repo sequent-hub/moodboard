@@ -48,6 +48,9 @@ export class PixiEngine {
             case 'shape':
                 pixiObject = this.createShape(objectData);
                 break;
+            case 'emoji':
+                pixiObject = this.createEmoji(objectData);
+                break;
             case 'drawing':
                 pixiObject = this.createDrawing(objectData);
                 break;
@@ -152,6 +155,16 @@ export class PixiEngine {
         });
 
         const text = new PIXI.Text(objectData.content || 'Sample Text', textStyle);
+        return text;
+    }
+
+    createEmoji(objectData) {
+        const content = objectData.properties?.content || '🙂';
+        const fontSize = objectData.properties?.fontSize || 48;
+        const style = new PIXI.TextStyle({ fontFamily: 'Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial', fontSize });
+        const text = new PIXI.Text(content, style);
+        // Центрируем anchor, чтобы ставить по центру курсора
+        text.anchor.set(0.5, 0.5);
         return text;
     }
 

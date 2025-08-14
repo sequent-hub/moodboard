@@ -183,6 +183,7 @@ export class Toolbar {
                 this.toggleEmojiPopup(button);
                 this.closeShapesPopup();
                 this.closeDrawPopup();
+                this.eventBus.emit('keyboard:tool-select', { tool: 'place' });
                 return;
             }
             
@@ -538,7 +539,18 @@ export class Toolbar {
                 btn.className = 'moodboard-emoji__btn';
                 btn.title = ch;
                 btn.textContent = ch;
-                btn.addEventListener('click', () => this.animateButton(btn));
+                btn.addEventListener('click', () => {
+                    this.animateButton(btn);
+                    // Устанавливаем pending для размещения emoji кликом по холсту
+                    const size = 48; // базовый размер
+                    this.eventBus.emit('place:set', {
+                        type: 'emoji',
+                        properties: { content: ch, fontSize: size },
+                        size: { width: size, height: size },
+                        anchorCentered: true
+                    });
+                    this.closeEmojiPopup();
+                });
                 grid.appendChild(btn);
             });
             section.appendChild(title);

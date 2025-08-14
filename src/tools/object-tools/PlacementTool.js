@@ -47,10 +47,16 @@ export class PlacementTool extends BaseTool {
         if (!this.pending) return;
 
         const worldPoint = this._toWorld(event.x, event.y);
-        // Центр к курсору: смещаем на половину дефолтного размера (100x100)
-        const halfW = (this.pending.size?.width ?? 100) / 2;
-        const halfH = (this.pending.size?.height ?? 100) / 2;
-        const position = { x: Math.round(worldPoint.x - halfW), y: Math.round(worldPoint.y - halfH) };
+        let position;
+        if (this.pending.anchorCentered) {
+            // Для объектов с центрированным anchor (напр. emoji)
+            position = { x: Math.round(worldPoint.x), y: Math.round(worldPoint.y) };
+        } else {
+            // Центр к курсору: смещаем на половину размера
+            const halfW = (this.pending.size?.width ?? 100) / 2;
+            const halfH = (this.pending.size?.height ?? 100) / 2;
+            position = { x: Math.round(worldPoint.x - halfW), y: Math.round(worldPoint.y - halfH) };
+        }
         // Создаём объект через общий канал (важно: без префикса tool:)
         this.eventBus.emit('toolbar:action', {
             type: this.pending.type,

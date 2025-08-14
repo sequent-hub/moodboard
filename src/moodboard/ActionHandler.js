@@ -16,6 +16,7 @@ export class ActionHandler {
             case 'simple-text':
             case 'shape':
             case 'drawing':
+            case 'emoji':
                 return this.handleCreateObject(action.type, action.position, action.properties || {});
 
             case 'delete-object':
