@@ -477,10 +477,61 @@ export class PixiEngine {
                         };
                     }
                 }
+            } else {
+                // Доп. хит-тест для нарисованных линий (stroke), где containsPoint может не сработать
+                const meta = child._mb;
+                if (meta && meta.type === 'drawing' && child.toLocal) {
+                    // Переводим точку в локальные координаты объекта
+                    const local = child.toLocal(point);
+                    const props = meta.properties || {};
+                    const pts = Array.isArray(props.points) ? props.points : [];
+                    if (pts.length >= 2) {
+                        // Оценка текущего масштаба относительно базовых размеров
+                        const baseW = props.baseWidth || 1;
+                        const baseH = props.baseHeight || 1;
+                        const b = child.getBounds();
+                        const scaleX = baseW ? (b.width / baseW) : 1;
+                        const scaleY = baseH ? (b.height / baseH) : 1;
+                        // Толщина линии с учётом режима маркера
+                        const baseWidth = props.strokeWidth || 2;
+                        const lineWidth = (props.mode === 'marker' ? baseWidth * 2 : baseWidth);
+                        const threshold = Math.max(4, lineWidth / 2 + 3);
+                        // Проверяем расстояние до каждого сегмента
+                        for (let j = 0; j < pts.length - 1; j++) {
+                            const ax = pts[j].x * scaleX;
+                            const ay = pts[j].y * scaleY;
+                            const bx = pts[j + 1].x * scaleX;
+                            const by = pts[j + 1].y * scaleY;
+                            const dist = this._distancePointToSegment(local.x, local.y, ax, ay, bx, by);
+                            if (dist <= threshold) {
+                                // Найдём и вернём ID
+                                for (const [objectId, pixiObject] of this.objects.entries()) {
+                                    if (pixiObject === child) {
+                                        return { type: 'object', object: objectId, pixiObject: child };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         
         return { type: 'empty' };
+    }
+
+    _distancePointToSegment(px, py, ax, ay, bx, by) {
+        const abx = bx - ax;
+        const aby = by - ay;
+        const apx = px - ax;
+        const apy = py - ay;
+        const ab2 = abx * abx + aby * aby;
+        if (ab2 === 0) return Math.hypot(px - ax, py - ay);
+        let t = (apx * abx + apy * aby) / ab2;
+        t = Math.max(0, Math.min(1, t));
+        const cx = ax + t * abx;
+        const cy = ay + t * aby;
+        return Math.hypot(px - cx, py - cy);
     }
 
     destroy() {
