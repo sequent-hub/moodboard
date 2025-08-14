@@ -68,6 +68,9 @@ export class Toolbar {
         this.eventBus.on('tool:activated', ({ tool }) => {
             this.setActiveToolbarButton(tool);
         });
+
+        // Текущее состояние попапа рисования
+        this.currentDrawTool = 'pencil';
     }
     
     /**
@@ -358,12 +361,13 @@ export class Toolbar {
 
         // Первый ряд: карандаш, маркер, ластик (иконки SVG)
         const tools = [
-            { id: 'pencil-tool', title: 'Карандаш', svg: '<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 14 L14 2 L18 6 L6 18 L2 18 Z" fill="#1f2937"/><path d="M12 4 L16 8" stroke="#e5e7eb" stroke-width="2"/></svg>' },
-            { id: 'marker-tool', title: 'Маркер', svg: '<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="3" y="3" width="10" height="6" rx="2" fill="#1f2937"/><path d="M13 4 L17 8 L12 13 L8 9 Z" fill="#374151"/></svg>' },
-            { id: 'eraser-tool', title: 'Ластик', svg: '<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="4" y="10" width="10" height="6" rx="2" transform="rotate(-45 4 10)" fill="#9ca3af"/><rect x="9" y="5" width="6" height="4" rx="1" transform="rotate(-45 9 5)" fill="#d1d5db"/></svg>' }
+            { id: 'pencil-tool', tool: 'pencil', title: 'Карандаш', svg: '<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 14 L14 2 L18 6 L6 18 L2 18 Z" fill="#1f2937"/><path d="M12 4 L16 8" stroke="#e5e7eb" stroke-width="2"/></svg>' },
+            { id: 'marker-tool', tool: 'marker', title: 'Маркер', svg: '<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="3" y="3" width="10" height="6" rx="2" fill="#1f2937"/><path d="M13 4 L17 8 L12 13 L8 9 Z" fill="#374151"/></svg>' },
+            { id: 'eraser-tool', tool: 'eraser', title: 'Ластик', svg: '<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="4" y="10" width="10" height="6" rx="2" transform="rotate(-45 4 10)" fill="#9ca3af"/><rect x="9" y="5" width="6" height="4" rx="1" transform="rotate(-45 9 5)" fill="#d1d5db"/></svg>' }
         ];
         const row1 = document.createElement('div');
         row1.className = 'moodboard-draw__row';
+        this.drawRow1 = row1;
         tools.forEach(t => {
             const btn = document.createElement('button');
             btn.className = `moodboard-draw__btn moodboard-draw__btn--${t.id}`;
@@ -372,64 +376,111 @@ export class Toolbar {
             icon.className = 'draw-icon';
             icon.innerHTML = t.svg;
             btn.appendChild(icon);
-            btn.addEventListener('click', () => this.animateButton(btn));
+            btn.addEventListener('click', () => {
+                this.animateButton(btn);
+                // Активируем инструмент рисования
+                row1.querySelectorAll('.moodboard-draw__btn--active').forEach(el => el.classList.remove('moodboard-draw__btn--active'));
+                btn.classList.add('moodboard-draw__btn--active');
+                this.currentDrawTool = t.tool;
+                // Сообщаем текущий мод
+                this.eventBus.emit('draw:brush:set', { mode: t.tool });
+                // Перестраиваем нижний ряд пресетов
+                this.buildDrawPresets(row2);
+            });
             row1.appendChild(btn);
         });
 
         // Второй ряд: толщина/цвет — круг + центральная точка
-        const sizes = [
-            { id: 'size-thin-black', title: 'Тонкий черный', color: '#111827', dot: 4 },
-            { id: 'size-medium-red', title: 'Средний красный', color: '#ef4444', dot: 7 },
-            { id: 'size-thick-green', title: 'Толстый зеленый', color: '#16a34a', dot: 10 }
-        ];
         const row2 = document.createElement('div');
         row2.className = 'moodboard-draw__row';
-        sizes.forEach(s => {
-            const btn = document.createElement('button');
-            btn.className = `moodboard-draw__btn moodboard-draw__btn--${s.id}`;
-            btn.title = s.title;
-            btn.dataset.brushWidth = String(s.dot <= 4 ? 2 : s.dot <= 7 ? 4 : 6);
-            btn.dataset.brushColor = s.color;
-            const holder = document.createElement('span');
-            holder.className = 'draw-size';
-            const dot = document.createElement('span');
-            dot.className = 'draw-dot';
-            dot.style.background = s.color;
-            dot.style.width = `${s.dot}px`;
-            dot.style.height = `${s.dot}px`;
-            holder.appendChild(dot);
-            btn.appendChild(holder);
-            btn.addEventListener('click', () => {
-                this.animateButton(btn);
-                // Снимаем active со всех пресетов
-                row2.querySelectorAll('.moodboard-draw__btn--active').forEach(el => el.classList.remove('moodboard-draw__btn--active'));
-                // Ставим active на выбранный
-                btn.classList.add('moodboard-draw__btn--active');
-                this.currentBrushPresetId = s.id;
-                // Эмитим установку кисти
-                const width = parseInt(btn.dataset.brushWidth, 10) || 2;
-                const hex = (btn.dataset.brushColor || '#111827').replace('#','');
-                const color = parseInt(hex, 16);
-                this.eventBus.emit('draw:brush:set', { width, color });
-            });
-            row2.appendChild(btn);
-        });
+        this.drawRow2 = row2;
+        this.buildDrawPresets = (container) => {
+            container.innerHTML = '';
+            if (this.currentDrawTool === 'pencil') {
+                const sizes = [
+                    { id: 'size-thin-black', title: 'Тонкий черный', color: '#111827', dot: 4, width: 2 },
+                    { id: 'size-medium-red', title: 'Средний красный', color: '#ef4444', dot: 7, width: 4 },
+                    { id: 'size-thick-green', title: 'Толстый зеленый', color: '#16a34a', dot: 10, width: 6 }
+                ];
+                sizes.forEach(s => {
+                    const btn = document.createElement('button');
+                    btn.className = `moodboard-draw__btn moodboard-draw__btn--${s.id}`;
+                    btn.title = s.title;
+                    btn.dataset.brushWidth = String(s.width);
+                    btn.dataset.brushColor = s.color;
+                    const holder = document.createElement('span');
+                    holder.className = 'draw-size';
+                    const dot = document.createElement('span');
+                    dot.className = 'draw-dot';
+                    dot.style.background = s.color;
+                    dot.style.width = `${s.dot}px`;
+                    dot.style.height = `${s.dot}px`;
+                    holder.appendChild(dot);
+                    btn.appendChild(holder);
+                    btn.addEventListener('click', () => {
+                        this.animateButton(btn);
+                        container.querySelectorAll('.moodboard-draw__btn--active').forEach(el => el.classList.remove('moodboard-draw__btn--active'));
+                        btn.classList.add('moodboard-draw__btn--active');
+                        const width = s.width;
+                        const color = parseInt(s.color.replace('#',''), 16);
+                        this.eventBus.emit('draw:brush:set', { mode: 'pencil', width, color });
+                    });
+                    container.appendChild(btn);
+                });
+                // Выставляем дефолт
+                const first = container.querySelector('.moodboard-draw__btn');
+                if (first) {
+                    first.classList.add('moodboard-draw__btn--active');
+                    const width = parseInt(first.dataset.brushWidth, 10) || 2;
+                    const color = parseInt((first.dataset.brushColor || '#111827').replace('#',''), 16);
+                    this.eventBus.emit('draw:brush:set', { mode: 'pencil', width, color });
+                }
+            } else if (this.currentDrawTool === 'marker') {
+                const swatches = [
+                    { id: 'marker-yellow', title: 'Жёлтый', color: '#fde047' },
+                    { id: 'marker-green', title: 'Светло-зелёный', color: '#86efac' },
+                    { id: 'marker-pink', title: 'Розовый', color: '#f9a8d4' }
+                ];
+                swatches.forEach(s => {
+                    const btn = document.createElement('button');
+                    btn.className = `moodboard-draw__btn moodboard-draw__btn--${s.id}`;
+                    btn.title = s.title;
+                    const sw = document.createElement('span');
+                    sw.className = 'draw-swatch';
+                    sw.style.background = s.color;
+                    btn.appendChild(sw);
+                    btn.addEventListener('click', () => {
+                        this.animateButton(btn);
+                        container.querySelectorAll('.moodboard-draw__btn--active').forEach(el => el.classList.remove('moodboard-draw__btn--active'));
+                        btn.classList.add('moodboard-draw__btn--active');
+                        const color = parseInt(s.color.replace('#',''), 16);
+                        this.eventBus.emit('draw:brush:set', { mode: 'marker', color, width: 8 });
+                    });
+                    container.appendChild(btn);
+                });
+                // Дефолт — первый цвет
+                const first = container.querySelector('.moodboard-draw__btn');
+                if (first) {
+                    first.classList.add('moodboard-draw__btn--active');
+                    const color = parseInt(swatches[0].color.replace('#',''), 16);
+                    this.eventBus.emit('draw:brush:set', { mode: 'marker', color, width: 8 });
+                }
+            } else if (this.currentDrawTool === 'eraser') {
+                // Ластик — без пресетов
+                this.eventBus.emit('draw:brush:set', { mode: 'eraser' });
+            }
+        };
 
         grid.appendChild(row1);
         grid.appendChild(row2);
         this.drawPopupEl.appendChild(grid);
         this.container.appendChild(this.drawPopupEl);
-
-        // Устанавливаем пресет по умолчанию (первая кнопка)
-        const firstPreset = row2.querySelector('.moodboard-draw__btn');
-        if (firstPreset) {
-            firstPreset.classList.add('moodboard-draw__btn--active');
-            const width = parseInt(firstPreset.dataset.brushWidth, 10) || 2;
-            const hex = (firstPreset.dataset.brushColor || '#111827').replace('#','');
-            const color = parseInt(hex, 16);
-            this.eventBus.emit('draw:brush:set', { width, color });
-            this.currentBrushPresetId = sizes[0].id;
-        }
+        // Инициализируем верх/низ по умолчанию: активен карандаш и первый пресет
+        const pencilBtn = row1.querySelector('.moodboard-draw__btn--pencil-tool');
+        if (pencilBtn) pencilBtn.classList.add('moodboard-draw__btn--active');
+        this.currentDrawTool = 'pencil';
+        this.eventBus.emit('draw:brush:set', { mode: 'pencil' });
+        this.buildDrawPresets(row2);
     }
 
     toggleDrawPopup(anchorButton) {

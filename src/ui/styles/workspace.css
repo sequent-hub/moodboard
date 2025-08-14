@@ -459,6 +459,14 @@
     border-radius: 50%;
 }
 
+/* Swatch for marker colors */
+.draw-swatch {
+    width: 24px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+}
+
 .moodboard-shapes__btn {
     width: 40px;
     height: 40px;
