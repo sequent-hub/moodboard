@@ -143,7 +143,9 @@ export class DrawingTool extends BaseTool {
         if (!this.tempGraphics) return;
         const g = this.tempGraphics;
         g.clear();
-        g.lineStyle(this.brush.width, this.brush.color, 1);
+        const alpha = this.brush.mode === 'marker' ? 0.35 : 1;
+        const lineWidth = this.brush.mode === 'marker' ? this.brush.width * 2 : this.brush.width;
+        g.lineStyle(lineWidth, this.brush.color, alpha);
         const pts = this.points;
         if (pts.length === 0) return;
         // Рисуем сглаженную кривую с quadraticCurveTo

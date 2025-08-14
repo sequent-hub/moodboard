@@ -223,9 +223,11 @@ export class PixiEngine {
         const graphics = new PIXI.Graphics();
         const color = objectData.properties?.strokeColor ?? 0x111827;
         const width = objectData.properties?.strokeWidth ?? 2;
+        const alpha = objectData.properties?.mode === 'marker' ? 0.35 : 1;
         const pts = Array.isArray(objectData.properties?.points) ? objectData.properties.points : [];
+        const lineWidth = objectData.properties?.mode === 'marker' ? width * 2 : width;
 
-        graphics.lineStyle(width, color, 1);
+        graphics.lineStyle(lineWidth, color, alpha);
         if (pts.length > 0) {
             if (pts.length < 3) {
                 graphics.moveTo(pts[0].x, pts[0].y);
@@ -374,12 +376,14 @@ export class PixiEngine {
             const props = meta.properties || {};
             const color = props.strokeColor ?? 0x111827;
             const widthPx = props.strokeWidth ?? 2;
+            const alpha = props.mode === 'marker' ? 0.35 : 1;
             const pts = Array.isArray(props.points) ? props.points : [];
             const baseW = props.baseWidth || size.width || 1;
             const baseH = props.baseHeight || size.height || 1;
             const scaleX = baseW ? (size.width / baseW) : 1;
             const scaleY = baseH ? (size.height / baseH) : 1;
-            pixiObject.lineStyle(widthPx, color, 1);
+            const lineWidth = props.mode === 'marker' ? widthPx * 2 : widthPx;
+            pixiObject.lineStyle(lineWidth, color, alpha);
             if (pts.length > 0) {
                 if (pts.length < 3) {
                     pixiObject.moveTo(pts[0].x * scaleX, pts[0].y * scaleY);
