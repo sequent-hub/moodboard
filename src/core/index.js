@@ -417,6 +417,19 @@ export class CoreMoodBoard {
             const moved = this.state.state.objects.find(o => o.id === data.object);
             if (moved && moved.type === 'frame') {
                 this.pixi.setFrameFill(moved.id, moved.width, moved.height, 0xEEEEEE);
+                // Зафиксировать стартовые позиции фрейма и всех его детей — для абсолютного смещения без накапливания
+                this._frameDragFrameStart = { x: this.dragStartPosition.x, y: this.dragStartPosition.y };
+                const attachments = this._getFrameChildren(moved.id);
+                this._frameDragChildStart = new Map();
+                for (const childId of attachments) {
+                    const childPixi = this.pixi.objects.get(childId);
+                    if (childPixi) {
+                        this._frameDragChildStart.set(childId, { x: childPixi.x, y: childPixi.y });
+                    } else {
+                        const stObj = this.state.state.objects.find(o => o.id === childId);
+                        if (stObj) this._frameDragChildStart.set(childId, { x: stObj.position.x, y: stObj.position.y });
+                    }
+                }
             }
         });
 
@@ -487,6 +500,49 @@ export class CoreMoodBoard {
             world.y += (globalPoint.y - newGlobal.y);
             this.eventBus.emit('ui:zoom:percent', { percentage: Math.round(newScale * 100) });
         });
+
+        // === Инвариант слоёв: все фреймы всегда под всеми остальными объектами ===
+        const ensureFramesBottom = () => {
+            const arr = this.state.state.objects || [];
+            if (arr.length === 0) return;
+            const frames = [];
+            const others = [];
+            for (const o of arr) {
+                if (o?.type === 'frame') frames.push(o); else others.push(o);
+            }
+            // Сохраняем относительный порядок внутри групп
+            const newOrder = [...frames, ...others];
+            // Если порядок не изменился — пропускаем
+            let changed = false;
+            if (newOrder.length === arr.length) {
+                for (let i = 0; i < arr.length; i++) {
+                    if (arr[i] !== newOrder[i]) { changed = true; break; }
+                }
+            }
+            if (!changed) return;
+            this.state.state.objects = newOrder;
+            // Пересчёт zIndex согласно порядку
+            const world = this.pixi?.worldLayer || this.pixi?.app?.stage;
+            if (world) world.sortableChildren = true;
+            // Назначим фреймам всегда нижний zIndex, остальным — по порядку
+            let z = 0;
+            for (const o of this.state.state.objects || []) {
+                const pixi = this.pixi.objects.get(o.id);
+                if (!pixi) continue;
+                if (o.type === 'frame') {
+                    pixi.zIndex = -100000; // всегда ниже
+                } else {
+                    pixi.zIndex = z++;
+                }
+            }
+            this.state.markDirty();
+        };
+
+        // Поддерживаем порядок после любых событий, влияющих на слои
+        this.eventBus.on('object:created', () => ensureFramesBottom());
+        this.eventBus.on('object:deleted', () => ensureFramesBottom());
+        this.eventBus.on('object:reordered', () => ensureFramesBottom());
+        this.eventBus.on('group:reordered', () => ensureFramesBottom());
 
         // Кнопки зума из UI
         this.eventBus.on('ui:zoom:in', () => {
@@ -625,21 +681,58 @@ export class CoreMoodBoard {
             const moved = this.state.state.objects.find(o => o.id === data.object);
             if (moved && moved.type === 'frame') {
                 const attachments = this._getFrameChildren(moved.id);
-                const dx = data.position.x - (this.dragStartPosition?.x ?? data.position.x);
-                const dy = data.position.y - (this.dragStartPosition?.y ?? data.position.y);
+                const frameStart = this._frameDragFrameStart || this.dragStartPosition || { x: data.position.x, y: data.position.y };
+                const dx = data.position.x - frameStart.x;
+                const dy = data.position.y - frameStart.y;
                 if (attachments.length && (dx !== 0 || dy !== 0)) {
                     for (const childId of attachments) {
+                        const start = this._frameDragChildStart?.get(childId);
+                        const baseX = start ? start.x : (this.state.state.objects.find(o => o.id === childId)?.position.x || 0);
+                        const baseY = start ? start.y : (this.state.state.objects.find(o => o.id === childId)?.position.y || 0);
+                        const newX = baseX + dx;
+                        const newY = baseY + dy;
                         const p = this.pixi.objects.get(childId);
                         if (p) {
-                            p.x += dx;
-                            p.y += dy;
+                            p.x = newX;
+                            p.y = newY;
                         }
                         const stObj = this.state.state.objects.find(o => o.id === childId);
                         if (stObj) {
-                            stObj.position.x += dx;
-                            stObj.position.y += dy;
+                            stObj.position.x = newX;
+                            stObj.position.y = newY;
                         }
                     }
+                    this.state.markDirty();
+                }
+            } else if (moved) {
+                // Hover-эффект: если во время перетаскивания объект заносим внутрь фрейма — подсветить фрейм
+                const centerX = moved.position.x + (moved.width || 0) / 2;
+                const centerY = moved.position.y + (moved.height || 0) / 2;
+                const frames = this._getFrames();
+                const ordered = frames.slice().sort((a, b) => {
+                    const pa = this.pixi.objects.get(a.id);
+                    const pb = this.pixi.objects.get(b.id);
+                    return (pb?.zIndex || 0) - (pa?.zIndex || 0);
+                });
+                let hoverId = null;
+                for (const f of ordered) {
+                    const rect = { x: f.position.x, y: f.position.y, w: f.width || 0, h: f.height || 0 };
+                    if (centerX >= rect.x && centerX <= rect.x + rect.w && centerY >= rect.y && centerY <= rect.y + rect.h) {
+                        hoverId = f.id; break;
+                    }
+                }
+                if (hoverId !== this._frameHoverId) {
+                    // Снять подсветку с предыдущего
+                    if (this._frameHoverId) {
+                        const prev = frames.find(fr => fr.id === this._frameHoverId);
+                        if (prev) this.pixi.setFrameFill(prev.id, prev.width, prev.height, 0xFFFFFF);
+                    }
+                    // Включить подсветку нового
+                    if (hoverId) {
+                        const cur = frames.find(fr => fr.id === hoverId);
+                        if (cur) this.pixi.setFrameFill(cur.id, cur.width, cur.height, 0xEEEEEE);
+                    }
+                    this._frameHoverId = hoverId || null;
                 }
             }
         });
@@ -669,7 +762,8 @@ export class CoreMoodBoard {
                             for (const childId of attachments) {
                                 const child = this.state.state.objects.find(o => o.id === childId);
                                 if (!child) continue;
-                                const from = { x: child.position.x - dx, y: child.position.y - dy };
+                                const start = this._frameDragChildStart?.get(childId);
+                                const from = start ? { x: start.x, y: start.y } : { x: (child.position.x - dx), y: (child.position.y - dy) };
                                 const to = { x: child.position.x, y: child.position.y };
                                 moves.push({ id: childId, from, to });
                             }
@@ -699,6 +793,18 @@ export class CoreMoodBoard {
             if (movedObj && movedObj.type === 'frame') {
                 this.pixi.setFrameFill(movedObj.id, movedObj.width, movedObj.height, 0xFFFFFF);
             }
+
+            // Сбросить hover-подсветку, если была
+            if (this._frameHoverId) {
+                const frames = this._getFrames();
+                const prev = frames.find(fr => fr.id === this._frameHoverId);
+                if (prev) this.pixi.setFrameFill(prev.id, prev.width, prev.height, 0xFFFFFF);
+                this._frameHoverId = null;
+            }
+
+            // Очистить временные структуры dragging-фрейма
+            this._frameDragFrameStart = null;
+            this._frameDragChildStart = null;
         });
 
         // === ДУБЛИРОВАНИЕ ЧЕРЕЗ ALT-ПЕРЕТАСКИВАНИЕ ===

@@ -120,8 +120,12 @@ export class PixiEngine {
                 // no-op
             }
 
-            // Объекты над слоем сетки
-            pixiObject.zIndex = (this.app.stage.children.length || 1) + 1;
+            // Z-порядок: фреймы всегда должны быть под остальными
+            if ((pixiObject._mb?.type || objectData.type) === 'frame') {
+                pixiObject.zIndex = -100000; // гарантированно ниже
+            } else {
+                pixiObject.zIndex = 0; // будет пересчитано глобальным порядком
+            }
             this.worldLayer.addChild(pixiObject);
             this.objects.set(objectData.id, pixiObject);
 
