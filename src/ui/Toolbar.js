@@ -38,7 +38,6 @@ export class Toolbar {
         const existingTools = [
             { id: 'frame', icon: '🖼️', title: 'Добавить рамку', type: 'frame' },
             { id: 'text', icon: '📝', title: 'Добавить текст', type: 'simple-text' },
-            { id: 'shape', icon: '🔶', title: 'Добавить фигуру', type: 'shape' },
             { id: 'divider', type: 'divider' },
             { id: 'clear', icon: '🗑️', title: 'Очистить холст', type: 'clear' },
             { id: 'export', icon: '💾', title: 'Экспорт', type: 'export' },
@@ -83,6 +82,8 @@ export class Toolbar {
             button.classList.add('moodboard-toolbar__button--disabled');
         }
         
+        // Специальных визуальных замен нет
+
         return button;
     }
     
@@ -207,7 +208,8 @@ export class Toolbar {
         grid.className = 'moodboard-shapes__grid';
 
         const shapes = [
-            { id: 'square', title: 'Квадрат' },
+            // Перенесли кнопку "Добавить фигуру" сюда как первый элемент
+            { id: 'shape', title: 'Добавить фигуру', isToolbarAction: true },
             { id: 'rounded-square', title: 'Скругленный квадрат' },
             { id: 'circle', title: 'Круг' },
             { id: 'triangle', title: 'Треугольник' },
@@ -221,15 +223,49 @@ export class Toolbar {
             btn.className = `moodboard-shapes__btn moodboard-shapes__btn--${s.id}`;
             btn.title = s.title;
             const icon = document.createElement('span');
-            icon.className = `moodboard-shapes__icon shape-${s.id}`;
+            if (s.isToolbarAction) {
+                // Визуально как квадрат, действие — как старая кнопка "Добавить фигуру"
+                icon.className = 'moodboard-shapes__icon shape-square';
+            } else {
+                icon.className = `moodboard-shapes__icon shape-${s.id}`;
                 if (s.id === 'arrow') {
                     // Залитая стрелка в стиле U+21E8 (прямоугольник + треугольник)
                     icon.innerHTML = '<svg width="18" height="12" viewBox="0 0 18 12" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="0" y="5" width="12" height="2" rx="1" fill="#1d4ed8"/><path d="M12 0 L18 6 L12 12 Z" fill="#1d4ed8"/></svg>';
                 }
+            }
             btn.appendChild(icon);
             btn.addEventListener('click', () => {
-                // Пока без функционала — просто визуальная обратная связь
                 this.animateButton(btn);
+                if (s.isToolbarAction) {
+                    // Эмитим действие как у прежней кнопки "Добавить фигуру"
+                    this.eventBus.emit('toolbar:action', {
+                        type: 'shape',
+                        id: 'shape',
+                        position: this.getRandomPosition()
+                    });
+                    this.closeShapesPopup();
+                    return;
+                }
+                // Для остальных фигур — эмитим специфический тип
+                const propsMap = {
+                    'square': { kind: 'square' },
+                    'rounded-square': { kind: 'rounded', cornerRadius: 10 },
+                    'circle': { kind: 'circle' },
+                    'triangle': { kind: 'triangle' },
+                    'diamond': { kind: 'diamond' },
+                    'parallelogram': { kind: 'parallelogram' },
+                    'arrow': { kind: 'arrow' }
+                };
+                const props = propsMap[s.id];
+                if (props) {
+                    this.eventBus.emit('toolbar:action', {
+                        type: 'shape',
+                        id: s.id,
+                        position: this.getRandomPosition(),
+                        properties: props
+                    });
+                    this.closeShapesPopup();
+                }
             });
             grid.appendChild(btn);
         });

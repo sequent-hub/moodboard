@@ -15,7 +15,7 @@ export class ActionHandler {
             case 'frame':
             case 'simple-text':
             case 'shape':
-                return this.handleCreateObject(action.type, action.position);
+                return this.handleCreateObject(action.type, action.position, action.properties || {});
                 
             case 'clear':
                 return this.handleClearBoard();
@@ -32,8 +32,8 @@ export class ActionHandler {
     /**
      * Обрабатывает создание объекта
      */
-    handleCreateObject(type, position) {
-        const objectData = this.dataManager.createObject(type, position);
+    handleCreateObject(type, position, properties = {}) {
+        const objectData = this.dataManager.createObject(type, position, properties);
         
         if (objectData) {
             console.log(`Created ${type} object:`, objectData);

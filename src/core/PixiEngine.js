@@ -56,6 +56,12 @@ export class PixiEngine {
             pixiObject.y = objectData.position.y;
             pixiObject.eventMode = 'static'; // Исправляем deprecation warning
             pixiObject.cursor = 'pointer';
+            // Сохраняем метаданные о типе и свойствах для последующих перерасчетов (resize)
+            pixiObject._mb = {
+                objectId: objectData.id,
+                type: objectData.type,
+                properties: objectData.properties || {}
+            };
             
             // Устанавливаем центр вращения в центр объекта
             if (pixiObject.anchor !== undefined) {
@@ -146,20 +152,64 @@ export class PixiEngine {
 
     createShape(objectData) {
         const graphics = new PIXI.Graphics();
-        
-        // Цветной квадрат/круг
-        graphics.beginFill(objectData.color || 0x3b82f6);
-        
-        if (objectData.shape === 'circle') {
-            graphics.drawCircle(
-                (objectData.width || 50) / 2, 
-                (objectData.height || 50) / 2, 
-                (objectData.width || 50) / 2
-            );
-        } else {
-            graphics.drawRect(0, 0, objectData.width || 50, objectData.height || 50);
+        const color = objectData.color || 0x3b82f6;
+        const w = objectData.width || 50;
+        const h = objectData.height || 50;
+        const kind = (objectData.properties && objectData.properties.kind) || objectData.shape || 'square';
+
+        graphics.beginFill(color);
+        switch (kind) {
+            case 'circle': {
+                const r = Math.min(w, h) / 2;
+                graphics.drawCircle(w / 2, h / 2, r);
+                break;
+            }
+            case 'rounded': {
+                const r = (objectData.properties && objectData.properties.cornerRadius) || 10;
+                graphics.drawRoundedRect(0, 0, w, h, r);
+                break;
+            }
+            case 'triangle': {
+                graphics.moveTo(w / 2, 0);
+                graphics.lineTo(w, h);
+                graphics.lineTo(0, h);
+                graphics.lineTo(w / 2, 0);
+                break;
+            }
+            case 'diamond': {
+                graphics.moveTo(w / 2, 0);
+                graphics.lineTo(w, h / 2);
+                graphics.lineTo(w / 2, h);
+                graphics.lineTo(0, h / 2);
+                graphics.lineTo(w / 2, 0);
+                break;
+            }
+            case 'parallelogram': {
+                const skew = Math.min(w * 0.25, 20);
+                graphics.moveTo(skew, 0);
+                graphics.lineTo(w, 0);
+                graphics.lineTo(w - skew, h);
+                graphics.lineTo(0, h);
+                graphics.lineTo(skew, 0);
+                break;
+            }
+            case 'arrow': {
+                // Прямоугольник + треугольник
+                const shaftH = Math.max(6, h * 0.3);
+                const shaftY = (h - shaftH) / 2;
+                graphics.drawRect(0, shaftY, w * 0.6, shaftH);
+                graphics.moveTo(w * 0.6, 0);
+                graphics.lineTo(w, h / 2);
+                graphics.lineTo(w * 0.6, h);
+                graphics.lineTo(w * 0.6, 0);
+                break;
+            }
+            case 'square':
+            default: {
+                graphics.drawRect(0, 0, w, h);
+                break;
+            }
         }
-        
         graphics.endFill();
         return graphics;
     }
@@ -227,9 +277,64 @@ export class PixiEngine {
             pixiObject.drawRect(halfBorder, halfBorder, size.width - borderWidth, size.height - borderWidth);
             pixiObject.endFill();
         } else if (objectType === 'shape') {
-            // Фигура (заполненная)
-            pixiObject.beginFill(0x3b82f6, 1);
-            pixiObject.drawRect(0, 0, size.width, size.height);
+            // Фигура: сохраняем вид из _mb.properties.kind
+            const meta = pixiObject._mb || {};
+            const props = meta.properties || {};
+            const color = 0x3b82f6;
+            const w = size.width;
+            const h = size.height;
+            pixiObject.beginFill(color, 1);
+            switch (props.kind) {
+                case 'circle': {
+                    const r = Math.min(w, h) / 2;
+                    pixiObject.drawCircle(w / 2, h / 2, r);
+                    break;
+                }
+                case 'rounded': {
+                    const r = props.cornerRadius || 10;
+                    pixiObject.drawRoundedRect(0, 0, w, h, r);
+                    break;
+                }
+                case 'triangle': {
+                    pixiObject.moveTo(w / 2, 0);
+                    pixiObject.lineTo(w, h);
+                    pixiObject.lineTo(0, h);
+                    pixiObject.lineTo(w / 2, 0);
+                    break;
+                }
+                case 'diamond': {
+                    pixiObject.moveTo(w / 2, 0);
+                    pixiObject.lineTo(w, h / 2);
+                    pixiObject.lineTo(w / 2, h);
+                    pixiObject.lineTo(0, h / 2);
+                    pixiObject.lineTo(w / 2, 0);
+                    break;
+                }
+                case 'parallelogram': {
+                    const skew = Math.min(w * 0.25, 20);
+                    pixiObject.moveTo(skew, 0);
+                    pixiObject.lineTo(w, 0);
+                    pixiObject.lineTo(w - skew, h);
+                    pixiObject.lineTo(0, h);
+                    pixiObject.lineTo(skew, 0);
+                    break;
+                }
+                case 'arrow': {
+                    const shaftH = Math.max(6, h * 0.3);
+                    const shaftY = (h - shaftH) / 2;
+                    pixiObject.drawRect(0, shaftY, w * 0.6, shaftH);
+                    pixiObject.moveTo(w * 0.6, 0);
+                    pixiObject.lineTo(w, h / 2);
+                    pixiObject.lineTo(w * 0.6, h);
+                    pixiObject.lineTo(w * 0.6, 0);
+                    break;
+                }
+                case 'square':
+                default: {
+                    pixiObject.drawRect(0, 0, w, h);
+                    break;
+                }
+            }
             pixiObject.endFill();
         } else {
             // Fallback - определяем по существующему содержимому (если тип не передан)
