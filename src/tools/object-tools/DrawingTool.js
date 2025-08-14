@@ -143,9 +143,11 @@ export class DrawingTool extends BaseTool {
         if (!this.tempGraphics) return;
         const g = this.tempGraphics;
         g.clear();
-        const alpha = this.brush.mode === 'marker' ? 0.35 : 1;
+        const alpha = this.brush.mode === 'marker' ? 0.6 : 1;
         const lineWidth = this.brush.mode === 'marker' ? this.brush.width * 2 : this.brush.width;
-        g.lineStyle(lineWidth, this.brush.color, alpha);
+        g.lineStyle({ width: lineWidth, color: this.brush.color, alpha, cap: 'round', join: 'round', miterLimit: 2, alignment: 0.5 });
+        // Для маркера используем режим LIGHTEN, чтобы наложения не темнели
+        g.blendMode = this.brush.mode === 'marker' ? PIXI.BLEND_MODES.LIGHTEN : PIXI.BLEND_MODES.NORMAL;
         const pts = this.points;
         if (pts.length === 0) return;
         // Рисуем сглаженную кривую с quadraticCurveTo

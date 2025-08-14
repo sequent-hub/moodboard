@@ -437,9 +437,9 @@ export class Toolbar {
                 }
             } else if (this.currentDrawTool === 'marker') {
                 const swatches = [
-                    { id: 'marker-yellow', title: 'Жёлтый', color: '#fde047' },
-                    { id: 'marker-green', title: 'Светло-зелёный', color: '#86efac' },
-                    { id: 'marker-pink', title: 'Розовый', color: '#f9a8d4' }
+                    { id: 'marker-yellow', title: 'Жёлтый', color: '#facc15' },
+                    { id: 'marker-green', title: 'Светло-зелёный', color: '#22c55e' },
+                    { id: 'marker-pink', title: 'Розовый', color: '#ec4899' }
                 ];
                 swatches.forEach(s => {
                     const btn = document.createElement('button');
