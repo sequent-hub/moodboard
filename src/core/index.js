@@ -412,6 +412,12 @@ export class CoreMoodBoard {
             if (pixiObject) {
                 this.dragStartPosition = { x: pixiObject.x, y: pixiObject.y };
             }
+
+            // Визуал для фрейма: сделать фон светло-серым на время перетаскивания
+            const moved = this.state.state.objects.find(o => o.id === data.object);
+            if (moved && moved.type === 'frame') {
+                this.pixi.setFrameFill(moved.id, moved.width, moved.height, 0xEEEEEE);
+            }
         });
 
         // Панорамирование холста
@@ -614,6 +620,28 @@ export class CoreMoodBoard {
         this.eventBus.on('tool:drag:update', (data) => {
             // Во время перетаскивания обновляем позицию напрямую (без команды)
             this.updateObjectPositionDirect(data.object, data.position);
+
+            // Если двигаем фрейм — двигаем прикрепленных детей вместе (живое смещение)
+            const moved = this.state.state.objects.find(o => o.id === data.object);
+            if (moved && moved.type === 'frame') {
+                const attachments = this._getFrameChildren(moved.id);
+                const dx = data.position.x - (this.dragStartPosition?.x ?? data.position.x);
+                const dy = data.position.y - (this.dragStartPosition?.y ?? data.position.y);
+                if (attachments.length && (dx !== 0 || dy !== 0)) {
+                    for (const childId of attachments) {
+                        const p = this.pixi.objects.get(childId);
+                        if (p) {
+                            p.x += dx;
+                            p.y += dy;
+                        }
+                        const stObj = this.state.state.objects.find(o => o.id === childId);
+                        if (stObj) {
+                            stObj.position.x += dx;
+                            stObj.position.y += dy;
+                        }
+                    }
+                }
+            }
         });
 
         this.eventBus.on('tool:drag:end', (data) => {
@@ -628,17 +656,48 @@ export class CoreMoodBoard {
                     if (this.dragStartPosition.x !== finalPosition.x || 
                         this.dragStartPosition.y !== finalPosition.y) {
                         
-                        const command = new MoveObjectCommand(
-                            this, 
-                            data.object, 
-                            this.dragStartPosition, 
-                            finalPosition
-                        );
-                        command.setEventBus(this.eventBus);
-                        this.history.executeCommand(command);
+                        const moved = this.state.state.objects.find(o => o.id === data.object);
+                        if (moved && moved.type === 'frame') {
+                            // Групповая фиксация перемещения для фрейма и его детей
+                            const attachments = this._getFrameChildren(moved.id);
+                            const moves = [];
+                            // сам фрейм
+                            moves.push({ id: moved.id, from: this.dragStartPosition, to: finalPosition });
+                            // дети
+                            const dx = finalPosition.x - this.dragStartPosition.x;
+                            const dy = finalPosition.y - this.dragStartPosition.y;
+                            for (const childId of attachments) {
+                                const child = this.state.state.objects.find(o => o.id === childId);
+                                if (!child) continue;
+                                const from = { x: child.position.x - dx, y: child.position.y - dy };
+                                const to = { x: child.position.x, y: child.position.y };
+                                moves.push({ id: childId, from, to });
+                            }
+                            const cmd = new GroupMoveCommand(this, moves);
+                            cmd.setEventBus(this.eventBus);
+                            this.history.executeCommand(cmd);
+                        } else {
+                            const command = new MoveObjectCommand(
+                                this, 
+                                data.object, 
+                                this.dragStartPosition, 
+                                finalPosition
+                            );
+                            command.setEventBus(this.eventBus);
+                            this.history.executeCommand(command);
+                        }
                     }
                 }
                 this.dragStartPosition = null;
+            }
+
+            // После любого перетаскивания: авто-привязка/отвязка для объектов и фреймов
+            const movedObj = this.state.state.objects.find(o => o.id === data.object);
+            if (movedObj) this._recomputeFrameAttachment(movedObj.id);
+
+            // Вернуть обычную заливку фрейму после перетаскивания
+            if (movedObj && movedObj.type === 'frame') {
+                this.pixi.setFrameFill(movedObj.id, movedObj.width, movedObj.height, 0xFFFFFF);
             }
         });
 
@@ -1312,6 +1371,51 @@ export class CoreMoodBoard {
         this.history.executeCommand(command);
 
         return objectData;
+    }
+
+    // === Прикрепления к фреймам ===
+    _getFrames() {
+        return (this.state.state.objects || []).filter(o => o.type === 'frame');
+    }
+
+    _getFrameChildren(frameId) {
+        const res = [];
+        for (const o of this.state.state.objects || []) {
+            if (o.id === frameId) continue;
+            if (o.properties && o.properties.frameId === frameId) res.push(o.id);
+        }
+        return res;
+    }
+
+    _recomputeFrameAttachment(objectId) {
+        const obj = (this.state.state.objects || []).find(o => o.id === objectId);
+        if (!obj) return;
+        if (obj.type === 'frame') return; // фрейм к фрейму не крепим
+        const center = {
+            x: obj.position.x + (obj.width || 0) / 2,
+            y: obj.position.y + (obj.height || 0) / 2
+        };
+        // Проверяем попадание центра в любой фрейм (верхний при пересечении нескольких)
+        const frames = this._getFrames();
+        // Фреймы уже в state; определим порядок по zIndex из pixi при наличии
+        const ordered = frames.slice().sort((a, b) => {
+            const pa = this.pixi.objects.get(a.id);
+            const pb = this.pixi.objects.get(b.id);
+            return (pb?.zIndex || 0) - (pa?.zIndex || 0);
+        });
+        let newFrameId = null;
+        for (const f of ordered) {
+            const rect = { x: f.position.x, y: f.position.y, w: f.width || 0, h: f.height || 0 };
+            if (center.x >= rect.x && center.x <= rect.x + rect.w && center.y >= rect.y && center.y <= rect.y + rect.h) {
+                newFrameId = f.id; break;
+            }
+        }
+        const prevFrameId = obj.properties?.frameId || null;
+        if (newFrameId !== prevFrameId) {
+            obj.properties = obj.properties || {};
+            obj.properties.frameId = newFrameId || undefined;
+            this.state.markDirty();
+        }
     }
 
     /**

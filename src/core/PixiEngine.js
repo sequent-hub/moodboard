@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import { FrameObject } from '../objects/FrameObject.js';
 
 export class PixiEngine {
     constructor(container, eventBus, options) {
@@ -38,9 +39,20 @@ export class PixiEngine {
         let pixiObject;
 
         switch (objectData.type) {
-            case 'frame':
-                pixiObject = this.createFrame(objectData);
+            case 'frame': {
+                const frame = new FrameObject(objectData);
+                pixiObject = frame.getPixi();
+                // Сохраняем метаданные и ссылку на инстанс для делегирования операций
+                const prevMb = pixiObject._mb || {};
+                pixiObject._mb = {
+                    ...prevMb,
+                    objectId: objectData.id,
+                    type: objectData.type,
+                    properties: objectData.properties || {},
+                    instance: frame
+                };
                 break;
+            }
             case 'simple-text':
             case 'text':
                 pixiObject = this.createText(objectData);
@@ -64,13 +76,15 @@ export class PixiEngine {
             pixiObject.y = objectData.position.y;
             pixiObject.eventMode = 'static'; // Исправляем deprecation warning
             pixiObject.cursor = 'pointer';
-            // Сохраняем метаданные о типе и свойствах для последующих перерасчетов (resize)
+            // Сохраняем метаданные о типе и свойствах для последующих перерасчетов (resize),
+            // если не были заданы выше (для frame уже установлено)
             const prevMb = pixiObject._mb || {};
             pixiObject._mb = {
                 ...prevMb,
-                objectId: objectData.id,
-                type: objectData.type,
-                properties: objectData.properties || {}
+                objectId: prevMb.objectId ?? objectData.id,
+                type: prevMb.type ?? objectData.type,
+                properties: prevMb.properties ?? (objectData.properties || {}),
+                instance: prevMb.instance
             };
             
             // Устанавливаем центр вращения в центр объекта
@@ -128,24 +142,7 @@ export class PixiEngine {
         }
     }
 
-    createFrame(objectData) {
-        const graphics = new PIXI.Graphics();
-        
-        const borderWidth = 2;
-        const width = objectData.width || 100;
-        const height = objectData.height || 100;
-        
-        // Рамка с учетом толщины границы
-        graphics.lineStyle(borderWidth, objectData.borderColor || 0x333333, 1);
-        graphics.beginFill(objectData.backgroundColor || 0xFFFFFF, objectData.backgroundAlpha || 0.1);
-        
-        // Рисуем с отступом на половину толщины границы
-        const halfBorder = borderWidth / 2;
-        graphics.drawRect(halfBorder, halfBorder, width - borderWidth, height - borderWidth);
-        graphics.endFill();
-
-        return graphics;
-    }
+    // createFrame удалён — логика вынесена в FrameObject
 
     createText(objectData) {
         const textStyle = new PIXI.TextStyle({
@@ -311,7 +308,12 @@ export class PixiEngine {
         
         // Для Graphics объектов (рамки, фигуры) нужно пересоздать геометрию
         if (pixiObject instanceof PIXI.Graphics) {
-            this.recreateGraphicsObject(pixiObject, size, position, objectType);
+            const meta = pixiObject._mb || {};
+            if (meta.type === 'frame' && meta.instance) {
+                meta.instance.updateSize(size);
+            } else {
+                this.recreateGraphicsObject(pixiObject, size, position, objectType);
+            }
         } else if (pixiObject instanceof PIXI.Text) {
             const prevPos = { x: pixiObject.x, y: pixiObject.y };
             this.updateTextLikeSize(pixiObject, size);
@@ -336,16 +338,7 @@ export class PixiEngine {
         console.log(`🔄 Пересоздаем Graphics объект, тип: ${objectType}`);
         
         // Определяем что рисовать по типу объекта
-        if (objectType === 'frame') {
-            // Рамка
-            const borderWidth = 2;
-            pixiObject.lineStyle(borderWidth, 0x333333, 1);
-            pixiObject.beginFill(0xFFFFFF, 0.1);
-            
-            const halfBorder = borderWidth / 2;
-            pixiObject.drawRect(halfBorder, halfBorder, size.width - borderWidth, size.height - borderWidth);
-            pixiObject.endFill();
-        } else if (objectType === 'shape') {
+        if (objectType === 'shape') {
             // Фигура: сохраняем вид из _mb.properties.kind
             const meta = pixiObject._mb || {};
             const props = meta.properties || {};
@@ -496,6 +489,20 @@ export class PixiEngine {
         
         // Применяем поворот
         pixiObject.rotation = angleRadians;
+    }
+
+    /**
+     * Установить цвет заливки для фрейма, не изменяя размер и позицию
+     * Используется для визуала «во время перетаскивания» (светло-серый фон)
+     */
+    setFrameFill(objectId, width, height, fillColor = 0xFFFFFF) {
+        const pixiObject = this.objects.get(objectId);
+        if (!pixiObject || !(pixiObject instanceof PIXI.Graphics)) return;
+        const meta = pixiObject._mb || {};
+        if (meta.type !== 'frame') return;
+        if (meta.instance) {
+            meta.instance.setFill(fillColor);
+        }
     }
 
     /**

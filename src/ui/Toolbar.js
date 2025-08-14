@@ -143,13 +143,29 @@ export class Toolbar {
                 return;
             }
 
-            // Заглушки для новых кнопок — пока без действий (только анимация)
-            if (toolType === 'custom-t' || toolType === 'custom-frame' || toolType === 'custom-comments' || toolType === 'custom-attachments') {
+            // Заглушки для новых кнопок (кроме custom-frame) — пока без действий (только анимация)
+            if (toolType === 'custom-t' || toolType === 'custom-comments' || toolType === 'custom-attachments') {
                 this.animateButton(button);
                 // Закрываем панель фигур, если клик не по ней
                 this.closeShapesPopup();
                 this.closeDrawPopup();
                 this.closeEmojiPopup();
+                return;
+            }
+
+            // Инструмент «Фрейм» — создаём через универсальный place-поток с размерами 200x300
+            if (toolType === 'custom-frame') {
+                this.animateButton(button);
+                this.closeShapesPopup();
+                this.closeDrawPopup();
+                this.closeEmojiPopup();
+                // Активируем режим размещения и устанавливаем pending
+                this.eventBus.emit('keyboard:tool-select', { tool: 'place' });
+                this.setActiveToolbarButton('place');
+                this.eventBus.emit('place:set', {
+                    type: 'frame',
+                    properties: { width: 200, height: 300 }
+                });
                 return;
             }
 
