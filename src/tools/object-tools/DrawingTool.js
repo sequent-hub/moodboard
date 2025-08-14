@@ -116,7 +116,13 @@ export class DrawingTool extends BaseTool {
             points: normPoints,
             strokeColor: this.brush.color,
             strokeWidth: this.brush.width,
-            mode: this.brush.mode
+            mode: this.brush.mode,
+            // Базовые размеры для масштабирования при ресайзе
+            baseWidth: width,
+            baseHeight: height,
+            // Передаём стартовый размер, чтобы ядро установило width/height у объекта
+            width: width,
+            height: height
         };
 
         // Важно: отправляем глобальное событие без префикса tool:

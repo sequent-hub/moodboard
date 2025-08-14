@@ -357,6 +357,24 @@ export class PixiEngine {
                 }
             }
             pixiObject.endFill();
+        } else if (objectType === 'drawing') {
+            // Рисунок: перерисовываем по сохранённым точкам с масштабированием под новый size
+            const meta = pixiObject._mb || {};
+            const props = meta.properties || {};
+            const color = props.strokeColor ?? 0x111827;
+            const widthPx = props.strokeWidth ?? 2;
+            const pts = Array.isArray(props.points) ? props.points : [];
+            const baseW = props.baseWidth || size.width || 1;
+            const baseH = props.baseHeight || size.height || 1;
+            const scaleX = baseW ? (size.width / baseW) : 1;
+            const scaleY = baseH ? (size.height / baseH) : 1;
+            pixiObject.lineStyle(widthPx, color, 1);
+            if (pts.length > 0) {
+                pixiObject.moveTo(pts[0].x * scaleX, pts[0].y * scaleY);
+                for (let i = 1; i < pts.length; i++) {
+                    pixiObject.lineTo(pts[i].x * scaleX, pts[i].y * scaleY);
+                }
+            }
         } else {
             // Fallback - определяем по существующему содержимому (если тип не передан)
             console.warn(`⚠️ Тип объекта не определен, используем fallback логику`);

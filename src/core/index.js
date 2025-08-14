@@ -1292,12 +1292,14 @@ export class CoreMoodBoard {
             const inPixi = this.pixi?.objects?.has ? this.pixi.objects.has(id) : false;
             return inState || inPixi;
         };
+        const initialWidth = (properties && typeof properties.width === 'number') ? properties.width : 100;
+        const initialHeight = (properties && typeof properties.height === 'number') ? properties.height : 100;
         const objectData = {
             id: generateObjectId(exists),
             type,
             position,
-            width: 100,
-            height: 100,
+            width: initialWidth,
+            height: initialHeight,
             properties,
             created: new Date().toISOString(),
             transform: {
