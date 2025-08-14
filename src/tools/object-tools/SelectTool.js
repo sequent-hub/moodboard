@@ -1006,6 +1006,11 @@ export class SelectTool extends BaseTool {
         return this.selection.toArray();
     }
 
+    // Совместимость с существующим кодом ядра: возвращаем Set выбранных id
+    get selectedObjects() {
+        return new Set(this.selection.toArray());
+    }
+
     // Экспонируем выделение через EventBus для внешних слушателей (keyboard)
     onActivate() {
         // Подписка безопасна: EventBus простая шина, а вызов синхронный

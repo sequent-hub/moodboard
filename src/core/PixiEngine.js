@@ -103,12 +103,7 @@ export class PixiEngine {
                 // no-op
             }
 
-            // Z-порядок: фреймы всегда должны быть под остальными
-            if ((pixiObject._mb?.type || objectData.type) === 'frame') {
-                pixiObject.zIndex = -100000; // гарантированно ниже
-            } else {
-                pixiObject.zIndex = 0; // будет пересчитано глобальным порядком
-            }
+            // Z-порядок пересчитывается извне (ZOrderManager)
             this.worldLayer.addChild(pixiObject);
             this.objects.set(objectData.id, pixiObject);
 
@@ -131,84 +126,11 @@ export class PixiEngine {
 
     // createFrame удалён — логика вынесена в FrameObject
 
-    createText(objectData) {
-        const textStyle = new PIXI.TextStyle({
-            fontFamily: objectData.fontFamily || 'Arial',
-            fontSize: objectData.fontSize || 16,
-            fill: objectData.color || 0x000000,
-            fontWeight: objectData.fontWeight || 'normal',
-            fontStyle: objectData.fontStyle || 'normal'
-        });
-
-        const text = new PIXI.Text(objectData.content || 'Sample Text', textStyle);
-        return text;
-    }
+    // createText удалён — логика в TextObject
 
     // createEmoji удалён — логика вынесена в EmojiObject
 
-    createShape(objectData) {
-        const graphics = new PIXI.Graphics();
-        const color = objectData.color || 0x3b82f6;
-        const w = objectData.width || 50;
-        const h = objectData.height || 50;
-        const kind = (objectData.properties && objectData.properties.kind) || objectData.shape || 'square';
-
-        graphics.beginFill(color);
-        switch (kind) {
-            case 'circle': {
-                const r = Math.min(w, h) / 2;
-                graphics.drawCircle(w / 2, h / 2, r);
-                break;
-            }
-            case 'rounded': {
-                const r = (objectData.properties && objectData.properties.cornerRadius) || 10;
-                graphics.drawRoundedRect(0, 0, w, h, r);
-                break;
-            }
-            case 'triangle': {
-                graphics.moveTo(w / 2, 0);
-                graphics.lineTo(w, h);
-                graphics.lineTo(0, h);
-                graphics.lineTo(w / 2, 0);
-                break;
-            }
-            case 'diamond': {
-                graphics.moveTo(w / 2, 0);
-                graphics.lineTo(w, h / 2);
-                graphics.lineTo(w / 2, h);
-                graphics.lineTo(0, h / 2);
-                graphics.lineTo(w / 2, 0);
-                break;
-            }
-            case 'parallelogram': {
-                const skew = Math.min(w * 0.25, 20);
-                graphics.moveTo(skew, 0);
-                graphics.lineTo(w, 0);
-                graphics.lineTo(w - skew, h);
-                graphics.lineTo(0, h);
-                graphics.lineTo(skew, 0);
-                break;
-            }
-            case 'arrow': {
-                // Прямоугольник + треугольник
-                const shaftH = Math.max(6, h * 0.3);
-                const shaftY = (h - shaftH) / 2;
-                graphics.drawRect(0, shaftY, w * 0.6, shaftH);
-                graphics.moveTo(w * 0.6, 0);
-                graphics.lineTo(w, h / 2);
-                graphics.lineTo(w * 0.6, h);
-                graphics.lineTo(w * 0.6, 0);
-                break;
-            }
-            case 'square':
-            default: {
-                graphics.drawRect(0, 0, w, h);
-                break;
-            }
-        }
-        graphics.endFill();
-        return graphics;
-    }
+    // createShape удалён — логика в ShapeObject
 
     // createDrawing удалён — логика вынесена в DrawingObject
 
@@ -250,16 +172,6 @@ export class PixiEngine {
         const meta = pixiObject._mb || {};
         if (meta.instance && typeof meta.instance.updateSize === 'function') {
             meta.instance.updateSize(size);
-        } else if (pixiObject instanceof PIXI.Text) {
-            const prevPos = { x: pixiObject.x, y: pixiObject.y };
-            this.updateTextLikeSize(pixiObject, size);
-            if (position) {
-                pixiObject.x = position.x;
-                pixiObject.y = position.y;
-            } else {
-                pixiObject.x = prevPos.x;
-                pixiObject.y = prevPos.y;
-            }
         } else if (pixiObject instanceof PIXI.Graphics) {
             // Fallback для устаревших объектов без инстанса
             this.recreateGraphicsObject(pixiObject, size, position, objectType);
@@ -276,67 +188,7 @@ export class PixiEngine {
         console.log(`🔄 Пересоздаем Graphics объект, тип: ${objectType}`);
         
         // Определяем что рисовать по типу объекта
-        if (objectType === 'shape') {
-            // Фигура: сохраняем вид из _mb.properties.kind
-            const meta = pixiObject._mb || {};
-            const props = meta.properties || {};
-            const color = 0x3b82f6;
-            const w = size.width;
-            const h = size.height;
-            pixiObject.beginFill(color, 1);
-            switch (props.kind) {
-                case 'circle': {
-                    const r = Math.min(w, h) / 2;
-                    pixiObject.drawCircle(w / 2, h / 2, r);
-                    break;
-                }
-                case 'rounded': {
-                    const r = props.cornerRadius || 10;
-                    pixiObject.drawRoundedRect(0, 0, w, h, r);
-                    break;
-                }
-                case 'triangle': {
-                    pixiObject.moveTo(w / 2, 0);
-                    pixiObject.lineTo(w, h);
-                    pixiObject.lineTo(0, h);
-                    pixiObject.lineTo(w / 2, 0);
-                    break;
-                }
-                case 'diamond': {
-                    pixiObject.moveTo(w / 2, 0);
-                    pixiObject.lineTo(w, h / 2);
-                    pixiObject.lineTo(w / 2, h);
-                    pixiObject.lineTo(0, h / 2);
-                    pixiObject.lineTo(w / 2, 0);
-                    break;
-                }
-                case 'parallelogram': {
-                    const skew = Math.min(w * 0.25, 20);
-                    pixiObject.moveTo(skew, 0);
-                    pixiObject.lineTo(w, 0);
-                    pixiObject.lineTo(w - skew, h);
-                    pixiObject.lineTo(0, h);
-                    pixiObject.lineTo(skew, 0);
-                    break;
-                }
-                case 'arrow': {
-                    const shaftH = Math.max(6, h * 0.3);
-                    const shaftY = (h - shaftH) / 2;
-                    pixiObject.drawRect(0, shaftY, w * 0.6, shaftH);
-                    pixiObject.moveTo(w * 0.6, 0);
-                    pixiObject.lineTo(w, h / 2);
-                    pixiObject.lineTo(w * 0.6, h);
-                    pixiObject.lineTo(w * 0.6, 0);
-                    break;
-                }
-                case 'square':
-                default: {
-                    pixiObject.drawRect(0, 0, w, h);
-                    break;
-                }
-            }
-            pixiObject.endFill();
-        } else if (objectType === 'drawing') {
+        if (objectType === 'drawing') {
             // Рисунок: перерисовываем по сохранённым точкам с масштабированием под новый size
             const meta = pixiObject._mb || {};
             const props = meta.properties || {};
@@ -393,27 +245,7 @@ export class PixiEngine {
     /**
      * Обновить размер текстового объекта
      */
-    updateTextObjectSize(textObject, size) {
-        // Для текстовых объектов адаптируем размер шрифта к новой высоте
-        const fontSize = Math.max(12, Math.min(size.height / 2, size.width / 8));
-        textObject.style.fontSize = fontSize;
-        
-        // Ограничиваем ширину текста
-        textObject.style.wordWrap = true;
-        textObject.style.wordWrapWidth = size.width - 10; // Небольшой отступ
-    }
-
-    // Унифицированное масштабирование для текстоподобных объектов (emoji/текст с anchor)
-    updateTextLikeSize(textObject, size) {
-        // Если это обычный текст с переносами — используем старую логику
-        if (!textObject._mb || !textObject._mb.baseW || !textObject._mb.baseH) {
-            return this.updateTextObjectSize(textObject, size);
-        }
-        const baseW = textObject._mb.baseW;
-        const baseH = textObject._mb.baseH;
-        const s = Math.min((size.width / baseW) || 1, (size.height / baseH) || 1);
-        textObject.scale.set(s, s);
-    }
+    // Методы обновления текстов/эмоджи перенесены в соответствующие классы
 
     /**
      * Обновить угол поворота объекта
@@ -510,18 +342,21 @@ export class PixiEngine {
         return { type: 'empty' };
     }
 
+    // Геометрические помощники/хит-тесты вынести в отдельный сервис при следующем рефакторинге
     _distancePointToSegment(px, py, ax, ay, bx, by) {
-        const abx = bx - ax;
-        const aby = by - ay;
-        const apx = px - ax;
-        const apy = py - ay;
-        const ab2 = abx * abx + aby * aby;
-        if (ab2 === 0) return Math.hypot(px - ax, py - ay);
-        let t = (apx * abx + apy * aby) / ab2;
+        const vectorABx = bx - ax;
+        const vectorABy = by - ay;
+        const vectorAPx = px - ax;
+        const vectorAPy = py - ay;
+        const squaredLengthAB = vectorABx * vectorABx + vectorABy * vectorABy;
+        if (squaredLengthAB === 0) {
+            return Math.hypot(px - ax, py - ay);
+        }
+        let t = (vectorAPx * vectorABx + vectorAPy * vectorABy) / squaredLengthAB;
         t = Math.max(0, Math.min(1, t));
-        const cx = ax + t * abx;
-        const cy = ay + t * aby;
-        return Math.hypot(px - cx, py - cy);
+        const closestX = ax + t * vectorABx;
+        const closestY = ay + t * vectorABy;
+        return Math.hypot(px - closestX, py - closestY);
     }
 
     destroy() {
