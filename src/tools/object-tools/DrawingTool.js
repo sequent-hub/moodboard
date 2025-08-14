@@ -119,7 +119,8 @@ export class DrawingTool extends BaseTool {
             mode: this.brush.mode
         };
 
-        this.emit('toolbar:action', { type: 'drawing', id: 'drawing', position, properties });
+        // Важно: отправляем глобальное событие без префикса tool:
+        this.eventBus.emit('toolbar:action', { type: 'drawing', id: 'drawing', position, properties });
 
         // Чистим временную графику
         if (this.tempGraphics && this.tempGraphics.parent) this.tempGraphics.parent.removeChild(this.tempGraphics);
