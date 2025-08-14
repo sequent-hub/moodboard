@@ -26,6 +26,7 @@ export class DrawingTool extends BaseTool {
 
         // Набор уже удалённых объектов в текущем мазке ластика
         this._eraserDeleted = new Set();
+        this._eraserIdleTimer = null;
 
         // Подписка на изменения кисти (резерв на будущее)
         if (this.eventBus) {
@@ -58,6 +59,10 @@ export class DrawingTool extends BaseTool {
         super.deactivate();
         if (this.app && this.app.view) this.app.view.style.cursor = '';
         this._finishAndCommit();
+        if (this._eraserIdleTimer) {
+            clearTimeout(this._eraserIdleTimer);
+            this._eraserIdleTimer = null;
+        }
         this.app = null;
         this.world = null;
     }
@@ -115,6 +120,15 @@ export class DrawingTool extends BaseTool {
                 this._eraserSweep(prev, p);
             }
             this._redrawTemporary();
+            // Переход в режим круга при остановке курсора
+            if (this.brush.mode === 'eraser') {
+                if (this._eraserIdleTimer) clearTimeout(this._eraserIdleTimer);
+                this._eraserIdleTimer = setTimeout(() => {
+                    if (!this.isDrawing || !this.tempGraphics) return;
+                    // Форсируем перерисовку в режиме «стоит на месте»
+                    this._redrawTemporary(true);
+                }, 150);
+            }
         }
     }
 
@@ -185,18 +199,97 @@ export class DrawingTool extends BaseTool {
         this.points = [];
     }
 
-    _redrawTemporary() {
+    _redrawTemporary(forceCircle = false) {
         if (!this.tempGraphics) return;
         const g = this.tempGraphics;
         g.clear();
-        const alpha = this.brush.mode === 'marker' ? 0.6 : 1;
-        const lineWidth = this.brush.mode === 'marker' ? this.brush.width * 2 : (this.brush.mode === 'eraser' ? 10 : this.brush.width);
-        g.lineStyle({ width: lineWidth, color: this.brush.color, alpha, cap: 'round', join: 'round', miterLimit: 2, alignment: 0.5 });
-        // Для маркера используем режим LIGHTEN, чтобы наложения не темнели
-        g.blendMode = this.brush.mode === 'marker' ? PIXI.BLEND_MODES.LIGHTEN : PIXI.BLEND_MODES.NORMAL;
         const pts = this.points;
         if (pts.length === 0) return;
-        // Рисуем сглаженную кривую с quadraticCurveTo
+
+        // Особая визуализация для ластика: кружок под курсором + короткий «хвост»
+        if (this.brush.mode === 'eraser') {
+            const color = 0x6B7280; // слегка светлее серый
+            const maxAlpha = 0.6;
+            const radius = 7; // базовая толщина = radius*2
+            const tailMaxLen = 70; // чуть меньшая длина хвоста
+            const last = pts[pts.length - 1];
+
+            if (forceCircle || pts.length < 2) {
+                // Кружок под курсором, когда стоим на месте
+                g.beginFill(color, maxAlpha);
+                g.drawCircle(last.x, last.y, radius);
+                g.endFill();
+            } else {
+                // Формируем полилинию хвоста из последних точек так, чтобы суммарная длина ≤ tailMaxLen
+                const tailPoints = [last];
+                let acc = 0;
+                for (let i = pts.length - 2; i >= 0; i--) {
+                    const a = pts[i + 1];
+                    const b = pts[i];
+                    const dl = Math.hypot(a.x - b.x, a.y - b.y);
+                    acc += dl;
+                    tailPoints.push(b);
+                    if (acc >= tailMaxLen) break;
+                }
+                tailPoints.reverse(); // от старых к новым
+
+                // Пересэмплируем хвост равномерно для большей плотности (чтобы не было «бусинок»)
+                const targetStep = 3; // px между соседними сэмплами
+                const samples = [];
+                // Накопитель вдоль полилинии
+                let cursor = 0;
+                let segIdx = 0;
+                let segPos = 0; // позиция внутри сегмента
+                // Считаем длины сегментов
+                const segLens = [];
+                for (let i = 0; i < tailPoints.length - 1; i++) {
+                    const a = tailPoints[i];
+                    const b = tailPoints[i + 1];
+                    segLens.push(Math.hypot(b.x - a.x, b.y - a.y));
+                }
+                const totalLen = segLens.reduce((s, v) => s + v, 0);
+                const sampleCount = Math.max(2, Math.floor(totalLen / targetStep));
+                // Добавляем первый
+                samples.push({ x: tailPoints[0].x, y: tailPoints[0].y });
+                for (let k = 1; k < sampleCount; k++) {
+                    const dist = k * (totalLen / (sampleCount - 1));
+                    // Ищем сегмент, в котором находится эта дистанция
+                    let d = 0;
+                    let idx = 0;
+                    while (idx < segLens.length && d + segLens[idx] < dist) {
+                        d += segLens[idx++];
+                    }
+                    if (idx >= segLens.length) {
+                        samples.push({ x: tailPoints[tailPoints.length - 1].x, y: tailPoints[tailPoints.length - 1].y });
+                        continue;
+                    }
+                    const a = tailPoints[idx];
+                    const b = tailPoints[idx + 1];
+                    const t = (dist - d) / (segLens[idx] || 1);
+                    samples.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+                }
+
+                // Рисуем одну непрерывную ломаную, нарезанную на короткие штрихи с плавным альфа-градиентом
+                const segCount = samples.length - 1;
+                for (let i = 0; i < segCount; i++) {
+                    const a = samples[i];
+                    const b = samples[i + 1];
+                    const t = (i + 1) / segCount; // 0..1, ближе к концу — плотнее
+                    const alpha = Math.max(0.03, Math.pow(t, 1.2) * maxAlpha);
+                    g.lineStyle({ width: radius * 2, color, alpha, cap: 'round', join: 'round' });
+                    g.moveTo(a.x, a.y);
+                    g.lineTo(b.x, b.y);
+                }
+            }
+            return;
+        }
+
+        // Карандаш/маркер: сглаженная кривая
+        const alpha = this.brush.mode === 'marker' ? 0.6 : 1;
+        const lineWidth = this.brush.mode === 'marker' ? this.brush.width * 2 : this.brush.width;
+        g.lineStyle({ width: lineWidth, color: this.brush.color, alpha, cap: 'round', join: 'round', miterLimit: 2, alignment: 0.5 });
+        g.blendMode = this.brush.mode === 'marker' ? PIXI.BLEND_MODES.LIGHTEN : PIXI.BLEND_MODES.NORMAL;
+
         if (pts.length < 3) {
             g.moveTo(pts[0].x, pts[0].y);
             for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
@@ -212,7 +305,6 @@ export class DrawingTool extends BaseTool {
             const my = (cy + ny) / 2;
             g.quadraticCurveTo(cx, cy, mx, my);
         }
-        // Последний сегмент к конечной точке
         const pen = pts[pts.length - 2];
         const last = pts[pts.length - 1];
         g.quadraticCurveTo(pen.x, pen.y, last.x, last.y);
