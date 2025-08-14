@@ -156,7 +156,20 @@ export class SelectTool extends BaseTool {
             // Начинаем обычный drag исходника; Alt-режим включим на лету при движении
             this.handleObjectSelect(hitResult.object, event);
         } else {
-            // Клик по пустому месту - начинаем рамку выделения
+            // Клик по пустому месту — если есть одиночное выделение, разрешаем drag за пределами объекта в пределах рамки
+            if (this.selectedObjects.size === 1) {
+                const selId = Array.from(this.selectedObjects)[0];
+                const boundsReq = { objects: [] };
+                this.emit('get:all:objects', boundsReq);
+                const map = new Map(boundsReq.objects.map(o => [o.id, o.bounds]));
+                const b = map.get(selId);
+                if (b && this.isPointInBounds({ x: event.x, y: event.y }, b)) {
+                    // Старт перетаскивания как если бы кликнули по объекту
+                    this.startDrag(selId, event);
+                    return;
+                }
+            }
+            // Иначе — начинаем рамку выделения
             this.startBoxSelect(event);
         }
     }
