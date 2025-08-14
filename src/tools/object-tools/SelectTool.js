@@ -1,6 +1,16 @@
+import { calculateNewSize, calculatePositionOffset } from './selection/GeometryUtils.js';
 import { BaseTool } from '../BaseTool.js';
 import { ResizeHandles } from '../ResizeHandles.js';
 import * as PIXI from 'pixi.js';
+import { SelectionModel } from './selection/SelectionModel.js';
+import { HandlesSync } from './selection/HandlesSync.js';
+import { SimpleDragController } from './selection/SimpleDragController.js';
+import { ResizeController } from './selection/ResizeController.js';
+import { RotateController } from './selection/RotateController.js';
+import { GroupResizeController } from './selection/GroupResizeController.js';
+import { GroupRotateController } from './selection/GroupRotateController.js';
+import { GroupDragController } from './selection/GroupDragController.js';
+import { BoxSelectController } from './selection/BoxSelectController.js';
 
 /**
  * Инструмент выделения и работы с объектами
@@ -12,8 +22,8 @@ export class SelectTool extends BaseTool {
         this.cursor = 'default';
         this.hotkey = 'v';
         
-        // Состояние выделения
-        this.selectedObjects = new Set();
+        // Состояние выделения перенесено в модель
+        this.selection = new SelectionModel();
         this.isMultiSelect = false;
 		
 		// Режим Alt-клонирования при перетаскивании
@@ -66,9 +76,9 @@ export class SelectTool extends BaseTool {
         
         // Состояние рамки выделения
         this.isBoxSelect = false;
-		this.selectionBox = null;
-		this.selectionGraphics = null; // PIXI.Graphics для визуализации рамки
-		this.initialSelectionBeforeBox = null; // снимок выделения перед началом box-select
+        this.selectionBox = null;
+        this.selectionGraphics = null; // PIXI.Graphics для визуализации рамки
+        this.initialSelectionBeforeBox = null; // снимок выделения перед началом box-select
 
 		// Подписка на событие готовности дубликата (от Core)
 		// Когда PasteObjectCommand завершится, ядро сообщит newId
@@ -100,14 +110,71 @@ export class SelectTool extends BaseTool {
         
         // Инициализируем систему ручек изменения размера
         if (!this.resizeHandles && app) {
-
             this.resizeHandles = new ResizeHandles(app);
+            this._handlesSync = new HandlesSync({
+                app,
+                resizeHandles: this.resizeHandles,
+                selection: this.selection,
+                emit: (event, payload) => this.emit(event, payload)
+            });
+            this._dragCtrl = new SimpleDragController({
+                emit: (event, payload) => this.emit(event, payload)
+            });
+            this._resizeCtrl = new ResizeController({
+                emit: (event, payload) => this.emit(event, payload),
+                getRotation: (objectId) => {
+                    const d = { objectId, rotation: 0 };
+                    this.emit('get:object:rotation', d);
+                    return d.rotation || 0;
+                }
+            });
+            this._rotateCtrl = new RotateController({
+                emit: (event, payload) => this.emit(event, payload)
+            });
+            this._groupResizeCtrl = new GroupResizeController({
+                emit: (event, payload) => this.emit(event, payload),
+                selection: this.selection,
+                getGroupBounds: () => this.computeGroupBounds(),
+                ensureGroupGraphics: (b) => this.ensureGroupBoundsGraphics(b),
+                updateGroupGraphics: (b) => this.updateGroupBoundsGraphics(b)
+            });
+            this._groupRotateCtrl = new GroupRotateController({
+                emit: (event, payload) => this.emit(event, payload),
+                selection: this.selection,
+                getGroupBounds: () => this.computeGroupBounds(),
+                ensureGroupGraphics: (b) => this.ensureGroupBoundsGraphics(b),
+                updateHandles: () => { if (this.resizeHandles) this.resizeHandles.updateHandles(); }
+            });
+            this._groupDragCtrl = new GroupDragController({
+                emit: (event, payload) => this.emit(event, payload),
+                selection: this.selection,
+                updateGroupBoundsByTopLeft: (pos) => this.updateGroupBoundsGraphicsByTopLeft(pos)
+            });
+            this._boxSelect = new BoxSelectController({
+                app,
+                selection: this.selection,
+                emit: (event, payload) => this.emit(event, payload),
+                setSelection: (ids) => this.setSelection(ids),
+                clearSelection: () => this.clearSelection(),
+                rectIntersectsRect: (a, b) => this.rectIntersectsRect(a, b)
+            });
         } else if (!app) {
             console.log('❌ PIXI app не передан в activate');
         } else {
             console.log('ℹ️ ResizeHandles уже созданы');
         }
     }
+
+    // Удобные врапперы вокруг SelectionModel (для минимальных правок ниже)
+    _has(id) { return this.selection.has(id); }
+    _size() { return this.selection.size(); }
+    _ids() { return this.selection.toArray(); }
+    _clear() { this.selection.clear(); }
+    _add(id) { this.selection.add(id); }
+    _addMany(ids) { this.selection.addMany(ids); }
+    _remove(id) { this.selection.remove(id); }
+    _toggle(id) { this.selection.toggle(id); }
+    _computeGroupBounds(getPixiById) { return this.selection.computeBounds(getPixiById); }
     
     /**
      * Деактивация инструмента
@@ -137,7 +204,7 @@ export class SelectTool extends BaseTool {
             this.startResize(hitResult.handle, hitResult.object);
         } else if (hitResult.type === 'rotate-handle') {
             this.startRotate(hitResult.object);
-        } else if (this.selectedObjects.size > 1) {
+        } else if (this.selection.size() > 1) {
             // Особая логика для группового выделения: клики внутри общей рамки не снимают выделение
             const gb = this.computeGroupBounds();
             const insideGroup = this.isPointInBounds({ x: event.x, y: event.y }, { x: gb.x, y: gb.y, width: gb.width, height: gb.height });
@@ -157,8 +224,8 @@ export class SelectTool extends BaseTool {
             this.handleObjectSelect(hitResult.object, event);
         } else {
             // Клик по пустому месту — если есть одиночное выделение, разрешаем drag за пределами объекта в пределах рамки
-            if (this.selectedObjects.size === 1) {
-                const selId = Array.from(this.selectedObjects)[0];
+            if (this.selection.size() === 1) {
+                const selId = this.selection.toArray()[0];
                 const boundsReq = { objects: [] };
                 this.emit('get:all:objects', boundsReq);
                 const map = new Map(boundsReq.objects.map(o => [o.id, o.bounds]));
@@ -236,12 +303,12 @@ export class SelectTool extends BaseTool {
         let targetId = null;
         if (hit && hit.type === 'object' && hit.object) {
             targetId = hit.object;
-            if (this.selectedObjects.has(targetId) && this.selectedObjects.size > 1) {
+            if (this.selection.has(targetId) && this.selection.size() > 1) {
                 context = 'group';
             } else {
                 context = 'object';
             }
-        } else if (this.selectedObjects.size > 1) {
+        } else if (this.selection.size() > 1) {
             context = 'group';
         }
         // Сообщаем ядру/UI, что нужно показать контекстное меню (пока без пунктов)
@@ -360,10 +427,10 @@ export class SelectTool extends BaseTool {
             this.clearSelection();
         }
         
-        if (this.selectedObjects.has(objectId)) {
+        if (this.selection.has(objectId)) {
             if (this.isMultiSelect) {
                 this.removeFromSelection(objectId);
-            } else if (this.selectedObjects.size > 1) {
+            } else if (this.selection.size() > 1) {
                 // Перетаскивание группы
                 this.startGroupDrag(event);
             } else {
@@ -372,7 +439,7 @@ export class SelectTool extends BaseTool {
             }
         } else {
             this.addToSelection(objectId);
-            if (this.selectedObjects.size > 1) {
+            if (this.selection.size() > 1) {
                 this.startGroupDrag(event);
             } else {
                 this.startDrag(objectId, event);
@@ -391,16 +458,7 @@ export class SelectTool extends BaseTool {
         const objectData = { objectId, position: null };
         this.emit('get:object:position', objectData);
         
-        if (objectData.position) {
-            this.dragOffset = {
-                x: event.x - objectData.position.x,
-                y: event.y - objectData.position.y
-            };
-        } else {
-            this.dragOffset = { x: 0, y: 0 };
-        }
-        
-        this.emit('drag:start', { object: objectId, position: { x: event.x, y: event.y } });
+        if (this._dragCtrl) this._dragCtrl.start(objectId, event);
     }
     
     /**
@@ -408,29 +466,7 @@ export class SelectTool extends BaseTool {
      */
     updateDrag(event) {
         // Перетаскивание группы
-        if (this.isGroupDragging && this.groupStartBounds && this.groupDragOffset) {
-            // Если Alt зажат и клон группы ещё не запрошен — запускаем групповой клон
-            if (event.originalEvent && event.originalEvent.altKey && !this.isAltGroupCloneMode && !this.groupClonePending) {
-                this.isAltGroupCloneMode = true;
-                this.groupClonePending = true;
-                this.groupCloneOriginalIds = Array.from(this.selectedObjects);
-                // Запрашиваем групповой клон на текущих позициях
-                this.emit('group:duplicate:request', { objects: this.groupCloneOriginalIds });
-                return; // дождемся маппинга и переключимся
-            }
-            const newTopLeft = {
-                x: event.x - this.groupDragOffset.x,
-                y: event.y - this.groupDragOffset.y
-            };
-            const delta = {
-                dx: newTopLeft.x - this.groupStartBounds.x,
-                dy: newTopLeft.y - this.groupStartBounds.y
-            };
-            const ids = Array.from(this.selectedObjects);
-            this.emit('group:drag:update', { objects: ids, delta });
-            this.updateGroupBoundsGraphicsByTopLeft(newTopLeft);
-            return;
-        }
+        if (this.isGroupDragging && this._groupDragCtrl) { this._groupDragCtrl.update(event); return; }
         // Если во время обычного перетаскивания зажали Alt — включаем режим клонирования на лету
         if (this.isDragging && !this.isAltCloneMode && event.originalEvent && event.originalEvent.altKey) {
             this.isAltCloneMode = true;
@@ -450,16 +486,10 @@ export class SelectTool extends BaseTool {
         // Если ожидаем создание копии — продолжаем двигать текущую цель (исходник)
         if (!this.dragTarget) return;
         
-        const newX = event.x - this.dragOffset.x;
-        const newY = event.y - this.dragOffset.y;
-        
-        this.emit('drag:update', { 
-            object: this.dragTarget, 
-            position: { x: newX, y: newY } 
-        });
+        if (this._dragCtrl) this._dragCtrl.update(event);
         
         // Обновляем ручки во время перетаскивания
-        if (this.resizeHandles && this.selectedObjects.has(this.dragTarget)) {
+        if (this.resizeHandles && this.selection.has(this.dragTarget)) {
             this.resizeHandles.updateHandles();
         }
     }
@@ -469,14 +499,15 @@ export class SelectTool extends BaseTool {
      */
     endDrag() {
         if (this.isGroupDragging) {
-            const ids = Array.from(this.selectedObjects);
+            const ids = this.selection.toArray();
             this.emit('group:drag:end', { objects: ids });
+            if (this._groupDragCtrl) this._groupDragCtrl.end();
             this.isAltGroupCloneMode = false;
             this.groupClonePending = false;
             this.groupCloneOriginalIds = [];
             this.groupCloneMap = null;
         } else if (this.dragTarget) {
-            this.emit('drag:end', { object: this.dragTarget });
+            if (this._dragCtrl) this._dragCtrl.end();
         }
         
         this.isDragging = false;
@@ -495,42 +526,18 @@ export class SelectTool extends BaseTool {
     startResize(handle, objectId) {
         console.log(`🔧 Начинаем resize: ручка ${handle}, объект ${objectId}`);
         // Групповой resize
-        if (objectId === this.groupId && this.selectedObjects.size > 1) {
+        if (objectId === this.groupId && this.selection.size() > 1) {
             this.isGroupResizing = true;
-            this.groupStartBounds = this.computeGroupBounds();
-            this.groupStartMouse = { x: this.currentX, y: this.currentY };
-            // Снимок делается в Core для точности; здесь просто эмит старт
-            const ids = Array.from(this.selectedObjects);
-            this.emit('group:resize:start', { objects: ids, startBounds: this.groupStartBounds, handle });
             this.resizeHandle = handle;
-            // Блокируем обычный флаг isResizing, чтобы не конфликтовало
+            if (this._groupResizeCtrl) this._groupResizeCtrl.start(handle, { x: this.currentX, y: this.currentY });
             this.isResizing = false;
             return;
         }
 
         this.isResizing = true;
         this.resizeHandle = handle;
-        this.dragTarget = objectId; // Используем dragTarget для совместимости
-        
-        // Получаем данные объекта для сохранения начального состояния
-        const sizeData = { objectId, size: null };
-        this.emit('get:object:size', sizeData);
-        
-        // Получаем начальную позицию объекта
-        const positionData = { objectId, position: null };
-        this.emit('get:object:position', positionData);
-        
-        this.resizeStartBounds = sizeData.size || { width: 100, height: 100 };
-        this.resizeStartMousePos = { x: this.currentX, y: this.currentY };
-        this.resizeStartPosition = positionData.position || { x: 0, y: 0 };
-        
-        console.log(`📐 Начальный размер:`, this.resizeStartBounds);
-        console.log(`📍 Начальная позиция мыши:`, this.resizeStartMousePos);
-        console.log(`📍 Начальная позиция объекта:`, this.resizeStartPosition);
-        
-        // Ручки остаются видными во время resize для лучшего UX
-        
-        this.emit('resize:start', { object: objectId, handle });
+        this.dragTarget = objectId;
+        if (this._resizeCtrl) this._resizeCtrl.start(handle, objectId, { x: this.currentX, y: this.currentY });
     }
     
     /**
@@ -538,181 +545,16 @@ export class SelectTool extends BaseTool {
      */
     updateResize(event) {
 		// Групповой resize
-		if (this.isGroupResizing && this.groupStartBounds && this.resizeHandle) {
-            const start = this.groupStartBounds;
-            const deltaX = event.x - this.groupStartMouse.x;
-            const deltaY = event.y - this.groupStartMouse.y;
-            const minW = 20;
-            const minH = 20;
-            let x = start.x;
-            let y = start.y;
-            let w = start.width;
-            let h = start.height;
+        if (this.isGroupResizing && this._groupResizeCtrl) { this._groupResizeCtrl.update(event); return; }
 
-			// Пропорциональный ресайз с Shift
-			const maintainAspectRatio = !!(event.originalEvent && event.originalEvent.shiftKey);
-
-            switch (this.resizeHandle) {
-                case 'e':
-                    w = start.width + deltaX;
-                    break;
-                case 'w':
-                    w = start.width - deltaX;
-                    x = start.x + deltaX;
-                    break;
-                case 's':
-                    h = start.height + deltaY;
-                    break;
-                case 'n':
-                    h = start.height - deltaY;
-                    y = start.y + deltaY;
-                    break;
-                case 'se':
-                    w = start.width + deltaX;
-                    h = start.height + deltaY;
-                    break;
-                case 'ne':
-                    w = start.width + deltaX;
-                    h = start.height - deltaY;
-                    y = start.y + deltaY;
-                    break;
-                case 'sw':
-                    w = start.width - deltaX;
-                    x = start.x + deltaX;
-                    h = start.height + deltaY;
-                    break;
-                case 'nw':
-                    w = start.width - deltaX;
-                    x = start.x + deltaX;
-                    h = start.height - deltaY;
-                    y = start.y + deltaY;
-                    break;
+        if (this._resizeCtrl) this._resizeCtrl.update(event, {
+            calculateNewSize: (handleType, startBounds, dx, dy, keepAR) => {
+                const rot = (() => { const d = { objectId: this.dragTarget, rotation: 0 }; this.emit('get:object:rotation', d); return d.rotation || 0; })();
+                return calculateNewSize(handleType, startBounds, dx, dy, keepAR, rot);
+            },
+            calculatePositionOffset: (handleType, startBounds, newSize, objectRotation) => {
+                return calculatePositionOffset(handleType, startBounds, newSize, objectRotation);
             }
-
-			// Если зажат Shift — сохраняем исходные пропорции группы
-			if (maintainAspectRatio && start.height !== 0) {
-				const ar = start.width / start.height;
-				if (['nw','ne','sw','se'].includes(this.resizeHandle)) {
-					const widthChange = Math.abs(w - start.width);
-					const heightChange = Math.abs(h - start.height);
-					if (widthChange > heightChange) {
-						// Корректируем высоту по ширине
-						h = w / ar;
-						// Если тянем верхние ручки — двигаем y, чтобы верх оставался закреплен
-						if (['n','ne','nw'].includes(this.resizeHandle)) {
-							y = start.y + (start.height - h);
-						} else {
-							y = start.y;
-						}
-					} else {
-						// Корректируем ширину по высоте
-						w = h * ar;
-						// Если тянем левые ручки — двигаем x, чтобы левый край оставался закреплен
-						if (['w','sw','nw'].includes(this.resizeHandle)) {
-							x = start.x + (start.width - w);
-						} else {
-							x = start.x;
-						}
-					}
-				} else if (['e','w'].includes(this.resizeHandle)) {
-					// Горизонтальные ручки — ширина задает высоту
-					h = w / ar;
-					// Верхний край корректируем, если тянем верх
-					if (['n'].includes(this.resizeHandle)) {
-						y = start.y + (start.height - h);
-					} else {
-						y = start.y;
-					}
-					// Если тянем левую — корректируем x уже задан во время переключения ручки
-					if (this.resizeHandle === 'w') {
-						x = start.x + (start.width - w);
-					} else {
-						x = start.x;
-					}
-				} else if (['n','s'].includes(this.resizeHandle)) {
-					// Вертикальные ручки — высота задает ширину
-					w = h * ar;
-					if (this.resizeHandle === 'n') {
-						y = start.y + (start.height - h);
-					} else {
-						y = start.y;
-					}
-					if (['w'].includes(this.resizeHandle)) {
-						x = start.x + (start.width - w);
-					} else {
-						x = start.x;
-					}
-				}
-			}
-
-            // Минимальные размеры и коррекция позиции для левых/верхних ручек
-            if (w < minW) {
-                if (['w', 'sw', 'nw'].includes(this.resizeHandle)) {
-                    x += (w - minW);
-                }
-                w = minW;
-            }
-            if (h < minH) {
-                if (['n', 'ne', 'nw'].includes(this.resizeHandle)) {
-                    y += (h - minH);
-                }
-                h = minH;
-            }
-
-            const scale = { x: w / start.width, y: h / start.height };
-            const ids = Array.from(this.selectedObjects);
-            const newBounds = { x, y, width: w, height: h };
-            this.emit('group:resize:update', { objects: ids, startBounds: start, newBounds, scale });
-            this.updateGroupBoundsGraphics(newBounds);
-            return;
-        }
-
-        if (!this.isResizing || !this.resizeStartBounds || !this.resizeStartMousePos) return;
-        
-        // Вычисляем изменение позиции мыши
-        const deltaX = event.x - this.resizeStartMousePos.x;
-        const deltaY = event.y - this.resizeStartMousePos.y;
-        
-        // Проверяем, зажат ли Shift для пропорционального изменения размера
-        const maintainAspectRatio = event.originalEvent.shiftKey;
-        
-        // Вычисляем новые размеры в зависимости от типа ручки
-        const newSize = this.calculateNewSize(
-            this.resizeHandle, 
-            this.resizeStartBounds, 
-            deltaX, 
-            deltaY, 
-            maintainAspectRatio
-        );
-        
-        // Ограничиваем минимальный размер
-        newSize.width = Math.max(20, newSize.width);
-        newSize.height = Math.max(20, newSize.height);
-        
-        // Получаем угол поворота для расчета смещения позиции
-        const rotationData = { objectId: this.dragTarget, rotation: 0 };
-        this.emit('get:object:rotation', rotationData);
-        const objectRotation = rotationData.rotation || 0;
-        
-        // Вычисляем новую абсолютную позицию для левых/верхних ручек
-        const positionOffset = this.calculatePositionOffset(
-            this.resizeHandle, 
-            this.resizeStartBounds, 
-            newSize,
-            objectRotation
-        );
-        
-        // Вычисляем абсолютную позицию относительно начальной позиции
-        const newPosition = {
-            x: this.resizeStartPosition.x + positionOffset.x,
-            y: this.resizeStartPosition.y + positionOffset.y
-        };
-        
-        this.emit('resize:update', { 
-            object: this.dragTarget,
-            handle: this.resizeHandle,
-            size: newSize,
-            position: newPosition
         });
         
         // Обновляем ручки в реальном времени во время resize
@@ -726,8 +568,7 @@ export class SelectTool extends BaseTool {
      */
     endResize() {
         if (this.isGroupResizing) {
-            const ids = Array.from(this.selectedObjects);
-            this.emit('group:resize:end', { objects: ids });
+            if (this._groupResizeCtrl) this._groupResizeCtrl.end();
             this.isGroupResizing = false;
             this.resizeHandle = null;
             this.groupStartBounds = null;
@@ -746,23 +587,7 @@ export class SelectTool extends BaseTool {
             }
             return;
         }
-        if (this.dragTarget && this.resizeStartBounds) {
-            // Получаем финальный размер
-            const finalSizeData = { objectId: this.dragTarget, size: null };
-            this.emit('get:object:size', finalSizeData);
-            
-            // Получаем финальную позицию
-            const finalPositionData = { objectId: this.dragTarget, position: null };
-            this.emit('get:object:position', finalPositionData);
-            
-            this.emit('resize:end', { 
-                object: this.dragTarget,
-                oldSize: this.resizeStartBounds,
-                newSize: finalSizeData.size || this.resizeStartBounds,
-                oldPosition: this.resizeStartPosition,
-                newPosition: finalPositionData.position || this.resizeStartPosition
-            });
-        }
+        if (this._resizeCtrl) this._resizeCtrl.end();
         
         // Обновляем позицию ручек после resize
         if (this.resizeHandles) {
@@ -781,7 +606,7 @@ export class SelectTool extends BaseTool {
      */
     startRotate(objectId) {
         // Групповой поворот
-        if (objectId === this.groupId && this.selectedObjects.size > 1) {
+        if (objectId === this.groupId && this.selection.size() > 1) {
             this.isGroupRotating = true;
             const gb = this.computeGroupBounds();
             this.groupRotateBounds = gb;
@@ -808,46 +633,21 @@ export class SelectTool extends BaseTool {
                 // Нарисуем пока осевую рамку, вращение применим в update
                 this.groupSelectionGraphics.drawRect(gb.x, gb.y, gb.width, gb.height);
             }
-            const ids = Array.from(this.selectedObjects);
+            const ids = this.selection.toArray();
             this.emit('group:rotate:start', { objects: ids, center: this.rotateCenter });
             return;
         }
 
         this.isRotating = true;
         this.dragTarget = objectId; // Используем dragTarget для совместимости
-        
-        // Получаем текущий угол объекта
-        const rotationData = { objectId, rotation: 0 };
-        this.emit('get:object:rotation', rotationData);
-        this.rotateStartAngle = rotationData.rotation || 0;
-        this.rotateCurrentAngle = this.rotateStartAngle;
-        
-        // Получаем позицию объекта для вычисления центра вращения
-        const positionData = { objectId, position: null };
-        this.emit('get:object:position', positionData);
-        
+        const posData = { objectId, position: null };
+        this.emit('get:object:position', posData);
         const sizeData = { objectId, size: null };
         this.emit('get:object:size', sizeData);
-        
-        if (positionData.position && sizeData.size) {
-            // Центр объекта = позиция + половина размера
-            this.rotateCenter = {
-                x: positionData.position.x + sizeData.size.width / 2,
-                y: positionData.position.y + sizeData.size.height / 2
-            };
-            
-            // Вычисляем начальный угол мыши относительно центра
-            this.rotateStartMouseAngle = Math.atan2(
-                this.currentY - this.rotateCenter.y,
-                this.currentX - this.rotateCenter.x
-            );
-            
-
+        if (posData.position && sizeData.size && this._rotateCtrl) {
+            const center = { x: posData.position.x + sizeData.size.width / 2, y: posData.position.y + sizeData.size.height / 2 };
+            this._rotateCtrl.start(objectId, { x: this.currentX, y: this.currentY }, center);
         }
-        
-        // Ручки остаются видными во время вращения для лучшего UX
-        
-        this.emit('rotate:start', { object: objectId });
     }
     
     /**
@@ -855,67 +655,9 @@ export class SelectTool extends BaseTool {
      */
     updateRotate(event) {
         // Групповой поворот
-        if (this.isGroupRotating && this.rotateCenter) {
-            const currentMouseAngle = Math.atan2(
-                event.y - this.rotateCenter.y,
-                event.x - this.rotateCenter.x
-            );
-            let deltaAngle = currentMouseAngle - this.rotateStartMouseAngle;
-            while (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
-            while (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
-            let deltaAngleDegrees = deltaAngle * 180 / Math.PI;
-            if (event.originalEvent.shiftKey) {
-                deltaAngleDegrees = Math.round(deltaAngleDegrees / 15) * 15;
-            }
-            this.rotateCurrentAngle = deltaAngleDegrees;
-            const ids = Array.from(this.selectedObjects);
-            this.emit('group:rotate:update', { objects: ids, center: this.rotateCenter, angle: this.rotateCurrentAngle });
-        // Вращаем общую рамку (groupBoundsGraphics) вокруг центра — это и есть рамка с ручками
-            const angleRad = this.rotateCurrentAngle * Math.PI / 180;
-        if (this.groupBoundsGraphics && this.groupRotateBounds) {
-            this.groupBoundsGraphics.pivot.set(this.groupRotateBounds.width / 2, this.groupRotateBounds.height / 2);
-            this.groupBoundsGraphics.position.set(this.rotateCenter.x, this.rotateCenter.y);
-            this.groupBoundsGraphics.rotation = angleRad;
-            if (this.resizeHandles) {
-                this.resizeHandles.updateHandles();
-            }
-        }
-            return;
-        }
-        if (!this.isRotating || !this.rotateCenter) return;
-        
-        // Вычисляем текущий угол мыши относительно центра объекта
-        const currentMouseAngle = Math.atan2(
-            event.y - this.rotateCenter.y,
-            event.x - this.rotateCenter.x
-        );
-        
-        // Вычисляем разность углов (сколько повернула мышь)
-        let deltaAngle = currentMouseAngle - this.rotateStartMouseAngle;
-        
-        // Нормализуем угол в диапазон -π до π
-        while (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
-        while (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
-        
-        // Конвертируем в градусы
-        let deltaAngleDegrees = deltaAngle * 180 / Math.PI;
-        
-        // Если зажат Shift - ступенчатое вращение (15° шаги)
-        if (event.originalEvent.shiftKey) {
-            deltaAngleDegrees = Math.round(deltaAngleDegrees / 15) * 15;
-        }
-        
-        // Вычисляем финальный угол объекта
-        this.rotateCurrentAngle = this.rotateStartAngle + deltaAngleDegrees;
-        
-        // Нормализуем угол объекта в диапазон 0-360°
-        while (this.rotateCurrentAngle < 0) this.rotateCurrentAngle += 360;
-        while (this.rotateCurrentAngle >= 360) this.rotateCurrentAngle -= 360;
-        
-        this.emit('rotate:update', { 
-            object: this.dragTarget,
-            angle: this.rotateCurrentAngle
-        });
+        if (this.isGroupRotating && this._groupRotateCtrl) { this._groupRotateCtrl.update(event); return; }
+        if (!this.isRotating || !this._rotateCtrl) return;
+        this._rotateCtrl.update(event);
         
         // Обновляем ручки в реальном времени во время поворота
         if (this.resizeHandles) {
@@ -928,11 +670,9 @@ export class SelectTool extends BaseTool {
      */
     endRotate() {
         if (this.isGroupRotating) {
-            const ids = Array.from(this.selectedObjects);
-            this.emit('group:rotate:end', { objects: ids, angle: this.rotateCurrentAngle });
+            if (this._groupRotateCtrl) this._groupRotateCtrl.end();
             this.isGroupRotating = false;
-            // После финализации пересчитываем осевые границы группы и
-            // перестраиваем рамку с ручками в осевом виде (rotation=0)
+            // Восстановление рамки
             const gb = this.computeGroupBounds();
             this.ensureGroupBoundsGraphics(gb);
             if (this.groupBoundsGraphics) {
@@ -940,24 +680,10 @@ export class SelectTool extends BaseTool {
                 this.groupBoundsGraphics.pivot.set(0, 0);
                 this.groupBoundsGraphics.position.set(gb.x, gb.y);
             }
-            // Обновляем ручки на новых границах
-            if (this.resizeHandles) {
-                this.resizeHandles.showHandles(this.groupBoundsGraphics, this.groupId);
-            }
-            this.rotateCenter = null;
-            this.rotateStartAngle = 0;
-            this.rotateCurrentAngle = 0;
-            this.rotateStartMouseAngle = 0;
-            this.groupRotateBounds = null;
+            if (this.resizeHandles) this.resizeHandles.showHandles(this.groupBoundsGraphics, this.groupId);
             return;
         }
-        if (this.dragTarget && this.rotateStartAngle !== undefined) {
-            this.emit('rotate:end', { 
-                object: this.dragTarget,
-                oldAngle: this.rotateStartAngle,
-                newAngle: this.rotateCurrentAngle
-            });
-        }
+        if (this._rotateCtrl) this._rotateCtrl.end();
         
         // Обновляем позицию ручек после поворота
         if (this.resizeHandles) {
@@ -976,127 +702,22 @@ export class SelectTool extends BaseTool {
      */
     startBoxSelect(event) {
         this.isBoxSelect = true;
-        this.selectionBox = {
-            startX: event.x,
-            startY: event.y,
-            endX: event.x,
-            endY: event.y
-        };
-        
-        // Сохраняем исходное выделение для корректного union при Ctrl/Meta
-        this.initialSelectionBeforeBox = Array.from(this.selectedObjects);
-        if (!this.isMultiSelect) {
-            this.clearSelection();
-        }
-
-		// Создаем графику рамки на стадии (поверх всех объектов и ручек)
-		if (this.app && this.app.stage) {
-			this.app.stage.sortableChildren = true;
-			this.selectionGraphics = new PIXI.Graphics();
-			this.selectionGraphics.zIndex = 2000; // выше ручек (1000/2000)
-			this.selectionGraphics.name = 'selection-box';
-			this.app.stage.addChild(this.selectionGraphics);
-		}
+        if (this._boxSelect) this._boxSelect.start({ x: event.x, y: event.y }, this.isMultiSelect);
     }
     
     /**
      * Обновление рамки выделения
      */
     updateBoxSelect(event) {
-        if (!this.selectionBox) return;
-        
-        this.selectionBox.endX = event.x;
-        this.selectionBox.endY = event.y;
-		// Визуализация рамки
-		if (this.selectionGraphics) {
-			const x = Math.min(this.selectionBox.startX, this.selectionBox.endX);
-			const y = Math.min(this.selectionBox.startY, this.selectionBox.endY);
-			const w = Math.abs(this.selectionBox.endX - this.selectionBox.startX);
-			const h = Math.abs(this.selectionBox.endY - this.selectionBox.startY);
-
-			this.selectionGraphics.clear();
-			this.selectionGraphics.lineStyle(1, 0x3B82F6, 1);
-			this.selectionGraphics.beginFill(0x3B82F6, 0.08);
-			this.selectionGraphics.drawRect(x, y, w, h);
-			this.selectionGraphics.endFill();
-		}
-
-		// Живое обновление множественного выделения по пересечению с рамкой
-		const x = Math.min(this.selectionBox.startX, this.selectionBox.endX);
-		const y = Math.min(this.selectionBox.startY, this.selectionBox.endY);
-		const w = Math.abs(this.selectionBox.endX - this.selectionBox.startX);
-		const h = Math.abs(this.selectionBox.endY - this.selectionBox.startY);
-		if (w >= 2 && h >= 2) {
-			const box = { x, y, width: w, height: h };
-			const request = { objects: [] };
-			this.emit('get:all:objects', request);
-			const matched = [];
-			for (const item of request.objects) {
-				if (this.rectIntersectsRect(box, item.bounds)) matched.push(item.id);
-			}
-			let newSelection;
-			if (this.isMultiSelect && this.initialSelectionBeforeBox) {
-				const base = new Set(this.initialSelectionBeforeBox);
-				for (const id of matched) base.add(id);
-				newSelection = Array.from(base);
-			} else {
-				newSelection = matched;
-			}
-			this.setSelection(newSelection);
-		}
+        if (this._boxSelect) this._boxSelect.update({ x: event.x, y: event.y });
     }
     
     /**
      * Завершение рамки выделения
      */
     endBoxSelect() {
-		this.isBoxSelect = false;
-		
-		// Выделяем объекты, пересекающиеся с рамкой
-		if (this.selectionBox) {
-			const x = Math.min(this.selectionBox.startX, this.selectionBox.endX);
-			const y = Math.min(this.selectionBox.startY, this.selectionBox.endY);
-			const w = Math.abs(this.selectionBox.endX - this.selectionBox.startX);
-			const h = Math.abs(this.selectionBox.endY - this.selectionBox.startY);
-			const box = { x, y, width: w, height: h };
-
-			// Пропускаем очень маленькие рамки (случайные клики)
-            if (w >= 2 && h >= 2) {
-                // Запрашиваем у ядра список объектов и их bounds
-                const request = { objects: [] };
-                this.emit('get:all:objects', request);
-
-                const matched = [];
-                for (const item of request.objects) {
-                    if (this.rectIntersectsRect(box, item.bounds)) {
-                        matched.push(item.id);
-                    }
-                }
-
-                if (matched.length > 0) {
-                    if (this.isMultiSelect) {
-                        // Добавляем к текущему выделению
-                        for (const id of matched) {
-                            if (!this.selectedObjects.has(id)) {
-                                this.addToSelection(id);
-                            }
-                        }
-                    } else {
-                        // Заменяем выделение целиком
-                        this.setSelection(matched);
-                    }
-                }
-            }
-		}
-
-        // Удаляем графику рамки
-        if (this.selectionGraphics && this.selectionGraphics.parent) {
-            this.selectionGraphics.parent.removeChild(this.selectionGraphics);
-            this.selectionGraphics.destroy();
-        }
-        this.selectionGraphics = null;
-        this.selectionBox = null;
-		this.initialSelectionBeforeBox = null;
+        this.isBoxSelect = false;
+        if (this._boxSelect) this._boxSelect.end();
     }
 
 	/**
@@ -1115,8 +736,9 @@ export class SelectTool extends BaseTool {
      * Установить выделение списком ID за один раз (батч)
      */
     setSelection(objectIds) {
-        const prev = Array.from(this.selectedObjects);
-        this.selectedObjects = new Set(objectIds);
+        const prev = this.selection.toArray();
+        this.selection.clear();
+        this.selection.addMany(objectIds);
         // Эмитим события для совместимости
         if (prev.length > 0) {
             this.emit('selection:clear', { objects: prev });
@@ -1132,7 +754,7 @@ export class SelectTool extends BaseTool {
      */
     drawGroupSelectionGraphics() {
         if (!this.app || !this.app.stage) return;
-        const selectedIds = Array.from(this.selectedObjects);
+        const selectedIds = this.selection.toArray();
         if (selectedIds.length <= 1) {
             this.removeGroupSelectionGraphics();
             return;
@@ -1173,18 +795,10 @@ export class SelectTool extends BaseTool {
     computeGroupBounds() {
         const request = { objects: [] };
         this.emit('get:all:objects', request);
-        const selected = new Set(this.getSelection());
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for (const item of request.objects) {
-            if (!selected.has(item.id)) continue;
-            const b = item.bounds;
-            minX = Math.min(minX, b.x);
-            minY = Math.min(minY, b.y);
-            maxX = Math.max(maxX, b.x + b.width);
-            maxY = Math.max(maxY, b.y + b.height);
-        }
-        if (!isFinite(minX)) return { x: 0, y: 0, width: 0, height: 0 };
-        return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        const pixiMap = new Map(request.objects.map(o => [o.id, o.pixi]));
+        const b = this.selection.computeBounds((id) => pixiMap.get(id));
+        if (!b) return { x: 0, y: 0, width: 0, height: 0 };
+        return b;
     }
 
     ensureGroupBoundsGraphics(bounds) {
@@ -1228,16 +842,14 @@ export class SelectTool extends BaseTool {
     startGroupDrag(event) {
         const gb = this.computeGroupBounds();
         this.groupStartBounds = gb;
-        this.groupDragOffset = { x: event.x - gb.x, y: event.y - gb.y };
         this.isGroupDragging = true;
         this.isDragging = false; // отключаем одиночный drag, если был
-        // Обеспечиваем наличие невидимой геометрии и ручек на группе
         this.ensureGroupBoundsGraphics(gb);
         if (this.groupBoundsGraphics && this.resizeHandles) {
             this.resizeHandles.showHandles(this.groupBoundsGraphics, this.groupId);
         }
-        const ids = Array.from(this.selectedObjects);
-        this.emit('group:drag:start', { objects: ids });
+        if (this._groupDragCtrl) this._groupDragCtrl.start(gb, { x: event.x, y: event.y });
+        this.emit('group:drag:start', { objects: this.selection.toArray() });
     }
 
     /**
@@ -1246,6 +858,7 @@ export class SelectTool extends BaseTool {
     onGroupDuplicateReady(idMap) {
         this.groupClonePending = false;
         this.groupCloneMap = idMap;
+        if (this._groupDragCtrl) this._groupDragCtrl.onGroupDuplicateReady(idMap);
         // Формируем новое выделение из клонов
         const newIds = [];
         for (const orig of this.groupCloneOriginalIds) {
@@ -1353,20 +966,20 @@ export class SelectTool extends BaseTool {
     
         addToSelection(object) {
         console.log(`➕ Добавляем в выделение: ${object}`);
-        this.selectedObjects.add(object);
+        this.selection.add(object);
         this.emit('selection:add', { object });
         this.updateResizeHandles();
     }
 
     removeFromSelection(object) {
-        this.selectedObjects.delete(object);
+        this.selection.remove(object);
         this.emit('selection:remove', { object });
         this.updateResizeHandles();
     }
 
     clearSelection() {
-        const objects = Array.from(this.selectedObjects);
-        this.selectedObjects.clear();
+        const objects = this.selection.toArray();
+        this.selection.clear();
         this.emit('selection:clear', { objects });
         this.updateResizeHandles();
     }
@@ -1377,7 +990,7 @@ export class SelectTool extends BaseTool {
     }
     
     deleteSelectedObjects() {
-        const objects = Array.from(this.selectedObjects);
+        const objects = this.selection.toArray();
         this.clearSelection();
         this.emit('objects:delete', { objects });
     }
@@ -1390,7 +1003,7 @@ export class SelectTool extends BaseTool {
      * Получение информации о выделении
      */
     getSelection() {
-        return Array.from(this.selectedObjects);
+        return this.selection.toArray();
     }
 
     // Экспонируем выделение через EventBus для внешних слушателей (keyboard)
@@ -1402,50 +1015,15 @@ export class SelectTool extends BaseTool {
     }
     
     hasSelection() {
-        return this.selectedObjects.size > 0;
+        return this.selection.size() > 0;
     }
     
     /**
      * Обновление ручек изменения размера
      */
     updateResizeHandles() {
-        if (!this.resizeHandles) {
-            console.log('❌ ResizeHandles не инициализированы');
-            return;
-        }
-        
-        // Показываем ручки только для одного выделенного объекта
-        if (this.selectedObjects.size === 1) {
-            // Удаляем графику группового выделения
-            this.removeGroupSelectionGraphics();
-            const objectId = Array.from(this.selectedObjects)[0];
-            const pixiObjectData = { objectId, pixiObject: null };
-            
-            // Получаем PIXI объект
-            this.emit('get:object:pixi', pixiObjectData);
-            
-            if (pixiObjectData.pixiObject) {
-                this.resizeHandles.showHandles(pixiObjectData.pixiObject, objectId);
-            }
-        } else if (this.selectedObjects.size >= 2) {
-            // Для группы: создаем невидимый прямоугольник и вешаем на него ручки
-            const gb = this.computeGroupBounds();
-            // Если границы пока невалидны (например, временно пусты во время box-select), скрываем
-            if (gb.width <= 0 || gb.height <= 0) {
-                this.resizeHandles.hideHandles();
-                return;
-            }
-            this.ensureGroupBoundsGraphics(gb);
-            if (this.groupBoundsGraphics) {
-                this.resizeHandles.showHandles(this.groupBoundsGraphics, this.groupId);
-            }
-            // Общая рамка группы для визуализации
-            this.drawGroupSelectionGraphics();
-        } else {
-            // Нет выделения
-            this.resizeHandles.hideHandles();
-            this.removeGroupSelectionGraphics();
-        }
+        if (!this._handlesSync) return;
+        this._handlesSync.update();
     }
 
     /**
