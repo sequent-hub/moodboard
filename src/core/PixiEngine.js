@@ -227,9 +227,20 @@ export class PixiEngine {
 
         graphics.lineStyle(width, color, 1);
         if (pts.length > 0) {
-            graphics.moveTo(pts[0].x, pts[0].y);
-            for (let i = 1; i < pts.length; i++) {
-                graphics.lineTo(pts[i].x, pts[i].y);
+            if (pts.length < 3) {
+                graphics.moveTo(pts[0].x, pts[0].y);
+                for (let i = 1; i < pts.length; i++) graphics.lineTo(pts[i].x, pts[i].y);
+            } else {
+                graphics.moveTo(pts[0].x, pts[0].y);
+                for (let i = 1; i < pts.length - 1; i++) {
+                    const cx = pts[i].x, cy = pts[i].y;
+                    const nx = pts[i + 1].x, ny = pts[i + 1].y;
+                    const mx = (cx + nx) / 2, my = (cy + ny) / 2;
+                    graphics.quadraticCurveTo(cx, cy, mx, my);
+                }
+                const pen = pts[pts.length - 2];
+                const last = pts[pts.length - 1];
+                graphics.quadraticCurveTo(pen.x, pen.y, last.x, last.y);
             }
         }
         return graphics;
@@ -370,9 +381,20 @@ export class PixiEngine {
             const scaleY = baseH ? (size.height / baseH) : 1;
             pixiObject.lineStyle(widthPx, color, 1);
             if (pts.length > 0) {
-                pixiObject.moveTo(pts[0].x * scaleX, pts[0].y * scaleY);
-                for (let i = 1; i < pts.length; i++) {
-                    pixiObject.lineTo(pts[i].x * scaleX, pts[i].y * scaleY);
+                if (pts.length < 3) {
+                    pixiObject.moveTo(pts[0].x * scaleX, pts[0].y * scaleY);
+                    for (let i = 1; i < pts.length; i++) pixiObject.lineTo(pts[i].x * scaleX, pts[i].y * scaleY);
+                } else {
+                    pixiObject.moveTo(pts[0].x * scaleX, pts[0].y * scaleY);
+                    for (let i = 1; i < pts.length - 1; i++) {
+                        const cx = pts[i].x * scaleX, cy = pts[i].y * scaleY;
+                        const nx = pts[i + 1].x * scaleX, ny = pts[i + 1].y * scaleY;
+                        const mx = (cx + nx) / 2, my = (cy + ny) / 2;
+                        pixiObject.quadraticCurveTo(cx, cy, mx, my);
+                    }
+                    const pen = pts[pts.length - 2];
+                    const last = pts[pts.length - 1];
+                    pixiObject.quadraticCurveTo(pen.x * scaleX, pen.y * scaleY, last.x * scaleX, last.y * scaleY);
                 }
             }
         } else {

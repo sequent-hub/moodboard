@@ -146,10 +146,26 @@ export class DrawingTool extends BaseTool {
         g.lineStyle(this.brush.width, this.brush.color, 1);
         const pts = this.points;
         if (pts.length === 0) return;
-        g.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) {
-            g.lineTo(pts[i].x, pts[i].y);
+        // Рисуем сглаженную кривую с quadraticCurveTo
+        if (pts.length < 3) {
+            g.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+            return;
         }
+        g.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length - 1; i++) {
+            const cx = pts[i].x;
+            const cy = pts[i].y;
+            const nx = pts[i + 1].x;
+            const ny = pts[i + 1].y;
+            const mx = (cx + nx) / 2;
+            const my = (cy + ny) / 2;
+            g.quadraticCurveTo(cx, cy, mx, my);
+        }
+        // Последний сегмент к конечной точке
+        const pen = pts[pts.length - 2];
+        const last = pts[pts.length - 1];
+        g.quadraticCurveTo(pen.x, pen.y, last.x, last.y);
     }
 
     _toWorld(x, y) {
