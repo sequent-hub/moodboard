@@ -10,7 +10,7 @@ export class SaveStatus {
             showTimestamp: true,
             autoHide: true,
             hideDelay: 3000,
-            position: 'top-right',
+            position: 'bottom-left',
             // Настраиваемые опции (только для внутреннего использования)
             ...options
         };
@@ -43,18 +43,7 @@ export class SaveStatus {
     getBaseClasses() {
         return [
             'moodboard-save-status',
-            'absolute',
-            'z-10',
-            'px-3',
-            'py-2', 
-            'rounded-lg',
-            'text-sm',
-            'font-medium',
-            'transition-all',
-            'duration-300',
-            'shadow-lg',
-            'backdrop-blur-sm',
-            'border'
+            'absolute'
         ].join(' ');
     }
     
@@ -79,10 +68,9 @@ export class SaveStatus {
      */
     getInitialContent() {
         return `
-            <div class="flex items-center gap-2">
-                <span class="save-icon">🔄</span>
+            <div class="save-textline">
                 <span class="save-text">Готов к работе</span>
-                ${this.options.showTimestamp ? '<span class="save-time text-xs opacity-70"></span>' : ''}
+                ${this.options.showTimestamp ? '<span class="save-time"></span>' : ''}
             </div>
         `;
     }
@@ -123,47 +111,38 @@ export class SaveStatus {
         
         // Показываем элемент
         this.element.style.opacity = '1';
-        this.element.style.transform = 'translateY(0)';
         
         switch (data.status) {
             case 'pending':
                 this.applyStyle('pending');
-                iconEl.textContent = '⏳';
                 textEl.textContent = 'Изменения...';
                 break;
                 
             case 'saving':
                 this.applyStyle('saving');
-                iconEl.textContent = '💾';
                 textEl.textContent = 'Сохранение...';
                 break;
                 
             case 'saved':
                 this.applyStyle('saved');
-                iconEl.textContent = '✅';
                 textEl.textContent = 'Сохранено';
                 this.scheduleAutoHide();
                 break;
                 
             case 'error':
                 this.applyStyle('error');
-                iconEl.textContent = '❌';
                 textEl.textContent = data.message || 'Ошибка сохранения';
                 this.scheduleAutoHide(6000); // Ошибки показываем дольше
                 break;
                 
             default:
                 this.applyStyle('idle');
-                iconEl.textContent = '🔄';
                 textEl.textContent = 'Готов к работе';
         }
         
         // Обновляем время
         if (timeEl && this.options.showTimestamp) {
-            const time = new Date().toLocaleTimeString('ru-RU', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+            const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
             timeEl.textContent = time;
         }
     }
@@ -172,36 +151,13 @@ export class SaveStatus {
      * Применение стилей для статуса
      */
     applyStyle(status) {
-        // Удаляем предыдущие классы статуса
-        this.element.className = this.element.className.replace(/status-\w+/g, '');
-        
-        const styles = {
-            idle: {
-                className: 'status-idle bg-gray-100 text-gray-600 border-gray-200',
-                bgColor: 'rgba(243, 244, 246, 0.9)'
-            },
-            pending: {
-                className: 'status-pending bg-blue-100 text-blue-600 border-blue-200',
-                bgColor: 'rgba(219, 234, 254, 0.9)'
-            },
-            saving: {
-                className: 'status-saving bg-blue-100 text-blue-600 border-blue-200',
-                bgColor: 'rgba(219, 234, 254, 0.9)'
-            },
-            saved: {
-                className: 'status-saved bg-green-100 text-green-600 border-green-200',
-                bgColor: 'rgba(220, 252, 231, 0.9)'
-            },
-            error: {
-                className: 'status-error bg-red-100 text-red-600 border-red-200',
-                bgColor: 'rgba(254, 226, 226, 0.9)'
-            }
-        };
-        
-        const style = styles[status] || styles.idle;
-        
-        this.element.className += ` ${style.className}`;
-        this.element.style.backgroundColor = style.bgColor;
+        // Плоский стиль без цветной подложки
+        this.element.className = 'moodboard-save-status absolute';
+        this.element.style.background = 'transparent';
+        this.element.style.border = 'none';
+        this.element.style.boxShadow = 'none';
+        this.element.style.padding = '0';
+        this.element.style.transform = 'none';
     }
     
     /**
@@ -234,7 +190,6 @@ export class SaveStatus {
         
         this.hideTimer = setTimeout(() => {
             this.element.style.opacity = '0.6';
-            this.element.style.transform = 'translateY(-8px)';
         }, hideDelay);
     }
     

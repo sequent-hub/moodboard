@@ -539,17 +539,27 @@
 }
 
 .moodboard-save-status .save-icon {
-    display: inline-block;
-    font-size: 14px;
+    display: none;
 }
 
 .moodboard-save-status .save-text {
-    font-weight: 500;
+    font-weight: 400;
 }
 
 .moodboard-save-status .save-time {
     font-weight: 400;
-    opacity: 0.7;
+    opacity: 0.6;
+}
+
+/* Плоский статус в левом нижнем углу */
+.moodboard-save-status {
+    position: absolute;
+    font-size: 12px;
+    color: #6b7280;
+    left: 20px !important;
+    bottom: 20px !important;
+    z-index: 3100;
+    pointer-events: none;
 }
 
 /* Context menu */

@@ -113,7 +113,7 @@ export class MoodBoard {
         
         // Инициализируем индикатор сохранения (с фиксированными настройками)
         this.saveStatus = new SaveStatus(
-            this.canvasContainer,
+            this.workspaceElement,
             this.coreMoodboard.eventBus
         );
         
