@@ -305,6 +305,95 @@
     background: #e1bee7;
 }
 
+/* Big T button */
+.moodboard-toolbar__button--big-t {
+    font-size: 24px;
+    font-weight: 800;
+}
+
+/* Новые кнопки тулбара — небольшие визуальные акценты */
+.moodboard-toolbar__button--select,
+.moodboard-toolbar__button--pan,
+.moodboard-toolbar__button--shapes,
+.moodboard-toolbar__button--pencil,
+.moodboard-toolbar__button--frame-tool,
+.moodboard-toolbar__button--comments,
+.moodboard-toolbar__button--attachments,
+.moodboard-toolbar__button--emoji {
+    opacity: 0.95;
+}
+
+.moodboard-toolbar__button--select { background: #eef2ff; color: #1e40af; }
+.moodboard-toolbar__button--pan { background: #f0fdf4; color: #166534; }
+.moodboard-toolbar__button--shapes { background: #eff6ff; color: #1d4ed8; }
+.moodboard-toolbar__button--pencil { background: #fff7ed; color: #9a3412; }
+.moodboard-toolbar__button--frame-tool { background: #f5f3ff; color: #6d28d9; }
+.moodboard-toolbar__button--comments { background: #f0f9ff; color: #075985; }
+.moodboard-toolbar__button--attachments { background: #f8fafc; color: #334155; }
+.moodboard-toolbar__button--emoji { background: #fefce8; color: #854d0e; }
+
+/* Попап для фигур */
+.moodboard-toolbar__popup {
+    position: absolute;
+    top: 0;
+    left: 64px; /* по умолчанию справа от тулбара */
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+    z-index: 3200;
+    padding: 8px;
+    pointer-events: auto;
+}
+
+.moodboard-toolbar__popup--shapes { width: auto; }
+
+.moodboard-shapes__grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.moodboard-shapes__btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 8px;
+    background: #f5f5f5;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .2s ease, transform .1s ease;
+}
+.moodboard-shapes__btn:hover { background: #eaeaea; }
+.moodboard-shapes__btn:active { transform: scale(0.97); }
+
+/* Иконки фигур — рисуем CSSом */
+.moodboard-shapes__icon { display: inline-block; }
+.shape-square {
+    width: 15px; height: 15px; background: #1d4ed8; border-radius: 2px;
+}
+.shape-rounded-square {
+    width: 15px; height: 15px; background: #1d4ed8; border-radius: 4px;
+}
+.shape-circle {
+    width: 15px; height: 15px; background: #1d4ed8; border-radius: 50%;
+}
+.shape-triangle {
+    width: 0; height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 14px solid #1d4ed8;
+}
+.shape-diamond {
+    width: 11px; height: 11px; background: #1d4ed8; transform: rotate(45deg);
+}
+.shape-parallelogram {
+    width: 17px; height: 11px; background: #1d4ed8; transform: skewX(-20deg);
+}
+.shape-arrow { font-size: 16px; color: #1d4ed8; line-height: 1; }
+
 /* Dark theme button overrides */
 .moodboard-toolbar--dark .moodboard-toolbar__button--frame,
 .moodboard-toolbar--dark .moodboard-toolbar__button--text,
