@@ -15,6 +15,7 @@ export class ActionHandler {
             case 'frame':
             case 'simple-text':
             case 'shape':
+            case 'drawing':
                 return this.handleCreateObject(action.type, action.position, action.properties || {});
                 
             case 'clear':

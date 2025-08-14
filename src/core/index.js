@@ -130,6 +130,11 @@ export class CoreMoodBoard {
         const panToolModule = await import('../tools/board-tools/PanTool.js');
         const panTool = new panToolModule.PanTool(this.eventBus);
         this.toolManager.registerTool(panTool);
+
+        // Инструмент рисования (карандаш)
+        const drawingToolModule = await import('../tools/object-tools/DrawingTool.js');
+        const drawingTool = new drawingToolModule.DrawingTool(this.eventBus);
+        this.toolManager.registerTool(drawingTool);
         
         // Сохраняем ссылку на selectTool для обновления ручек
         this.selectTool = selectTool;
