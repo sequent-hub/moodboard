@@ -28,7 +28,7 @@ export class Toolbar {
             { id: 'big-t', icon: 'T', title: 'Текст', type: 'custom-t' },
             { id: 'shapes', icon: '🔷', title: 'Фигуры', type: 'custom-shapes' },
             { id: 'pencil', icon: '✏️', title: 'Рисование', type: 'custom-draw' },
-            { id: 'frame-tool', icon: '🖼️', title: 'Фрейм', type: 'custom-frame' },
+            { id: 'frame-tool', icon: '📌', title: 'Фрейм', type: 'custom-frame' },
             { id: 'comments', icon: '💬', title: 'Комментарии', type: 'custom-comments' },
             { id: 'attachments', icon: '📎', title: 'Файлы', type: 'custom-attachments' },
             { id: 'emoji', icon: '🙂', title: 'Эмоджи', type: 'custom-emoji' }
@@ -60,9 +60,10 @@ export class Toolbar {
         
         this.container.appendChild(this.element);
 
-        // Создаем всплывающие панели (фигуры и рисование)
+        // Создаем всплывающие панели (фигуры, рисование, эмоджи)
         this.createShapesPopup();
         this.createDrawPopup();
+        this.createEmojiPopup();
     }
     
     /**
@@ -110,11 +111,12 @@ export class Toolbar {
             }
 
             // Заглушки для новых кнопок — пока без действий (только анимация)
-            if (toolType === 'custom-t' || toolType === 'custom-frame' || toolType === 'custom-comments' || toolType === 'custom-attachments' || toolType === 'custom-emoji' || toolType === 'activate-select' || toolType === 'activate-pan') {
+            if (toolType === 'custom-t' || toolType === 'custom-frame' || toolType === 'custom-comments' || toolType === 'custom-attachments' || toolType === 'activate-select' || toolType === 'activate-pan') {
                 this.animateButton(button);
                 // Закрываем панель фигур, если клик не по ней
                 this.closeShapesPopup();
                 this.closeDrawPopup();
+                this.closeEmojiPopup();
                 return;
             }
 
@@ -123,6 +125,7 @@ export class Toolbar {
                 this.animateButton(button);
                 this.toggleShapesPopup(button);
                 this.closeDrawPopup();
+                this.closeEmojiPopup();
                 return;
             }
 
@@ -131,6 +134,16 @@ export class Toolbar {
                 this.animateButton(button);
                 this.toggleDrawPopup(button);
                 this.closeShapesPopup();
+                this.closeEmojiPopup();
+                return;
+            }
+
+            // Тоггл всплывающей панели эмоджи
+            if (toolType === 'custom-emoji') {
+                this.animateButton(button);
+                this.toggleEmojiPopup(button);
+                this.closeShapesPopup();
+                this.closeDrawPopup();
                 return;
             }
             
@@ -150,11 +163,14 @@ export class Toolbar {
             const isInsideToolbar = this.element.contains(e.target);
             const isInsideShapesPopup = this.shapesPopupEl && this.shapesPopupEl.contains(e.target);
             const isInsideDrawPopup = this.drawPopupEl && this.drawPopupEl.contains(e.target);
+            const isInsideEmojiPopup = this.emojiPopupEl && this.emojiPopupEl.contains(e.target);
             const isShapesButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--shapes');
             const isDrawButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--pencil');
-            if (!isInsideToolbar && !isInsideShapesPopup && !isShapesButton && !isInsideDrawPopup && !isDrawButton) {
+            const isEmojiButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--emoji');
+            if (!isInsideToolbar && !isInsideShapesPopup && !isShapesButton && !isInsideDrawPopup && !isDrawButton && !isInsideEmojiPopup && !isEmojiButton) {
                 this.closeShapesPopup();
                 this.closeDrawPopup();
+                this.closeEmojiPopup();
             }
         });
     }
@@ -335,6 +351,104 @@ export class Toolbar {
     closeDrawPopup() {
         if (this.drawPopupEl) {
             this.drawPopupEl.style.display = 'none';
+        }
+    }
+
+    /**
+     * Всплывающая панель эмоджи (UI)
+     */
+    createEmojiPopup() {
+        this.emojiPopupEl = document.createElement('div');
+        this.emojiPopupEl.className = 'moodboard-toolbar__popup moodboard-toolbar__popup--emoji';
+        this.emojiPopupEl.style.display = 'none';
+
+        const categories = [
+            { title: 'Смайлики', items: ['😀','😁','😂','🤣','🙂','😊','😍','😘','😎','🤔','😴','😡','😭','😇','🤩','🤨','😐','😅','😏','🤗','🤫','😤','🤯','🤪'] },
+            { title: 'Жесты', items: ['👍','👎','👌','✌️','🤘','🤙','👏','🙌','🙏','💪','☝️','👋','🖐️','✋'] },
+            { title: 'Предметы', items: ['💡','📌','📎','📝','🖌️','🖼️','🗂️','📁','📷','🎥','🎯','🧩','🔒','🔑'] },
+            { title: 'Символы', items: ['⭐','🌟','✨','🔥','💥','⚡','❗','❓','✅','❌','💯','🔔','🌀'] },
+            { title: 'Животные', items: ['🐶','🐱','🦊','🐼','🐨','🐵','🐸','🐧','🐤','🦄','🐙'] }
+        ];
+
+        categories.forEach(cat => {
+            const section = document.createElement('div');
+            section.className = 'moodboard-emoji__section';
+            const title = document.createElement('div');
+            title.className = 'moodboard-emoji__title';
+            title.textContent = cat.title;
+            const grid = document.createElement('div');
+            grid.className = 'moodboard-emoji__grid';
+            cat.items.forEach(ch => {
+                const btn = document.createElement('button');
+                btn.className = 'moodboard-emoji__btn';
+                btn.title = ch;
+                btn.textContent = ch;
+                btn.addEventListener('click', () => this.animateButton(btn));
+                grid.appendChild(btn);
+            });
+            section.appendChild(title);
+            section.appendChild(grid);
+            this.emojiPopupEl.appendChild(section);
+        });
+
+        // Разделительная линия
+        const divider = document.createElement('div');
+        divider.className = 'moodboard-emoji__divider';
+        this.emojiPopupEl.appendChild(divider);
+
+        // Стикеры (простые крупные эмодзи или пиктограммы)
+        const stickersTitle = document.createElement('div');
+        stickersTitle.className = 'moodboard-stickers__title';
+        stickersTitle.textContent = 'Стикеры';
+        const stickersGrid = document.createElement('div');
+        stickersGrid.className = 'moodboard-stickers__grid';
+
+        const stickers = ['📌','📎','🗂️','📁','🧩','🎯','💡','⭐','🔥','🚀','🎉','🧠'];
+        stickers.forEach(s => {
+            const btn = document.createElement('button');
+            btn.className = 'moodboard-sticker__btn';
+            btn.title = s;
+            btn.textContent = s;
+            btn.addEventListener('click', () => this.animateButton(btn));
+            stickersGrid.appendChild(btn);
+        });
+        this.emojiPopupEl.appendChild(stickersTitle);
+        this.emojiPopupEl.appendChild(stickersGrid);
+        this.container.appendChild(this.emojiPopupEl);
+    }
+
+    toggleEmojiPopup(anchorButton) {
+        if (!this.emojiPopupEl) return;
+        if (this.emojiPopupEl.style.display === 'none') {
+            this.openEmojiPopup(anchorButton);
+        } else {
+            this.closeEmojiPopup();
+        }
+    }
+
+    openEmojiPopup(anchorButton) {
+        if (!this.emojiPopupEl) return;
+        const toolbarRect = this.container.getBoundingClientRect();
+        const buttonRect = anchorButton.getBoundingClientRect();
+        const left = this.element.offsetWidth + 8;
+        // Показать невидимо для вычисления размеров
+        this.emojiPopupEl.style.visibility = 'hidden';
+        this.emojiPopupEl.style.display = 'block';
+        // Рассчитать top так, чтобы попап не уходил за нижнюю границу
+        const desiredTop = buttonRect.top - toolbarRect.top - 4;
+        const popupHeight = this.emojiPopupEl.offsetHeight;
+        const containerHeight = this.container.clientHeight || toolbarRect.height;
+        const minTop = 8;
+        const maxTop = Math.max(minTop, containerHeight - popupHeight - 8);
+        const top = Math.min(Math.max(minTop, desiredTop), maxTop);
+        this.emojiPopupEl.style.top = `${top}px`;
+        this.emojiPopupEl.style.left = `${left}px`;
+        this.emojiPopupEl.style.visibility = 'visible';
+    }
+
+    closeEmojiPopup() {
+        if (this.emojiPopupEl) {
+            this.emojiPopupEl.style.display = 'none';
         }
     }
     

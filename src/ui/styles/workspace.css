@@ -348,6 +348,12 @@
 
 .moodboard-toolbar__popup--shapes { width: auto; }
 .moodboard-toolbar__popup--draw { width: auto; padding: 10px; }
+.moodboard-toolbar__popup--emoji {
+    width: 360px;
+    max-height: none;
+    overflow: visible;
+    padding: 8px 10px;
+}
 
 .moodboard-shapes__grid {
     display: grid;
@@ -357,6 +363,68 @@
 
 /* Draw popup layout */
 .moodboard-draw__grid { display: grid; gap: 8px; }
+.moodboard-emoji__section { margin-bottom: 8px; }
+.moodboard-emoji__title {
+    font-size: 12px;
+    color: #6b7280;
+    margin: 4px 4px 6px;
+}
+.moodboard-emoji__grid {
+    display: grid;
+    grid-template-columns: repeat(8, 32px);
+    gap: 6px;
+}
+
+.moodboard-emoji__btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: #f5f5f5;
+    cursor: pointer;
+    font-size: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .2s ease, transform .1s ease;
+}
+.moodboard-emoji__btn:hover { background: #eaeaea; }
+.moodboard-emoji__btn:active { transform: scale(0.97); }
+
+/* Divider inside emoji popup */
+.moodboard-emoji__divider {
+    height: 1px;
+    background: #e5e7eb;
+    margin: 8px 2px;
+}
+
+/* Stickers section */
+.moodboard-stickers__title {
+    font-size: 12px;
+    color: #6b7280;
+    margin: 8px 4px 6px;
+}
+.moodboard-stickers__grid {
+    display: grid;
+    grid-template-columns: repeat(6, 48px);
+    gap: 8px;
+}
+.moodboard-sticker__btn {
+    width: 48px;
+    height: 48px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    cursor: pointer;
+    font-size: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .2s ease, transform .1s ease;
+}
+.moodboard-sticker__btn:hover { background: #f8fafc; }
+.moodboard-sticker__btn:active { transform: scale(0.97); }
 .moodboard-draw__row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .moodboard-draw__btn {
     width: 40px;
