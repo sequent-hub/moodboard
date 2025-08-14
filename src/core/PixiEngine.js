@@ -1,5 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { FrameObject } from '../objects/FrameObject.js';
+import { ShapeObject } from '../objects/ShapeObject.js';
+import { DrawingObject } from '../objects/DrawingObject.js';
 
 export class PixiEngine {
     constructor(container, eventBus, options) {
@@ -57,15 +59,35 @@ export class PixiEngine {
             case 'text':
                 pixiObject = this.createText(objectData);
                 break;
-            case 'shape':
-                pixiObject = this.createShape(objectData);
+            case 'shape': {
+                const shape = new ShapeObject(objectData);
+                pixiObject = shape.getPixi();
+                const prevMb = pixiObject._mb || {};
+                pixiObject._mb = {
+                    ...prevMb,
+                    objectId: objectData.id,
+                    type: objectData.type,
+                    properties: objectData.properties || {},
+                    instance: shape
+                };
                 break;
+            }
             case 'emoji':
                 pixiObject = this.createEmoji(objectData);
                 break;
-            case 'drawing':
-                pixiObject = this.createDrawing(objectData);
+            case 'drawing': {
+                const drawing = new DrawingObject(objectData);
+                pixiObject = drawing.getPixi();
+                const prevMb = pixiObject._mb || {};
+                pixiObject._mb = {
+                    ...prevMb,
+                    objectId: objectData.id,
+                    type: objectData.type,
+                    properties: objectData.properties || {},
+                    instance: drawing
+                };
                 break;
+            }
             default:
                 console.warn(`Unknown object type: ${objectData.type}`);
                 pixiObject = this.createDefaultObject(objectData);
@@ -246,36 +268,7 @@ export class PixiEngine {
         return graphics;
     }
 
-    createDrawing(objectData) {
-        const graphics = new PIXI.Graphics();
-        const color = objectData.properties?.strokeColor ?? 0x111827;
-        const width = objectData.properties?.strokeWidth ?? 2;
-        const alpha = objectData.properties?.mode === 'marker' ? 0.6 : 1;
-        const pts = Array.isArray(objectData.properties?.points) ? objectData.properties.points : [];
-        const lineWidth = objectData.properties?.mode === 'marker' ? width * 2 : width;
-
-        graphics.lineStyle({ width: lineWidth, color, alpha, cap: 'round', join: 'round', miterLimit: 2, alignment: 0.5 });
-        // Режим смешивания для маркера — LIGHTEN, чтобы наложения не темнели
-        graphics.blendMode = objectData.properties?.mode === 'marker' ? PIXI.BLEND_MODES.LIGHTEN : PIXI.BLEND_MODES.NORMAL;
-        if (pts.length > 0) {
-            if (pts.length < 3) {
-                graphics.moveTo(pts[0].x, pts[0].y);
-                for (let i = 1; i < pts.length; i++) graphics.lineTo(pts[i].x, pts[i].y);
-            } else {
-                graphics.moveTo(pts[0].x, pts[0].y);
-                for (let i = 1; i < pts.length - 1; i++) {
-                    const cx = pts[i].x, cy = pts[i].y;
-                    const nx = pts[i + 1].x, ny = pts[i + 1].y;
-                    const mx = (cx + nx) / 2, my = (cy + ny) / 2;
-                    graphics.quadraticCurveTo(cx, cy, mx, my);
-                }
-                const pen = pts[pts.length - 2];
-                const last = pts[pts.length - 1];
-                graphics.quadraticCurveTo(pen.x, pen.y, last.x, last.y);
-            }
-        }
-        return graphics;
-    }
+    // createDrawing удалён — логика вынесена в DrawingObject
 
     createDefaultObject(objectData) {
         // Заглушка для неизвестных типов
@@ -313,7 +306,7 @@ export class PixiEngine {
         // Для Graphics объектов (рамки, фигуры) нужно пересоздать геометрию
         if (pixiObject instanceof PIXI.Graphics) {
             const meta = pixiObject._mb || {};
-            if (meta.type === 'frame' && meta.instance) {
+            if ((meta.type === 'frame' || meta.type === 'shape') && meta.instance) {
                 meta.instance.updateSize(size);
             } else {
                 this.recreateGraphicsObject(pixiObject, size, position, objectType);
@@ -328,6 +321,12 @@ export class PixiEngine {
             } else {
                 pixiObject.x = prevPos.x;
                 pixiObject.y = prevPos.y;
+            }
+        } else {
+            // Делегируем, если это кастомный объект с инстансом
+            const meta = pixiObject._mb || {};
+            if (meta.instance && typeof meta.instance.updateSize === 'function') {
+                meta.instance.updateSize(size);
             }
         }
     }
