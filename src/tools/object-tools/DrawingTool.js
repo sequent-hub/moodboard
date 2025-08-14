@@ -28,7 +28,11 @@ export class DrawingTool extends BaseTool {
         if (this.eventBus) {
             this.eventBus.on('draw:brush:set', (data) => {
                 if (!data) return;
-                this.brush = { ...this.brush, ...data };
+                const patch = {};
+                if (typeof data.width === 'number') patch.width = data.width;
+                if (typeof data.color === 'number') patch.color = data.color;
+                if (typeof data.mode === 'string') patch.mode = data.mode;
+                this.brush = { ...this.brush, ...patch };
             });
         }
     }

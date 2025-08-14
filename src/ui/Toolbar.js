@@ -388,6 +388,8 @@ export class Toolbar {
             const btn = document.createElement('button');
             btn.className = `moodboard-draw__btn moodboard-draw__btn--${s.id}`;
             btn.title = s.title;
+            btn.dataset.brushWidth = String(s.dot <= 4 ? 2 : s.dot <= 7 ? 4 : 6);
+            btn.dataset.brushColor = s.color;
             const holder = document.createElement('span');
             holder.className = 'draw-size';
             const dot = document.createElement('span');
@@ -397,7 +399,19 @@ export class Toolbar {
             dot.style.height = `${s.dot}px`;
             holder.appendChild(dot);
             btn.appendChild(holder);
-            btn.addEventListener('click', () => this.animateButton(btn));
+            btn.addEventListener('click', () => {
+                this.animateButton(btn);
+                // Снимаем active со всех пресетов
+                row2.querySelectorAll('.moodboard-draw__btn--active').forEach(el => el.classList.remove('moodboard-draw__btn--active'));
+                // Ставим active на выбранный
+                btn.classList.add('moodboard-draw__btn--active');
+                this.currentBrushPresetId = s.id;
+                // Эмитим установку кисти
+                const width = parseInt(btn.dataset.brushWidth, 10) || 2;
+                const hex = (btn.dataset.brushColor || '#111827').replace('#','');
+                const color = parseInt(hex, 16);
+                this.eventBus.emit('draw:brush:set', { width, color });
+            });
             row2.appendChild(btn);
         });
 
@@ -405,6 +419,17 @@ export class Toolbar {
         grid.appendChild(row2);
         this.drawPopupEl.appendChild(grid);
         this.container.appendChild(this.drawPopupEl);
+
+        // Устанавливаем пресет по умолчанию (первая кнопка)
+        const firstPreset = row2.querySelector('.moodboard-draw__btn');
+        if (firstPreset) {
+            firstPreset.classList.add('moodboard-draw__btn--active');
+            const width = parseInt(firstPreset.dataset.brushWidth, 10) || 2;
+            const hex = (firstPreset.dataset.brushColor || '#111827').replace('#','');
+            const color = parseInt(hex, 16);
+            this.eventBus.emit('draw:brush:set', { width, color });
+            this.currentBrushPresetId = sizes[0].id;
+        }
     }
 
     toggleDrawPopup(anchorButton) {

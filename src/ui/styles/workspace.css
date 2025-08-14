@@ -440,6 +440,10 @@
 }
 .moodboard-draw__btn:hover { background: #eaeaea; }
 .moodboard-draw__btn:active { transform: scale(0.97); }
+.moodboard-draw__btn--active {
+    background: #dbeafe;
+    box-shadow: inset 0 0 0 1px #93c5fd;
+}
 .draw-icon svg { display: block; }
 .draw-size {
     width: 22px;
