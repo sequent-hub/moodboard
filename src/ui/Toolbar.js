@@ -60,8 +60,9 @@ export class Toolbar {
         
         this.container.appendChild(this.element);
 
-        // Создаем всплывающие панели (пока только для фигур)
+        // Создаем всплывающие панели (фигуры и рисование)
         this.createShapesPopup();
+        this.createDrawPopup();
     }
     
     /**
@@ -109,10 +110,11 @@ export class Toolbar {
             }
 
             // Заглушки для новых кнопок — пока без действий (только анимация)
-            if (toolType === 'custom-t' || toolType === 'custom-draw' || toolType === 'custom-frame' || toolType === 'custom-comments' || toolType === 'custom-attachments' || toolType === 'custom-emoji' || toolType === 'activate-select' || toolType === 'activate-pan') {
+            if (toolType === 'custom-t' || toolType === 'custom-frame' || toolType === 'custom-comments' || toolType === 'custom-attachments' || toolType === 'custom-emoji' || toolType === 'activate-select' || toolType === 'activate-pan') {
                 this.animateButton(button);
                 // Закрываем панель фигур, если клик не по ней
                 this.closeShapesPopup();
+                this.closeDrawPopup();
                 return;
             }
 
@@ -120,6 +122,15 @@ export class Toolbar {
             if (toolType === 'custom-shapes') {
                 this.animateButton(button);
                 this.toggleShapesPopup(button);
+                this.closeDrawPopup();
+                return;
+            }
+
+            // Тоггл всплывающей панели рисования
+            if (toolType === 'custom-draw') {
+                this.animateButton(button);
+                this.toggleDrawPopup(button);
+                this.closeShapesPopup();
                 return;
             }
             
@@ -138,9 +149,12 @@ export class Toolbar {
         document.addEventListener('click', (e) => {
             const isInsideToolbar = this.element.contains(e.target);
             const isInsideShapesPopup = this.shapesPopupEl && this.shapesPopupEl.contains(e.target);
+            const isInsideDrawPopup = this.drawPopupEl && this.drawPopupEl.contains(e.target);
             const isShapesButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--shapes');
-            if (!isInsideToolbar && !isInsideShapesPopup && !isShapesButton) {
+            const isDrawButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--pencil');
+            if (!isInsideToolbar && !isInsideShapesPopup && !isShapesButton && !isInsideDrawPopup && !isDrawButton) {
                 this.closeShapesPopup();
+                this.closeDrawPopup();
             }
         });
     }
@@ -233,6 +247,94 @@ export class Toolbar {
     closeShapesPopup() {
         if (this.shapesPopupEl) {
             this.shapesPopupEl.style.display = 'none';
+        }
+    }
+
+    /**
+     * Всплывающая панель рисования (UI)
+     */
+    createDrawPopup() {
+        this.drawPopupEl = document.createElement('div');
+        this.drawPopupEl.className = 'moodboard-toolbar__popup moodboard-toolbar__popup--draw';
+        this.drawPopupEl.style.display = 'none';
+
+        const grid = document.createElement('div');
+        grid.className = 'moodboard-draw__grid';
+
+        // Первый ряд: карандаш, маркер, ластик (иконки SVG)
+        const tools = [
+            { id: 'pencil-tool', title: 'Карандаш', svg: '<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 14 L14 2 L18 6 L6 18 L2 18 Z" fill="#1f2937"/><path d="M12 4 L16 8" stroke="#e5e7eb" stroke-width="2"/></svg>' },
+            { id: 'marker-tool', title: 'Маркер', svg: '<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="3" y="3" width="10" height="6" rx="2" fill="#1f2937"/><path d="M13 4 L17 8 L12 13 L8 9 Z" fill="#374151"/></svg>' },
+            { id: 'eraser-tool', title: 'Ластик', svg: '<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="4" y="10" width="10" height="6" rx="2" transform="rotate(-45 4 10)" fill="#9ca3af"/><rect x="9" y="5" width="6" height="4" rx="1" transform="rotate(-45 9 5)" fill="#d1d5db"/></svg>' }
+        ];
+        const row1 = document.createElement('div');
+        row1.className = 'moodboard-draw__row';
+        tools.forEach(t => {
+            const btn = document.createElement('button');
+            btn.className = `moodboard-draw__btn moodboard-draw__btn--${t.id}`;
+            btn.title = t.title;
+            const icon = document.createElement('span');
+            icon.className = 'draw-icon';
+            icon.innerHTML = t.svg;
+            btn.appendChild(icon);
+            btn.addEventListener('click', () => this.animateButton(btn));
+            row1.appendChild(btn);
+        });
+
+        // Второй ряд: толщина/цвет — круг + центральная точка
+        const sizes = [
+            { id: 'size-thin-black', title: 'Тонкий черный', color: '#111827', dot: 4 },
+            { id: 'size-medium-red', title: 'Средний красный', color: '#ef4444', dot: 7 },
+            { id: 'size-thick-green', title: 'Толстый зеленый', color: '#16a34a', dot: 10 }
+        ];
+        const row2 = document.createElement('div');
+        row2.className = 'moodboard-draw__row';
+        sizes.forEach(s => {
+            const btn = document.createElement('button');
+            btn.className = `moodboard-draw__btn moodboard-draw__btn--${s.id}`;
+            btn.title = s.title;
+            const holder = document.createElement('span');
+            holder.className = 'draw-size';
+            const dot = document.createElement('span');
+            dot.className = 'draw-dot';
+            dot.style.background = s.color;
+            dot.style.width = `${s.dot}px`;
+            dot.style.height = `${s.dot}px`;
+            holder.appendChild(dot);
+            btn.appendChild(holder);
+            btn.addEventListener('click', () => this.animateButton(btn));
+            row2.appendChild(btn);
+        });
+
+        grid.appendChild(row1);
+        grid.appendChild(row2);
+        this.drawPopupEl.appendChild(grid);
+        this.container.appendChild(this.drawPopupEl);
+    }
+
+    toggleDrawPopup(anchorButton) {
+        if (!this.drawPopupEl) return;
+        if (this.drawPopupEl.style.display === 'none') {
+            this.openDrawPopup(anchorButton);
+        } else {
+            this.closeDrawPopup();
+        }
+    }
+
+    openDrawPopup(anchorButton) {
+        if (!this.drawPopupEl) return;
+        const toolbarRect = this.container.getBoundingClientRect();
+        const buttonRect = anchorButton.getBoundingClientRect();
+        const top = buttonRect.top - toolbarRect.top - 4;
+        const left = this.element.offsetWidth + 8;
+        this.drawPopupEl.style.top = `${top}px`;
+        this.drawPopupEl.style.left = `${left}px`;
+        this.drawPopupEl.style.display = 'block';
+    }
+
+    closeDrawPopup() {
+        if (this.drawPopupEl) {
+            this.drawPopupEl.style.display = 'none';
         }
     }
     

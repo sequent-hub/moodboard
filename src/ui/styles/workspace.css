@@ -347,11 +347,44 @@
 }
 
 .moodboard-toolbar__popup--shapes { width: auto; }
+.moodboard-toolbar__popup--draw { width: auto; padding: 10px; }
 
 .moodboard-shapes__grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
+}
+
+/* Draw popup layout */
+.moodboard-draw__grid { display: grid; gap: 8px; }
+.moodboard-draw__row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.moodboard-draw__btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 8px;
+    background: #f5f5f5;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .2s ease, transform .1s ease;
+}
+.moodboard-draw__btn:hover { background: #eaeaea; }
+.moodboard-draw__btn:active { transform: scale(0.97); }
+.draw-icon svg { display: block; }
+.draw-size {
+    width: 22px;
+    height: 22px;
+    border: 2px solid #1f2937; /* темный контур круга */
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.draw-dot {
+    display: inline-block;
+    border-radius: 50%;
 }
 
 .moodboard-shapes__btn {
