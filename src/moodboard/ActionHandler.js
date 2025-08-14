@@ -17,6 +17,12 @@ export class ActionHandler {
             case 'shape':
             case 'drawing':
                 return this.handleCreateObject(action.type, action.position, action.properties || {});
+
+            case 'delete-object':
+                if (action.id) {
+                    this.dataManager.deleteObject(action.id);
+                }
+                return null;
                 
             case 'clear':
                 return this.handleClearBoard();

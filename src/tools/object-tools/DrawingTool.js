@@ -24,6 +24,9 @@ export class DrawingTool extends BaseTool {
             mode: 'pencil'
         };
 
+        // Набор уже удалённых объектов в текущем мазке ластика
+        this._eraserDeleted = new Set();
+
         // Подписка на изменения кисти (резерв на будущее)
         if (this.eventBus) {
             this.eventBus.on('draw:brush:set', (data) => {
@@ -33,6 +36,10 @@ export class DrawingTool extends BaseTool {
                 if (typeof data.color === 'number') patch.color = data.color;
                 if (typeof data.mode === 'string') patch.mode = data.mode;
                 this.brush = { ...this.brush, ...patch };
+            });
+            // Удаление объектов ластиком: кликаем по объекту — если попали, удаляем
+            this.eventBus.on('tool:hit:test', (data) => {
+                // Прокси для совместимости, не используем здесь
             });
         }
     }
@@ -60,6 +67,31 @@ export class DrawingTool extends BaseTool {
         if (!this.world) this.world = this._getWorldLayer();
         if (!this.world) return;
 
+        // Если режим ластика — попробуем удалить объект под курсором и показать временный след
+        if (this.brush.mode === 'eraser') {
+            const hitData = { x: event.x, y: event.y, result: null };
+            this.emit('hit:test', hitData);
+            if (hitData.result && hitData.result.object) {
+                // Проверяем, что это именно нарисованный объект (drawing)
+                const pixReq = { objectId: hitData.result.object, pixiObject: null };
+                this.emit('get:object:pixi', pixReq);
+                const pixObj = pixReq.pixiObject;
+                const isDrawing = !!(pixObj && pixObj._mb && pixObj._mb.type === 'drawing');
+                if (isDrawing) {
+                    this.eventBus.emit('toolbar:action', { type: 'delete-object', id: hitData.result.object });
+                }
+            }
+            // Рисуем временный след ластика
+            this.isDrawing = true;
+            this.points = [];
+            this.tempGraphics = new PIXI.Graphics();
+            this.world.addChild(this.tempGraphics);
+            const p = this._toWorld(event.x, event.y);
+            this.points.push(p);
+            this._redrawTemporary();
+            return;
+        }
+
         this.isDrawing = true;
         this.points = [];
         this.tempGraphics = new PIXI.Graphics();
@@ -78,6 +110,10 @@ export class DrawingTool extends BaseTool {
         // Фильтр слишком частых точек
         if (!prev || Math.hypot(p.x - prev.x, p.y - prev.y) >= 1) {
             this.points.push(p);
+            // Ластик: при движении удаляем все фигуры, пересекаемые текущим сегментом
+            if (this.brush.mode === 'eraser' && prev) {
+                this._eraserSweep(prev, p);
+            }
             this._redrawTemporary();
         }
     }
@@ -90,6 +126,16 @@ export class DrawingTool extends BaseTool {
     _finishAndCommit() {
         if (!this.isDrawing) return;
         this.isDrawing = false;
+
+        // Если ластик — чистим временную линию и выходим (удаление уже произошло onMouseDown)
+        if (this.brush.mode === 'eraser') {
+            if (this.tempGraphics && this.tempGraphics.parent) this.tempGraphics.parent.removeChild(this.tempGraphics);
+            this.tempGraphics?.destroy();
+            this.tempGraphics = null;
+            this.points = [];
+            this._eraserDeleted.clear();
+            return;
+        }
 
         // Если слишком мало точек — удаляем временную графику
         if (!this.points || this.points.length < 2) {
@@ -144,7 +190,7 @@ export class DrawingTool extends BaseTool {
         const g = this.tempGraphics;
         g.clear();
         const alpha = this.brush.mode === 'marker' ? 0.6 : 1;
-        const lineWidth = this.brush.mode === 'marker' ? this.brush.width * 2 : this.brush.width;
+        const lineWidth = this.brush.mode === 'marker' ? this.brush.width * 2 : (this.brush.mode === 'eraser' ? 10 : this.brush.width);
         g.lineStyle({ width: lineWidth, color: this.brush.color, alpha, cap: 'round', join: 'round', miterLimit: 2, alignment: 0.5 });
         // Для маркера используем режим LIGHTEN, чтобы наложения не темнели
         g.blendMode = this.brush.mode === 'marker' ? PIXI.BLEND_MODES.LIGHTEN : PIXI.BLEND_MODES.NORMAL;
@@ -183,6 +229,82 @@ export class DrawingTool extends BaseTool {
         if (!this.app || !this.app.stage) return null;
         const world = this.app.stage.getChildByName && this.app.stage.getChildByName('worldLayer');
         return world || this.app.stage; // фолбэк на stage
+    }
+
+    // Удаляет все объекты, пересекаемые сегментом ластика prev→p
+    _eraserSweep(prev, p) {
+        const req = { objects: [] };
+        this.emit('get:all:objects', req);
+        const objects = req.objects || [];
+        // Радиус воздействия ластика (связан с отображаемой толщиной)
+        const radius = 8;
+        const segMinX = Math.min(prev.x, p.x) - radius;
+        const segMaxX = Math.max(prev.x, p.x) + radius;
+        const segMinY = Math.min(prev.y, p.y) - radius;
+        const segMaxY = Math.max(prev.y, p.y) + radius;
+
+        for (const item of objects) {
+            const id = item.id;
+            if (this._eraserDeleted.has(id)) continue;
+            const pixi = item.pixi;
+            if (!pixi) continue;
+
+            // Быстрая проверка по bbox объекта
+            const b = item.bounds;
+            if (!b) continue;
+            if (b.x > segMaxX || b.x + b.width < segMinX || b.y > segMaxY || b.y + b.height < segMinY) {
+                continue;
+            }
+
+            const meta = pixi._mb || {};
+            const type = meta.type;
+            let intersects = false;
+
+            if (type === 'drawing') {
+                const props = meta.properties || {};
+                const pts = Array.isArray(props.points) ? props.points : [];
+                if (pts.length >= 2) {
+                    // Оценка масштабов
+                    const baseW = props.baseWidth || 1;
+                    const baseH = props.baseHeight || 1;
+                    const scaleX = baseW ? (b.width / baseW) : 1;
+                    const scaleY = baseH ? (b.height / baseH) : 1;
+                    const eraserThresh = Math.max(6, (props.strokeWidth || 2) / 2 + radius);
+                    // трансформируем сегмент ластика в локальные координаты фигуры
+                    const localPrev = pixi.toLocal(new PIXI.Point(prev.x, prev.y));
+                    const localCurr = pixi.toLocal(new PIXI.Point(p.x, p.y));
+                    // Проверяем пересечение с каждым отрезком рисунка
+                    for (let i = 0; i < pts.length - 1 && !intersects; i++) {
+                        const ax = pts[i].x * scaleX;
+                        const ay = pts[i].y * scaleY;
+                        const bx = pts[i + 1].x * scaleX;
+                        const by = pts[i + 1].y * scaleY;
+                        const d = this._distancePointToSegment(localPrev.x, localPrev.y, ax, ay, bx, by);
+                        const d2 = this._distancePointToSegment(localCurr.x, localCurr.y, ax, ay, bx, by);
+                        if (Math.min(d, d2) <= eraserThresh) intersects = true;
+                    }
+                }
+            }
+
+            if (intersects) {
+                this._eraserDeleted.add(id);
+                this.eventBus.emit('toolbar:action', { type: 'delete-object', id });
+            }
+        }
+    }
+
+    _distancePointToSegment(px, py, ax, ay, bx, by) {
+        const abx = bx - ax;
+        const aby = by - ay;
+        const apx = px - ax;
+        const apy = py - ay;
+        const ab2 = abx * abx + aby * aby;
+        if (ab2 === 0) return Math.hypot(px - ax, py - ay);
+        let t = (apx * abx + apy * aby) / ab2;
+        t = Math.max(0, Math.min(1, t));
+        const cx = ax + t * abx;
+        const cy = ay + t * aby;
+        return Math.hypot(px - cx, py - cy);
     }
 }
 
