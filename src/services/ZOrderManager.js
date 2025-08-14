@@ -1,3 +1,5 @@
+import { Events } from '../core/events/Events.js';
+
 export class ZOrderManager {
 	constructor(eventBus, pixi, state) {
 		this.eventBus = eventBus;
@@ -38,10 +40,10 @@ export class ZOrderManager {
 			this.state.markDirty();
 		};
 
-		this.eventBus.on('object:created', () => ensureFramesBottom());
-		this.eventBus.on('object:deleted', () => ensureFramesBottom());
-		this.eventBus.on('object:reordered', () => ensureFramesBottom());
-		this.eventBus.on('group:reordered', () => ensureFramesBottom());
+		this.eventBus.on(Events.Object.Created, () => ensureFramesBottom());
+		this.eventBus.on(Events.Object.Deleted, () => ensureFramesBottom());
+		this.eventBus.on(Events.Object.Reordered, () => ensureFramesBottom());
+		this.eventBus.on(Events.UI.LayerGroupSendToBack, () => ensureFramesBottom());
 	}
 }
 

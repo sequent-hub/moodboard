@@ -1,3 +1,5 @@
+import { Events } from '../core/events/Events.js';
+
 export class FrameService {
 	constructor(eventBus, pixi, state) {
 		this.eventBus = eventBus;
@@ -7,7 +9,7 @@ export class FrameService {
 
 	attach() {
 		// Визуал подсветки при drag над фреймом и перенос детей на drag
-		this.eventBus.on('tool:drag:start', (data) => {
+		this.eventBus.on(Events.Tool.DragStart, (data) => {
 			const moved = this.state.state.objects.find(o => o.id === data.object);
 			if (moved && moved.type === 'frame') {
 				// Серый фон
@@ -23,7 +25,7 @@ export class FrameService {
 			}
 		});
 
-		this.eventBus.on('tool:drag:update', (data) => {
+		this.eventBus.on(Events.Tool.DragUpdate, (data) => {
 			const moved = this.state.state.objects.find(o => o.id === data.object);
 			if (!moved) return;
 			if (moved.type === 'frame') {
@@ -72,7 +74,7 @@ export class FrameService {
 			}
 		});
 
-		this.eventBus.on('tool:drag:end', (data) => {
+		this.eventBus.on(Events.Tool.DragEnd, (data) => {
 			const movedObj = this.state.state.objects.find(o => o.id === data.object);
 			if (!movedObj) return;
 			// Сброс заливки

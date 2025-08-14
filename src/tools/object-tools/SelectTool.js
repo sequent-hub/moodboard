@@ -2,6 +2,7 @@ import { calculateNewSize, calculatePositionOffset } from './selection/GeometryU
 import { BaseTool } from '../BaseTool.js';
 import { ResizeHandles } from '../ResizeHandles.js';
 import * as PIXI from 'pixi.js';
+import { Events } from '../../core/events/Events.js';
 import { SelectionModel } from './selection/SelectionModel.js';
 import { HandlesSync } from './selection/HandlesSync.js';
 import { SimpleDragController } from './selection/SimpleDragController.js';
@@ -83,14 +84,14 @@ export class SelectTool extends BaseTool {
 		// Подписка на событие готовности дубликата (от Core)
 		// Когда PasteObjectCommand завершится, ядро сообщит newId
 		if (this.eventBus) {
-			this.eventBus.on('tool:duplicate:ready', (data) => {
+            this.eventBus.on(Events.Tool.DuplicateReady, (data) => {
 				// data: { originalId, newId }
 				if (!this.isAltCloneMode || !this.clonePending) return;
 				if (!data || data.originalId !== this.cloneSourceId) return;
 				this.onDuplicateReady(data.newId);
 			});
 			// Групповой клон готов
-			this.eventBus.on('tool:group:duplicate:ready', (data) => {
+            this.eventBus.on(Events.Tool.GroupDuplicateReady, (data) => {
 				// data: { map: { [originalId]: newId } }
 				if (!this.isAltGroupCloneMode || !this.groupClonePending) return;
 				if (!data || !data.map) return;
@@ -124,7 +125,7 @@ export class SelectTool extends BaseTool {
                 emit: (event, payload) => this.emit(event, payload),
                 getRotation: (objectId) => {
                     const d = { objectId, rotation: 0 };
-                    this.emit('get:object:rotation', d);
+                    this.emit(Events.Tool.GetObjectRotation, d);
                     return d.rotation || 0;
                 }
             });
@@ -227,7 +228,7 @@ export class SelectTool extends BaseTool {
             if (this.selection.size() === 1) {
                 const selId = this.selection.toArray()[0];
                 const boundsReq = { objects: [] };
-                this.emit('get:all:objects', boundsReq);
+                this.emit(Events.Tool.GetAllObjects, boundsReq);
                 const map = new Map(boundsReq.objects.map(o => [o.id, o.bounds]));
                 const b = map.get(selId);
                 if (b && this.isPointInBounds({ x: event.x, y: event.y }, b)) {
@@ -365,7 +366,7 @@ export class SelectTool extends BaseTool {
         
         // Получаем объекты из системы через событие
         const hitTestData = { x, y, result: null };
-        this.emit('hit:test', hitTestData);
+        this.emit(Events.Tool.HitTest, hitTestData);
         
         if (hitTestData.result && hitTestData.result.object) {
             return hitTestData.result;
@@ -741,10 +742,10 @@ export class SelectTool extends BaseTool {
         this.selection.addMany(objectIds);
         // Эмитим события для совместимости
         if (prev.length > 0) {
-            this.emit('selection:clear', { objects: prev });
+            this.emit(Events.Tool.SelectionClear, { objects: prev });
         }
         for (const id of objectIds) {
-            this.emit('selection:add', { object: id });
+            this.emit(Events.Tool.SelectionAdd, { object: id });
         }
         this.updateResizeHandles();
     }
@@ -761,7 +762,7 @@ export class SelectTool extends BaseTool {
         }
         // Получаем bounds всех объектов и отрисовываем контур на groupBoundsGraphics (одна рамка с ручками)
         const request = { objects: [] };
-        this.emit('get:all:objects', request);
+        this.emit(Events.Tool.GetAllObjects, request);
         const idToBounds = new Map(request.objects.map(o => [o.id, o.bounds]));
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for (const id of selectedIds) {
@@ -794,7 +795,7 @@ export class SelectTool extends BaseTool {
      */
     computeGroupBounds() {
         const request = { objects: [] };
-        this.emit('get:all:objects', request);
+        this.emit(Events.Tool.GetAllObjects, request);
         const pixiMap = new Map(request.objects.map(o => [o.id, o.pixi]));
         const b = this.selection.computeBounds((id) => pixiMap.get(id));
         if (!b) return { x: 0, y: 0, width: 0, height: 0 };
@@ -967,7 +968,7 @@ export class SelectTool extends BaseTool {
         addToSelection(object) {
         console.log(`➕ Добавляем в выделение: ${object}`);
         this.selection.add(object);
-        this.emit('selection:add', { object });
+        this.emit(Events.Tool.SelectionAdd, { object });
         this.updateResizeHandles();
     }
 
@@ -980,7 +981,7 @@ export class SelectTool extends BaseTool {
     clearSelection() {
         const objects = this.selection.toArray();
         this.selection.clear();
-        this.emit('selection:clear', { objects });
+        this.emit(Events.Tool.SelectionClear, { objects });
         this.updateResizeHandles();
     }
     

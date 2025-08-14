@@ -1,3 +1,5 @@
+import { Events } from '../core/events/Events.js';
+
 export class ZoomPanController {
 	constructor(eventBus, pixi) {
 		this.eventBus = eventBus;
@@ -6,7 +8,7 @@ export class ZoomPanController {
 
 	attach() {
 		// Масштабирование колесом — глобально отрабатываем Ctrl+Wheel
-		this.eventBus.on('tool:wheel:zoom', ({ x, y, delta }) => {
+		this.eventBus.on(Events.Tool.WheelZoom, ({ x, y, delta }) => {
 			const factor = 1 + (-delta) * 0.0015;
 			const world = this.pixi.worldLayer || this.pixi.app.stage;
 			const oldScale = world.scale.x || 1;
@@ -22,15 +24,15 @@ export class ZoomPanController {
 		});
 
 		// Кнопки зума из UI
-		this.eventBus.on('ui:zoom:in', () => {
+		this.eventBus.on(Events.UI.ZoomIn, () => {
 			const center = { x: this.pixi.app.view.clientWidth / 2, y: this.pixi.app.view.clientHeight / 2 };
 			this.eventBus.emit('tool:wheel:zoom', { x: center.x, y: center.y, delta: -120 });
 		});
-		this.eventBus.on('ui:zoom:out', () => {
+		this.eventBus.on(Events.UI.ZoomOut, () => {
 			const center = { x: this.pixi.app.view.clientWidth / 2, y: this.pixi.app.view.clientHeight / 2 };
 			this.eventBus.emit('tool:wheel:zoom', { x: center.x, y: center.y, delta: 120 });
 		});
-		this.eventBus.on('ui:zoom:reset', () => {
+		this.eventBus.on(Events.UI.ZoomReset, () => {
 			const world = this.pixi.worldLayer || this.pixi.app.stage;
 			const center = { x: this.pixi.app.view.clientWidth / 2, y: this.pixi.app.view.clientHeight / 2 };
 			const globalPoint = center;
@@ -41,7 +43,7 @@ export class ZoomPanController {
 			world.y += (globalPoint.y - newGlobal.y);
 			this.eventBus.emit('ui:zoom:percent', { percentage: 100 });
 		});
-		this.eventBus.on('ui:zoom:fit', () => {
+		this.eventBus.on(Events.UI.ZoomFit, () => {
 			const objs = (this.pixi?.objects ? Array.from(this.pixi.objects.values()) : []);
 			if (objs.length === 0) return;
 			let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -66,7 +68,7 @@ export class ZoomPanController {
 			world.scale.set(newScale);
 			world.x = viewW / 2 - worldCenterX * newScale;
 			world.y = viewH / 2 - worldCenterY * newScale;
-			this.eventBus.emit('ui:zoom:percent', { percentage: Math.round(newScale * 100) });
+			this.eventBus.emit(Events.UI.ZoomPercent, { percentage: Math.round(newScale * 100) });
 		});
 	}
 }

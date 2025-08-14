@@ -1,4 +1,5 @@
 import { GridFactory } from '../grid/GridFactory.js';
+import { Events } from '../core/events/Events.js';
 
 export class BoardService {
 	constructor(eventBus, pixi) {
@@ -22,14 +23,14 @@ export class BoardService {
 		});
 		this.grid.updateVisual();
 		this.pixi.setGrid(this.grid);
-		this.eventBus.emit('ui:grid:current', { type: 'line' });
+		this.eventBus.emit(Events.UI.GridCurrent, { type: 'line' });
 
 		this._attachEvents();
 	}
 
 	_attachEvents() {
 		// Смена вида сетки из UI
-		this.eventBus.on('ui:grid:change', ({ type }) => {
+		this.eventBus.on(Events.UI.GridChange, ({ type }) => {
 			const size = this._getCanvasSize?.() || { width: 800, height: 600 };
 			if (type === 'off') {
 				this.grid?.setEnabled(false);
@@ -47,14 +48,14 @@ export class BoardService {
 				this.grid = GridFactory.createGrid(type, options);
 				this.grid.updateVisual();
 				this.pixi.setGrid(this.grid);
-				this.eventBus.emit('ui:grid:current', { type });
+				this.eventBus.emit(Events.UI.GridCurrent, { type });
 			} catch (e) {
 				console.warn('Unknown grid type:', type);
 			}
 		});
 
 		// Миникарта: данные и управление
-		this.eventBus.on('ui:minimap:get-data', (req) => {
+		this.eventBus.on(Events.UI.MinimapGetData, (req) => {
 			const world = this.pixi.worldLayer || this.pixi.app.stage;
 			const viewEl = this.pixi.app.view;
 			const objects = (this.pixi?.objects ? Array.from(this.pixi.objects.keys()) : []).map((id) => id);
@@ -62,7 +63,7 @@ export class BoardService {
 			req.view = { width: viewEl.clientWidth, height: viewEl.clientHeight };
 			// Прокидываем только метаданные объектов через ядро (сам список формирует Core)
 		});
-		this.eventBus.on('ui:minimap:center-on', ({ worldX, worldY }) => {
+		this.eventBus.on(Events.UI.MinimapCenterOn, ({ worldX, worldY }) => {
 			const world = this.pixi.worldLayer || this.pixi.app.stage;
 			const viewW = this.pixi.app.view.clientWidth;
 			const viewH = this.pixi.app.view.clientHeight;

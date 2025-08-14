@@ -12,6 +12,7 @@ import { BoardService } from '../services/BoardService.js';
 import { ZoomPanController } from '../services/ZoomPanController.js';
 import { ZOrderManager } from '../services/ZOrderManager.js';
 import { FrameService } from '../services/FrameService.js';
+import { Events } from './events/Events.js';
 import { generateObjectId } from '../utils/objectIdGenerator.js';
 
 export class CoreMoodBoard {
@@ -136,16 +137,16 @@ export class CoreMoodBoard {
      */
     setupToolEvents() {
         // События выделения
-        this.eventBus.on('tool:selection:add', (data) => {
+        this.eventBus.on(Events.Tool.SelectionAdd, (data) => {
 
         });
 
-        this.eventBus.on('tool:selection:clear', (data) => {
+        this.eventBus.on(Events.Tool.SelectionClear, (data) => {
 
         });
 
         // Показ контекстного меню (пока пустое) — передаем вверх координаты и контекст
-        this.eventBus.on('tool:context:menu:show', (data) => {
+        this.eventBus.on(Events.Tool.ContextMenuShow, (data) => {
             // Прокидываем событие для UI
             this.eventBus.emit('ui:contextmenu:show', {
                 x: data.x,
@@ -157,12 +158,12 @@ export class CoreMoodBoard {
         });
 
         // Действия из UI контекстного меню
-        this.eventBus.on('ui:copy-object', ({ objectId }) => {
+        this.eventBus.on(Events.UI.CopyObject, ({ objectId }) => {
             if (!objectId) return;
             this.copyObject(objectId);
         });
 
-        this.eventBus.on('ui:copy-group', () => {
+        this.eventBus.on(Events.UI.CopyGroup, () => {
             if (this.toolManager.getActiveTool()?.name !== 'select') return;
             const selected = Array.from(this.toolManager.getActiveTool().selectedObjects || []);
             if (selected.length <= 1) return;
@@ -179,7 +180,7 @@ export class CoreMoodBoard {
             };
         });
 
-        this.eventBus.on('ui:paste-at', ({ x, y }) => {
+        this.eventBus.on(Events.UI.PasteAt, ({ x, y }) => {
             if (!this.clipboard) return;
             if (this.clipboard.type === 'object') {
                 this.pasteObject({ x, y });
@@ -269,7 +270,7 @@ export class CoreMoodBoard {
         const bringForward = (id) => reorderInState(id, 'forward');
         const sendBackward = (id) => reorderInState(id, 'backward');
 
-        this.eventBus.on('ui:layer:bring-to-front', ({ objectId }) => {
+        this.eventBus.on(Events.UI.LayerBringToFront, ({ objectId }) => {
             const arr = this.state.state.objects || [];
             const from = arr.findIndex(o => o.id === objectId);
             if (from === -1) return;
@@ -279,7 +280,7 @@ export class CoreMoodBoard {
             cmd.setEventBus(this.eventBus);
             this.history.executeCommand(cmd);
         });
-        this.eventBus.on('ui:layer:bring-forward', ({ objectId }) => {
+        this.eventBus.on(Events.UI.LayerBringForward, ({ objectId }) => {
             const arr = this.state.state.objects || [];
             const from = arr.findIndex(o => o.id === objectId);
             if (from === -1) return;
@@ -289,7 +290,7 @@ export class CoreMoodBoard {
             cmd.setEventBus(this.eventBus);
             this.history.executeCommand(cmd);
         });
-        this.eventBus.on('ui:layer:send-backward', ({ objectId }) => {
+        this.eventBus.on(Events.UI.LayerSendBackward, ({ objectId }) => {
             const arr = this.state.state.objects || [];
             const from = arr.findIndex(o => o.id === objectId);
             if (from === -1) return;
@@ -299,7 +300,7 @@ export class CoreMoodBoard {
             cmd.setEventBus(this.eventBus);
             this.history.executeCommand(cmd);
         });
-        this.eventBus.on('ui:layer:send-to-back', ({ objectId }) => {
+        this.eventBus.on(Events.UI.LayerSendToBack, ({ objectId }) => {
             const arr = this.state.state.objects || [];
             const from = arr.findIndex(o => o.id === objectId);
             if (from === -1) return;
@@ -441,7 +442,7 @@ export class CoreMoodBoard {
         });
 
         // === ГРУППОВОЕ ПЕРЕТАСКИВАНИЕ ===
-        this.eventBus.on('tool:group:drag:start', (data) => {
+        this.eventBus.on(Events.Tool.GroupDragStart, (data) => {
             // Сохраняем стартовые позиции для текущей группы
             this._groupDragStart = new Map();
             for (const id of data.objects) {
@@ -450,7 +451,7 @@ export class CoreMoodBoard {
             }
         });
 
-        this.eventBus.on('tool:group:drag:update', (data) => {
+        this.eventBus.on(Events.Tool.GroupDragUpdate, (data) => {
             const { dx, dy } = data.delta;
             for (const id of data.objects) {
                 const pixiObject = this.pixi.objects.get(id);
@@ -467,7 +468,7 @@ export class CoreMoodBoard {
             this.state.markDirty();
         });
 
-        this.eventBus.on('tool:group:drag:end', (data) => {
+        this.eventBus.on(Events.Tool.GroupDragEnd, (data) => {
             // Собираем один батч для истории
             const moves = [];
             for (const id of data.objects) {
@@ -487,13 +488,13 @@ export class CoreMoodBoard {
             this._groupDragStart = null;
         });
 
-        this.eventBus.on('tool:drag:update', (data) => {
+        this.eventBus.on(Events.Tool.DragUpdate, (data) => {
             // Во время перетаскивания обновляем позицию напрямую (без команды)
             this.updateObjectPositionDirect(data.object, data.position);
             // Hover-подсветка фреймов вынесена в FrameService
         });
 
-        this.eventBus.on('tool:drag:end', (data) => {
+        this.eventBus.on(Events.Tool.DragEnd, (data) => {
 
             // В конце создаем одну команду перемещения
             if (this.dragStartPosition) {
@@ -546,7 +547,7 @@ export class CoreMoodBoard {
 
         // === ДУБЛИРОВАНИЕ ЧЕРЕЗ ALT-ПЕРЕТАСКИВАНИЕ ===
         // Запрос на создание дубликата от SelectTool
-        this.eventBus.on('tool:duplicate:request', (data) => {
+        this.eventBus.on(Events.Tool.DuplicateRequest, (data) => {
             const { originalId, position } = data || {};
             if (!originalId) return;
             // Находим исходный объект в состоянии
@@ -565,7 +566,7 @@ export class CoreMoodBoard {
         });
 
         // Запрос на групповое дублирование
-        this.eventBus.on('tool:group:duplicate:request', (data) => {
+        this.eventBus.on(Events.Tool.GroupDuplicateRequest, (data) => {
             const originals = (data.objects || []).filter((id) => this.state.state.objects.some(o => o.id === id));
             const total = originals.length;
             if (total === 0) {
@@ -603,12 +604,12 @@ export class CoreMoodBoard {
         });
 
         // Когда объект вставлен (из PasteObjectCommand) — сообщаем SelectTool
-        this.eventBus.on('object:pasted', ({ originalId, newId }) => {
+        this.eventBus.on(Events.Object.Pasted, ({ originalId, newId }) => {
             this.eventBus.emit('tool:duplicate:ready', { originalId, newId });
         });
 
         // События изменения размера
-        this.eventBus.on('tool:resize:start', (data) => {
+        this.eventBus.on(Events.Tool.ResizeStart, (data) => {
             // Сохраняем начальный размер для команды
             const objects = this.state.getObjects();
             const object = objects.find(obj => obj.id === data.object);
@@ -618,7 +619,7 @@ export class CoreMoodBoard {
         });
 
         // === ГРУППОВОЙ RESIZE ===
-        this.eventBus.on('tool:group:resize:start', (data) => {
+        this.eventBus.on(Events.Tool.GroupResizeStart, (data) => {
             this._groupResizeStart = data.startBounds || null;
             // Сохраним начальные размеры и позиции, чтобы сформировать команду на end
             this._groupResizeSnapshot = new Map();
@@ -635,7 +636,7 @@ export class CoreMoodBoard {
             }
         });
 
-        this.eventBus.on('tool:group:resize:update', (data) => {
+        this.eventBus.on(Events.Tool.GroupResizeUpdate, (data) => {
             const { startBounds, newBounds, scale } = data;
             const sx = scale?.x ?? (newBounds.width / startBounds.width);
             const sy = scale?.y ?? (newBounds.height / startBounds.height);
@@ -663,7 +664,7 @@ export class CoreMoodBoard {
             }
         });
 
-        this.eventBus.on('tool:group:resize:end', (data) => {
+        this.eventBus.on(Events.Tool.GroupResizeEnd, (data) => {
             // Сформируем батч-команду GroupResizeCommand
             const changes = [];
             for (const id of data.objects) {
@@ -689,7 +690,7 @@ export class CoreMoodBoard {
             }
         });
 
-        this.eventBus.on('tool:resize:update', (data) => {
+        this.eventBus.on(Events.Tool.ResizeUpdate, (data) => {
             // Во время resize обновляем размер напрямую (без команды)
             // Получаем тип объекта для правильного пересоздания
             const objects = this.state.getObjects();
@@ -699,7 +700,7 @@ export class CoreMoodBoard {
             this.updateObjectSizeAndPositionDirect(data.object, data.size, data.position, objectType);
         });
 
-        this.eventBus.on('tool:resize:end', (data) => {
+        this.eventBus.on(Events.Tool.ResizeEnd, (data) => {
             // В конце создаем одну команду изменения размера
             if (this.resizeStartSize && data.oldSize && data.newSize) {
                 // Создаем команду только если размер действительно изменился
@@ -731,12 +732,12 @@ export class CoreMoodBoard {
 
         // === ОБРАБОТЧИКИ СОБЫТИЙ ВРАЩЕНИЯ ===
         
-        this.eventBus.on('tool:rotate:update', (data) => {
+        this.eventBus.on(Events.Tool.RotateUpdate, (data) => {
             // Во время вращения обновляем угол напрямую
             this.pixi.updateObjectRotation(data.object, data.angle);
         });
 
-        this.eventBus.on('tool:rotate:end', (data) => {
+        this.eventBus.on(Events.Tool.RotateEnd, (data) => {
             // В конце создаем команду вращения для Undo/Redo
             if (data.oldAngle !== undefined && data.newAngle !== undefined) {
                 // Создаем команду только если угол действительно изменился
@@ -757,7 +758,7 @@ export class CoreMoodBoard {
         });
 
         // === ГРУППОВОЙ ПОВОРОТ ===
-        this.eventBus.on('tool:group:rotate:start', (data) => {
+        this.eventBus.on(Events.Tool.GroupRotateStart, (data) => {
             // Сохраняем начальные углы и позиции
             this._groupRotateStart = new Map();
             for (const id of data.objects) {
@@ -770,7 +771,7 @@ export class CoreMoodBoard {
             this._groupRotateCenter = data.center;
         });
 
-        this.eventBus.on('tool:group:rotate:update', (data) => {
+        this.eventBus.on(Events.Tool.GroupRotateUpdate, (data) => {
             // Поворачиваем каждый объект вокруг общего центра с сохранением относительного смещения
             const center = this._groupRotateCenter || { x: 0, y: 0 };
             const rad = (data.angle || 0) * Math.PI / 180;
@@ -796,7 +797,7 @@ export class CoreMoodBoard {
             this.eventBus.emit('object:transform:updated', { objectId: '__group__', type: 'rotation' });
         });
 
-        this.eventBus.on('tool:group:rotate:end', (data) => {
+        this.eventBus.on(Events.Tool.GroupRotateEnd, (data) => {
             // Оформляем как батч-команду GroupRotateCommand
             const center = this._groupRotateCenter || { x: 0, y: 0 };
             const changes = [];
@@ -821,7 +822,7 @@ export class CoreMoodBoard {
 
         // === ОБРАБОТЧИКИ КОМАНД ВРАЩЕНИЯ ===
         
-        this.eventBus.on('object:rotate', (data) => {
+        this.eventBus.on(Events.Object.Rotate, (data) => {
             // Обновляем угол в PIXI
             this.pixi.updateObjectRotation(data.objectId, data.angle);
             
@@ -837,7 +838,7 @@ export class CoreMoodBoard {
         });
 
         // Обновляем ручки когда объект изменяется через команды (Undo/Redo)
-        this.eventBus.on('object:transform:updated', (data) => {
+        this.eventBus.on(Events.Object.TransformUpdated, (data) => {
             console.log(`🔄 Объект ${data.objectId} был изменен через команду, обновляем ручки`);
             // Обновляем ручки если объект выделен
             if (this.selectTool && this.selectTool.selectedObjects.has(data.objectId)) {
@@ -846,13 +847,13 @@ export class CoreMoodBoard {
         });
 
         // Hit testing
-        this.eventBus.on('tool:hit:test', (data) => {
+        this.eventBus.on(Events.Tool.HitTest, (data) => {
             const result = this.pixi.hitTest(data.x, data.y);
             data.result = result;
         });
 
         // Получение позиции объекта
-        this.eventBus.on('tool:get:object:position', (data) => {
+        this.eventBus.on(Events.Tool.GetObjectPosition, (data) => {
             const pixiObject = this.pixi.objects.get(data.objectId);
             if (pixiObject) {
                 data.position = { x: pixiObject.x, y: pixiObject.y };
@@ -874,7 +875,7 @@ export class CoreMoodBoard {
         });
 
         // Получение списка всех объектов (с их PIXI и логическими границами)
-        this.eventBus.on('tool:get:all:objects', (data) => {
+        this.eventBus.on(Events.Tool.GetAllObjects, (data) => {
             const result = [];
             for (const [objectId, pixiObject] of this.pixi.objects.entries()) {
                 const bounds = pixiObject.getBounds();
@@ -888,7 +889,7 @@ export class CoreMoodBoard {
         });
 
         // Получение размера объекта
-        this.eventBus.on('tool:get:object:size', (data) => {
+        this.eventBus.on(Events.Tool.GetObjectSize, (data) => {
             const objects = this.state.getObjects();
             const object = objects.find(obj => obj.id === data.objectId);
             if (object) {
@@ -897,7 +898,7 @@ export class CoreMoodBoard {
         });
 
         // Получение угла поворота объекта
-        this.eventBus.on('tool:get:object:rotation', (data) => {
+        this.eventBus.on(Events.Tool.GetObjectRotation, (data) => {
             const pixiObject = this.pixi.objects.get(data.objectId);
             if (pixiObject) {
                 // Конвертируем радианы в градусы
@@ -913,14 +914,14 @@ export class CoreMoodBoard {
      */
     setupKeyboardEvents() {
         // Выделение всех объектов
-        this.eventBus.on('keyboard:select-all', () => {
+        this.eventBus.on(Events.Keyboard.SelectAll, () => {
             if (this.toolManager.getActiveTool()?.name === 'select') {
                 this.toolManager.getActiveTool().selectAll();
             }
         });
 
         // Удаление выделенных объектов (делаем копию списка, чтобы избежать мутаций во время удаления)
-        this.eventBus.on('keyboard:delete', () => {
+        this.eventBus.on(Events.Keyboard.Delete, () => {
             if (this.toolManager.getActiveTool()?.name === 'select') {
                 const ids = Array.from(this.toolManager.getActiveTool().selectedObjects);
                 ids.forEach((objectId) => this.deleteObject(objectId));
@@ -929,21 +930,21 @@ export class CoreMoodBoard {
         });
 
         // Отмена выделения
-        this.eventBus.on('keyboard:escape', () => {
+        this.eventBus.on(Events.Keyboard.Escape, () => {
             if (this.toolManager.getActiveTool()?.name === 'select') {
                 this.toolManager.getActiveTool().clearSelection();
             }
         });
 
         // Переключение инструментов
-        this.eventBus.on('keyboard:tool-select', (data) => {
+        this.eventBus.on(Events.Keyboard.ToolSelect, (data) => {
             if (this.toolManager.hasActiveTool(data.tool)) {
                 this.toolManager.activateTool(data.tool);
             }
         });
 
         // Перемещение объектов стрелками
-        this.eventBus.on('keyboard:move', (data) => {
+        this.eventBus.on(Events.Keyboard.Move, (data) => {
             if (this.toolManager.getActiveTool()?.name === 'select') {
                 const selectedObjects = this.toolManager.getActiveTool().selectedObjects;
                 const { direction, step } = data;
@@ -971,7 +972,7 @@ export class CoreMoodBoard {
         });
 
         // Копирование выделенных объектов (поддержка группы)
-        this.eventBus.on('keyboard:copy', () => {
+        this.eventBus.on(Events.Keyboard.Copy, () => {
             if (this.toolManager.getActiveTool()?.name !== 'select') return;
             const selected = Array.from(this.toolManager.getActiveTool().selectedObjects || []);
             if (selected.length === 0) return;
@@ -995,7 +996,7 @@ export class CoreMoodBoard {
         });
 
         // Вставка объектов из буфера обмена (поддержка группы)
-        this.eventBus.on('keyboard:paste', () => {
+        this.eventBus.on(Events.Keyboard.Paste, () => {
             if (!this.clipboard) return;
             if (this.clipboard.type === 'object') {
                 // Одиночная вставка
@@ -1059,24 +1060,24 @@ export class CoreMoodBoard {
      */
     setupSaveEvents() {
         // Предоставляем данные для сохранения
-        this.eventBus.on('save:get-board-data', (requestData) => {
+        this.eventBus.on(Events.Save.GetBoardData, (requestData) => {
             requestData.data = this.getBoardData();
         });
 
         // Обработка статуса сохранения
-        this.eventBus.on('save:status-changed', (data) => {
+        this.eventBus.on(Events.Save.StatusChanged, (data) => {
             // Можно добавить UI индикатор статуса сохранения
 
         });
 
         // Обработка ошибок сохранения
-        this.eventBus.on('save:error', (data) => {
+        this.eventBus.on(Events.Save.Error, (data) => {
             console.error('Save error:', data.error);
             // Можно показать уведомление пользователю
         });
 
         // Обработка успешного сохранения
-        this.eventBus.on('save:success', (data) => {
+        this.eventBus.on(Events.Save.Success, (data) => {
 
         });
     }
@@ -1086,7 +1087,7 @@ export class CoreMoodBoard {
      */
     setupHistoryEvents() {
         // Следим за изменениями истории для обновления UI
-        this.eventBus.on('history:changed', (data) => {
+        this.eventBus.on(Events.History.Changed, (data) => {
 
             
             // Можно здесь обновить состояние кнопок Undo/Redo в UI

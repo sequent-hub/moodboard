@@ -164,23 +164,31 @@ export class BaseTool {
      * Эмитит событие инструмента
      */
     emit(eventName, data) {
-        // Для событий, которые ожидают изменения data по ссылке, передаем data напрямую
-        if (eventName === 'hit:test' || eventName === 'get:object:position' || eventName === 'get:object:pixi' || eventName === 'get:object:size' || eventName === 'get:object:rotation' || eventName === 'get:all:objects') {
-            this.eventBus.emit(`tool:${eventName}`, data);
-        } else {
-            // Для остальных событий создаем новый объект с полем tool
-            const eventData = {
-                tool: this.name,
-                ...data
-            };
-            
-            // Отладка для событий вращения
-            if (eventName.includes('rotate')) {
-                console.log(`📡 BaseTool отправляет событие tool:${eventName}:`, eventData);
-            }
-            
-            this.eventBus.emit(`tool:${eventName}`, eventData);
+        // Поддержка как коротких имён ('hit:test'), так и полных ('tool:hit:test')
+        const isQualified = eventName.startsWith('tool:');
+        const name = isQualified ? eventName.slice(5) : eventName;
+
+        // События, ожидающие мутацию объекта (передаем data напрямую)
+        const passThrough = new Set([
+            'hit:test',
+            'get:object:position',
+            'get:object:pixi',
+            'get:object:size',
+            'get:object:rotation',
+            'get:all:objects'
+        ]);
+
+        if (passThrough.has(name)) {
+            this.eventBus.emit(`tool:${name}`, data);
+            return;
         }
+
+        // Для остальных событий добавляем контекст инструмента
+        const eventData = { tool: this.name, ...data };
+        if (name.includes('rotate')) {
+            console.log(`📡 BaseTool отправляет событие tool:${name}:`, eventData);
+        }
+        this.eventBus.emit(`tool:${name}`, eventData);
     }
     
     /**
