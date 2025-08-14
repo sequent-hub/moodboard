@@ -1,0 +1,136 @@
+export class FrameService {
+	constructor(eventBus, pixi, state) {
+		this.eventBus = eventBus;
+		this.pixi = pixi;
+		this.state = state;
+	}
+
+	attach() {
+		// Визуал подсветки при drag над фреймом и перенос детей на drag
+		this.eventBus.on('tool:drag:start', (data) => {
+			const moved = this.state.state.objects.find(o => o.id === data.object);
+			if (moved && moved.type === 'frame') {
+				// Серый фон
+				this.pixi.setFrameFill(moved.id, moved.width, moved.height, 0xEEEEEE);
+				// Cнимок стартовых позиций
+				this._frameDragFrameStart = { x: this.pixi.objects.get(moved.id)?.x || 0, y: this.pixi.objects.get(moved.id)?.y || 0 };
+				const attachments = this._getFrameChildren(moved.id);
+				this._frameDragChildStart = new Map();
+				for (const childId of attachments) {
+					const childPixi = this.pixi.objects.get(childId);
+					if (childPixi) this._frameDragChildStart.set(childId, { x: childPixi.x, y: childPixi.y });
+				}
+			}
+		});
+
+		this.eventBus.on('tool:drag:update', (data) => {
+			const moved = this.state.state.objects.find(o => o.id === data.object);
+			if (!moved) return;
+			if (moved.type === 'frame') {
+				const attachments = this._getFrameChildren(moved.id);
+				const frameStart = this._frameDragFrameStart || { x: data.position.x, y: data.position.y };
+				const dx = data.position.x - frameStart.x;
+				const dy = data.position.y - frameStart.y;
+				for (const childId of attachments) {
+					const start = this._frameDragChildStart?.get(childId);
+					if (!start) continue;
+					const p = this.pixi.objects.get(childId);
+					if (p) { p.x = start.x + dx; p.y = start.y + dy; }
+					const stObj = this.state.state.objects.find(o => o.id === childId);
+					if (stObj) { stObj.position.x = start.x + dx; stObj.position.y = start.y + dy; }
+				}
+			} else {
+				// Hover-эффект: подсветка фрейма, если центр объекта внутри
+				const centerX = moved.position.x + (moved.width || 0) / 2;
+				const centerY = moved.position.y + (moved.height || 0) / 2;
+				const frames = (this.state.state.objects || []).filter(o => o.type === 'frame');
+				const ordered = frames.slice().sort((a, b) => {
+					const pa = this.pixi.objects.get(a.id);
+					const pb = this.pixi.objects.get(b.id);
+					return (pb?.zIndex || 0) - (pa?.zIndex || 0);
+				});
+				let hoverId = null;
+				for (const f of ordered) {
+					const rect = { x: f.position.x, y: f.position.y, w: f.width || 0, h: f.height || 0 };
+					if (centerX >= rect.x && centerX <= rect.x + rect.w && centerY >= rect.y && centerY <= rect.y + rect.h) {
+						hoverId = f.id; break;
+					}
+				}
+				if (hoverId !== this._frameHoverId) {
+					// Снять подсветку с предыдущего
+					if (this._frameHoverId) {
+						const prev = frames.find(fr => fr.id === this._frameHoverId);
+						if (prev) this.pixi.setFrameFill(prev.id, prev.width, prev.height, 0xFFFFFF);
+					}
+					// Включить подсветку нового
+					if (hoverId) {
+						const cur = frames.find(fr => fr.id === hoverId);
+						if (cur) this.pixi.setFrameFill(cur.id, cur.width, cur.height, 0xEEEEEE);
+					}
+					this._frameHoverId = hoverId || null;
+				}
+			}
+		});
+
+		this.eventBus.on('tool:drag:end', (data) => {
+			const movedObj = this.state.state.objects.find(o => o.id === data.object);
+			if (!movedObj) return;
+			// Сброс заливки
+			if (movedObj.type === 'frame') {
+				this.pixi.setFrameFill(movedObj.id, movedObj.width, movedObj.height, 0xFFFFFF);
+			}
+
+			// Автопривязка/отвязка объекта к фрейму после перемещения
+			this._recomputeFrameAttachment(movedObj.id);
+			// Сброс временных структур и hover-подсветки
+			this._frameDragFrameStart = null;
+			this._frameDragChildStart = null;
+			if (this._frameHoverId) {
+				const frames = (this.state.state.objects || []).filter(o => o.type === 'frame');
+				const prev = frames.find(fr => fr.id === this._frameHoverId);
+				if (prev) this.pixi.setFrameFill(prev.id, prev.width, prev.height, 0xFFFFFF);
+				this._frameHoverId = null;
+			}
+		});
+	}
+
+	_getFrameChildren(frameId) {
+		const res = [];
+		for (const o of this.state.state.objects || []) {
+			if (o.id === frameId) continue;
+			if (o.properties && o.properties.frameId === frameId) res.push(o.id);
+		}
+		return res;
+	}
+
+	_recomputeFrameAttachment(objectId) {
+		const obj = (this.state.state.objects || []).find(o => o.id === objectId);
+		if (!obj) return;
+		if (obj.type === 'frame') return; // фрейм к фрейму не крепим
+		const center = {
+			x: obj.position.x + (obj.width || 0) / 2,
+			y: obj.position.y + (obj.height || 0) / 2
+		};
+		const frames = (this.state.state.objects || []).filter(o => o.type === 'frame');
+		const ordered = frames.slice().sort((a, b) => {
+			const pa = this.pixi.objects.get(a.id);
+			const pb = this.pixi.objects.get(b.id);
+			return (pb?.zIndex || 0) - (pa?.zIndex || 0);
+		});
+		let newFrameId = null;
+		for (const f of ordered) {
+			const rect = { x: f.position.x, y: f.position.y, w: f.width || 0, h: f.height || 0 };
+			if (center.x >= rect.x && center.x <= rect.x + rect.w && center.y >= rect.y && center.y <= rect.y + rect.h) {
+				newFrameId = f.id; break;
+			}
+		}
+		const prevFrameId = obj.properties?.frameId || null;
+		if (newFrameId !== prevFrameId) {
+			obj.properties = obj.properties || {};
+			obj.properties.frameId = newFrameId || undefined;
+			this.state.markDirty();
+		}
+	}
+}
+
+

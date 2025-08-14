@@ -8,7 +8,10 @@ import { HistoryManager } from './HistoryManager.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
 import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand, GroupRotateCommand, GroupResizeCommand, ReorderZCommand, GroupReorderZCommand } from './commands/index.js';
-import { GridFactory } from '../grid/GridFactory.js';
+import { BoardService } from '../services/BoardService.js';
+import { ZoomPanController } from '../services/ZoomPanController.js';
+import { ZOrderManager } from '../services/ZOrderManager.js';
+import { FrameService } from '../services/FrameService.js';
 import { generateObjectId } from '../utils/objectIdGenerator.js';
 
 export class CoreMoodBoard {
@@ -58,44 +61,15 @@ export class CoreMoodBoard {
             // Инициализируем систему инструментов
             await this.initTools();
 
-            // Инициализируем сетку (по умолчанию линейная)
-            const canvasSize = this.workspaceSize?.() || { width: this.options.width, height: this.options.height };
-            this.grid = GridFactory.createGrid('line', {
-                enabled: true,
-                size: 20,
-                width: canvasSize.width,
-                height: canvasSize.height,
-                color: 0xE6E6E6,
-                opacity: 0.5
-            });
-            this.grid.updateVisual();
-            this.pixi.setGrid(this.grid);
-            this.eventBus.emit('ui:grid:current', { type: 'line' });
-
-            // Смена вида сетки из UI
-            this.eventBus.on('ui:grid:change', ({ type }) => {
-                const size = this.workspaceSize?.() || { width: this.options.width, height: this.options.height };
-                if (type === 'off') {
-                    this.grid?.setEnabled(false);
-                    this.grid?.updateVisual();
-                    this.pixi.setGrid(this.grid);
-                    return;
-                }
-                const options = {
-                    ...GridFactory.getDefaultOptions(type),
-                    enabled: true,
-                    width: size.width,
-                    height: size.height
-                };
-                try {
-                    this.grid = GridFactory.createGrid(type, options);
-                    this.grid.updateVisual();
-                    this.pixi.setGrid(this.grid);
-                    this.eventBus.emit('ui:grid:current', { type });
-                } catch (e) {
-                    console.warn('Unknown grid type:', type);
-                }
-            });
+            // Сервисы доски: сетка/миникомапа, зум, порядок слоёв, логика фреймов
+            this.boardService = new BoardService(this.eventBus, this.pixi);
+            await this.boardService.init(() => (this.workspaceSize?.() || { width: this.options.width, height: this.options.height }));
+            this.zoomPan = new ZoomPanController(this.eventBus, this.pixi);
+            this.zoomPan.attach();
+            this.zOrder = new ZOrderManager(this.eventBus, this.pixi, this.state);
+            this.zOrder.attach();
+            this.frameService = new FrameService(this.eventBus, this.pixi, this.state);
+            this.frameService.attach();
 
             // Создаем пустую доску для демо
             this.state.loadBoard({
@@ -256,15 +230,14 @@ export class CoreMoodBoard {
             }
         });
 
-        // Слойность: изменение порядка отрисовки (zIndex) с синхронизацией состояния
+        // Слойность: изменение порядка отрисовки (локальные операции)
         const applyZOrderFromState = () => {
             const arr = this.state.state.objects || [];
-            // Устанавливаем zIndex по порядку в состоянии (объекты всегда < служебных элементов с высоким zIndex)
             this.pixi.app.stage.sortableChildren = true;
             for (let i = 0; i < arr.length; i++) {
                 const id = arr[i]?.id;
                 const pixi = id ? this.pixi.objects.get(id) : null;
-                if (pixi) pixi.zIndex = i; // объекты 0..N
+                if (pixi) pixi.zIndex = i;
             }
         };
 
@@ -413,24 +386,7 @@ export class CoreMoodBoard {
                 this.dragStartPosition = { x: pixiObject.x, y: pixiObject.y };
             }
 
-            // Визуал для фрейма: сделать фон светло-серым на время перетаскивания
-            const moved = this.state.state.objects.find(o => o.id === data.object);
-            if (moved && moved.type === 'frame') {
-                this.pixi.setFrameFill(moved.id, moved.width, moved.height, 0xEEEEEE);
-                // Зафиксировать стартовые позиции фрейма и всех его детей — для абсолютного смещения без накапливания
-                this._frameDragFrameStart = { x: this.dragStartPosition.x, y: this.dragStartPosition.y };
-                const attachments = this._getFrameChildren(moved.id);
-                this._frameDragChildStart = new Map();
-                for (const childId of attachments) {
-                    const childPixi = this.pixi.objects.get(childId);
-                    if (childPixi) {
-                        this._frameDragChildStart.set(childId, { x: childPixi.x, y: childPixi.y });
-                    } else {
-                        const stObj = this.state.state.objects.find(o => o.id === childId);
-                        if (stObj) this._frameDragChildStart.set(childId, { x: stObj.position.x, y: stObj.position.y });
-                    }
-                }
-            }
+            // Фрейм-специфичная логика вынесена в FrameService
         });
 
         // Панорамирование холста
@@ -446,155 +402,13 @@ export class CoreMoodBoard {
             }
         });
 
-        // === Миникарта: данные и управление ===
-        // Синхронная выдача данных для миникарты (мир, вьюпорт, объекты)
-        this.eventBus.on('ui:minimap:get-data', (req) => {
-            const world = this.pixi.worldLayer || this.pixi.app.stage;
-            const viewEl = this.pixi.app.view;
-            const objects = this.state.state.objects || [];
-            req.world = {
-                x: world.x,
-                y: world.y,
-                scale: world.scale?.x || 1
-            };
-            req.view = {
-                width: viewEl.clientWidth,
-                height: viewEl.clientHeight
-            };
-            req.objects = objects.map(o => ({
-                id: o.id,
-                x: o.position?.x || 0,
-                y: o.position?.y || 0,
-                width: o.width || 0,
-                height: o.height || 0,
-                rotation: o.rotation || 0,
-                type: o.type || null
-            }));
-        });
-        // Центрирование основного вида на мировой точке
-        this.eventBus.on('ui:minimap:center-on', ({ worldX, worldY }) => {
-            const world = this.pixi.worldLayer || this.pixi.app.stage;
-            const viewW = this.pixi.app.view.clientWidth;
-            const viewH = this.pixi.app.view.clientHeight;
-            const s = world.scale?.x || 1;
-            world.x = viewW / 2 - worldX * s;
-            world.y = viewH / 2 - worldY * s;
-        });
+        // Миникарта перенесена в BoardService
 
-        // Масштабирование колесом — глобально отрабатываем Ctrl+Wheel
-        this.eventBus.on('tool:wheel:zoom', ({ x, y, delta }) => {
-            const factor = 1 + (-delta) * 0.0015; // чувствительность
-            const world = this.pixi.worldLayer || this.pixi.app.stage;
-            const oldScale = world.scale.x || 1;
-            const newScale = Math.max(0.1, Math.min(5, oldScale * factor));
-            if (newScale === oldScale) return;
-            const globalPoint = new PIXI.Point(x, y);
-            // Локальная точка до зума
-            const localPoint = world.toLocal(globalPoint);
-            // Применяем новый масштаб
-            world.scale.set(newScale);
-            // Глобальная позиция той же локальной точки после зума
-            const newGlobal = world.toGlobal(localPoint);
-            // Сдвигаем мир так, чтобы точка под курсором осталась неподвижной
-            world.x += (globalPoint.x - newGlobal.x);
-            world.y += (globalPoint.y - newGlobal.y);
-            this.eventBus.emit('ui:zoom:percent', { percentage: Math.round(newScale * 100) });
-        });
+        // Зум перенесен в ZoomPanController
 
-        // === Инвариант слоёв: все фреймы всегда под всеми остальными объектами ===
-        const ensureFramesBottom = () => {
-            const arr = this.state.state.objects || [];
-            if (arr.length === 0) return;
-            const frames = [];
-            const others = [];
-            for (const o of arr) {
-                if (o?.type === 'frame') frames.push(o); else others.push(o);
-            }
-            // Сохраняем относительный порядок внутри групп
-            const newOrder = [...frames, ...others];
-            // Если порядок не изменился — пропускаем
-            let changed = false;
-            if (newOrder.length === arr.length) {
-                for (let i = 0; i < arr.length; i++) {
-                    if (arr[i] !== newOrder[i]) { changed = true; break; }
-                }
-            }
-            if (!changed) return;
-            this.state.state.objects = newOrder;
-            // Пересчёт zIndex согласно порядку
-            const world = this.pixi?.worldLayer || this.pixi?.app?.stage;
-            if (world) world.sortableChildren = true;
-            // Назначим фреймам всегда нижний zIndex, остальным — по порядку
-            let z = 0;
-            for (const o of this.state.state.objects || []) {
-                const pixi = this.pixi.objects.get(o.id);
-                if (!pixi) continue;
-                if (o.type === 'frame') {
-                    pixi.zIndex = -100000; // всегда ниже
-                } else {
-                    pixi.zIndex = z++;
-                }
-            }
-            this.state.markDirty();
-        };
+        // Инвариант слоёв перенесён в ZOrderManager
 
-        // Поддерживаем порядок после любых событий, влияющих на слои
-        this.eventBus.on('object:created', () => ensureFramesBottom());
-        this.eventBus.on('object:deleted', () => ensureFramesBottom());
-        this.eventBus.on('object:reordered', () => ensureFramesBottom());
-        this.eventBus.on('group:reordered', () => ensureFramesBottom());
-
-        // Кнопки зума из UI
-        this.eventBus.on('ui:zoom:in', () => {
-            const center = new PIXI.Point(this.pixi.app.view.clientWidth / 2, this.pixi.app.view.clientHeight / 2);
-            this.eventBus.emit('tool:wheel:zoom', { x: center.x, y: center.y, delta: -120 });
-        });
-        this.eventBus.on('ui:zoom:out', () => {
-            const center = new PIXI.Point(this.pixi.app.view.clientWidth / 2, this.pixi.app.view.clientHeight / 2);
-            this.eventBus.emit('tool:wheel:zoom', { x: center.x, y: center.y, delta: 120 });
-        });
-        this.eventBus.on('ui:zoom:reset', () => {
-            const world = this.pixi.worldLayer || this.pixi.app.stage;
-            const center = new PIXI.Point(this.pixi.app.view.clientWidth / 2, this.pixi.app.view.clientHeight / 2);
-            // Сброс масштаба к 1 с центрированием
-            const oldScale = world.scale.x || 1;
-            const newScale = 1;
-            const globalPoint = center;
-            const localPoint = world.toLocal(globalPoint);
-            world.scale.set(newScale);
-            const newGlobal = world.toGlobal(localPoint);
-            world.x += (globalPoint.x - newGlobal.x);
-            world.y += (globalPoint.y - newGlobal.y);
-            this.eventBus.emit('ui:zoom:percent', { percentage: 100 });
-        });
-        this.eventBus.on('ui:zoom:fit', () => {
-            // Fit to screen: берем bbox всех объектов
-            const objs = this.state.state.objects || [];
-            if (objs.length === 0) return;
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            for (const o of objs) {
-                minX = Math.min(minX, o.position.x);
-                minY = Math.min(minY, o.position.y);
-                maxX = Math.max(maxX, o.position.x + (o.width || 0));
-                maxY = Math.max(maxY, o.position.y + (o.height || 0));
-            }
-            const bboxW = Math.max(1, maxX - minX);
-            const bboxH = Math.max(1, maxY - minY);
-            const viewW = this.pixi.app.view.clientWidth;
-            const viewH = this.pixi.app.view.clientHeight;
-            const padding = 40;
-            const scaleX = (viewW - padding) / bboxW;
-            const scaleY = (viewH - padding) / bboxH;
-            const newScale = Math.max(0.1, Math.min(5, Math.min(scaleX, scaleY)));
-            const world = this.pixi.worldLayer || this.pixi.app.stage;
-            // Центрируем bbox к центру экрана
-            const worldCenterX = minX + bboxW / 2;
-            const worldCenterY = minY + bboxH / 2;
-            world.scale.set(newScale);
-            world.x = viewW / 2 - worldCenterX * newScale;
-            world.y = viewH / 2 - worldCenterY * newScale;
-            this.eventBus.emit('ui:zoom:percent', { percentage: Math.round(newScale * 100) });
-        });
+        // Кнопки зума перенесены в ZoomPanController
         this.eventBus.on('ui:zoom:selection', () => {
             // Zoom to selection: берем bbox выделенных
             const selected = this.selectTool ? Array.from(this.selectTool.selectedObjects || []) : [];
@@ -676,65 +490,7 @@ export class CoreMoodBoard {
         this.eventBus.on('tool:drag:update', (data) => {
             // Во время перетаскивания обновляем позицию напрямую (без команды)
             this.updateObjectPositionDirect(data.object, data.position);
-
-            // Если двигаем фрейм — двигаем прикрепленных детей вместе (живое смещение)
-            const moved = this.state.state.objects.find(o => o.id === data.object);
-            if (moved && moved.type === 'frame') {
-                const attachments = this._getFrameChildren(moved.id);
-                const frameStart = this._frameDragFrameStart || this.dragStartPosition || { x: data.position.x, y: data.position.y };
-                const dx = data.position.x - frameStart.x;
-                const dy = data.position.y - frameStart.y;
-                if (attachments.length && (dx !== 0 || dy !== 0)) {
-                    for (const childId of attachments) {
-                        const start = this._frameDragChildStart?.get(childId);
-                        const baseX = start ? start.x : (this.state.state.objects.find(o => o.id === childId)?.position.x || 0);
-                        const baseY = start ? start.y : (this.state.state.objects.find(o => o.id === childId)?.position.y || 0);
-                        const newX = baseX + dx;
-                        const newY = baseY + dy;
-                        const p = this.pixi.objects.get(childId);
-                        if (p) {
-                            p.x = newX;
-                            p.y = newY;
-                        }
-                        const stObj = this.state.state.objects.find(o => o.id === childId);
-                        if (stObj) {
-                            stObj.position.x = newX;
-                            stObj.position.y = newY;
-                        }
-                    }
-                    this.state.markDirty();
-                }
-            } else if (moved) {
-                // Hover-эффект: если во время перетаскивания объект заносим внутрь фрейма — подсветить фрейм
-                const centerX = moved.position.x + (moved.width || 0) / 2;
-                const centerY = moved.position.y + (moved.height || 0) / 2;
-                const frames = this._getFrames();
-                const ordered = frames.slice().sort((a, b) => {
-                    const pa = this.pixi.objects.get(a.id);
-                    const pb = this.pixi.objects.get(b.id);
-                    return (pb?.zIndex || 0) - (pa?.zIndex || 0);
-                });
-                let hoverId = null;
-                for (const f of ordered) {
-                    const rect = { x: f.position.x, y: f.position.y, w: f.width || 0, h: f.height || 0 };
-                    if (centerX >= rect.x && centerX <= rect.x + rect.w && centerY >= rect.y && centerY <= rect.y + rect.h) {
-                        hoverId = f.id; break;
-                    }
-                }
-                if (hoverId !== this._frameHoverId) {
-                    // Снять подсветку с предыдущего
-                    if (this._frameHoverId) {
-                        const prev = frames.find(fr => fr.id === this._frameHoverId);
-                        if (prev) this.pixi.setFrameFill(prev.id, prev.width, prev.height, 0xFFFFFF);
-                    }
-                    // Включить подсветку нового
-                    if (hoverId) {
-                        const cur = frames.find(fr => fr.id === hoverId);
-                        if (cur) this.pixi.setFrameFill(cur.id, cur.width, cur.height, 0xEEEEEE);
-                    }
-                    this._frameHoverId = hoverId || null;
-                }
-            }
+            // Hover-подсветка фреймов вынесена в FrameService
         });
 
         this.eventBus.on('tool:drag:end', (data) => {
@@ -785,26 +541,7 @@ export class CoreMoodBoard {
                 this.dragStartPosition = null;
             }
 
-            // После любого перетаскивания: авто-привязка/отвязка для объектов и фреймов
-            const movedObj = this.state.state.objects.find(o => o.id === data.object);
-            if (movedObj) this._recomputeFrameAttachment(movedObj.id);
-
-            // Вернуть обычную заливку фрейму после перетаскивания
-            if (movedObj && movedObj.type === 'frame') {
-                this.pixi.setFrameFill(movedObj.id, movedObj.width, movedObj.height, 0xFFFFFF);
-            }
-
-            // Сбросить hover-подсветку, если была
-            if (this._frameHoverId) {
-                const frames = this._getFrames();
-                const prev = frames.find(fr => fr.id === this._frameHoverId);
-                if (prev) this.pixi.setFrameFill(prev.id, prev.width, prev.height, 0xFFFFFF);
-                this._frameHoverId = null;
-            }
-
-            // Очистить временные структуры dragging-фрейма
-            this._frameDragFrameStart = null;
-            this._frameDragChildStart = null;
+            // После любого перетаскивания: логика фреймов перенесена в FrameService
         });
 
         // === ДУБЛИРОВАНИЕ ЧЕРЕЗ ALT-ПЕРЕТАСКИВАНИЕ ===
@@ -1480,49 +1217,7 @@ export class CoreMoodBoard {
     }
 
     // === Прикрепления к фреймам ===
-    _getFrames() {
-        return (this.state.state.objects || []).filter(o => o.type === 'frame');
-    }
-
-    _getFrameChildren(frameId) {
-        const res = [];
-        for (const o of this.state.state.objects || []) {
-            if (o.id === frameId) continue;
-            if (o.properties && o.properties.frameId === frameId) res.push(o.id);
-        }
-        return res;
-    }
-
-    _recomputeFrameAttachment(objectId) {
-        const obj = (this.state.state.objects || []).find(o => o.id === objectId);
-        if (!obj) return;
-        if (obj.type === 'frame') return; // фрейм к фрейму не крепим
-        const center = {
-            x: obj.position.x + (obj.width || 0) / 2,
-            y: obj.position.y + (obj.height || 0) / 2
-        };
-        // Проверяем попадание центра в любой фрейм (верхний при пересечении нескольких)
-        const frames = this._getFrames();
-        // Фреймы уже в state; определим порядок по zIndex из pixi при наличии
-        const ordered = frames.slice().sort((a, b) => {
-            const pa = this.pixi.objects.get(a.id);
-            const pb = this.pixi.objects.get(b.id);
-            return (pb?.zIndex || 0) - (pa?.zIndex || 0);
-        });
-        let newFrameId = null;
-        for (const f of ordered) {
-            const rect = { x: f.position.x, y: f.position.y, w: f.width || 0, h: f.height || 0 };
-            if (center.x >= rect.x && center.x <= rect.x + rect.w && center.y >= rect.y && center.y <= rect.y + rect.h) {
-                newFrameId = f.id; break;
-            }
-        }
-        const prevFrameId = obj.properties?.frameId || null;
-        if (newFrameId !== prevFrameId) {
-            obj.properties = obj.properties || {};
-            obj.properties.frameId = newFrameId || undefined;
-            this.state.markDirty();
-        }
-    }
+    // Логика фреймов перенесена в FrameService
 
     /**
      * Копирует выбранный объект в буфер обмена
