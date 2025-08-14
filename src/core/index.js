@@ -135,6 +135,11 @@ export class CoreMoodBoard {
         const drawingToolModule = await import('../tools/object-tools/DrawingTool.js');
         const drawingTool = new drawingToolModule.DrawingTool(this.eventBus);
         this.toolManager.registerTool(drawingTool);
+
+        // Инструмент размещения объектов по клику (универсальный)
+        const placementToolModule = await import('../tools/object-tools/PlacementTool.js');
+        const placementTool = new placementToolModule.PlacementTool(this.eventBus);
+        this.toolManager.registerTool(placementTool);
         
         // Сохраняем ссылку на selectTool для обновления ручек
         this.selectTool = selectTool;

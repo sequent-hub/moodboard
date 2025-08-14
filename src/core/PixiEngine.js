@@ -20,10 +20,12 @@ export class PixiEngine {
 
         // Отдельные слои: сетка (не двигается) и мир с объектами (двигается)
         this.gridLayer = new PIXI.Container();
+        this.gridLayer.name = 'gridLayer';
         this.gridLayer.zIndex = 0;
         this.app.stage.addChild(this.gridLayer);
 
         this.worldLayer = new PIXI.Container();
+        this.worldLayer.name = 'worldLayer';
         this.worldLayer.zIndex = 1;
         this.worldLayer.sortableChildren = true;
         this.app.stage.addChild(this.worldLayer);

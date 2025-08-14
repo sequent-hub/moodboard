@@ -63,6 +63,11 @@ export class Toolbar {
         this.createShapesPopup();
         this.createDrawPopup();
         this.createEmojiPopup();
+
+        // Подсветка активной кнопки на тулбаре по активному инструменту
+        this.eventBus.on('tool:activated', ({ tool }) => {
+            this.setActiveToolbarButton(tool);
+        });
     }
     
     /**
@@ -111,8 +116,32 @@ export class Toolbar {
                 return;
             }
 
+            // Выбор инструмента выделения — отменяем режимы размещения и возвращаемся к select
+            if (toolType === 'activate-select') {
+                this.animateButton(button);
+                this.closeShapesPopup();
+                this.closeDrawPopup();
+                this.closeEmojiPopup();
+                // Сбрасываем отложенное размещение, активируем select
+                this.eventBus.emit('place:set', null);
+                this.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+                this.setActiveToolbarButton('select');
+                return;
+            }
+
+            // Временная активация панорамирования с панели
+            if (toolType === 'activate-pan') {
+                this.animateButton(button);
+                this.closeShapesPopup();
+                this.closeDrawPopup();
+                this.closeEmojiPopup();
+                this.eventBus.emit('keyboard:tool-select', { tool: 'pan' });
+                this.setActiveToolbarButton('pan');
+                return;
+            }
+
             // Заглушки для новых кнопок — пока без действий (только анимация)
-            if (toolType === 'custom-t' || toolType === 'custom-frame' || toolType === 'custom-comments' || toolType === 'custom-attachments' || toolType === 'activate-select' || toolType === 'activate-pan') {
+            if (toolType === 'custom-t' || toolType === 'custom-frame' || toolType === 'custom-comments' || toolType === 'custom-attachments') {
                 this.animateButton(button);
                 // Закрываем панель фигур, если клик не по ней
                 this.closeShapesPopup();
@@ -127,6 +156,9 @@ export class Toolbar {
                 this.toggleShapesPopup(button);
                 this.closeDrawPopup();
                 this.closeEmojiPopup();
+                // Активируем универсальный place tool для дальнейшего размещения
+                this.eventBus.emit('keyboard:tool-select', { tool: 'place' });
+                this.setActiveToolbarButton('place');
                 return;
             }
 
@@ -136,6 +168,9 @@ export class Toolbar {
                 this.toggleDrawPopup(button);
                 this.closeShapesPopup();
                 this.closeEmojiPopup();
+                // Выбираем инструмент рисования (последующее действие — на холсте)
+                this.eventBus.emit('keyboard:tool-select', { tool: 'draw' });
+                this.setActiveToolbarButton('draw');
                 return;
             }
 
@@ -174,6 +209,26 @@ export class Toolbar {
                 this.closeEmojiPopup();
             }
         });
+    }
+
+    /**
+     * Подсвечивает активную кнопку на тулбаре в зависимости от активного инструмента
+     */
+    setActiveToolbarButton(toolName) {
+        if (!this.element) return;
+        // Сбрасываем активные классы
+        this.element.querySelectorAll('.moodboard-toolbar__button--active').forEach(el => el.classList.remove('moodboard-toolbar__button--active'));
+        // Соответствие инструмент → кнопка
+        const map = {
+            select: 'select',
+            pan: 'pan',
+            draw: 'pencil',
+            place: 'shapes'
+        };
+        const btnId = map[toolName];
+        if (!btnId) return;
+        const btn = this.element.querySelector(`.moodboard-toolbar__button--${btnId}`);
+        if (btn) btn.classList.add('moodboard-toolbar__button--active');
     }
     
     /**
@@ -237,18 +292,13 @@ export class Toolbar {
             btn.addEventListener('click', () => {
                 this.animateButton(btn);
                 if (s.isToolbarAction) {
-                    // Эмитим действие как у прежней кнопки "Добавить фигуру"
-                    this.eventBus.emit('toolbar:action', {
-                        type: 'shape',
-                        id: 'shape',
-                        position: this.getRandomPosition()
-                    });
+                    // Режим: добавить дефолтную фигуру по клику на холсте
+                    this.eventBus.emit('place:set', { type: 'shape', properties: { kind: 'square' } });
                     this.closeShapesPopup();
                     return;
                 }
-                // Для остальных фигур — эмитим специфический тип
+                // Для остальных фигур — запоминаем выбранную форму и ждём клика по холсту
                 const propsMap = {
-                    'square': { kind: 'square' },
                     'rounded-square': { kind: 'rounded', cornerRadius: 10 },
                     'circle': { kind: 'circle' },
                     'triangle': { kind: 'triangle' },
@@ -256,16 +306,9 @@ export class Toolbar {
                     'parallelogram': { kind: 'parallelogram' },
                     'arrow': { kind: 'arrow' }
                 };
-                const props = propsMap[s.id];
-                if (props) {
-                    this.eventBus.emit('toolbar:action', {
-                        type: 'shape',
-                        id: s.id,
-                        position: this.getRandomPosition(),
-                        properties: props
-                    });
-                    this.closeShapesPopup();
-                }
+                const props = propsMap[s.id] || { kind: 'square' };
+                this.eventBus.emit('place:set', { type: 'shape', properties: props });
+                this.closeShapesPopup();
             });
             grid.appendChild(btn);
         });
