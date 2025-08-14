@@ -44,6 +44,7 @@ export class ResizeObjectCommand extends BaseCommand {
         if (position && object) {
             const pixiObject = this.coreMoodboard.pixi.objects.get(this.objectId);
             if (pixiObject) {
+                // Для текстоподобных (emoji) позиция трактуется как левый-верх
                 pixiObject.x = position.x;
                 pixiObject.y = position.y;
                 object.position.x = position.x;

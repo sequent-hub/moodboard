@@ -545,9 +545,9 @@ export class Toolbar {
                     const size = 48; // базовый размер
                     this.eventBus.emit('place:set', {
                         type: 'emoji',
-                        properties: { content: ch, fontSize: size },
+                        properties: { content: ch, fontSize: size, width: size, height: size },
                         size: { width: size, height: size },
-                        anchorCentered: true
+                        // anchorCentered не используем, позиция ставится как топ-левт со смещением на половину размера
                     });
                     this.closeEmojiPopup();
                 });

@@ -65,7 +65,9 @@ export class PixiEngine {
             pixiObject.eventMode = 'static'; // Исправляем deprecation warning
             pixiObject.cursor = 'pointer';
             // Сохраняем метаданные о типе и свойствах для последующих перерасчетов (resize)
+            const prevMb = pixiObject._mb || {};
             pixiObject._mb = {
+                ...prevMb,
                 objectId: objectData.id,
                 type: objectData.type,
                 properties: objectData.properties || {}
@@ -160,11 +162,22 @@ export class PixiEngine {
 
     createEmoji(objectData) {
         const content = objectData.properties?.content || '🙂';
-        const fontSize = objectData.properties?.fontSize || 48;
-        const style = new PIXI.TextStyle({ fontFamily: 'Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial', fontSize });
+        const baseSize = objectData.properties?.fontSize || 48;
+        const style = new PIXI.TextStyle({ fontFamily: 'Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial', fontSize: baseSize });
         const text = new PIXI.Text(content, style);
-        // Центрируем anchor, чтобы ставить по центру курсора
-        text.anchor.set(0.5, 0.5);
+        // Anchor по умолчанию (0,0), чтобы позиция в state была левым верхом (как у остальных объектов)
+        text.anchor.set(0, 0);
+        // Нормализуем масштаб на основе заданной ширины/высоты объекта (state.width/height)
+        const targetW = objectData.width || baseSize;
+        const targetH = objectData.height || baseSize;
+        const bounds = text.getLocalBounds();
+        const scaleX = targetW / (bounds.width || 1);
+        const scaleY = targetH / (bounds.height || 1);
+        // Используем равномерное масштабирование, чтобы не искажать смайл
+        const s = Math.min(scaleX, scaleY);
+        text.scale.set(s, s);
+        // Сохраним базовый размер для корректного ресайза
+        text._mb = { ...(text._mb || {}), baseW: bounds.width, baseH: bounds.height };
         return text;
     }
 
@@ -299,10 +312,17 @@ export class PixiEngine {
         // Для Graphics объектов (рамки, фигуры) нужно пересоздать геометрию
         if (pixiObject instanceof PIXI.Graphics) {
             this.recreateGraphicsObject(pixiObject, size, position, objectType);
-        } 
-        // Для Text объектов изменяем размер шрифта
-        else if (pixiObject instanceof PIXI.Text) {
-            this.updateTextObjectSize(pixiObject, size);
+        } else if (pixiObject instanceof PIXI.Text) {
+            const prevPos = { x: pixiObject.x, y: pixiObject.y };
+            this.updateTextLikeSize(pixiObject, size);
+            // Возвращаем левый-верх к прежнему/переданному значению
+            if (position) {
+                pixiObject.x = position.x;
+                pixiObject.y = position.y;
+            } else {
+                pixiObject.x = prevPos.x;
+                pixiObject.y = prevPos.y;
+            }
         }
     }
 
@@ -450,6 +470,18 @@ export class PixiEngine {
         // Ограничиваем ширину текста
         textObject.style.wordWrap = true;
         textObject.style.wordWrapWidth = size.width - 10; // Небольшой отступ
+    }
+
+    // Унифицированное масштабирование для текстоподобных объектов (emoji/текст с anchor)
+    updateTextLikeSize(textObject, size) {
+        // Если это обычный текст с переносами — используем старую логику
+        if (!textObject._mb || !textObject._mb.baseW || !textObject._mb.baseH) {
+            return this.updateTextObjectSize(textObject, size);
+        }
+        const baseW = textObject._mb.baseW;
+        const baseH = textObject._mb.baseH;
+        const s = Math.min((size.width / baseW) || 1, (size.height / baseH) || 1);
+        textObject.scale.set(s, s);
     }
 
     /**
