@@ -46,12 +46,16 @@ export class PlacementTool extends BaseTool {
         super.onMouseDown(event);
         if (!this.pending) return;
 
-        const position = this._toWorld(event.x, event.y);
+        const worldPoint = this._toWorld(event.x, event.y);
+        // Центр к курсору: смещаем на половину дефолтного размера (100x100)
+        const halfW = (this.pending.size?.width ?? 100) / 2;
+        const halfH = (this.pending.size?.height ?? 100) / 2;
+        const position = { x: Math.round(worldPoint.x - halfW), y: Math.round(worldPoint.y - halfH) };
         // Создаём объект через общий канал (важно: без префикса tool:)
         this.eventBus.emit('toolbar:action', {
             type: this.pending.type,
             id: this.pending.type,
-            position: { x: Math.round(position.x), y: Math.round(position.y) },
+            position,
             properties: this.pending.properties || {}
         });
 
