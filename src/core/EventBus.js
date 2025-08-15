@@ -11,13 +11,28 @@ export class EventBus {
     }
 
     off(event, callback) {
-        this.events.get(event)?.delete(callback);
+        const callbacks = this.events.get(event);
+        if (callbacks) {
+            callbacks.delete(callback);
+
+            // Если callback'ов больше нет, удаляем событие из Map
+            if (callbacks.size === 0) {
+                this.events.delete(event);
+            }
+        }
     }
 
     emit(event, data) {
         const callbacks = this.events.get(event);
         if (callbacks) {
-            callbacks.forEach(callback => callback(data));
+            callbacks.forEach(callback => {
+                try {
+                    callback(data);
+                } catch (error) {
+                    // Логируем ошибку, но продолжаем выполнение
+                    console.error(`Error in event callback for '${event}':`, error);
+                }
+            });
         }
     }
 
