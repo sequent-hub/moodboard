@@ -1,0 +1,72 @@
+# .github/workflows/deploy.yml
+name: Deploy to TimeWeb.Cloud
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run tests
+      run: npm test
+    
+    - name: Build project
+      run: npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Deploy to TimeWeb.Cloud server
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.TIMEWEB_HOST }}
+        username: ${{ secrets.TIMEWEB_USERNAME }}
+        key: ${{ secrets.TIMEWEB_SSH_KEY }}
+        script: |
+          echo "🚀 Starting deployment from GitHub Actions..."
+          cd /var/www/moodboard
+          
+          # Останавливаем приложение
+          if pm2 list | grep -q "moodboard"; then
+            pm2 stop moodboard
+          fi
+          
+          # Получаем изменения
+          git fetch origin
+          git reset --hard origin/main
+          
+          # Устанавливаем зависимости
+          npm ci --only=production
+          
+          # Собираем проект
+          npm run build
+          
+          # Запускаем приложение
+          pm2 start ecosystem.config.js --env production
+          pm2 save
+          
+          # Проверяем статус
+          pm2 status moodboard
+          
+          echo "✅ Deployment completed successfully!"

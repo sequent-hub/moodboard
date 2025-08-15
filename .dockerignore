@@ -1,0 +1,25 @@
+# .dockerignore
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+.env
+.nyc_output
+coverage
+.nyc_output
+.coverage
+coverage.json
+*.lcov
+tests
+.vscode
+.idea
+*.swp
+*.swo
+*~
+src.7z
+src.zip
+src2.zip
+DEVELOPER_GUIDE.md
+DEVELOPMENT_HISTORY.md
+USER_GUIDE.md

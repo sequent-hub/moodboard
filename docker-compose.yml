@@ -1,0 +1,19 @@
+# docker-compose.yml для Moodboard проекта
+version: '3.8'
+
+services:
+  moodboard:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
