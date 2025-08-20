@@ -21,6 +21,7 @@ export class SimpleDragController {
         } else {
             this.offset = { x: 0, y: 0 };
         }
+        // Позиция и координаты — уже в мировых координатах (SelectTool нормализует)
         this.emit('drag:start', { object: objectId, position: { x: event.x, y: event.y } });
     }
 

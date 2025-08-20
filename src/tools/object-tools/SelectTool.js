@@ -458,8 +458,10 @@ export class SelectTool extends BaseTool {
         // Получаем текущую позицию объекта
         const objectData = { objectId, position: null };
         this.emit(Events.Tool.GetObjectPosition, objectData);
-        
-        if (this._dragCtrl) this._dragCtrl.start(objectId, event);
+        // Нормализуем координаты в мировые (worldLayer), чтобы убрать влияние зума
+        const w = this._toWorld(event.x, event.y);
+        const worldEvent = { ...event, x: w.x, y: w.y };
+        if (this._dragCtrl) this._dragCtrl.start(objectId, worldEvent);
     }
     
     /**
@@ -467,7 +469,11 @@ export class SelectTool extends BaseTool {
      */
     updateDrag(event) {
         // Перетаскивание группы
-        if (this.isGroupDragging && this._groupDragCtrl) { this._groupDragCtrl.update(event); return; }
+        if (this.isGroupDragging && this._groupDragCtrl) {
+            const w = this._toWorld(event.x, event.y);
+            this._groupDragCtrl.update({ ...event, x: w.x, y: w.y });
+            return;
+        }
         // Если во время обычного перетаскивания зажали Alt — включаем режим клонирования на лету
         if (this.isDragging && !this.isAltCloneMode && event.originalEvent && event.originalEvent.altKey) {
             this.isAltCloneMode = true;
@@ -487,7 +493,10 @@ export class SelectTool extends BaseTool {
         // Если ожидаем создание копии — продолжаем двигать текущую цель (исходник)
         if (!this.dragTarget) return;
         
-        if (this._dragCtrl) this._dragCtrl.update(event);
+        if (this._dragCtrl) {
+            const w = this._toWorld(event.x, event.y);
+            this._dragCtrl.update({ ...event, x: w.x, y: w.y });
+        }
         
         // Обновляем ручки во время перетаскивания
         if (this.resizeHandles && this.selection.has(this.dragTarget)) {
@@ -538,7 +547,10 @@ export class SelectTool extends BaseTool {
         this.isResizing = true;
         this.resizeHandle = handle;
         this.dragTarget = objectId;
-        if (this._resizeCtrl) this._resizeCtrl.start(handle, objectId, { x: this.currentX, y: this.currentY });
+        if (this._resizeCtrl) {
+            const w = this._toWorld(this.currentX, this.currentY);
+            this._resizeCtrl.start(handle, objectId, { x: w.x, y: w.y });
+        }
     }
     
     /**
@@ -546,17 +558,24 @@ export class SelectTool extends BaseTool {
      */
     updateResize(event) {
 		// Групповой resize
-        if (this.isGroupResizing && this._groupResizeCtrl) { this._groupResizeCtrl.update(event); return; }
+        if (this.isGroupResizing && this._groupResizeCtrl) {
+            const w = this._toWorld(event.x, event.y);
+            this._groupResizeCtrl.update({ ...event, x: w.x, y: w.y });
+            return; 
+        }
 
-        if (this._resizeCtrl) this._resizeCtrl.update(event, {
-            calculateNewSize: (handleType, startBounds, dx, dy, keepAR) => {
-                const rot = (() => { const d = { objectId: this.dragTarget, rotation: 0 }; this.emit(Events.Tool.GetObjectRotation, d); return d.rotation || 0; })();
-                return calculateNewSize(handleType, startBounds, dx, dy, keepAR, rot);
-            },
-            calculatePositionOffset: (handleType, startBounds, newSize, objectRotation) => {
-                return calculatePositionOffset(handleType, startBounds, newSize, objectRotation);
-            }
-        });
+        if (this._resizeCtrl) {
+            const w = this._toWorld(event.x, event.y);
+            this._resizeCtrl.update({ ...event, x: w.x, y: w.y }, {
+                calculateNewSize: (handleType, startBounds, dx, dy, keepAR) => {
+                    const rot = (() => { const d = { objectId: this.dragTarget, rotation: 0 }; this.emit(Events.Tool.GetObjectRotation, d); return d.rotation || 0; })();
+                    return calculateNewSize(handleType, startBounds, dx, dy, keepAR, rot);
+                },
+                calculatePositionOffset: (handleType, startBounds, newSize, objectRotation) => {
+                    return calculatePositionOffset(handleType, startBounds, newSize, objectRotation);
+                }
+            });
+        }
         
         // Обновляем ручки в реальном времени во время resize
         if (this.resizeHandles) {
@@ -647,7 +666,8 @@ export class SelectTool extends BaseTool {
         this.emit('get:object:size', sizeData);
         if (posData.position && sizeData.size && this._rotateCtrl) {
             const center = { x: posData.position.x + sizeData.size.width / 2, y: posData.position.y + sizeData.size.height / 2 };
-            this._rotateCtrl.start(objectId, { x: this.currentX, y: this.currentY }, center);
+            const w = this._toWorld(this.currentX, this.currentY);
+            this._rotateCtrl.start(objectId, { x: w.x, y: w.y }, center);
         }
     }
     
@@ -656,9 +676,16 @@ export class SelectTool extends BaseTool {
      */
     updateRotate(event) {
         // Групповой поворот
-        if (this.isGroupRotating && this._groupRotateCtrl) { this._groupRotateCtrl.update(event); return; }
+        if (this.isGroupRotating && this._groupRotateCtrl) {
+            const w = this._toWorld(event.x, event.y);
+            this._groupRotateCtrl.update({ ...event, x: w.x, y: w.y });
+            return;
+        }
         if (!this.isRotating || !this._rotateCtrl) return;
-        this._rotateCtrl.update(event);
+        {
+            const w = this._toWorld(event.x, event.y);
+            this._rotateCtrl.update({ ...event, x: w.x, y: w.y });
+        }
         
         // Обновляем ручки в реальном времени во время поворота
         if (this.resizeHandles) {
@@ -840,6 +867,16 @@ export class SelectTool extends BaseTool {
         }
     }
 
+    // Преобразование экранных координат (canvas/view) в мировые (worldLayer)
+    _toWorld(x, y) {
+        if (!this.app || !this.app.stage) return { x, y };
+        const world = this.app.stage.getChildByName && this.app.stage.getChildByName('worldLayer');
+        if (!world || !world.toLocal) return { x, y };
+        const p = new PIXI.Point(x, y);
+        const local = world.toLocal(p);
+        return { x: local.x, y: local.y };
+    }
+
     startGroupDrag(event) {
         const gb = this.computeGroupBounds();
         this.groupStartBounds = gb;
@@ -849,7 +886,10 @@ export class SelectTool extends BaseTool {
         if (this.groupBoundsGraphics && this.resizeHandles) {
             this.resizeHandles.showHandles(this.groupBoundsGraphics, this.groupId);
         }
-        if (this._groupDragCtrl) this._groupDragCtrl.start(gb, { x: event.x, y: event.y });
+        if (this._groupDragCtrl) {
+            const w = this._toWorld(event.x, event.y);
+            this._groupDragCtrl.start(gb, { x: w.x, y: w.y });
+        }
         this.emit(Events.Tool.GroupDragStart, { objects: this.selection.toArray() });
     }
 
