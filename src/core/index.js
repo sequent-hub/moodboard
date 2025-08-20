@@ -380,11 +380,12 @@ export class CoreMoodBoard {
 
         // События перетаскивания
         this.eventBus.on(Events.Tool.DragStart, (data) => {
-
-            // Сохраняем начальную позицию для команды
+            // Сохраняем начальную позицию как левый-верх, переводя центр PIXI в state-координаты
             const pixiObject = this.pixi.objects.get(data.object);
             if (pixiObject) {
-                this.dragStartPosition = { x: pixiObject.x, y: pixiObject.y };
+                const halfW = (pixiObject.width || 0) / 2;
+                const halfH = (pixiObject.height || 0) / 2;
+                this.dragStartPosition = { x: pixiObject.x - halfW, y: pixiObject.y - halfH };
             }
 
             // Фрейм-специфичная логика вынесена в FrameService
@@ -456,13 +457,18 @@ export class CoreMoodBoard {
             for (const id of data.objects) {
                 const pixiObject = this.pixi.objects.get(id);
                 if (!pixiObject) continue;
-                pixiObject.x = (this._groupDragStart.get(id)?.x || pixiObject.x) + dx;
-                pixiObject.y = (this._groupDragStart.get(id)?.y || pixiObject.y) + dy;
-                // Обновляем state
+                // Смещаем центр (PIXI хранит x/y по центру при pivot/anchor)
+                const startCenter = this._groupDragStart.get(id) || { x: pixiObject.x, y: pixiObject.y };
+                const newCenter = { x: startCenter.x + dx, y: startCenter.y + dy };
+                pixiObject.x = newCenter.x;
+                pixiObject.y = newCenter.y;
+                // Обновляем state как левый-верхний угол
                 const obj = this.state.state.objects.find(o => o.id === id);
                 if (obj) {
-                    obj.position.x = pixiObject.x;
-                    obj.position.y = pixiObject.y;
+                    const halfW = (pixiObject.width || 0) / 2;
+                    const halfH = (pixiObject.height || 0) / 2;
+                    obj.position.x = newCenter.x - halfW;
+                    obj.position.y = newCenter.y - halfH;
                 }
             }
             this.state.markDirty();
@@ -500,7 +506,7 @@ export class CoreMoodBoard {
             if (this.dragStartPosition) {
                 const pixiObject = this.pixi.objects.get(data.object);
                 if (pixiObject) {
-                    const finalPosition = { x: pixiObject.x, y: pixiObject.y };
+                    const finalPosition = { x: pixiObject.x - (pixiObject.width||0)/2, y: pixiObject.y - (pixiObject.height||0)/2 };
                     
                     // Создаем команду только если позиция действительно изменилась
                     if (this.dragStartPosition.x !== finalPosition.x || 
@@ -789,7 +795,10 @@ export class CoreMoodBoard {
                 const newY = center.y + relX * sin + relY * cos;
                 // Применяем
                 // Сначала позиция, затем угол (для корректной визуализации ручек)
-                this.updateObjectPositionDirect(id, { x: newX, y: newY });
+                const pObj = this.pixi.objects.get(id);
+                const halfW = (pObj?.width || 0) / 2;
+                const halfH = (pObj?.height || 0) / 2;
+                this.updateObjectPositionDirect(id, { x: newX - halfW, y: newY - halfH });
                 this.pixi.updateObjectRotation(id, newAngle);
                 this.updateObjectRotationDirect(id, newAngle);
             }
@@ -852,11 +861,13 @@ export class CoreMoodBoard {
             data.result = result;
         });
 
-        // Получение позиции объекта
+        // Получение позиции объекта (левый-верх логических координат)
         this.eventBus.on(Events.Tool.GetObjectPosition, (data) => {
             const pixiObject = this.pixi.objects.get(data.objectId);
             if (pixiObject) {
-                data.position = { x: pixiObject.x, y: pixiObject.y };
+                const halfW = (pixiObject.width || 0) / 2;
+                const halfH = (pixiObject.height || 0) / 2;
+                data.position = { x: pixiObject.x - halfW, y: pixiObject.y - halfH };
             }
         });
 
@@ -1120,11 +1131,13 @@ export class CoreMoodBoard {
      * Используется во время перетаскивания для плавного движения
      */
     updateObjectPositionDirect(objectId, position) {
-        // Обновляем позицию в PIXI — координаты трактуем как левый верх объекта
+        // position — левый верх (state); приводим к центру в PIXI
         const pixiObject = this.pixi.objects.get(objectId);
         if (pixiObject) {
-            pixiObject.x = position.x;
-            pixiObject.y = position.y;
+            const halfW = (pixiObject.width || 0) / 2;
+            const halfH = (pixiObject.height || 0) / 2;
+            pixiObject.x = position.x + halfW;
+            pixiObject.y = position.y + halfH;
         }
         
         // Обновляем позицию в состоянии (без эмита события)

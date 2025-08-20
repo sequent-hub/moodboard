@@ -162,7 +162,7 @@ export class PixiEngine {
         const pixiObject = this.objects.get(objectId);
         if (!pixiObject) return;
 
-        // Сохраняем позицию
+        // Сохраняем позицию (центр) на случай, если инстанс пересоздаст геометрию
         const position = { x: pixiObject.x, y: pixiObject.y };
         
         console.log(`🎨 Обновляем размер объекта ${objectId}, тип: ${objectType}`);
@@ -238,8 +238,12 @@ export class PixiEngine {
         // Устанавливаем pivot в центр (для правильного вращения)
         const pivotX = size.width / 2;
         const pivotY = size.height / 2;
+        // Сохраняем текущий центр до изменения pivot
+        const prevCenter = { x: pixiObject.x, y: pixiObject.y };
         pixiObject.pivot.set(pivotX, pivotY);
-        // Позицию не меняем здесь; она будет установлена вызывающей стороной
+        // Восстанавливаем центр, чтобы левый-верх в state не «уползал» при ресайзе
+        pixiObject.x = prevCenter.x;
+        pixiObject.y = prevCenter.y;
     }
 
     /**

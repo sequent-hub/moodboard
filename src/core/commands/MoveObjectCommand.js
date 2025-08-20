@@ -29,14 +29,16 @@ export class MoveObjectCommand extends BaseCommand {
     }
 
     _setPosition(position) {
-        // Обновляем позицию в PIXI
+        // Обновляем позицию в PIXI (x/y — центр), position — левый-верх
         const pixiObject = this.coreMoodboard.pixi.objects.get(this.objectId);
         if (pixiObject) {
-            pixiObject.x = position.x;
-            pixiObject.y = position.y;
+            const halfW = (pixiObject.width || 0) / 2;
+            const halfH = (pixiObject.height || 0) / 2;
+            pixiObject.x = position.x + halfW;
+            pixiObject.y = position.y + halfH;
         }
         
-        // Обновляем позицию в состоянии (но БЕЗ эмита события, чтобы не создавать новую команду)
+        // Обновляем позицию в состоянии (левый-верх; без эмита события)
         const objects = this.coreMoodboard.state.state.objects;
         const object = objects.find(obj => obj.id === this.objectId);
         if (object) {
