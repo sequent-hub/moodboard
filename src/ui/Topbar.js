@@ -99,13 +99,18 @@ export class Topbar {
         }
         const pop = document.createElement('div');
         pop.className = 'moodboard-topbar__paint-popover';
-        // Пять цветов: 1 — светло-зелёный, 2 — светло-синий, 3 — светло-оранжевый, 4 — светло‑серый, 5 — белый
+        // Пять цветов кнопок-палитры и соответствующие цвета фона доски
+        // 1: фон #f7fbff, кнопка #B3E5FC
+        // 2: фон #f8fff7, кнопка #E8F5E9
+        // 3: фон #fffcf7, кнопка #FFF3E0
+        // 4: фон #f5f5f5, кнопка #f5f5f5
+        // 5: фон #ffffff, кнопка #ffffff
         const colors = [
-            { id: 1, name: 'light-green', hex: '#D1FAE5' },
-            { id: 2, name: 'light-blue', hex: '#DBEAFE' },
-            { id: 3, name: 'light-orange', hex: '#FFEDD5' },
-            { id: 4, name: 'light-gray', hex: '#F3F4F6' },
-            { id: 5, name: 'white', hex: '#FFFFFF' }
+            { id: 1, name: 'default-light', hex: '#B3E5FC', board: '#f7fbff' },
+            { id: 2, name: 'mint-light',    hex: '#E8F5E9', board: '#f8fff7' },
+            { id: 3, name: 'peach-light',   hex: '#FFF3E0', board: '#fffcf7' },
+            { id: 4, name: 'gray-light',    hex: '#f5f5f5', board: '#f5f5f5' },
+            { id: 5, name: 'white',         hex: '#ffffff', board: '#ffffff' }
         ];
         const grid = document.createElement('div');
         grid.className = 'moodboard-topbar__paint-grid';
@@ -117,7 +122,7 @@ export class Topbar {
             b.style.background = c.hex;
             b.dataset.colorId = String(c.id);
             b.addEventListener('click', () => {
-                this.eventBus.emit(Events.UI.PaintPick, { id: c.id, color: c.hex, name: c.name });
+                this.eventBus.emit(Events.UI.PaintPick, { id: c.id, color: c.board, name: c.name });
                 if (this._paintPopover) this._paintPopover.remove();
                 this._paintPopover = null;
             });

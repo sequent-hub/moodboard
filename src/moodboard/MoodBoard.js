@@ -92,7 +92,8 @@ export class MoodBoard {
             boardId: this.options.boardId || 'workspace-board',
             width: canvasSize.width,
             height: canvasSize.height,
-            backgroundColor: this.options.theme === 'dark' ? 0x2a2a2a : 0xF5F5F5,
+            // Цвет фона по умолчанию: #f7fbff (светлый голубовато-белый)
+            backgroundColor: this.options.theme === 'dark' ? 0x2a2a2a : 0xF7FBFF,
             // Передаем только настройки эндпоинтов для автосохранения
             saveEndpoint: this.options.saveEndpoint,
             loadEndpoint: this.options.loadEndpoint
@@ -130,6 +131,17 @@ export class MoodBoard {
             this.coreMoodboard.eventBus,
             this.options.theme
         );
+
+        // Смена фона доски по выбору цвета в топбаре
+        this.coreMoodboard.eventBus.on(Events.UI.PaintPick, ({ color }) => {
+            if (!color) return;
+            const hex = typeof color === 'string' && color.startsWith('#')
+                ? parseInt(color.slice(1), 16)
+                : color;
+            if (this.coreMoodboard?.pixi?.app?.renderer) {
+                this.coreMoodboard.pixi.app.renderer.backgroundColor = hex;
+            }
+        });
     }
 
     initZoombar() {
