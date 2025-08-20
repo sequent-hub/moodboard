@@ -1,4 +1,4 @@
-// Создайте файл tests/core/rendering/PixiRenderer.test.js
+// Создайте файл tests/core/rendering/PixiRenderer.test.js пока не работает!!!
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Мокаем весь модуль pixi.js inline
