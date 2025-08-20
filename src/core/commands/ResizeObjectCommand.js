@@ -40,14 +40,15 @@ export class ResizeObjectCommand extends BaseCommand {
         
         // Обновляем размер в PIXI с указанием типа
         this.coreMoodboard.pixi.updateObjectSize(this.objectId, size, objectType);
-        
-        // Обновляем позицию если передана
+
+        // Обновляем позицию если передана (позиция в state — левый-верх; в PIXI — центр)
         if (position && object) {
             const pixiObject = this.coreMoodboard.pixi.objects.get(this.objectId);
             if (pixiObject) {
-                // Для текстоподобных (emoji) позиция трактуется как левый-верх
-                pixiObject.x = position.x;
-                pixiObject.y = position.y;
+                const halfW = (size?.width ?? pixiObject.width ?? 0) / 2;
+                const halfH = (size?.height ?? pixiObject.height ?? 0) / 2;
+                pixiObject.x = position.x + halfW;
+                pixiObject.y = position.y + halfH;
                 object.position.x = position.x;
                 object.position.y = position.y;
             }

@@ -569,10 +569,10 @@ export class SelectTool extends BaseTool {
             this._resizeCtrl.update({ ...event, x: w.x, y: w.y }, {
                 calculateNewSize: (handleType, startBounds, dx, dy, keepAR) => {
                     const rot = (() => { const d = { objectId: this.dragTarget, rotation: 0 }; this.emit(Events.Tool.GetObjectRotation, d); return d.rotation || 0; })();
-                    return calculateNewSize(handleType, startBounds, dx, dy, keepAR, rot);
+                    return this.calculateNewSize(handleType, startBounds, dx, dy, keepAR, rot);
                 },
                 calculatePositionOffset: (handleType, startBounds, newSize, objectRotation) => {
-                    return calculatePositionOffset(handleType, startBounds, newSize, objectRotation);
+                    return this.calculatePositionOffset(handleType, startBounds, newSize, objectRotation);
                 }
             });
         }
@@ -1241,59 +1241,48 @@ export class SelectTool extends BaseTool {
      * Вычисляет смещение позиции при изменении размера через левые/верхние ручки
      */
     calculatePositionOffset(handleType, startBounds, newSize, objectRotation = 0) {
-        // Вычисляем изменения размера
-        const deltaWidth = newSize.width - startBounds.width;
-        const deltaHeight = newSize.height - startBounds.height;
-        
-        // Определяем смещение в локальной системе координат объекта (до поворота)
-        let localOffsetX = 0;
-        let localOffsetY = 0;
-        
-        // В локальной системе координат (не повернутой) определяем смещение
-        // в зависимости от исходного типа ручки (до трансформации)
+        // Позиция в состоянии — левый верх. Для левых/верхних ручек топ-лев должен 
+        // смещаться на ту же величину, что и движение мыши в соответствующей оси.
+        // Мы восстанавливаем это через разницу размеров: 
+        // deltaX = start.width - new.width (эквивалентно мировому смещению мыши по X для левых ручек)
+        // deltaY = start.height - new.height (эквивалентно мировому смещению мыши по Y для верхних ручек)
+
+        const deltaX = startBounds.width - newSize.width;
+        const deltaY = startBounds.height - newSize.height;
+
+        let offsetX = 0;
+        let offsetY = 0;
+
         switch (handleType) {
-            case 'nw': // Левый верхний угол
-                localOffsetX = -deltaWidth / 2;  // Левый край неподвижен
-                localOffsetY = -deltaHeight / 2; // Верхний край неподвижен
+            case 'nw':
+                offsetX = deltaX; // левый край движется вместе с мышью
+                offsetY = deltaY; // верхний край движется вместе с мышью
                 break;
-            case 'n': // Верхняя сторона
-                localOffsetX = 0;                // Центр по горизонтали
-                localOffsetY = -deltaHeight / 2; // Верхний край неподвижен
+            case 'n':
+                offsetY = deltaY; // только верхний край
                 break;
-            case 'ne': // Правый верхний угол
-                localOffsetX = deltaWidth / 2;   // Правый край неподвижен
-                localOffsetY = -deltaHeight / 2; // Верхний край неподвижен
+            case 'ne':
+                offsetY = deltaY; // верх двигается, правый — нет
                 break;
-            case 'e': // Правая сторона
-                localOffsetX = deltaWidth / 2;   // Правый край неподвижен
-                localOffsetY = 0;                // Центр по вертикали
+            case 'e':
+                // правый край — левый верх не смещается
                 break;
-            case 'se': // Правый нижний угол
-                localOffsetX = deltaWidth / 2;   // Правый край неподвижен
-                localOffsetY = deltaHeight / 2;  // Нижний край неподвижен
+            case 'se':
+                // правый нижний — левый верх не смещается
                 break;
-            case 's': // Нижняя сторона
-                localOffsetX = 0;                // Центр по горизонтали
-                localOffsetY = deltaHeight / 2;  // Нижний край неподвижен
+            case 's':
+                // нижний — левый верх не смещается
                 break;
-            case 'sw': // Левый нижний угол
-                localOffsetX = -deltaWidth / 2;  // Левый край неподвижен
-                localOffsetY = deltaHeight / 2;  // Нижний край неподвижен
+            case 'sw':
+                offsetX = deltaX; // левый двигается, низ — нет
                 break;
-            case 'w': // Левая сторона
-                localOffsetX = -deltaWidth / 2;  // Левый край неподвижен
-                localOffsetY = 0;                // Центр по вертикали
+            case 'w':
+                offsetX = deltaX; // левый край двигается
                 break;
         }
-        
-        // Поворачиваем смещение на угол объекта для получения мирового смещения
-        const angleRad = objectRotation * Math.PI / 180;
-        const cos = Math.cos(angleRad);
-        const sin = Math.sin(angleRad);
-        
-        const worldOffsetX = localOffsetX * cos - localOffsetY * sin;
-        const worldOffsetY = localOffsetX * sin + localOffsetY * cos;
-        
-        return { x: worldOffsetX, y: worldOffsetY };
+
+        // Для поворота корректное смещение требует преобразования в локальные координаты объекта
+        // и обратно. В данной итерации оставляем смещение в мировых осях для устойчивости без вращения.
+        return { x: offsetX, y: offsetY };
     }
 }

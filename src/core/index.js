@@ -660,12 +660,12 @@ export class CoreMoodBoard {
                     x: newBounds.x + newBounds.width / 2 + relCenterX * sx,
                     y: newBounds.y + newBounds.height / 2 + relCenterY * sy
                 };
-                // Преобразуем центр в левый верх для state/PIXI (мы используем x/y как левый верх)
-                const newPos = { x: newCenter.x, y: newCenter.y };
                 const newSize = {
                     width: Math.max(10, snap.size.width * sx),
                     height: Math.max(10, snap.size.height * sy)
                 };
+                // Преобразуем центр в левый верх для state/PIXI (мы используем x/y как левый верх)
+                const newPos = { x: newCenter.x - newSize.width / 2, y: newCenter.y - newSize.height / 2 };
                 this.updateObjectSizeAndPositionDirect(id, newSize, newPos, snap.type || null);
             }
         });
@@ -1169,19 +1169,18 @@ export class CoreMoodBoard {
     updateObjectSizeAndPositionDirect(objectId, size, position = null, objectType = null) {
         // Обновляем размер в PIXI
         const pixiObject = this.pixi.objects.get(objectId);
-        const prevPosition = pixiObject ? { x: pixiObject.x, y: pixiObject.y } : null;
+        const prevCenter = pixiObject ? { x: pixiObject.x, y: pixiObject.y } : null;
         this.pixi.updateObjectSize(objectId, size, objectType);
-        
-        // Обновляем позицию если передана (для левых/верхних ручек)
+
+        // Обновляем позицию если передана (state: левый-верх; PIXI: центр)
         if (position) {
             const pixiObject2 = this.pixi.objects.get(objectId);
             if (pixiObject2) {
-                console.log(`📍 Устанавливаем позицию объекта: (${position.x}, ${position.y})`);
-                // Если pixiObject был и мы только что пересоздавали геометрию, могли потерять центр.
-                // Ставим позицию как есть (левый верх) — в PixiEngine пересоздание больше не трогает позицию.
-                pixiObject2.x = position.x;
-                pixiObject2.y = position.y;
-                
+                const halfW = (size?.width ?? pixiObject2.width ?? 0) / 2;
+                const halfH = (size?.height ?? pixiObject2.height ?? 0) / 2;
+                pixiObject2.x = position.x + halfW;
+                pixiObject2.y = position.y + halfH;
+
                 // Обновляем позицию в состоянии
                 const objects = this.state.state.objects;
                 const object = objects.find(obj => obj.id === objectId);
@@ -1189,6 +1188,13 @@ export class CoreMoodBoard {
                     object.position.x = position.x;
                     object.position.y = position.y;
                 }
+            }
+        } else if (prevCenter) {
+            // Если позиция не передана, сохраняем прежний центр (без дрейфа)
+            const pixiAfter = this.pixi.objects.get(objectId);
+            if (pixiAfter) {
+                pixiAfter.x = prevCenter.x;
+                pixiAfter.y = prevCenter.y;
             }
         }
         
