@@ -442,6 +442,36 @@ export class CoreMoodBoard {
             this.eventBus.emit(Events.UI.ZoomPercent, { percentage: Math.round(newScale * 100) });
         });
 
+        // Данные для миникарты (bbox объектов, трансформации мира, размеры вьюпорта)
+        this.eventBus.on(Events.UI.MinimapGetData, (data) => {
+            const world = this.pixi.worldLayer || this.pixi.app.stage;
+            const view = this.pixi.app.view;
+            const scale = world?.scale?.x || 1;
+
+            // Объекты берём из состояния (левый-верх + ширина/высота) и угол, если есть
+            const objects = (this.state.state.objects || []).map((o) => ({
+                id: o.id,
+                x: o.position?.x ?? 0,
+                y: o.position?.y ?? 0,
+                width: o.width ?? 0,
+                height: o.height ?? 0,
+                rotation: o.rotation ?? (o.transform?.rotation ?? 0)
+            }));
+
+            data.world = { x: world.x || 0, y: world.y || 0, scale };
+            data.view = { width: view.clientWidth, height: view.clientHeight };
+            data.objects = objects;
+        });
+
+        // Центрирование основного вида на точке из миникарты (world coords)
+        this.eventBus.on(Events.UI.MinimapCenterOn, ({ worldX, worldY }) => {
+            const world = this.pixi.worldLayer || this.pixi.app.stage;
+            const view = this.pixi.app.view;
+            const s = world?.scale?.x || 1;
+            world.x = view.clientWidth / 2 - worldX * s;
+            world.y = view.clientHeight / 2 - worldY * s;
+        });
+
         // === ГРУППОВОЕ ПЕРЕТАСКИВАНИЕ ===
         this.eventBus.on(Events.Tool.GroupDragStart, (data) => {
             // Сохраняем стартовые позиции для текущей группы
