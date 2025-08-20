@@ -606,6 +606,42 @@
     background: #e6e6e6;
 }
 
+/* Divider for topbar */
+.moodboard-topbar__divider {
+    width: 1px;
+    height: 28px;
+    background: #e5e7eb;
+    margin: 0 6px 0 2px;
+}
+
+/* Paint popover */
+.moodboard-topbar__paint-popover {
+    position: absolute;
+    top: 48px;
+    left: 0;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    padding: 8px;
+    z-index: 3100;
+}
+
+.moodboard-topbar__paint-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 28px);
+    gap: 8px;
+}
+
+.moodboard-topbar__paint-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.moodboard-topbar__paint-btn:hover { filter: brightness(0.97); }
+
 .moodboard-topbar__zoom {
     display: inline-flex;
     align-items: center;
