@@ -1,3 +1,5 @@
+import { Events } from '../core/events/Events.js';
+
 export class MapPanel {
     constructor(container, eventBus) {
         this.container = container;
@@ -30,7 +32,7 @@ export class MapPanel {
             e.stopPropagation();
             if (this.popupEl) this.hidePopup();
             else this.showPopup();
-            this.eventBus.emit('ui:map:toggle');
+            this.eventBus.emit(Events.UI.MapToggle);
         });
 
         // Закрытие по клику вне панели
@@ -53,12 +55,12 @@ export class MapPanel {
             const { worldX, worldY } = this.miniToWorld(mx, my);
             // Переводим мировые координаты в экранные, чтобы использовать существующий зум ядра
             const req = {};
-            this.eventBus.emit('ui:minimap:get-data', req);
+            this.eventBus.emit(Events.UI.MinimapGetData, req);
             const { world } = req;
             const screenX = worldX * (world.scale || 1) + world.x;
             const screenY = worldY * (world.scale || 1) + world.y;
             const delta = e.deltaY;
-            this.eventBus.emit('tool:wheel:zoom', { x: screenX, y: screenY, delta });
+            this.eventBus.emit(Events.Tool.WheelZoom, { x: screenX, y: screenY, delta });
         }, { passive: false });
     }
 
@@ -143,7 +145,7 @@ export class MapPanel {
     // Обратное преобразование: миникарта -> мир (используем bbox объектов)
     miniToWorld(miniX, miniY) {
         const req = {};
-        this.eventBus.emit('ui:minimap:get-data', req);
+        this.eventBus.emit(Events.UI.MinimapGetData, req);
         const { view, objects } = req;
         // Рассчитываем bbox по объектам
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -174,7 +176,7 @@ export class MapPanel {
         const y = e.clientY - rect.top;
         // Центрируем основной вид на точке
         const { worldX, worldY } = this.miniToWorld(x, y);
-        this.eventBus.emit('ui:minimap:center-on', { worldX, worldY });
+        this.eventBus.emit(Events.UI.MinimapCenterOn, { worldX, worldY });
         this.renderMinimap();
     }
 
@@ -188,7 +190,7 @@ export class MapPanel {
 
         // Получаем данные
         const req = {};
-        this.eventBus.emit('ui:minimap:get-data', req);
+        this.eventBus.emit(Events.UI.MinimapGetData, req);
         const { world, view, objects } = req;
         if (!view || !world) return;
         // Вычисляем bbox объектов
@@ -219,7 +221,7 @@ export class MapPanel {
         ctx.scale(scale, scale);
         // Подготовим множество выделенных объектов
         const selReq = { selection: [] };
-        this.eventBus.emit('tool:get:selection', selReq);
+        this.eventBus.emit(Events.Tool.GetSelection, selReq);
         const selectedSet = new Set(selReq.selection || []);
 
         // Сначала рисуем все объекты бледным

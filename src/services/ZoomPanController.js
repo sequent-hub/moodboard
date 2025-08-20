@@ -14,12 +14,13 @@ export class ZoomPanController {
 			const oldScale = world.scale.x || 1;
 			const newScale = Math.max(0.1, Math.min(5, oldScale * factor));
 			if (newScale === oldScale) return;
-			const globalPoint = new this.pixi.app.renderer.plugins.interaction.cursor.global.constructor(x, y);
-			const localPoint = world.toLocal({ x, y });
+			// Вычисляем мировые координаты точки под курсором до изменения скейла
+			const worldX = (x - world.x) / oldScale;
+			const worldY = (y - world.y) / oldScale;
+			// Применяем новый скейл и пересчитываем позицию, чтобы точка под курсором осталась на месте
 			world.scale.set(newScale);
-			const newGlobal = world.toGlobal(localPoint);
-			world.x += (x - newGlobal.x);
-			world.y += (y - newGlobal.y);
+			world.x = x - worldX * newScale;
+			world.y = y - worldY * newScale;
 			this.eventBus.emit(Events.UI.ZoomPercent, { percentage: Math.round(newScale * 100) });
 		});
 
@@ -34,13 +35,14 @@ export class ZoomPanController {
 		});
 		this.eventBus.on(Events.UI.ZoomReset, () => {
 			const world = this.pixi.worldLayer || this.pixi.app.stage;
-			const center = { x: this.pixi.app.view.clientWidth / 2, y: this.pixi.app.view.clientHeight / 2 };
-			const globalPoint = center;
-			const localPoint = world.toLocal(globalPoint);
+			const centerX = this.pixi.app.view.clientWidth / 2;
+			const centerY = this.pixi.app.view.clientHeight / 2;
+			const oldScale = world.scale.x || 1;
+			const worldX = (centerX - world.x) / oldScale;
+			const worldY = (centerY - world.y) / oldScale;
 			world.scale.set(1);
-			const newGlobal = world.toGlobal(localPoint);
-			world.x += (globalPoint.x - newGlobal.x);
-			world.y += (globalPoint.y - newGlobal.y);
+			world.x = centerX - worldX * 1;
+			world.y = centerY - worldY * 1;
 			this.eventBus.emit(Events.UI.ZoomPercent, { percentage: 100 });
 		});
 		this.eventBus.on(Events.UI.ZoomFit, () => {

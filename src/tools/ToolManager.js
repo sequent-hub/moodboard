@@ -1,3 +1,5 @@
+import { Events } from '../core/events/Events.js';
+
 /**
  * Менеджер инструментов - управляет активными инструментами и переключением между ними
  */
@@ -292,7 +294,7 @@ export class ToolManager {
         };
         
         // Глобальный зум колесиком (без Ctrl) — предотвращаем дефолтный скролл страницы
-        this.eventBus.emit('tool:wheel:zoom', { x: event.x, y: event.y, delta: e.deltaY });
+        this.eventBus.emit(Events.Tool.WheelZoom, { x: event.x, y: event.y, delta: e.deltaY });
         e.preventDefault();
         
         // Предотвращаем скроллинг страницы при зуме
