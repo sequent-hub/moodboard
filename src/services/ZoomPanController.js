@@ -20,17 +20,17 @@ export class ZoomPanController {
 			const newGlobal = world.toGlobal(localPoint);
 			world.x += (x - newGlobal.x);
 			world.y += (y - newGlobal.y);
-			this.eventBus.emit('ui:zoom:percent', { percentage: Math.round(newScale * 100) });
+			this.eventBus.emit(Events.UI.ZoomPercent, { percentage: Math.round(newScale * 100) });
 		});
 
 		// Кнопки зума из UI
 		this.eventBus.on(Events.UI.ZoomIn, () => {
 			const center = { x: this.pixi.app.view.clientWidth / 2, y: this.pixi.app.view.clientHeight / 2 };
-			this.eventBus.emit('tool:wheel:zoom', { x: center.x, y: center.y, delta: -120 });
+			this.eventBus.emit(Events.Tool.WheelZoom, { x: center.x, y: center.y, delta: -120 });
 		});
 		this.eventBus.on(Events.UI.ZoomOut, () => {
 			const center = { x: this.pixi.app.view.clientWidth / 2, y: this.pixi.app.view.clientHeight / 2 };
-			this.eventBus.emit('tool:wheel:zoom', { x: center.x, y: center.y, delta: 120 });
+			this.eventBus.emit(Events.Tool.WheelZoom, { x: center.x, y: center.y, delta: 120 });
 		});
 		this.eventBus.on(Events.UI.ZoomReset, () => {
 			const world = this.pixi.worldLayer || this.pixi.app.stage;
@@ -41,7 +41,7 @@ export class ZoomPanController {
 			const newGlobal = world.toGlobal(localPoint);
 			world.x += (globalPoint.x - newGlobal.x);
 			world.y += (globalPoint.y - newGlobal.y);
-			this.eventBus.emit('ui:zoom:percent', { percentage: 100 });
+			this.eventBus.emit(Events.UI.ZoomPercent, { percentage: 100 });
 		});
 		this.eventBus.on(Events.UI.ZoomFit, () => {
 			const objs = (this.pixi?.objects ? Array.from(this.pixi.objects.values()) : []);

@@ -6,13 +6,16 @@ export const Events = {
 		Deactivated: 'tool:deactivated',
 		ContextMenuShow: 'tool:context:menu:show',
 		SelectionAdd: 'tool:selection:add',
+		SelectionRemove: 'tool:selection:remove',
 		SelectionClear: 'tool:selection:clear',
+		SelectionAll: 'tool:selection:all',
 		HitTest: 'tool:hit:test',
 		GetSelection: 'tool:get:selection',
 		GetAllObjects: 'tool:get:all:objects',
 		GetObjectPosition: 'tool:get:object:position',
 		GetObjectSize: 'tool:get:object:size',
 		GetObjectRotation: 'tool:get:object:rotation',
+		GetObjectPixi: 'tool:get:object:pixi',
 		DragStart: 'tool:drag:start',
 		DragUpdate: 'tool:drag:update',
 		DragEnd: 'tool:drag:end',
@@ -36,6 +39,8 @@ export const Events = {
 		GroupDuplicateReady: 'tool:group:duplicate:ready',
 		PanUpdate: 'tool:pan:update',
 		WheelZoom: 'tool:wheel:zoom',
+		ObjectsDelete: 'tool:objects:delete',
+		ObjectEdit: 'tool:object:edit',
 	},
 
 	UI: {
@@ -63,6 +68,7 @@ export const Events = {
 		LayerGroupBringForward: 'ui:layer-group:bring-forward',
 		LayerGroupSendBackward: 'ui:layer-group:send-backward',
 		LayerGroupSendToBack: 'ui:layer-group:send-to-back',
+		MapToggle: 'ui:map:toggle',
 	},
 
 	Keyboard: {
@@ -99,10 +105,16 @@ export const Events = {
 		StatusChanged: 'save:status-changed',
 		Success: 'save:success',
 		Error: 'save:error',
+		Loaded: 'save:loaded',
+		LoadError: 'save:load-error',
 	},
 
 	Grid: {
 		BoardDataChanged: 'board:data-changed',
+	},
+
+	Board: {
+		Loaded: 'board:loaded',
 	},
 
 	Place: {

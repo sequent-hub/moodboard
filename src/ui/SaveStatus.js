@@ -1,6 +1,8 @@
 /**
  * Компонент индикатора статуса сохранения
  */
+import { Events } from '../core/events/Events.js';
+
 export class SaveStatus {
     constructor(container, eventBus, options = {}) {
         this.container = container;
@@ -80,17 +82,17 @@ export class SaveStatus {
      */
     setupEventListeners() {
         // Статус сохранения
-        this.eventBus.on('save:status-changed', (data) => {
+        this.eventBus.on(Events.Save.StatusChanged, (data) => {
             this.updateStatus(data);
         });
         
         // Успешное сохранение
-        this.eventBus.on('save:success', (data) => {
+        this.eventBus.on(Events.Save.Success, (data) => {
             this.showSuccess(data);
         });
         
         // Ошибка сохранения
-        this.eventBus.on('save:error', (data) => {
+        this.eventBus.on(Events.Save.Error, (data) => {
             this.showError(data);
         });
     }
@@ -237,9 +239,9 @@ export class SaveStatus {
             clearTimeout(this.hideTimer);
         }
         
-        this.eventBus.off('save:status-changed');
-        this.eventBus.off('save:success');
-        this.eventBus.off('save:error');
+        this.eventBus.off(Events.Save.StatusChanged);
+        this.eventBus.off(Events.Save.Success);
+        this.eventBus.off(Events.Save.Error);
         
         if (this.element && this.element.parentNode) {
             this.element.parentNode.removeChild(this.element);

@@ -1,4 +1,5 @@
 import { BaseTool } from '../BaseTool.js';
+import { Events } from '../../core/events/Events.js';
 import * as PIXI from 'pixi.js';
 
 /**
@@ -30,7 +31,7 @@ export class DrawingTool extends BaseTool {
 
         // Подписка на изменения кисти (резерв на будущее)
         if (this.eventBus) {
-            this.eventBus.on('draw:brush:set', (data) => {
+            this.eventBus.on(Events.Draw.BrushSet, (data) => {
                 if (!data) return;
                 const patch = {};
                 if (typeof data.width === 'number') patch.width = data.width;
@@ -39,7 +40,7 @@ export class DrawingTool extends BaseTool {
                 this.brush = { ...this.brush, ...patch };
             });
             // Удаление объектов ластиком: кликаем по объекту — если попали, удаляем
-            this.eventBus.on('tool:hit:test', (data) => {
+            this.eventBus.on(Events.Tool.HitTest, (data) => {
                 // Прокси для совместимости, не используем здесь
             });
         }
@@ -75,15 +76,15 @@ export class DrawingTool extends BaseTool {
         // Если режим ластика — попробуем удалить объект под курсором и показать временный след
         if (this.brush.mode === 'eraser') {
             const hitData = { x: event.x, y: event.y, result: null };
-            this.emit('hit:test', hitData);
+            this.emit(Events.Tool.HitTest, hitData);
             if (hitData.result && hitData.result.object) {
                 // Проверяем, что это именно нарисованный объект (drawing)
                 const pixReq = { objectId: hitData.result.object, pixiObject: null };
-                this.emit('get:object:pixi', pixReq);
+                this.emit(Events.Tool.GetObjectPixi, pixReq);
                 const pixObj = pixReq.pixiObject;
                 const isDrawing = !!(pixObj && pixObj._mb && pixObj._mb.type === 'drawing');
                 if (isDrawing) {
-                    this.eventBus.emit('toolbar:action', { type: 'delete-object', id: hitData.result.object });
+                    this.eventBus.emit(Events.UI.ToolbarAction, { type: 'delete-object', id: hitData.result.object });
                 }
             }
             // Рисуем временный след ластика
@@ -190,7 +191,7 @@ export class DrawingTool extends BaseTool {
         };
 
         // Важно: отправляем глобальное событие без префикса tool:
-        this.eventBus.emit('toolbar:action', { type: 'drawing', id: 'drawing', position, properties });
+        this.eventBus.emit(Events.UI.ToolbarAction, { type: 'drawing', id: 'drawing', position, properties });
 
         // Чистим временную графику
         if (this.tempGraphics && this.tempGraphics.parent) this.tempGraphics.parent.removeChild(this.tempGraphics);

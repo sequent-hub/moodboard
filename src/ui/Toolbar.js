@@ -1,6 +1,8 @@
 /**
  * Панель инструментов для MoodBoard
  */
+import { Events } from '../core/events/Events.js';
+
 export class Toolbar {
     constructor(container, eventBus, theme = 'light') {
         this.container = container;
@@ -65,7 +67,7 @@ export class Toolbar {
         this.createEmojiPopup();
 
         // Подсветка активной кнопки на тулбаре по активному инструменту
-        this.eventBus.on('tool:activated', ({ tool }) => {
+        this.eventBus.on(Events.Tool.Activated, ({ tool }) => {
             this.setActiveToolbarButton(tool);
         });
 
@@ -108,13 +110,13 @@ export class Toolbar {
             
             // Обрабатываем undo/redo отдельно
             if (toolType === 'undo') {
-                this.eventBus.emit('keyboard:undo');
+                this.eventBus.emit(Events.Keyboard.Undo);
                 this.animateButton(button);
                 return;
             }
             
             if (toolType === 'redo') {
-                this.eventBus.emit('keyboard:redo');
+                this.eventBus.emit(Events.Keyboard.Redo);
                 this.animateButton(button);
                 return;
             }
@@ -126,8 +128,8 @@ export class Toolbar {
                 this.closeDrawPopup();
                 this.closeEmojiPopup();
                 // Сбрасываем отложенное размещение, активируем select
-                this.eventBus.emit('place:set', null);
-                this.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+                this.eventBus.emit(Events.Place.Set, null);
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
                 this.setActiveToolbarButton('select');
                 return;
             }
@@ -138,7 +140,7 @@ export class Toolbar {
                 this.closeShapesPopup();
                 this.closeDrawPopup();
                 this.closeEmojiPopup();
-                this.eventBus.emit('keyboard:tool-select', { tool: 'pan' });
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'pan' });
                 this.setActiveToolbarButton('pan');
                 return;
             }
@@ -160,9 +162,9 @@ export class Toolbar {
                 this.closeDrawPopup();
                 this.closeEmojiPopup();
                 // Активируем режим размещения и устанавливаем pending
-                this.eventBus.emit('keyboard:tool-select', { tool: 'place' });
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
                 this.setActiveToolbarButton('place');
-                this.eventBus.emit('place:set', {
+                this.eventBus.emit(Events.Place.Set, {
                     type: 'frame',
                     properties: { width: 200, height: 300 }
                 });
@@ -176,7 +178,7 @@ export class Toolbar {
                 this.closeDrawPopup();
                 this.closeEmojiPopup();
                 // Активируем универсальный place tool для дальнейшего размещения
-                this.eventBus.emit('keyboard:tool-select', { tool: 'place' });
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
                 this.setActiveToolbarButton('place');
                 return;
             }
@@ -188,7 +190,7 @@ export class Toolbar {
                 this.closeShapesPopup();
                 this.closeEmojiPopup();
                 // Выбираем инструмент рисования (последующее действие — на холсте)
-                this.eventBus.emit('keyboard:tool-select', { tool: 'draw' });
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'draw' });
                 this.setActiveToolbarButton('draw');
                 return;
             }
@@ -199,12 +201,12 @@ export class Toolbar {
                 this.toggleEmojiPopup(button);
                 this.closeShapesPopup();
                 this.closeDrawPopup();
-                this.eventBus.emit('keyboard:tool-select', { tool: 'place' });
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
                 return;
             }
             
             // Эмитим событие для других инструментов
-            this.eventBus.emit('toolbar:action', {
+            this.eventBus.emit(Events.UI.ToolbarAction, {
                 type: toolType,
                 id: toolId,
                 position: this.getRandomPosition()
@@ -313,7 +315,7 @@ export class Toolbar {
                 this.animateButton(btn);
                 if (s.isToolbarAction) {
                     // Режим: добавить дефолтную фигуру по клику на холсте
-                    this.eventBus.emit('place:set', { type: 'shape', properties: { kind: 'square' } });
+                    this.eventBus.emit(Events.Place.Set, { type: 'shape', properties: { kind: 'square' } });
                     this.closeShapesPopup();
                     return;
                 }
@@ -327,7 +329,7 @@ export class Toolbar {
                     'arrow': { kind: 'arrow' }
                 };
                 const props = propsMap[s.id] || { kind: 'square' };
-                this.eventBus.emit('place:set', { type: 'shape', properties: props });
+                this.eventBus.emit(Events.Place.Set, { type: 'shape', properties: props });
                 this.closeShapesPopup();
             });
             grid.appendChild(btn);
@@ -400,7 +402,7 @@ export class Toolbar {
                 btn.classList.add('moodboard-draw__btn--active');
                 this.currentDrawTool = t.tool;
                 // Сообщаем текущий мод
-                this.eventBus.emit('draw:brush:set', { mode: t.tool });
+                this.eventBus.emit(Events.Draw.BrushSet, { mode: t.tool });
                 // Перестраиваем нижний ряд пресетов
                 this.buildDrawPresets(row2);
             });
@@ -440,7 +442,7 @@ export class Toolbar {
                         btn.classList.add('moodboard-draw__btn--active');
                         const width = s.width;
                         const color = parseInt(s.color.replace('#',''), 16);
-                        this.eventBus.emit('draw:brush:set', { mode: 'pencil', width, color });
+                        this.eventBus.emit(Events.Draw.BrushSet, { mode: 'pencil', width, color });
                     });
                     container.appendChild(btn);
                 });
@@ -450,7 +452,7 @@ export class Toolbar {
                     first.classList.add('moodboard-draw__btn--active');
                     const width = parseInt(first.dataset.brushWidth, 10) || 2;
                     const color = parseInt((first.dataset.brushColor || '#111827').replace('#',''), 16);
-                    this.eventBus.emit('draw:brush:set', { mode: 'pencil', width, color });
+                    this.eventBus.emit(Events.Draw.BrushSet, { mode: 'pencil', width, color });
                 }
             } else if (this.currentDrawTool === 'marker') {
                 const swatches = [
@@ -471,7 +473,7 @@ export class Toolbar {
                         container.querySelectorAll('.moodboard-draw__btn--active').forEach(el => el.classList.remove('moodboard-draw__btn--active'));
                         btn.classList.add('moodboard-draw__btn--active');
                         const color = parseInt(s.color.replace('#',''), 16);
-                        this.eventBus.emit('draw:brush:set', { mode: 'marker', color, width: 8 });
+                        this.eventBus.emit(Events.Draw.BrushSet, { mode: 'marker', color, width: 8 });
                     });
                     container.appendChild(btn);
                 });
@@ -480,11 +482,11 @@ export class Toolbar {
                 if (first) {
                     first.classList.add('moodboard-draw__btn--active');
                     const color = parseInt(swatches[0].color.replace('#',''), 16);
-                    this.eventBus.emit('draw:brush:set', { mode: 'marker', color, width: 8 });
+                    this.eventBus.emit(Events.Draw.BrushSet, { mode: 'marker', color, width: 8 });
                 }
             } else if (this.currentDrawTool === 'eraser') {
                 // Ластик — без пресетов
-                this.eventBus.emit('draw:brush:set', { mode: 'eraser' });
+                this.eventBus.emit(Events.Draw.BrushSet, { mode: 'eraser' });
             }
         };
 
@@ -496,7 +498,7 @@ export class Toolbar {
         const pencilBtn = row1.querySelector('.moodboard-draw__btn--pencil-tool');
         if (pencilBtn) pencilBtn.classList.add('moodboard-draw__btn--active');
         this.currentDrawTool = 'pencil';
-        this.eventBus.emit('draw:brush:set', { mode: 'pencil' });
+        this.eventBus.emit(Events.Draw.BrushSet, { mode: 'pencil' });
         this.buildDrawPresets(row2);
     }
 
@@ -559,7 +561,7 @@ export class Toolbar {
                     this.animateButton(btn);
                     // Устанавливаем pending для размещения emoji кликом по холсту
                     const size = 48; // базовый размер
-                    this.eventBus.emit('place:set', {
+                    this.eventBus.emit(Events.Place.Set, {
                         type: 'emoji',
                         properties: { content: ch, fontSize: size, width: size, height: size },
                         size: { width: size, height: size },
@@ -648,7 +650,7 @@ export class Toolbar {
      */
     setupHistoryEvents() {
         // Слушаем изменения истории для обновления кнопок undo/redo
-        this.eventBus.on('ui:update-history-buttons', (data) => {
+        this.eventBus.on(Events.UI.UpdateHistoryButtons, (data) => {
             this.updateHistoryButtons(data.canUndo, data.canRedo);
         });
     }
@@ -693,6 +695,6 @@ export class Toolbar {
         }
         
         // Отписываемся от событий
-        this.eventBus.removeAllListeners('ui:update-history-buttons');
+        this.eventBus.removeAllListeners(Events.UI.UpdateHistoryButtons);
     }
 }

@@ -1,4 +1,5 @@
 import { CoreMoodBoard } from '../core/index.js';
+import { Events } from '../core/events/Events.js';
 import { Toolbar } from '../ui/Toolbar.js';
 import { SaveStatus } from '../ui/SaveStatus.js';
 import { Topbar } from '../ui/Topbar.js';
@@ -118,7 +119,7 @@ export class MoodBoard {
         );
         
         // Подписываемся на события тулбара
-        this.coreMoodboard.eventBus.on('toolbar:action', (action) => {
+        this.coreMoodboard.eventBus.on(Events.UI.ToolbarAction, (action) => {
             this.actionHandler.handleToolbarAction(action);
         });
     }

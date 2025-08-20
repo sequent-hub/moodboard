@@ -1,6 +1,8 @@
 /**
  * Базовый класс для всех инструментов MoodBoard
  */
+import { Events } from '../core/events/Events.js';
+
 export class BaseTool {
     constructor(name, eventBus) {
         this.name = name;
@@ -22,7 +24,7 @@ export class BaseTool {
         this.isActive = true;
         this.onActivate();
         this.setCursor();
-        this.eventBus.emit('tool:activated', { tool: this.name });
+        this.eventBus.emit(Events.Tool.Activated, { tool: this.name });
     }
     
     /**
@@ -31,7 +33,7 @@ export class BaseTool {
     deactivate() {
         this.isActive = false;
         this.onDeactivate();
-        this.eventBus.emit('tool:deactivated', { tool: this.name });
+        this.eventBus.emit(Events.Tool.Deactivated, { tool: this.name });
     }
     
     /**
@@ -179,7 +181,16 @@ export class BaseTool {
         ]);
 
         if (passThrough.has(name)) {
-            this.eventBus.emit(`tool:${name}`, data);
+            const map = new Map([
+                ['hit:test', Events.Tool.HitTest],
+                ['get:object:position', Events.Tool.GetObjectPosition],
+                ['get:object:pixi', Events.Tool.GetObjectPixi],
+                ['get:object:size', Events.Tool.GetObjectSize],
+                ['get:object:rotation', Events.Tool.GetObjectRotation],
+                ['get:all:objects', Events.Tool.GetAllObjects],
+            ]);
+            const evt = map.get(name) || `tool:${name}`;
+            this.eventBus.emit(evt, data);
             return;
         }
 
@@ -188,7 +199,35 @@ export class BaseTool {
         if (name.includes('rotate')) {
             console.log(`📡 BaseTool отправляет событие tool:${name}:`, eventData);
         }
-        this.eventBus.emit(`tool:${name}`, eventData);
+        const map2 = new Map([
+            ['drag:start', Events.Tool.DragStart],
+            ['drag:update', Events.Tool.DragUpdate],
+            ['drag:end', Events.Tool.DragEnd],
+            ['group:drag:start', Events.Tool.GroupDragStart],
+            ['group:drag:update', Events.Tool.GroupDragUpdate],
+            ['group:drag:end', Events.Tool.GroupDragEnd],
+            ['resize:start', Events.Tool.ResizeStart],
+            ['resize:update', Events.Tool.ResizeUpdate],
+            ['resize:end', Events.Tool.ResizeEnd],
+            ['group:resize:start', Events.Tool.GroupResizeStart],
+            ['group:resize:update', Events.Tool.GroupResizeUpdate],
+            ['group:resize:end', Events.Tool.GroupResizeEnd],
+            ['rotate:update', Events.Tool.RotateUpdate],
+            ['rotate:end', Events.Tool.RotateEnd],
+            ['group:rotate:start', Events.Tool.GroupRotateStart],
+            ['group:rotate:update', Events.Tool.GroupRotateUpdate],
+            ['group:rotate:end', Events.Tool.GroupRotateEnd],
+            ['duplicate:request', Events.Tool.DuplicateRequest],
+            ['context:menu:show', Events.Tool.ContextMenuShow],
+            ['objects:delete', Events.Tool.ObjectsDelete],
+            ['object:edit', Events.Tool.ObjectEdit],
+            ['selection:add', Events.Tool.SelectionAdd],
+            ['selection:remove', Events.Tool.SelectionRemove],
+            ['selection:clear', Events.Tool.SelectionClear],
+            ['selection:all', Events.Tool.SelectionAll],
+        ]);
+        const evt2 = map2.get(name) || `tool:${name}`;
+        this.eventBus.emit(evt2, eventData);
     }
     
     /**

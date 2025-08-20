@@ -313,7 +313,7 @@ export class SelectTool extends BaseTool {
             context = 'group';
         }
         // Сообщаем ядру/UI, что нужно показать контекстное меню (пока без пунктов)
-        this.emit('context:menu:show', { x: event.x, y: event.y, context, targetId });
+        this.emit(Events.Tool.ContextMenuShow, { x: event.x, y: event.y, context, targetId });
     }
     
     /**
@@ -457,7 +457,7 @@ export class SelectTool extends BaseTool {
         
         // Получаем текущую позицию объекта
         const objectData = { objectId, position: null };
-        this.emit('get:object:position', objectData);
+        this.emit(Events.Tool.GetObjectPosition, objectData);
         
         if (this._dragCtrl) this._dragCtrl.start(objectId, event);
     }
@@ -475,9 +475,9 @@ export class SelectTool extends BaseTool {
             this.clonePending = true;
             // Запрашиваем текущую позицию исходного объекта
             const positionData = { objectId: this.cloneSourceId, position: null };
-            this.emit('get:object:position', positionData);
+            this.emit(Events.Tool.GetObjectPosition, positionData);
             // Сообщаем ядру о необходимости создать дубликат у позиции исходного объекта
-            this.emit('duplicate:request', {
+            this.emit(Events.Tool.DuplicateRequest, {
                 originalId: this.cloneSourceId,
                 position: positionData.position || { x: event.x, y: event.y }
             });
@@ -501,7 +501,7 @@ export class SelectTool extends BaseTool {
     endDrag() {
         if (this.isGroupDragging) {
             const ids = this.selection.toArray();
-            this.emit('group:drag:end', { objects: ids });
+            this.emit(Events.Tool.GroupDragEnd, { objects: ids });
             if (this._groupDragCtrl) this._groupDragCtrl.end();
             this.isAltGroupCloneMode = false;
             this.groupClonePending = false;
@@ -550,7 +550,7 @@ export class SelectTool extends BaseTool {
 
         if (this._resizeCtrl) this._resizeCtrl.update(event, {
             calculateNewSize: (handleType, startBounds, dx, dy, keepAR) => {
-                const rot = (() => { const d = { objectId: this.dragTarget, rotation: 0 }; this.emit('get:object:rotation', d); return d.rotation || 0; })();
+                const rot = (() => { const d = { objectId: this.dragTarget, rotation: 0 }; this.emit(Events.Tool.GetObjectRotation, d); return d.rotation || 0; })();
                 return calculateNewSize(handleType, startBounds, dx, dy, keepAR, rot);
             },
             calculatePositionOffset: (handleType, startBounds, newSize, objectRotation) => {
@@ -850,7 +850,7 @@ export class SelectTool extends BaseTool {
             this.resizeHandles.showHandles(this.groupBoundsGraphics, this.groupId);
         }
         if (this._groupDragCtrl) this._groupDragCtrl.start(gb, { x: event.x, y: event.y });
-        this.emit('group:drag:start', { objects: this.selection.toArray() });
+        this.emit(Events.Tool.GroupDragStart, { objects: this.selection.toArray() });
     }
 
     /**
@@ -941,7 +941,7 @@ export class SelectTool extends BaseTool {
         
         // Получаем угол поворота объекта
         const rotationData = { objectId: selectedObject, rotation: 0 };
-        this.emit('get:object:rotation', rotationData);
+        this.emit(Events.Tool.GetObjectRotation, rotationData);
         const objectRotation = rotationData.rotation || 0;
         
         // Создаем кастомный курсор, повернутый на точный угол объекта
@@ -974,7 +974,7 @@ export class SelectTool extends BaseTool {
 
     removeFromSelection(object) {
         this.selection.remove(object);
-        this.emit('selection:remove', { object });
+        this.emit(Events.Tool.SelectionRemove, { object });
         this.updateResizeHandles();
     }
 
@@ -987,17 +987,17 @@ export class SelectTool extends BaseTool {
     
     selectAll() {
         // TODO: Выделить все объекты на доске
-        this.emit('selection:all');
+        this.emit(Events.Tool.SelectionAll);
     }
     
     deleteSelectedObjects() {
         const objects = this.selection.toArray();
         this.clearSelection();
-        this.emit('objects:delete', { objects });
+        this.emit(Events.Tool.ObjectsDelete, { objects });
     }
     
     editObject(object) {
-        this.emit('object:edit', { object });
+        this.emit(Events.Tool.ObjectEdit, { object });
     }
     
     /**
@@ -1015,7 +1015,7 @@ export class SelectTool extends BaseTool {
     // Экспонируем выделение через EventBus для внешних слушателей (keyboard)
     onActivate() {
         // Подписка безопасна: EventBus простая шина, а вызов синхронный
-        this.eventBus.on('tool:get:selection', (data) => {
+        this.eventBus.on(Events.Tool.GetSelection, (data) => {
             data.selection = this.getSelection();
         });
     }

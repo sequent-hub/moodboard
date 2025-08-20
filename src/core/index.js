@@ -148,7 +148,7 @@ export class CoreMoodBoard {
         // Показ контекстного меню (пока пустое) — передаем вверх координаты и контекст
         this.eventBus.on(Events.Tool.ContextMenuShow, (data) => {
             // Прокидываем событие для UI
-            this.eventBus.emit('ui:contextmenu:show', {
+            this.eventBus.emit(Events.UI.ContextMenuShow, {
                 x: data.x,
                 y: data.y,
                 context: data.context, // 'canvas' | 'object' | 'group'
@@ -205,7 +205,7 @@ export class CoreMoodBoard {
                     newIds.push(payload.newId);
                     pending -= 1;
                     if (pending === 0) {
-                        this.eventBus.off('object:pasted', onPasted);
+                        this.eventBus.off(Events.Object.Pasted, onPasted);
                         requestAnimationFrame(() => {
                             if (this.selectTool && newIds.length > 0) {
                                 this.selectTool.setSelection(newIds);
@@ -214,7 +214,7 @@ export class CoreMoodBoard {
                         });
                     }
                 };
-                this.eventBus.on('object:pasted', onPasted);
+                this.eventBus.on(Events.Object.Pasted, onPasted);
                 data.forEach(orig => {
                     const cloned = JSON.parse(JSON.stringify(orig));
                     const targetPos = {
@@ -349,28 +349,28 @@ export class CoreMoodBoard {
             applyZOrderFromState();
             this.state.markDirty();
         };
-        this.eventBus.on('ui:layer-group:bring-to-front', () => {
+        this.eventBus.on(Events.UI.LayerGroupBringToFront, () => {
             const ids = getSelection();
             if (ids.length === 0) return;
             const cmd = new GroupReorderZCommand(this, ids, 'front');
             cmd.setEventBus(this.eventBus);
             this.history.executeCommand(cmd);
         });
-        this.eventBus.on('ui:layer-group:bring-forward', () => {
+        this.eventBus.on(Events.UI.LayerGroupBringForward, () => {
             const ids = getSelection();
             if (ids.length === 0) return;
             const cmd = new GroupReorderZCommand(this, ids, 'forward');
             cmd.setEventBus(this.eventBus);
             this.history.executeCommand(cmd);
         });
-        this.eventBus.on('ui:layer-group:send-backward', () => {
+        this.eventBus.on(Events.UI.LayerGroupSendBackward, () => {
             const ids = getSelection();
             if (ids.length === 0) return;
             const cmd = new GroupReorderZCommand(this, ids, 'backward');
             cmd.setEventBus(this.eventBus);
             this.history.executeCommand(cmd);
         });
-        this.eventBus.on('ui:layer-group:send-to-back', () => {
+        this.eventBus.on(Events.UI.LayerGroupSendToBack, () => {
             const ids = getSelection();
             if (ids.length === 0) return;
             const cmd = new GroupReorderZCommand(this, ids, 'back');
@@ -379,7 +379,7 @@ export class CoreMoodBoard {
         });
 
         // События перетаскивания
-        this.eventBus.on('tool:drag:start', (data) => {
+        this.eventBus.on(Events.Tool.DragStart, (data) => {
 
             // Сохраняем начальную позицию для команды
             const pixiObject = this.pixi.objects.get(data.object);
@@ -391,7 +391,7 @@ export class CoreMoodBoard {
         });
 
         // Панорамирование холста
-        this.eventBus.on('tool:pan:update', ({ delta }) => {
+        this.eventBus.on(Events.Tool.PanUpdate, ({ delta }) => {
             // Смещаем только worldLayer, сетка остается закрепленной к экрану
             if (this.pixi.worldLayer) {
                 this.pixi.worldLayer.x += delta.x;
@@ -410,7 +410,7 @@ export class CoreMoodBoard {
         // Инвариант слоёв перенесён в ZOrderManager
 
         // Кнопки зума перенесены в ZoomPanController
-        this.eventBus.on('ui:zoom:selection', () => {
+        this.eventBus.on(Events.UI.ZoomSelection, () => {
             // Zoom to selection: берем bbox выделенных
             const selected = this.selectTool ? Array.from(this.selectTool.selectedObjects || []) : [];
             if (!selected || selected.length === 0) return;
@@ -438,7 +438,7 @@ export class CoreMoodBoard {
             world.scale.set(newScale);
             world.x = viewW / 2 - worldCenterX * newScale;
             world.y = viewH / 2 - worldCenterY * newScale;
-            this.eventBus.emit('ui:zoom:percent', { percentage: Math.round(newScale * 100) });
+            this.eventBus.emit(Events.UI.ZoomPercent, { percentage: Math.round(newScale * 100) });
         });
 
         // === ГРУППОВОЕ ПЕРЕТАСКИВАНИЕ ===
@@ -570,7 +570,7 @@ export class CoreMoodBoard {
             const originals = (data.objects || []).filter((id) => this.state.state.objects.some(o => o.id === id));
             const total = originals.length;
             if (total === 0) {
-                this.eventBus.emit('tool:group:duplicate:ready', { map: {} });
+                this.eventBus.emit(Events.Tool.GroupDuplicateReady, { map: {} });
                 return;
             }
             const idMap = {};
@@ -581,10 +581,10 @@ export class CoreMoodBoard {
                 idMap[originalId] = payload.newId;
                 // Снять локального слушателя
                 const h = tempHandlers.get(originalId);
-                if (h) this.eventBus.off('object:pasted', h);
+                if (h) this.eventBus.off(Events.Object.Pasted, h);
                 remaining -= 1;
                 if (remaining === 0) {
-                    this.eventBus.emit('tool:group:duplicate:ready', { map: idMap });
+                    this.eventBus.emit(Events.Tool.GroupDuplicateReady, { map: idMap });
                 }
             };
             // Дублируем по одному, используя текущие позиции как стартовые
@@ -594,7 +594,7 @@ export class CoreMoodBoard {
                 // Подписываемся на ответ именно для этого оригинала
                 const handler = onPasted(originalId);
                 tempHandlers.set(originalId, handler);
-                this.eventBus.on('object:pasted', handler);
+                this.eventBus.on(Events.Object.Pasted, handler);
                 // Кладем в clipboard объект, затем вызываем PasteObjectCommand с текущей позицией
                 this.clipboard = { type: 'object', data: JSON.parse(JSON.stringify(obj)) };
                 const cmd = new PasteObjectCommand(this, { x: obj.position.x, y: obj.position.y });
@@ -605,7 +605,7 @@ export class CoreMoodBoard {
 
         // Когда объект вставлен (из PasteObjectCommand) — сообщаем SelectTool
         this.eventBus.on(Events.Object.Pasted, ({ originalId, newId }) => {
-            this.eventBus.emit('tool:duplicate:ready', { originalId, newId });
+            this.eventBus.emit(Events.Tool.DuplicateReady, { originalId, newId });
         });
 
         // События изменения размера
@@ -794,7 +794,7 @@ export class CoreMoodBoard {
                 this.updateObjectRotationDirect(id, newAngle);
             }
             // Сообщаем UI обновить ручки, если активна рамка группы
-            this.eventBus.emit('object:transform:updated', { objectId: '__group__', type: 'rotation' });
+            this.eventBus.emit(Events.Object.TransformUpdated, { objectId: '__group__', type: 'rotation' });
         });
 
         this.eventBus.on(Events.Tool.GroupRotateEnd, (data) => {
@@ -830,7 +830,7 @@ export class CoreMoodBoard {
             this.updateObjectRotationDirect(data.objectId, data.angle);
             
             // Уведомляем о том, что объект был изменен (для обновления ручек)
-            this.eventBus.emit('object:transform:updated', {
+            this.eventBus.emit(Events.Object.TransformUpdated, {
                 objectId: data.objectId,
                 type: 'rotation',
                 angle: data.angle
@@ -861,7 +861,7 @@ export class CoreMoodBoard {
         });
 
         // Получение PIXI объекта
-        this.eventBus.on('tool:get:object:pixi', (data) => {
+        this.eventBus.on(Events.Tool.GetObjectPixi, (data) => {
             console.log(`🔍 Запрос PIXI объекта для ${data.objectId}`);
             console.log('📋 Доступные PIXI объекты:', Array.from(this.pixi.objects.keys()));
             
@@ -1021,7 +1021,7 @@ export class CoreMoodBoard {
                     newIds.push(payload.newId);
                     pending -= 1;
                     if (pending === 0) {
-                        this.eventBus.off('object:pasted', onPasted);
+                        this.eventBus.off(Events.Object.Pasted, onPasted);
                         // Выделяем новую группу и показываем рамку с ручками
                         if (this.selectTool && newIds.length > 0) {
                             requestAnimationFrame(() => {
@@ -1031,7 +1031,7 @@ export class CoreMoodBoard {
                         }
                     }
                 };
-                this.eventBus.on('object:pasted', onPasted);
+                this.eventBus.on(Events.Object.Pasted, onPasted);
 
                 // Вставляем каждый объект группы, сохраняя относительное расположение + общее смещение
                 for (const original of data) {
@@ -1091,7 +1091,7 @@ export class CoreMoodBoard {
 
             
             // Можно здесь обновить состояние кнопок Undo/Redo в UI
-            this.eventBus.emit('ui:update-history-buttons', {
+            this.eventBus.emit(Events.UI.UpdateHistoryButtons, {
                 canUndo: data.canUndo,
                 canRedo: data.canRedo
             });

@@ -1,3 +1,5 @@
+import { Events } from '../core/events/Events.js';
+
 export class ZoomPanel {
     constructor(container, eventBus) {
         this.container = container;
@@ -50,8 +52,8 @@ export class ZoomPanel {
             const btn = e.target.closest('.moodboard-zoombar__button');
             if (!btn) return;
             const action = btn.dataset.action;
-            if (action === 'zoom-in') this.eventBus.emit('ui:zoom:in');
-            else if (action === 'zoom-out') this.eventBus.emit('ui:zoom:out');
+            if (action === 'zoom-in') this.eventBus.emit(Events.UI.ZoomIn);
+            else if (action === 'zoom-out') this.eventBus.emit(Events.UI.ZoomOut);
         });
 
         // Выпадающее меню по клику на процент
@@ -70,7 +72,7 @@ export class ZoomPanel {
             this.hideMenu();
         });
 
-        this.eventBus.on('ui:zoom:percent', ({ percentage }) => {
+        this.eventBus.on(Events.UI.ZoomPercent, ({ percentage }) => {
             if (this.valueEl) this.valueEl.textContent = `${percentage}%`;
         });
     }
@@ -92,9 +94,9 @@ export class ZoomPanel {
             this.menuEl.appendChild(item);
         };
 
-        addItem('По размеру экрана', () => this.eventBus.emit('ui:zoom:fit'));
-        addItem('К выделению', () => this.eventBus.emit('ui:zoom:selection'));
-        addItem('100%', () => this.eventBus.emit('ui:zoom:reset'));
+        addItem('По размеру экрана', () => this.eventBus.emit(Events.UI.ZoomFit));
+        addItem('К выделению', () => this.eventBus.emit(Events.UI.ZoomSelection));
+        addItem('100%', () => this.eventBus.emit(Events.UI.ZoomReset));
 
         this.element.appendChild(this.menuEl);
     }

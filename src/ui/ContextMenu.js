@@ -1,3 +1,5 @@
+import { Events } from '../core/events/Events.js';
+
 export class ContextMenu {
     constructor(container, eventBus) {
         this.container = container;
@@ -34,12 +36,12 @@ export class ContextMenu {
 
     attachEvents() {
         // Показ по событию из ядра
-        this.eventBus.on('ui:contextmenu:show', ({ x, y, context, targetId }) => {
+        this.eventBus.on(Events.UI.ContextMenuShow, ({ x, y, context, targetId }) => {
             this.show(x, y, context, targetId);
         });
 
         // Синхронизация активного типа сетки
-        this.eventBus.on('ui:grid:current', ({ type }) => {
+        this.eventBus.on(Events.UI.GridCurrent, ({ type }) => {
             if (type) this.currentGridType = type;
         });
 
@@ -115,27 +117,27 @@ export class ContextMenu {
             // Копировать — копируем конкретный объект
             list.appendChild(mkItem('Копировать', 'Ctrl+C', () => {
                 if (targetId) {
-                    this.eventBus.emit('ui:copy-object', { objectId: targetId });
+                    this.eventBus.emit(Events.UI.CopyObject, { objectId: targetId });
                 }
             }));
 
             // Вставить — используем текущий буфер (объект/группа)
             list.appendChild(mkItem('Вставить', 'Ctrl+V', () => {
-                this.eventBus.emit('ui:paste-at', { x: this.lastX, y: this.lastY });
+                this.eventBus.emit(Events.UI.PasteAt, { x: this.lastX, y: this.lastY });
             }));
 
             // Слойность
             list.appendChild(mkItem('На передний план', ']', () => {
-                if (targetId) this.eventBus.emit('ui:layer:bring-to-front', { objectId: targetId });
+                if (targetId) this.eventBus.emit(Events.UI.LayerBringToFront, { objectId: targetId });
             }));
             list.appendChild(mkItem('Перенести вперёд', 'Ctrl+]', () => {
-                if (targetId) this.eventBus.emit('ui:layer:bring-forward', { objectId: targetId });
+                if (targetId) this.eventBus.emit(Events.UI.LayerBringForward, { objectId: targetId });
             }));
             list.appendChild(mkItem('Перенести назад', 'Ctrl+[', () => {
-                if (targetId) this.eventBus.emit('ui:layer:send-backward', { objectId: targetId });
+                if (targetId) this.eventBus.emit(Events.UI.LayerSendBackward, { objectId: targetId });
             }));
             list.appendChild(mkItem('На задний план', '[', () => {
-                if (targetId) this.eventBus.emit('ui:layer:send-to-back', { objectId: targetId });
+                if (targetId) this.eventBus.emit(Events.UI.LayerSendToBack, { objectId: targetId });
             }));
 
             this.element.appendChild(list);
@@ -167,26 +169,26 @@ export class ContextMenu {
 
             // Копировать группу — берём текущее выделение
             list.appendChild(mkItem('Копировать', 'Ctrl+C', () => {
-                this.eventBus.emit('ui:copy-group');
+                this.eventBus.emit(Events.UI.CopyGroup);
             }));
 
             // Вставить — вставляет из group/object буфера в точку клика
             list.appendChild(mkItem('Вставить', 'Ctrl+V', () => {
-                this.eventBus.emit('ui:paste-at', { x: this.lastX, y: this.lastY });
+                this.eventBus.emit(Events.UI.PasteAt, { x: this.lastX, y: this.lastY });
             }));
 
             // Слойность для группы (двигаем все выбранные объекты)
             list.appendChild(mkItem('На передний план', ']', () => {
-                this.eventBus.emit('ui:layer-group:bring-to-front');
+                this.eventBus.emit(Events.UI.LayerGroupBringToFront);
             }));
             list.appendChild(mkItem('Перенести вперёд', 'Ctrl+]', () => {
-                this.eventBus.emit('ui:layer-group:bring-forward');
+                this.eventBus.emit(Events.UI.LayerGroupBringForward);
             }));
             list.appendChild(mkItem('Перенести назад', 'Ctrl+[', () => {
-                this.eventBus.emit('ui:layer-group:send-backward');
+                this.eventBus.emit(Events.UI.LayerGroupSendBackward);
             }));
             list.appendChild(mkItem('На задний план', '[', () => {
-                this.eventBus.emit('ui:layer-group:send-to-back');
+                this.eventBus.emit(Events.UI.LayerGroupSendToBack);
             }));
 
             this.element.appendChild(list);
@@ -209,7 +211,7 @@ export class ContextMenu {
             item.appendChild(right);
             item.addEventListener('click', () => {
                 this.hide();
-                this.eventBus.emit('ui:paste-at', { x: this.lastX, y: this.lastY });
+                this.eventBus.emit(Events.UI.PasteAt, { x: this.lastX, y: this.lastY });
             });
             list.appendChild(item);
 
@@ -239,7 +241,7 @@ export class ContextMenu {
                 b.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.hide();
-                    this.eventBus.emit('ui:grid:change', { type: cfg.type });
+                    this.eventBus.emit(Events.UI.GridChange, { type: cfg.type });
                 });
                 gridRow.appendChild(b);
             });

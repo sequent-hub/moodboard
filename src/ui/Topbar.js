@@ -1,6 +1,8 @@
 /**
  * Горизонтальная верхняя панель (пока пустая)
  */
+import { Events } from '../core/events/Events.js';
+
 export class Topbar {
     constructor(container, eventBus, theme = 'light') {
         this.container = container;
@@ -13,7 +15,7 @@ export class Topbar {
         this.setActive('line');
 
         // Синхронизация активного состояния по событию из ядра
-        this.eventBus.on('ui:grid:current', ({ type }) => {
+        this.eventBus.on(Events.UI.GridCurrent, ({ type }) => {
             this.setActive(type);
         });
     }
@@ -49,7 +51,7 @@ export class Topbar {
             if (!btn) return;
             const type = btn.dataset.grid;
             if (!type) return;
-            this.eventBus.emit('ui:grid:change', { type });
+            this.eventBus.emit(Events.UI.GridChange, { type });
             this.setActive(type);
         });
 

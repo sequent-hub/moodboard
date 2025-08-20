@@ -1,4 +1,5 @@
 import { BaseTool } from '../BaseTool.js';
+import { Events } from '../../core/events/Events.js';
 import * as PIXI from 'pixi.js';
 
 /**
@@ -15,11 +16,11 @@ export class PlacementTool extends BaseTool {
         this.pending = null; // { type, properties }
 
         if (this.eventBus) {
-            this.eventBus.on('place:set', (cfg) => {
+            this.eventBus.on(Events.Place.Set, (cfg) => {
                 this.pending = cfg ? { ...cfg } : null;
             });
             // Сброс pending при явном выборе select-инструмента
-            this.eventBus.on('tool:activated', ({ tool }) => {
+            this.eventBus.on(Events.Tool.Activated, ({ tool }) => {
                 if (tool === 'select') {
                     this.pending = null;
                 }
@@ -53,7 +54,7 @@ export class PlacementTool extends BaseTool {
         const halfH = (this.pending.size?.height ?? 100) / 2;
         position = { x: Math.round(worldPoint.x - halfW), y: Math.round(worldPoint.y - halfH) };
         // Создаём объект через общий канал (важно: без префикса tool:)
-        this.eventBus.emit('toolbar:action', {
+        this.eventBus.emit(Events.UI.ToolbarAction, {
             type: this.pending.type,
             id: this.pending.type,
             position,
@@ -62,7 +63,7 @@ export class PlacementTool extends BaseTool {
 
         // Сброс и возврат к select
         this.pending = null;
-        this.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+        this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
     }
 
     _toWorld(x, y) {
