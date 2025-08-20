@@ -1,4 +1,5 @@
 import { BaseCommand } from './BaseCommand.js';
+import { Events } from '../events/Events.js';
 
 /**
  * Команда изменения порядка (z-order) группы объектов как единого блока
@@ -38,7 +39,7 @@ export class GroupReorderZCommand extends BaseCommand {
             });
         }
         this.core.state.markDirty();
-        this.emit('group:reordered', { ids: this.objectIds });
+        this.emit(Events.Object.Reordered, { ids: this.objectIds });
     }
 
     reorder(mode) {

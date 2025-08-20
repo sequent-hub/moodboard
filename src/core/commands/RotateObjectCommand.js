@@ -2,6 +2,7 @@
  * Команда поворота объекта для системы Undo/Redo
  */
 import { BaseCommand } from './BaseCommand.js';
+import { Events } from '../events/Events.js';
 
 export class RotateObjectCommand extends BaseCommand {
     constructor(coreMoodboard, objectId, oldAngle, newAngle) {
@@ -17,7 +18,7 @@ export class RotateObjectCommand extends BaseCommand {
         this._setRotation(this.newAngle);
         
         // Применяем новый угол поворота
-        this.emit('object:rotate', {
+        this.emit(Events.Object.Rotate, {
             objectId: this.objectId,
             angle: this.newAngle
         });
@@ -29,7 +30,7 @@ export class RotateObjectCommand extends BaseCommand {
         this._setRotation(this.oldAngle);
         
         // Возвращаем старый угол поворота
-        this.emit('object:rotate', {
+        this.emit(Events.Object.Rotate, {
             objectId: this.objectId,
             angle: this.oldAngle
         });
@@ -54,7 +55,7 @@ export class RotateObjectCommand extends BaseCommand {
         
         // Уведомляем о том, что объект был изменен (для обновления ручек)
         if (this.eventBus) {
-            this.eventBus.emit('object:transform:updated', {
+            this.eventBus.emit(Events.Object.TransformUpdated, {
                 objectId: this.objectId,
                 type: 'rotation',
                 rotation: angle

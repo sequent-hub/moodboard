@@ -1,4 +1,5 @@
 import { BaseCommand } from './BaseCommand.js';
+import { Events } from '../events/Events.js';
 
 /**
  * Команда удаления объекта
@@ -28,7 +29,7 @@ export class DeleteObjectCommand extends BaseCommand {
         
 
         
-        this.coreMoodboard.eventBus.emit('object:deleted', { 
+        this.coreMoodboard.eventBus.emit(Events.Object.Deleted, { 
             objectId: this.objectId 
         });
     }
@@ -40,7 +41,7 @@ export class DeleteObjectCommand extends BaseCommand {
         
 
         
-        this.coreMoodboard.eventBus.emit('object:created', { 
+        this.coreMoodboard.eventBus.emit(Events.Object.Created, { 
             objectId: this.objectId, 
             objectData: this.objectData 
         });

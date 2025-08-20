@@ -1,4 +1,5 @@
 import { BaseCommand } from './BaseCommand.js';
+import { Events } from '../events/Events.js';
 
 /**
  * Команда поворота группы объектов одной операцией (для Undo/Redo)
@@ -18,8 +19,8 @@ export class GroupRotateCommand extends BaseCommand {
         for (const c of this.changes) {
             this.core.updateObjectRotationDirect(c.id, c.toAngle);
             this.core.updateObjectPositionDirect(c.id, c.toPos);
-            this.emit('object:transform:updated', { objectId: c.id, type: 'rotation', angle: c.toAngle });
-            this.emit('object:transform:updated', { objectId: c.id, type: 'position', position: c.toPos });
+            this.emit(Events.Object.TransformUpdated, { objectId: c.id, type: 'rotation', angle: c.toAngle });
+            this.emit(Events.Object.TransformUpdated, { objectId: c.id, type: 'position', position: c.toPos });
         }
     }
 
@@ -27,8 +28,8 @@ export class GroupRotateCommand extends BaseCommand {
         for (const c of this.changes) {
             this.core.updateObjectRotationDirect(c.id, c.fromAngle);
             this.core.updateObjectPositionDirect(c.id, c.fromPos);
-            this.emit('object:transform:updated', { objectId: c.id, type: 'rotation', angle: c.fromAngle });
-            this.emit('object:transform:updated', { objectId: c.id, type: 'position', position: c.fromPos });
+            this.emit(Events.Object.TransformUpdated, { objectId: c.id, type: 'rotation', angle: c.fromAngle });
+            this.emit(Events.Object.TransformUpdated, { objectId: c.id, type: 'position', position: c.fromPos });
         }
     }
 

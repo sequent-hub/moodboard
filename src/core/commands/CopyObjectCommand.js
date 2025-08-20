@@ -1,4 +1,5 @@
 import { BaseCommand } from './BaseCommand.js';
+import { Events } from '../events/Events.js';
 
 /**
  * Команда копирования объекта
@@ -26,7 +27,7 @@ export class CopyObjectCommand extends BaseCommand {
                 data: this.objectData
             };
             
-            this.emit('object:copied', {
+            this.emit(Events.Object.Updated, {
                 objectId: this.objectId,
                 objectData: this.objectData
             });

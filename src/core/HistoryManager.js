@@ -1,6 +1,7 @@
 /**
  * Управляет историей команд для функции Undo/Redo
  */
+import { Events } from './events/Events.js';
 export class HistoryManager {
     constructor(eventBus, options = {}) {
         this.eventBus = eventBus;
@@ -22,16 +23,16 @@ export class HistoryManager {
 
     initEventListeners() {
         // Слушаем события клавиатуры
-        this.eventBus.on('keyboard:undo', () => {
+        this.eventBus.on(Events.Keyboard.Undo, () => {
             this.undo();
         });
 
-        this.eventBus.on('keyboard:redo', () => {
+        this.eventBus.on(Events.Keyboard.Redo, () => {
             this.redo();
         });
 
         // Для отладки
-        this.eventBus.on('history:debug', () => {
+        this.eventBus.on(Events.History.Debug, () => {
             this.debugHistory();
         });
     }
@@ -83,7 +84,7 @@ export class HistoryManager {
         }
 
         // Уведомляем об изменении истории
-        this.eventBus.emit('history:changed', {
+        this.eventBus.emit(Events.History.Changed, {
             canUndo: this.canUndo(),
             canRedo: this.canRedo(),
             historySize: this.history.length,
@@ -110,7 +111,7 @@ export class HistoryManager {
             command.undo();
             this.currentIndex--;
             
-            this.eventBus.emit('history:changed', {
+            this.eventBus.emit(Events.History.Changed, {
                 canUndo: this.canUndo(),
                 canRedo: this.canRedo(),
                 historySize: this.history.length,
@@ -144,7 +145,7 @@ export class HistoryManager {
         try {
             command.execute();
             
-            this.eventBus.emit('history:changed', {
+            this.eventBus.emit(Events.History.Changed, {
                 canUndo: this.canUndo(),
                 canRedo: this.canRedo(),
                 historySize: this.history.length,
@@ -191,7 +192,7 @@ export class HistoryManager {
         this.history = [];
         this.currentIndex = -1;
         
-        this.eventBus.emit('history:changed', {
+        this.eventBus.emit(Events.History.Changed, {
             canUndo: false,
             canRedo: false,
             historySize: 0
@@ -235,8 +236,8 @@ export class HistoryManager {
      */
     destroy() {
         this.clear();
-        this.eventBus.removeAllListeners('keyboard:undo');
-        this.eventBus.removeAllListeners('keyboard:redo');
-        this.eventBus.removeAllListeners('history:debug');
+        this.eventBus.removeAllListeners(Events.Keyboard.Undo);
+        this.eventBus.removeAllListeners(Events.Keyboard.Redo);
+        this.eventBus.removeAllListeners(Events.History.Debug);
     }
 }

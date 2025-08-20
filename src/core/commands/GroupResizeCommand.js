@@ -1,4 +1,5 @@
 import { BaseCommand } from './BaseCommand.js';
+import { Events } from '../events/Events.js';
 
 /**
  * Команда изменения размера группы объектов одной операцией (Undo/Redo)
@@ -17,14 +18,14 @@ export class GroupResizeCommand extends BaseCommand {
     execute() {
         for (const c of this.changes) {
             this.core.updateObjectSizeAndPositionDirect(c.id, c.toSize, c.toPos, c.type || null);
-            this.emit('object:transform:updated', { objectId: c.id, type: 'resize', size: c.toSize, position: c.toPos });
+            this.emit(Events.Object.TransformUpdated, { objectId: c.id, type: 'resize', size: c.toSize, position: c.toPos });
         }
     }
 
     undo() {
         for (const c of this.changes) {
             this.core.updateObjectSizeAndPositionDirect(c.id, c.fromSize, c.fromPos, c.type || null);
-            this.emit('object:transform:updated', { objectId: c.id, type: 'resize', size: c.fromSize, position: c.fromPos });
+            this.emit(Events.Object.TransformUpdated, { objectId: c.id, type: 'resize', size: c.fromSize, position: c.fromPos });
         }
     }
 

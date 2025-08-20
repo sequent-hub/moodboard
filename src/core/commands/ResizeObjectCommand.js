@@ -1,4 +1,5 @@
 import { BaseCommand } from './BaseCommand.js';
+import { Events } from '../events/Events.js';
 
 /**
  * Команда изменения размера объекта
@@ -62,7 +63,7 @@ export class ResizeObjectCommand extends BaseCommand {
         // Уведомляем о том, что объект был изменен (для обновления ручек)
         if (this.eventBus) {
             console.log(`📡 ResizeObjectCommand отправляет object:transform:updated для ${this.objectId}`);
-            this.eventBus.emit('object:transform:updated', {
+            this.eventBus.emit(Events.Object.TransformUpdated, {
                 objectId: this.objectId,
                 type: 'resize',
                 size: size,

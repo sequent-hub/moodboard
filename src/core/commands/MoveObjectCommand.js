@@ -1,4 +1,5 @@
 import { BaseCommand } from './BaseCommand.js';
+import { Events } from '../events/Events.js';
 
 /**
  * Команда перемещения объекта
@@ -52,7 +53,7 @@ export class MoveObjectCommand extends BaseCommand {
         
         // Уведомляем о том, что объект был изменен (для обновления ручек)
         if (this.eventBus) {
-            this.eventBus.emit('object:transform:updated', {
+            this.eventBus.emit(Events.Object.TransformUpdated, {
                 objectId: this.objectId,
                 type: 'position',
                 position: position

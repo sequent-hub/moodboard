@@ -1,4 +1,5 @@
 import { BaseCommand } from './BaseCommand.js';
+import { Events } from '../events/Events.js';
 import { generateObjectId } from '../../utils/objectIdGenerator.js';
 
 /**
@@ -76,7 +77,7 @@ export class PasteObjectCommand extends BaseCommand {
         // Создаем PIXI объект
         this.coreMoodboard.pixi.createObject(this.newObjectData);
         
-        this.emit('object:pasted', {
+        this.emit(Events.Object.Pasted, {
             originalId: originalData.id,
             newId: this.newObjectId,
             objectData: this.newObjectData
@@ -89,7 +90,8 @@ export class PasteObjectCommand extends BaseCommand {
             this.coreMoodboard.state.removeObject(this.newObjectId);
             this.coreMoodboard.pixi.removeObject(this.newObjectId);
             
-            this.emit('object:removed', {
+            // Соответствующего константного события нет — остаёмся без эмита или используем Object.Deleted, если надо глобально
+            this.emit(Events.Object.Deleted, {
                 objectId: this.newObjectId
             });
         }

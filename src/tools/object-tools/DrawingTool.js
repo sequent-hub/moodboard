@@ -381,7 +381,7 @@ export class DrawingTool extends BaseTool {
 
             if (intersects) {
                 this._eraserDeleted.add(id);
-                this.eventBus.emit('toolbar:action', { type: 'delete-object', id });
+                this.eventBus.emit(Events.UI.ToolbarAction, { type: 'delete-object', id });
             }
         }
     }

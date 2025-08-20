@@ -1,6 +1,7 @@
 /**
  * Менеджер автоматического сохранения данных
  */
+import { Events } from './events/Events.js';
 export class SaveManager {
     constructor(eventBus, options = {}) {
         this.eventBus = eventBus;
@@ -36,28 +37,28 @@ export class SaveManager {
         if (!this.options.autoSave) return;
         
         // Отслеживаем изменения в данных
-        this.eventBus.on('board:data-changed', (data) => {
+        this.eventBus.on(Events.Grid.BoardDataChanged, (data) => {
             this.scheduleAutoSave(data);
         });
         
         // Отслеживаем создание объектов
-        this.eventBus.on('object:created', () => {
+        this.eventBus.on(Events.Object.Created, () => {
             this.markAsChanged();
         });
         
         // Отслеживаем изменения объектов
-        this.eventBus.on('object:updated', (data) => {
+        this.eventBus.on(Events.Object.Updated, (data) => {
 
             this.markAsChanged();
         });
         
         // Отслеживаем удаление объектов
-        this.eventBus.on('object:deleted', () => {
+        this.eventBus.on(Events.Object.Deleted, () => {
             this.markAsChanged();
         });
         
         // Отслеживаем прямые изменения состояния (для Undo/Redo)
-        this.eventBus.on('state:changed', (data) => {
+        this.eventBus.on(Events.Object.StateChanged, (data) => {
 
             this.markAsChanged();
         });
@@ -141,7 +142,7 @@ export class SaveManager {
                 this.updateSaveStatus('saved');
                 
                 // Эмитируем событие успешного сохранения
-                this.eventBus.emit('save:success', {
+                this.eventBus.emit(Events.Save.Success, {
                     data: saveData,
                     timestamp: new Date().toISOString()
                 });
@@ -163,7 +164,7 @@ export class SaveManager {
     async getBoardData() {
         return new Promise((resolve) => {
             const requestData = { data: null };
-            this.eventBus.emit('save:get-board-data', requestData);
+            this.eventBus.emit(Events.Save.GetBoardData, requestData);
             resolve(requestData.data);
         });
     }
@@ -230,7 +231,7 @@ export class SaveManager {
         this.updateSaveStatus('error', error.message);
         
         // Эмитируем событие ошибки
-        this.eventBus.emit('save:error', {
+        this.eventBus.emit(Events.Save.Error, {
             error: error.message,
             retryCount: this.retryCount,
             maxRetries: this.options.maxRetries
@@ -270,7 +271,7 @@ export class SaveManager {
                 this.hasUnsavedChanges = false;
                 
                 // Эмитируем событие загрузки
-                this.eventBus.emit('save:loaded', {
+                this.eventBus.emit(Events.Save.Loaded, {
                     data: result.data,
                     timestamp: new Date().toISOString()
                 });
@@ -282,7 +283,7 @@ export class SaveManager {
             
         } catch (error) {
             console.error('Ошибка загрузки данных:', error);
-            this.eventBus.emit('save:load-error', { error: error.message });
+            this.eventBus.emit(Events.Save.LoadError, { error: error.message });
             throw error;
         }
     }
@@ -294,7 +295,7 @@ export class SaveManager {
         this.saveStatus = status;
         
         // Эмитируем событие изменения статуса
-        this.eventBus.emit('save:status-changed', {
+        this.eventBus.emit(Events.Save.StatusChanged, {
             status,
             message,
             hasUnsavedChanges: this.hasUnsavedChanges,
@@ -352,11 +353,11 @@ export class SaveManager {
             this.saveImmediately();
         }
         
-        // Удаляем обработчики событий
-        this.eventBus.off('board:data-changed');
-        this.eventBus.off('object:created');
-        this.eventBus.off('object:updated');
-        this.eventBus.off('object:deleted');
-        this.eventBus.off('tool:drag:end');
+        // Удаляем обработчики событий (константы)
+        this.eventBus.off(Events.Grid.BoardDataChanged);
+        this.eventBus.off(Events.Object.Created);
+        this.eventBus.off(Events.Object.Updated);
+        this.eventBus.off(Events.Object.Deleted);
+        this.eventBus.off(Events.Tool.DragEnd);
     }
 }

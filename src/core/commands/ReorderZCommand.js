@@ -1,4 +1,5 @@
 import { BaseCommand } from './BaseCommand.js';
+import { Events } from '../events/Events.js';
 
 /**
  * Команда изменения порядка (z-order) одного объекта
@@ -37,7 +38,7 @@ export class ReorderZCommand extends BaseCommand {
             });
         }
         this.core.state.markDirty();
-        this.emit('object:reordered', { objectId: this.objectId, toIndex: to });
+        this.emit(Events.Object.Reordered, { objectId: this.objectId, toIndex: to });
     }
 }
 

@@ -1,4 +1,5 @@
 import { BaseCommand } from './BaseCommand.js';
+import { Events } from '../events/Events.js';
 
 /**
  * Команда перемещения группы объектов одной операцией (для Undo/Redo)
@@ -18,7 +19,7 @@ export class GroupMoveCommand extends BaseCommand {
         // Применяем конечные позиции ко всем объектам
         for (const item of this.moves) {
             this.core.updateObjectPositionDirect(item.id, item.to);
-            this.emit('object:transform:updated', {
+            this.emit(Events.Object.TransformUpdated, {
                 objectId: item.id,
                 type: 'position',
                 position: item.to
@@ -30,7 +31,7 @@ export class GroupMoveCommand extends BaseCommand {
         // Возвращаем исходные позиции
         for (const item of this.moves) {
             this.core.updateObjectPositionDirect(item.id, item.from);
-            this.emit('object:transform:updated', {
+            this.emit(Events.Object.TransformUpdated, {
                 objectId: item.id,
                 type: 'position',
                 position: item.from

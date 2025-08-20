@@ -1,4 +1,5 @@
 import { BaseCommand } from './BaseCommand.js';
+import { Events } from '../events/Events.js';
 
 /**
  * Команда создания объекта
@@ -25,7 +26,7 @@ export class CreateObjectCommand extends BaseCommand {
 
         }
         
-        this.coreMoodboard.eventBus.emit('object:created', { 
+        this.coreMoodboard.eventBus.emit(Events.Object.Created, { 
             objectId: this.objectData.id, 
             objectData: this.objectData 
         });
@@ -38,7 +39,7 @@ export class CreateObjectCommand extends BaseCommand {
         
 
         
-        this.coreMoodboard.eventBus.emit('object:deleted', { 
+        this.coreMoodboard.eventBus.emit(Events.Object.Deleted, { 
             objectId: this.objectData.id 
         });
     }

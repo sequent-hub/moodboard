@@ -1,6 +1,7 @@
 /**
  * Менеджер клавиатуры для обработки горячих клавиш
  */
+import { Events } from './events/Events.js';
 export class KeyboardManager {
     constructor(eventBus, targetElement = document) {
         this.eventBus = eventBus;
@@ -114,7 +115,7 @@ export class KeyboardManager {
         const combination = this.eventToShortcut(event, 'keyup');
         
         // Эмитируем событие для инструментов
-        this.eventBus.emit('keyboard:keyup', {
+        this.eventBus.emit(Events.Keyboard.KeyUp, {
             key: event.key,
             code: event.code,
             combination,
@@ -203,92 +204,92 @@ export class KeyboardManager {
     registerDefaultShortcuts() {
         // Выделение всех объектов
         this.registerShortcut('ctrl+a', () => {
-            this.eventBus.emit('keyboard:select-all');
+            this.eventBus.emit(Events.Keyboard.SelectAll);
         }, { description: 'Выделить все объекты' });
         
         // Удаление выделенных объектов
         this.registerShortcut('delete', () => {
-            this.eventBus.emit('keyboard:delete');
+            this.eventBus.emit(Events.Keyboard.Delete);
         }, { description: 'Удалить выделенные объекты' });
         
         this.registerShortcut('backspace', () => {
-            this.eventBus.emit('keyboard:delete');
+            this.eventBus.emit(Events.Keyboard.Delete);
         }, { description: 'Удалить выделенные объекты' });
         
         // Отмена выделения
         this.registerShortcut('escape', () => {
-            this.eventBus.emit('keyboard:escape');
+            this.eventBus.emit(Events.Keyboard.Escape);
         }, { description: 'Отменить выделение' });
         
         // Копирование
         this.registerShortcut('ctrl+c', () => {
-            this.eventBus.emit('keyboard:copy');
+            this.eventBus.emit(Events.Keyboard.Copy);
         }, { description: 'Копировать выделенные объекты' });
         
         // Вставка
         this.registerShortcut('ctrl+v', () => {
-            this.eventBus.emit('keyboard:paste');
+            this.eventBus.emit(Events.Keyboard.Paste);
         }, { description: 'Вставить объекты' });
         
         // Отмена действия
         this.registerShortcut('ctrl+z', () => {
-            this.eventBus.emit('keyboard:undo');
+            this.eventBus.emit(Events.Keyboard.Undo);
         }, { description: 'Отменить действие' });
         
         // Повтор действия
         this.registerShortcut('ctrl+y', () => {
-            this.eventBus.emit('keyboard:redo');
+            this.eventBus.emit(Events.Keyboard.Redo);
         }, { description: 'Повторить действие' });
         
         this.registerShortcut('ctrl+shift+z', () => {
-            this.eventBus.emit('keyboard:redo');
+            this.eventBus.emit(Events.Keyboard.Redo);
         }, { description: 'Повторить действие' });
         
         // Переключение инструментов
         this.registerShortcut('v', () => {
-            this.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
         }, { description: 'Инструмент выделения' });
         
         this.registerShortcut('t', () => {
-            this.eventBus.emit('keyboard:tool-select', { tool: 'text' });
+            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'text' });
         }, { description: 'Инструмент текста' });
         
         this.registerShortcut('r', () => {
-            this.eventBus.emit('keyboard:tool-select', { tool: 'frame' });
+            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'frame' });
         }, { description: 'Инструмент рамки' });
         
         // Перемещение объектов стрелками
         this.registerShortcut('arrowup', () => {
-            this.eventBus.emit('keyboard:move', { direction: 'up', step: 1 });
+            this.eventBus.emit(Events.Keyboard.Move, { direction: 'up', step: 1 });
         }, { description: 'Переместить объект вверх' });
         
         this.registerShortcut('arrowdown', () => {
-            this.eventBus.emit('keyboard:move', { direction: 'down', step: 1 });
+            this.eventBus.emit(Events.Keyboard.Move, { direction: 'down', step: 1 });
         }, { description: 'Переместить объект вниз' });
         
         this.registerShortcut('arrowleft', () => {
-            this.eventBus.emit('keyboard:move', { direction: 'left', step: 1 });
+            this.eventBus.emit(Events.Keyboard.Move, { direction: 'left', step: 1 });
         }, { description: 'Переместить объект влево' });
         
         this.registerShortcut('arrowright', () => {
-            this.eventBus.emit('keyboard:move', { direction: 'right', step: 1 });
+            this.eventBus.emit(Events.Keyboard.Move, { direction: 'right', step: 1 });
         }, { description: 'Переместить объект вправо' });
         
         // Перемещение с шагом 10px при зажатом Shift
         this.registerShortcut('shift+arrowup', () => {
-            this.eventBus.emit('keyboard:move', { direction: 'up', step: 10 });
+            this.eventBus.emit(Events.Keyboard.Move, { direction: 'up', step: 10 });
         }, { description: 'Переместить объект вверх на 10px' });
         
         this.registerShortcut('shift+arrowdown', () => {
-            this.eventBus.emit('keyboard:move', { direction: 'down', step: 10 });
+            this.eventBus.emit(Events.Keyboard.Move, { direction: 'down', step: 10 });
         }, { description: 'Переместить объект вниз на 10px' });
         
         this.registerShortcut('shift+arrowleft', () => {
-            this.eventBus.emit('keyboard:move', { direction: 'left', step: 10 });
+            this.eventBus.emit(Events.Keyboard.Move, { direction: 'left', step: 10 });
         }, { description: 'Переместить объект влево на 10px' });
         
         this.registerShortcut('shift+arrowright', () => {
-            this.eventBus.emit('keyboard:move', { direction: 'right', step: 10 });
+            this.eventBus.emit(Events.Keyboard.Move, { direction: 'right', step: 10 });
         }, { description: 'Переместить объект вправо на 10px' });
     }
     
@@ -316,144 +317,144 @@ export class KeyboardManager {
     registerDefaultShortcuts() {
         // Undo/Redo (латиница и кириллица)
         this.registerShortcut('ctrl+z', () => {
-            this.eventBus.emit('keyboard:undo');
+            this.eventBus.emit(Events.Keyboard.Undo);
         }, { description: 'Отменить действие', preventDefault: true });
         
         this.registerShortcut('ctrl+я', () => { // русская 'я' на той же клавише что и 'z'
-            this.eventBus.emit('keyboard:undo');
+            this.eventBus.emit(Events.Keyboard.Undo);
         }, { description: 'Отменить действие (рус)', preventDefault: true });
         
         this.registerShortcut('ctrl+shift+z', () => {
-            this.eventBus.emit('keyboard:redo');
+            this.eventBus.emit(Events.Keyboard.Redo);
         }, { description: 'Повторить действие', preventDefault: true });
         
         this.registerShortcut('ctrl+shift+я', () => {
-            this.eventBus.emit('keyboard:redo');
+            this.eventBus.emit(Events.Keyboard.Redo);
         }, { description: 'Повторить действие (рус)', preventDefault: true });
         
         this.registerShortcut('ctrl+y', () => {
-            this.eventBus.emit('keyboard:redo');
+            this.eventBus.emit(Events.Keyboard.Redo);
         }, { description: 'Повторить действие (альтернативный)', preventDefault: true });
         
         this.registerShortcut('ctrl+н', () => { // русская 'н' на той же клавише что и 'y'
-            this.eventBus.emit('keyboard:redo');
+            this.eventBus.emit(Events.Keyboard.Redo);
         }, { description: 'Повторить действие (рус альт)', preventDefault: true });
         
         // Выделение (латиница и кириллица)
         this.registerShortcut('ctrl+a', () => {
-            this.eventBus.emit('keyboard:select-all');
+            this.eventBus.emit(Events.Keyboard.SelectAll);
         }, { description: 'Выделить все', preventDefault: true });
         
         this.registerShortcut('ctrl+ф', () => { // русская 'ф' на той же клавише что и 'a'
-            this.eventBus.emit('keyboard:select-all');
+            this.eventBus.emit(Events.Keyboard.SelectAll);
         }, { description: 'Выделить все (рус)', preventDefault: true });
         
         // Копирование/Вставка (латиница и кириллица)
         this.registerShortcut('ctrl+c', () => {
-            this.eventBus.emit('keyboard:copy');
+            this.eventBus.emit(Events.Keyboard.Copy);
         }, { description: 'Копировать', preventDefault: true });
         
         this.registerShortcut('ctrl+с', () => { // русская 'с' на той же клавише что и 'c'
-            this.eventBus.emit('keyboard:copy');
+            this.eventBus.emit(Events.Keyboard.Copy);
         }, { description: 'Копировать (рус)', preventDefault: true });
         
         this.registerShortcut('ctrl+v', () => {
-            this.eventBus.emit('keyboard:paste');
+            this.eventBus.emit(Events.Keyboard.Paste);
         }, { description: 'Вставить', preventDefault: true });
         
         this.registerShortcut('ctrl+м', () => { // русская 'м' на той же клавише что и 'v'
-            this.eventBus.emit('keyboard:paste');
+            this.eventBus.emit(Events.Keyboard.Paste);
         }, { description: 'Вставить (рус)', preventDefault: true });
 
         // Слойность (латиница и русская раскладка)
         this.registerShortcut(']', () => {
             const data = { selection: [] };
-            this.eventBus.emit('tool:get:selection', data);
+            this.eventBus.emit(Events.Tool.GetSelection, data);
             const id = data.selection?.[0];
-            if (id) this.eventBus.emit('ui:layer:bring-to-front', { objectId: id });
+            if (id) this.eventBus.emit(Events.UI.LayerBringToFront, { objectId: id });
         }, { description: 'На передний план', preventDefault: true });
         this.registerShortcut('ctrl+]', () => {
             const data = { selection: [] };
-            this.eventBus.emit('tool:get:selection', data);
+            this.eventBus.emit(Events.Tool.GetSelection, data);
             const id = data.selection?.[0];
-            if (id) this.eventBus.emit('ui:layer:bring-forward', { objectId: id });
+            if (id) this.eventBus.emit(Events.UI.LayerBringForward, { objectId: id });
         }, { description: 'Перенести вперёд', preventDefault: true });
         this.registerShortcut('[', () => {
             const data = { selection: [] };
-            this.eventBus.emit('tool:get:selection', data);
+            this.eventBus.emit(Events.Tool.GetSelection, data);
             const id = data.selection?.[0];
-            if (id) this.eventBus.emit('ui:layer:send-to-back', { objectId: id });
+            if (id) this.eventBus.emit(Events.UI.LayerSendToBack, { objectId: id });
         }, { description: 'На задний план', preventDefault: true });
         this.registerShortcut('ctrl+[', () => {
             const data = { selection: [] };
-            this.eventBus.emit('tool:get:selection', data);
+            this.eventBus.emit(Events.Tool.GetSelection, data);
             const id = data.selection?.[0];
-            if (id) this.eventBus.emit('ui:layer:send-backward', { objectId: id });
+            if (id) this.eventBus.emit(Events.UI.LayerSendBackward, { objectId: id });
         }, { description: 'Перенести назад', preventDefault: true });
         
         // Удаление
         this.registerShortcut('delete', () => {
-            this.eventBus.emit('keyboard:delete');
+            this.eventBus.emit(Events.Keyboard.Delete);
         }, { description: 'Удалить объект', preventDefault: true });
         
         this.registerShortcut('backspace', () => {
-            this.eventBus.emit('keyboard:delete');
+            this.eventBus.emit(Events.Keyboard.Delete);
         }, { description: 'Удалить объект', preventDefault: true });
         
         // Отмена выделения
         this.registerShortcut('escape', () => {
-            this.eventBus.emit('keyboard:escape');
+            this.eventBus.emit(Events.Keyboard.Escape);
         }, { description: 'Отменить выделение', preventDefault: true });
         
         // Инструменты (латиница и кириллица)
         this.registerShortcut('v', () => {
-            this.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
         }, { description: 'Выбрать инструмент выделения' });
         
         this.registerShortcut('м', () => { // русская 'м' на той же клавише что и 'v'
-            this.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
         }, { description: 'Выбрать инструмент выделения (рус)' });
         
         this.registerShortcut('t', () => {
-            this.eventBus.emit('keyboard:tool-select', { tool: 'text' });
+            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'text' });
         }, { description: 'Выбрать инструмент текста' });
         
         this.registerShortcut('е', () => { // русская 'е' на той же клавише что и 't'
-            this.eventBus.emit('keyboard:tool-select', { tool: 'text' });
+            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'text' });
         }, { description: 'Выбрать инструмент текста (рус)' });
         
         this.registerShortcut('r', () => {
-            this.eventBus.emit('keyboard:tool-select', { tool: 'frame' });
+            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'frame' });
         }, { description: 'Выбрать инструмент рамки' });
         
         this.registerShortcut('к', () => { // русская 'к' на той же клавише что и 'r'
-            this.eventBus.emit('keyboard:tool-select', { tool: 'frame' });
+            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'frame' });
         }, { description: 'Выбрать инструмент рамки (рус)' });
         
         // Перемещение стрелками
         this.registerShortcut('arrowup', (event) => {
-            this.eventBus.emit('keyboard:move', { 
+            this.eventBus.emit(Events.Keyboard.Move, { 
                 direction: 'up', 
                 step: event.shiftKey ? 10 : 1 
             });
         }, { description: 'Переместить вверх', preventDefault: true });
         
         this.registerShortcut('arrowdown', (event) => {
-            this.eventBus.emit('keyboard:move', { 
+            this.eventBus.emit(Events.Keyboard.Move, { 
                 direction: 'down', 
                 step: event.shiftKey ? 10 : 1 
             });
         }, { description: 'Переместить вниз', preventDefault: true });
         
         this.registerShortcut('arrowleft', (event) => {
-            this.eventBus.emit('keyboard:move', { 
+            this.eventBus.emit(Events.Keyboard.Move, { 
                 direction: 'left', 
                 step: event.shiftKey ? 10 : 1 
             });
         }, { description: 'Переместить влево', preventDefault: true });
         
         this.registerShortcut('arrowright', (event) => {
-            this.eventBus.emit('keyboard:move', { 
+            this.eventBus.emit(Events.Keyboard.Move, { 
                 direction: 'right', 
                 step: event.shiftKey ? 10 : 1 
             });
