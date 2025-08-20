@@ -8,11 +8,16 @@ export class ResizeHandles {
         this.app = app;
         this.container = new PIXI.Container();
         this.container.name = 'resize-handles';
-        this.container.zIndex = 1000; // Поверх всех объектов
-        this.app.stage.addChild(this.container);
-        
-        // Включаем сортировку по zIndex
-        this.app.stage.sortableChildren = true;
+        this.container.zIndex = 100000; // Поверх всех объектов в worldLayer
+        // Размещаем контейнер ручек в worldLayer, чтобы он масштабировался вместе с доской
+        const worldLayer = this.app.stage.getChildByName && this.app.stage.getChildByName('worldLayer');
+        if (worldLayer) {
+            worldLayer.addChild(this.container);
+            worldLayer.sortableChildren = true;
+        } else {
+            this.app.stage.addChild(this.container);
+            this.app.stage.sortableChildren = true;
+        }
         
         this.handles = [];
         this.targetObject = null;
@@ -64,10 +69,6 @@ export class ResizeHandles {
         
         this.clearHandles();
         
-        // Получаем глобальные границы объекта для позиционирования контейнера
-        let globalBounds = this.targetObject.getBounds();
-        this.targetBounds = globalBounds;
-        
         // Получаем локальные границы объекта (без учета трансформации)
         const localBounds = this.targetObject.getLocalBounds();
         
@@ -103,23 +104,34 @@ export class ResizeHandles {
         } else {
             // Сбрасываем поворот если объект не повернут
             this.container.rotation = 0;
-            // Для группы используем координаты специального графического прямоугольника,
-            // для одиночных объектов — левый верх глобальных границ
+            const pivotX = this.targetObject.pivot ? this.targetObject.pivot.x : 0;
+            const pivotY = this.targetObject.pivot ? this.targetObject.pivot.y : 0;
+            // Если это специальная рамка группы — её x/y уже заданы как левый-верх в worldLayer
             if (this.targetObject.name === 'group-bounds') {
                 this.container.x = this.targetObject.x;
                 this.container.y = this.targetObject.y;
+                this.container.pivot.set(0, 0);
+                this.workingBounds = {
+                    x: 0,
+                    y: 0,
+                    width: localBounds.width,
+                    height: localBounds.height
+                };
             } else {
-                this.container.x = globalBounds.x;
-                this.container.y = globalBounds.y;
+                // Обычный объект: левый-верх = центр - pivot (в координатах worldLayer)
+                const topLeftX = this.targetObject.x - pivotX;
+                const topLeftY = this.targetObject.y - pivotY;
+                this.container.x = topLeftX;
+                this.container.y = topLeftY;
+                this.container.pivot.set(0, 0);
+                // Рабочие границы начинаются от (0,0) контейнера, размеры из локальных границ
+                this.workingBounds = {
+                    x: 0,
+                    y: 0,
+                    width: localBounds.width,
+                    height: localBounds.height
+                };
             }
-            this.container.pivot.set(0, 0);
-            // Рабочие границы начинаются от (0,0) контейнера
-            this.workingBounds = {
-                x: 0,
-                y: 0,
-                width: globalBounds.width,
-                height: globalBounds.height
-            };
         }
         
         // Создаем рамку выделения
