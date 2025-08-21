@@ -1108,8 +1108,20 @@ export class SelectTool extends BaseTool {
      * Обновление ручек изменения размера
      */
     updateResizeHandles() {
-        if (!this._handlesSync) return;
-        this._handlesSync.update();
+        // Используем HTML-ручки (HtmlHandlesLayer). Прячем Pixi-ручки и групповые графики.
+        try {
+            if (this.resizeHandles && typeof this.resizeHandles.hideHandles === 'function') {
+                this.resizeHandles.hideHandles();
+            }
+            const stage = this.app?.stage;
+            const world = stage?.getChildByName && stage.getChildByName('worldLayer');
+            const rh = world && world.getChildByName && world.getChildByName('resize-handles');
+            if (rh) rh.visible = false;
+            const gb = stage && stage.getChildByName && stage.getChildByName('group-bounds');
+            if (gb) gb.visible = false;
+        } catch (e) {
+            // noop
+        }
     }
 
     /**
@@ -1333,6 +1345,9 @@ export class SelectTool extends BaseTool {
         this.textEditor.world = world || null;
         const view = app?.view;
         if (!view) return;
+        if (this.resizeHandles && typeof this.resizeHandles.hideHandles === 'function') {
+            this.resizeHandles.hideHandles();
+        }
         // Обертка для рамки + textarea + ручек
         const wrapper = document.createElement('div');
         wrapper.className = 'moodboard-text-editor';
@@ -1341,7 +1356,6 @@ export class SelectTool extends BaseTool {
             left: '0px',
             top: '0px',
             transformOrigin: '0 0',
-            border: '1px dashed #3B82F6',
             boxSizing: 'border-box',
             zIndex: 10000,
         });
@@ -1378,7 +1392,7 @@ export class SelectTool extends BaseTool {
             const h = document.createElement('div');
             h.dataset.dir = dir;
             Object.assign(h.style, {
-                position: 'absolute', width: '8px', height: '8px', background: '#3B82F6',
+                position: 'absolute', width: '12px', height: '12px', background: '#007ACC',
                 border: '1px solid #fff', boxSizing: 'border-box', zIndex: 10001,
             });
             return h;

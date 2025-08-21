@@ -10,6 +10,7 @@ import { WorkspaceManager } from './WorkspaceManager.js';
 import { DataManager } from './DataManager.js';
 import { ActionHandler } from './ActionHandler.js';
 import { HtmlTextLayer } from '../ui/HtmlTextLayer.js';
+import { HtmlHandlesLayer } from '../ui/HtmlHandlesLayer.js';
 
 /**
  * Готовый MoodBoard с UI - главный класс пакета
@@ -72,9 +73,11 @@ export class MoodBoard {
             this.initZoombar();
             this.initMapbar();
             this.initContextMenu();
-            // HTML-слой сверхчёткого текста
+            // HTML-слои: сверхчёткий текст и единые ручки
             this.htmlTextLayer = new HtmlTextLayer(this.canvasContainer, this.coreMoodboard.eventBus, this.coreMoodboard);
             this.htmlTextLayer.attach();
+            this.htmlHandlesLayer = new HtmlHandlesLayer(this.canvasContainer, this.coreMoodboard.eventBus, this.coreMoodboard);
+            this.htmlHandlesLayer.attach();
             
             // Загружаем данные (сначала пробуем загрузить с сервера, потом дефолтные)
             await this.loadExistingBoard();
