@@ -1,110 +1,88 @@
 import * as PIXI from 'pixi.js';
 
 /**
- * Класс объекта «Текст»
- * Отвечает за создание текстового PIXI-объекта и корректное масштабирование по size.
+ * Класс объекта «Текст» — PIXI-объект служит только для хит-тестов/манипуляций.
+ * Визуальный рендер текста выполняет HtmlTextLayer.
  */
 export class TextObject {
     /**
      * @param {Object} objectData
-     *  - content: string
-     *  - color, fontFamily, fontSize, fontWeight, fontStyle
-     *  - width/height: целевые размеры для первичного масштаба
+     *  - properties.content: string
+     *  - properties.fontSize: number
+     *  - width/height: габариты текстового блока
      */
     constructor(objectData = {}) {
         this.objectData = objectData;
-        this.content = objectData.content || objectData.properties?.content || 'Text';
-        this.fontFamily = objectData.fontFamily || objectData.properties?.fontFamily || 'Arial';
+        this.content = objectData.content || objectData.properties?.content || '';
         this.fontSize = objectData.fontSize || objectData.properties?.fontSize || 16;
-        this.color = objectData.color || objectData.properties?.color || 0x000000;
-        this.fontWeight = objectData.fontWeight || objectData.properties?.fontWeight || 'normal';
-        this.fontStyle = objectData.fontStyle || objectData.properties?.fontStyle || 'normal';
 
-        const style = new PIXI.TextStyle({
-            fontFamily: this.fontFamily,
-            fontSize: this.fontSize,
-            fill: this.color,
-            fontWeight: this.fontWeight,
-            fontStyle: this.fontStyle
-        });
-        this.text = new PIXI.Text(this.content, style);
+        // Создаем невидимый прямоугольник для хит-теста
+        const w = Math.max(1, objectData.width || 160);
+        const h = Math.max(1, objectData.height || 36);
+        this.rect = new PIXI.Graphics();
+        this._drawRect(w, h);
 
-        // Базовые размеры для масштабирования
-        const bounds = this.text.getLocalBounds();
-        this.baseW = Math.max(1, bounds.width || 1);
-        this.baseH = Math.max(1, bounds.height || 1);
-
-        // Первичное приведение к целевым размерам из objectData (если заданы)
-        const targetW = objectData.width || this.baseW;
-        const targetH = objectData.height || this.baseH;
-        this._applyScaleToFit(targetW, targetH);
-
-        // Сохраняем мета
-        this.text._mb = {
-            ...(this.text._mb || {}),
+        // Метаданные типа
+        this.rect._mb = {
+            ...(this.rect._mb || {}),
             type: 'text',
             properties: {
                 content: this.content,
-                fontFamily: this.fontFamily,
                 fontSize: this.fontSize,
-                color: this.color,
-                fontWeight: this.fontWeight,
-                fontStyle: this.fontStyle,
-                baseW: this.baseW,
-                baseH: this.baseH
+                baseW: w,
+                baseH: h
             }
         };
     }
 
+    _drawRect(width, height) {
+        const g = this.rect;
+        g.clear();
+        // Едва заметная заливка для стабильного containsPoint (почти прозрачная)
+        g.beginFill(0x000000, 0.001);
+        g.drawRect(0, 0, width, height);
+        g.endFill();
+    }
+
     getPixi() {
-        return this.text;
+        return this.rect;
     }
 
     setText(content) {
         this.content = content;
-        this.text.text = content;
-        const bounds = this.text.getLocalBounds();
-        this.baseW = Math.max(1, bounds.width || 1);
-        this.baseH = Math.max(1, bounds.height || 1);
+        if (this.rect && this.rect._mb) {
+            this.rect._mb.properties = {
+                ...(this.rect._mb.properties || {}),
+                content: content
+            };
+        }
     }
 
-    setStyle({ fontFamily, fontSize, color, fontWeight, fontStyle } = {}) {
-        if (fontFamily) this.fontFamily = fontFamily;
+    setStyle({ fontSize } = {}) {
         if (typeof fontSize === 'number') this.fontSize = fontSize;
-        if (typeof color === 'number') this.color = color;
-        if (fontWeight) this.fontWeight = fontWeight;
-        if (fontStyle) this.fontStyle = fontStyle;
-        this.text.style = new PIXI.TextStyle({
-            fontFamily: this.fontFamily,
-            fontSize: this.fontSize,
-            fill: this.color,
-            fontWeight: this.fontWeight,
-            fontStyle: this.fontStyle
-        });
-        const bounds = this.text.getLocalBounds();
-        this.baseW = Math.max(1, bounds.width || 1);
-        this.baseH = Math.max(1, bounds.height || 1);
+        if (this.rect && this.rect._mb) {
+            this.rect._mb.properties = {
+                ...(this.rect._mb.properties || {}),
+                fontSize: this.fontSize
+            };
+        }
     }
 
-    /** Масштабирование текста под указанные размеры */
+    /** Обновление габаритов хит-бокса */
     updateSize(size) {
         if (!size) return;
-        const targetW = Math.max(1, size.width || 1);
-        const targetH = Math.max(1, size.height || 1);
-        const t = this.text;
-        const prev = { x: t.x, y: t.y, rot: t.rotation, px: t.pivot?.x || 0, py: t.pivot?.y || 0 };
-        this._applyScaleToFit(targetW, targetH);
-        t.pivot.set(prev.px, prev.py);
-        t.x = prev.x;
-        t.y = prev.y;
-        t.rotation = prev.rot;
-    }
-
-    _applyScaleToFit(targetW, targetH) {
-        const sx = targetW / (this.baseW || 1);
-        const sy = targetH / (this.baseH || 1);
-        const s = Math.min(sx, sy);
-        this.text.scale.set(s, s);
+        const w = Math.max(1, size.width || 1);
+        const h = Math.max(1, size.height || 1);
+        const t = this.rect;
+        const prevCenter = { x: t.x, y: t.y };
+        const prevRot = t.rotation || 0;
+        this._drawRect(w, h);
+        // Центрируем pivot по новым размерам и восстанавливаем центр в мире
+        t.pivot.set(w / 2, h / 2);
+        t.x = prevCenter.x;
+        t.y = prevCenter.y;
+        t.rotation = prevRot;
+        // Не обновляем baseW/baseH — они служат опорой для масштабирования шрифта в HtmlTextLayer
     }
 }
 

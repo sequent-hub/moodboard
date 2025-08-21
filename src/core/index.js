@@ -524,6 +524,12 @@ export class CoreMoodBoard {
             this._groupDragStart = null;
         });
 
+        // Удаление списка объектов (используется при перезаписи текста через редактирование)
+        this.eventBus.on(Events.Tool.ObjectsDelete, ({ objects }) => {
+            const ids = Array.isArray(objects) ? objects : [];
+            ids.forEach((id) => this.deleteObject(id));
+        });
+
         this.eventBus.on(Events.Tool.DragUpdate, (data) => {
             // Во время перетаскивания обновляем позицию напрямую (без команды)
             this.updateObjectPositionDirect(data.object, data.position);

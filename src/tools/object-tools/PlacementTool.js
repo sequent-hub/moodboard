@@ -48,22 +48,40 @@ export class PlacementTool extends BaseTool {
         if (!this.pending) return;
 
         const worldPoint = this._toWorld(event.x, event.y);
-        let position;
-        // По умолчанию ставим так, чтобы центр под курсором совпадал с центром объекта
         const halfW = (this.pending.size?.width ?? 100) / 2;
         const halfH = (this.pending.size?.height ?? 100) / 2;
-        position = { x: Math.round(worldPoint.x - halfW), y: Math.round(worldPoint.y - halfH) };
-        // Создаём объект через общий канал (важно: без префикса tool:)
-        this.eventBus.emit(Events.UI.ToolbarAction, {
-            type: this.pending.type,
-            id: this.pending.type,
-            position,
-            properties: this.pending.properties || {}
-        });
+        const position = { x: Math.round(worldPoint.x - halfW), y: Math.round(worldPoint.y - halfH) };
 
-        // Сброс и возврат к select
+        const props = this.pending.properties || {};
+        const isTextWithEditing = this.pending.type === 'text' && props.editOnCreate;
+
+        if (isTextWithEditing) {
+            // Переключаемся на select, чтобы у него был доступ к PIXI app, затем открываем редактор
+            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+            this.eventBus.emit(Events.Tool.ObjectEdit, {
+                object: {
+                    id: null,
+                    type: 'text',
+                    position,
+                    properties: { fontSize: props.fontSize || 18, content: '' }
+                },
+                create: true
+            });
+        } else {
+            // Обычное размещение через общий канал
+            this.eventBus.emit(Events.UI.ToolbarAction, {
+                type: this.pending.type,
+                id: this.pending.type,
+                position,
+                properties: props
+            });
+        }
+
+        // Сбрасываем pending и возвращаем стандартное поведение
         this.pending = null;
-        this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+        if (!isTextWithEditing) {
+            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+        }
     }
 
     _toWorld(x, y) {

@@ -14,6 +14,7 @@ export class ActionHandler {
         switch (action.type) {
             case 'frame':
             case 'simple-text':
+            case 'text':
             case 'shape':
             case 'drawing':
             case 'emoji':

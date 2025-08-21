@@ -9,6 +9,8 @@ export class Toolbar {
         this.eventBus = eventBus;
         this.theme = theme;
         this.element = null;
+        // Какой именно place-поток активен: 'big-t' | 'shapes' | 'emoji' | 'frame-tool' | null
+        this.placeSelectedButtonId = null;
         
         this.createToolbar();
         this.attachEvents();
@@ -27,6 +29,7 @@ export class Toolbar {
             { id: 'select', icon: '↖', title: 'Инструмент выделения (V)', type: 'activate-select' },
             { id: 'pan', icon: '✋', title: 'Панорамирование (Пробел)', type: 'activate-pan' },
             { id: 'divider', type: 'divider' },
+            { id: 'text-add', icon: 'T+', title: 'Добавить текст (клик сразу откроет редактирование)', type: 'text-add' },
             { id: 'big-t', icon: 'T', title: 'Текст', type: 'custom-t' },
             { id: 'shapes', icon: '🔷', title: 'Фигуры', type: 'custom-shapes' },
             { id: 'pencil', icon: '✏️', title: 'Рисование', type: 'custom-draw' },
@@ -129,6 +132,7 @@ export class Toolbar {
                 this.closeEmojiPopup();
                 // Сбрасываем отложенное размещение, активируем select
                 this.eventBus.emit(Events.Place.Set, null);
+                this.placeSelectedButtonId = null;
                 this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
                 this.setActiveToolbarButton('select');
                 return;
@@ -145,10 +149,49 @@ export class Toolbar {
                 return;
             }
 
-            // Заглушки для новых кнопок (кроме custom-frame) — пока без действий (только анимация)
-            if (toolType === 'custom-t' || toolType === 'custom-comments' || toolType === 'custom-attachments') {
+            // «Текст» (новый сценарий): после клика по кнопке кликаем по холсту — открывается поле ввода
+            if (toolType === 'custom-t') {
                 this.animateButton(button);
-                // Закрываем панель фигур, если клик не по ней
+                this.closeShapesPopup();
+                this.closeDrawPopup();
+                this.closeEmojiPopup();
+                // Переходим в универсальный placement tool и задаем pending конфигурацию
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                this.placeSelectedButtonId = 'big-t';
+                this.setActiveToolbarButton('place');
+                this.eventBus.emit(Events.Place.Set, {
+                    type: 'text',
+                    // Специальный флаг: не создавать сразу объект, а открыть форму ввода на холсте
+                    properties: { editOnCreate: true, fontSize: 18 }
+                });
+                return;
+            }
+
+            // Новая отдельная кнопка: добавить текст по клику (мгновенно, без выбора места)
+            if (toolType === 'text-add') {
+                this.animateButton(button);
+                this.closeShapesPopup();
+                this.closeDrawPopup();
+                this.closeEmojiPopup();
+                // Центр холста в мировых координатах как место вставки
+                const req = {};
+                this.eventBus.emit(Events.UI.MinimapGetData, req);
+                const view = req.view || { width: 800, height: 600 };
+                const world = req.world || { x: 0, y: 0, scale: 1 };
+                const worldX = (view.width / 2 - world.x) / (world.scale || 1);
+                const worldY = (view.height / 2 - world.y) / (world.scale || 1);
+                // Сообщаем select-инструменту открыть редактор
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+                this.eventBus.emit(Events.Tool.ObjectEdit, {
+                    object: { id: null, type: 'text', position: { x: worldX, y: worldY }, properties: { fontSize: 18, content: '' } },
+                    create: true
+                });
+                return;
+            }
+
+            // Заглушки для новых кнопок (пока без действий)
+            if (toolType === 'custom-comments' || toolType === 'custom-attachments') {
+                this.animateButton(button);
                 this.closeShapesPopup();
                 this.closeDrawPopup();
                 this.closeEmojiPopup();
@@ -163,6 +206,7 @@ export class Toolbar {
                 this.closeEmojiPopup();
                 // Активируем режим размещения и устанавливаем pending
                 this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                this.placeSelectedButtonId = 'frame-tool';
                 this.setActiveToolbarButton('place');
                 this.eventBus.emit(Events.Place.Set, {
                     type: 'frame',
@@ -179,6 +223,7 @@ export class Toolbar {
                 this.closeEmojiPopup();
                 // Активируем универсальный place tool для дальнейшего размещения
                 this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                this.placeSelectedButtonId = 'shapes';
                 this.setActiveToolbarButton('place');
                 return;
             }
@@ -202,6 +247,7 @@ export class Toolbar {
                 this.closeShapesPopup();
                 this.closeDrawPopup();
                 this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                this.placeSelectedButtonId = 'emoji';
                 return;
             }
             
@@ -244,10 +290,13 @@ export class Toolbar {
         const map = {
             select: 'select',
             pan: 'pan',
-            draw: 'pencil',
-            place: 'shapes'
+            draw: 'pencil'
         };
-        const btnId = map[toolName];
+        let btnId = map[toolName];
+        if (!btnId && toolName === 'place') {
+            // Подсвечиваем тот источник place, который активен (текст/фигуры/фрейм/эмоджи)
+            btnId = this.placeSelectedButtonId || 'shapes';
+        }
         if (!btnId) return;
         const btn = this.element.querySelector(`.moodboard-toolbar__button--${btnId}`);
         if (btn) btn.classList.add('moodboard-toolbar__button--active');

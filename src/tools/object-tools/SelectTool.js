@@ -97,7 +97,33 @@ export class SelectTool extends BaseTool {
 				if (!data || !data.map) return;
 				this.onGroupDuplicateReady(data.map);
 			});
+            this.eventBus.on(Events.Tool.ObjectEdit, ({ object, create }) => {
+                // object: { id?, type, position, properties }
+                if (!object || object.type !== 'text') return;
+                if (create) {
+                    // Создаём пустой textarea на позиции и ждём завершения редактирования
+                    this._openTextEditor(null, object.position, object.properties || {});
+                } else if (object && object.id) {
+                    // Редактирование существующего: запросим данные и откроем
+                    const posData = { objectId: object.id, position: null };
+                    const sizeData = { objectId: object.id, size: null };
+                    this.emit(Events.Tool.GetObjectPosition, posData);
+                    this.emit(Events.Tool.GetObjectSize, sizeData);
+                    const props = { content: object.properties?.content || '', fontSize: object.properties?.fontSize };
+                    this._openTextEditor(object.id, posData.position || { x: 0, y: 0 }, props);
+                }
+            });
 		}
+        this.textEditor = {
+            active: false,
+            objectId: null,
+            textarea: null,
+            wrapper: null,
+            world: null,
+            position: null, // world top-left
+            properties: null, // { fontSize }
+            isResizing: false,
+        };
     }
     
     /**
@@ -290,6 +316,15 @@ export class SelectTool extends BaseTool {
         const hitResult = this.hitTest(event.x, event.y);
         
         if (hitResult.type === 'object') {
+            // если это текст — войдём в режим редактирования через ObjectEdit
+            const req = { objectId: hitResult.object, pixiObject: null };
+            this.emit(Events.Tool.GetObjectPixi, req);
+            const pix = req.pixiObject;
+            const isText = !!(pix && pix._mb && pix._mb.type === 'text');
+            if (isText) {
+                this.emit(Events.Tool.ObjectEdit, { object: { id: hitResult.object, type: 'text', properties: { content: pix?.text || '' } }, create: false });
+                return;
+            }
             this.editObject(hitResult.object);
         }
     }
@@ -1284,5 +1319,197 @@ export class SelectTool extends BaseTool {
         // Для поворота корректное смещение требует преобразования в локальные координаты объекта
         // и обратно. В данной итерации оставляем смещение в мировых осях для устойчивости без вращения.
         return { x: offsetX, y: offsetY };
+    }
+
+    _openTextEditor(objectId, position, properties) {
+        if (this.textEditor.active) this._closeTextEditor(true);
+        const app = this.app;
+        const world = app?.stage?.getChildByName && app.stage.getChildByName('worldLayer');
+        this.textEditor.world = world || null;
+        const view = app?.view;
+        if (!view) return;
+        // Обертка для рамки + textarea + ручек
+        const wrapper = document.createElement('div');
+        wrapper.className = 'moodboard-text-editor';
+        Object.assign(wrapper.style, {
+            position: 'absolute',
+            left: '0px',
+            top: '0px',
+            transformOrigin: '0 0',
+            border: '1px dashed #3B82F6',
+            boxSizing: 'border-box',
+            zIndex: 10000,
+        });
+        const textarea = document.createElement('textarea');
+        textarea.className = 'moodboard-text-input';
+        textarea.value = properties.content || '';
+        const fontSize = properties.fontSize || 18;
+        Object.assign(textarea.style, {
+            position: 'relative',
+            left: '0px',
+            top: '0px',
+            border: 'none',
+            padding: '2px 4px',
+            fontSize: `${fontSize}px`,
+            fontFamily: 'Arial, sans-serif',
+            lineHeight: '1.2',
+            color: '#111',
+            background: 'white',
+            outline: 'none',
+            resize: 'none',
+            minWidth: '120px',
+            minHeight: '28px',
+            width: '160px',
+            height: '36px',
+            boxSizing: 'border-box',
+            // Повыше чёткость текста в CSS
+            WebkitFontSmoothing: 'antialiased',
+            MozOsxFontSmoothing: 'grayscale',
+        });
+        wrapper.appendChild(textarea);
+        // Ручки ресайза
+        const handles = ['nw','ne','se','sw'].map(dir => {
+            const h = document.createElement('div');
+            h.dataset.dir = dir;
+            Object.assign(h.style, {
+                position: 'absolute', width: '8px', height: '8px', background: '#3B82F6',
+                border: '1px solid #fff', boxSizing: 'border-box', zIndex: 10001,
+            });
+            return h;
+        });
+        const placeHandles = () => {
+            handles.forEach(hd => {
+                const dir = hd.dataset.dir;
+                if (dir === 'nw') { hd.style.left = '-4px'; hd.style.top = '-4px'; hd.style.cursor = 'nwse-resize'; }
+                if (dir === 'ne') { hd.style.right = '-4px'; hd.style.top = '-4px'; hd.style.cursor = 'nesw-resize'; }
+                if (dir === 'se') { hd.style.right = '-4px'; hd.style.bottom = '-4px'; hd.style.cursor = 'nwse-resize'; }
+                if (dir === 'sw') { hd.style.left = '-4px'; hd.style.bottom = '-4px'; hd.style.cursor = 'nesw-resize'; }
+            });
+        };
+        handles.forEach(h => wrapper.appendChild(h));
+        view.parentElement.appendChild(wrapper);
+        // Позиция обертки по миру → экран
+        const toScreen = (wx, wy) => {
+            const worldLayer = this.textEditor.world || (this.app?.stage);
+            if (!worldLayer) return { x: wx, y: wy };
+            const global = worldLayer.toGlobal(new PIXI.Point(wx, wy));
+            const viewRes = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
+            return { x: global.x / viewRes, y: global.y / viewRes };
+        };
+        const screenPos = toScreen(position.x, position.y);
+        wrapper.style.left = `${screenPos.x}px`;
+        wrapper.style.top = `${screenPos.y}px`;
+        // Автоподгон
+        const autoSize = () => {
+            textarea.style.height = '1px';
+            textarea.style.width = '1px';
+            const w = Math.max(120, textarea.scrollWidth + 8);
+            const h = Math.max(28, textarea.scrollHeight + 4);
+            textarea.style.width = `${w}px`;
+            textarea.style.height = `${h}px`;
+            wrapper.style.width = `${w}px`;
+            wrapper.style.height = `${h}px`;
+            placeHandles();
+        };
+        autoSize();
+        textarea.focus();
+        this.textEditor = { active: true, objectId, textarea, wrapper, world: this.textEditor.world, position, properties: { fontSize } };
+        // Ресайз мышью
+        const onHandleDown = (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const dir = e.target.dataset.dir;
+            if (!dir) return;
+            const start = {
+                x: e.clientX, y: e.clientY,
+                w: wrapper.offsetWidth, h: wrapper.offsetHeight,
+                left: parseFloat(wrapper.style.left), top: parseFloat(wrapper.style.top), dir
+            };
+            const onMove = (ev) => {
+                const dx = ev.clientX - start.x;
+                const dy = ev.clientY - start.y;
+                let newW = start.w, newH = start.h, newLeft = start.left, newTop = start.top;
+                if (dir.includes('e')) newW = Math.max(80, start.w + dx);
+                if (dir.includes('s')) newH = Math.max(24, start.h + dy);
+                if (dir.includes('w')) { newW = Math.max(80, start.w - dx); newLeft = start.left + dx; }
+                if (dir.includes('n')) { newH = Math.max(24, start.h - dy); newTop = start.top + dy; }
+                wrapper.style.width = `${newW}px`;
+                wrapper.style.height = `${newH}px`;
+                wrapper.style.left = `${newLeft}px`;
+                wrapper.style.top = `${newTop}px`;
+                textarea.style.width = `${Math.max(120, newW)}px`;
+                textarea.style.height = `${Math.max(28, newH)}px`;
+                placeHandles();
+            };
+            const onUp = () => {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        };
+        handles.forEach(h => h.addEventListener('mousedown', onHandleDown));
+        // Завершение
+        const finalize = (commit) => {
+            const value = textarea.value.trim();
+            const commitValue = commit && value.length > 0;
+            wrapper.remove();
+            this.textEditor = { active: false, objectId: null, textarea: null, wrapper: null, world: null, position: null, properties: null };
+            if (!commitValue) return;
+            if (objectId == null) {
+                this.eventBus.emit(Events.UI.ToolbarAction, {
+                    type: 'text',
+                    id: 'text',
+                    position: { x: position.x, y: position.y },
+                    properties: { content: value, fontSize }
+                });
+            } else {
+                this.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
+                this.eventBus.emit(Events.UI.ToolbarAction, {
+                    type: 'text',
+                    id: 'text',
+                    position: { x: position.x, y: position.y },
+                    properties: { content: value, fontSize }
+                });
+            }
+        };
+        textarea.addEventListener('blur', () => finalize(true));
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                finalize(true);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                finalize(false);
+            }
+        });
+        textarea.addEventListener('input', autoSize);
+    }
+
+    _closeTextEditor(commit) {
+        const textarea = this.textEditor.textarea;
+        if (!textarea) return;
+        const value = textarea.value.trim();
+        const commitValue = commit && value.length > 0;
+        textarea.remove();
+        this.textEditor = { active: false, objectId: null, textarea: null, world: null };
+        if (!commitValue) return;
+        if (this.textEditor.objectId == null) {
+            // Создаём новый текстовый объект через ToolbarAction
+            this.eventBus.emit(Events.UI.ToolbarAction, {
+                type: 'text',
+                id: 'text',
+                position: { x: this.textEditor.position.x, y: this.textEditor.position.y },
+                properties: { content: value, fontSize: this.textEditor.properties.fontSize }
+            });
+        } else {
+            // Обновление существующего: через команду изменения свойств пока нет, упростим — удалим и создадим
+            this.emit(Events.Tool.ObjectsDelete, { objects: [this.textEditor.objectId] });
+            this.eventBus.emit(Events.UI.ToolbarAction, {
+                type: 'text',
+                id: 'text',
+                position: { x: this.textEditor.position.x, y: this.textEditor.position.y },
+                properties: { content: value, fontSize: this.textEditor.properties.fontSize }
+            });
+        }
     }
 }

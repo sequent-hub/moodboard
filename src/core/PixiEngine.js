@@ -14,10 +14,15 @@ export class PixiEngine {
             width: this.options.width,
             height: this.options.height,
             backgroundColor: this.options.backgroundColor,
-            antialias: true
+            antialias: true,
+            resolution: (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1,
+            autoDensity: true
         });
 
         this.container.appendChild(this.app.view);
+        if (PIXI.settings && typeof PIXI.settings.ROUND_PIXELS !== 'undefined') {
+            PIXI.settings.ROUND_PIXELS = true;
+        }
 
         // Отдельные слои: сетка (не двигается) и мир с объектами (двигается)
         this.gridLayer = new PIXI.Container();
@@ -74,6 +79,15 @@ export class PixiEngine {
             if (pixiObject.anchor !== undefined) {
                 // Для объектов с anchor (текст, спрайты)
                 pixiObject.anchor.set(0.5, 0.5);
+                // Компенсируем смещение после центрирования anchor, если координаты ещё не скомпенсированы
+                const needsCompensation = !objectData.transform || !objectData.transform.pivotCompensated;
+                if (needsCompensation) {
+                    const b = pixiObject.getBounds();
+                    const halfW = (b?.width || 0) / 2;
+                    const halfH = (b?.height || 0) / 2;
+                    pixiObject.x += halfW;
+                    pixiObject.y += halfH;
+                }
             } else if (pixiObject instanceof PIXI.Graphics) {
                 // Для Graphics объектов устанавливаем pivot в центр
                 const bounds = pixiObject.getBounds();
