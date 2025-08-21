@@ -4,6 +4,7 @@ import { DrawingObject } from './DrawingObject.js';
 import { TextObject } from './TextObject.js';
 import { EmojiObject } from './EmojiObject.js';
 import { ImageObject } from './ImageObject.js';
+import { CommentObject } from './CommentObject.js';
 
 /**
  * Фабрика объектов холста
@@ -17,7 +18,8 @@ export class ObjectFactory {
         ['text', TextObject],
         ['simple-text', TextObject],
         ['emoji', EmojiObject],
-        ['image', ImageObject]
+        ['image', ImageObject],
+        ['comment', CommentObject]
     ]);
 
     /**

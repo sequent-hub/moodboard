@@ -723,6 +723,41 @@
     color: #1d4ed8;
 }
 
+/* Comment popover */
+.comment-popover {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+    min-width: 220px;
+    max-width: 320px;
+    pointer-events: auto;
+    overflow: hidden;
+    z-index: 3300;
+}
+.comment-popover__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #fafafa;
+}
+.comment-popover__title {
+    font-size: 14px;
+    color: #374151;
+}
+.comment-popover__close {
+    border: none;
+    background: transparent;
+    font-size: 16px;
+    line-height: 1;
+    color: #6b7280;
+    cursor: pointer;
+}
+.comment-popover__close:hover { color: #111827; }
+.comment-popover__body { padding: 12px; font-size: 14px; color: #374151; }
+
 /* Status Animation */
 .moodboard-save-status.status-saving .save-icon {
     animation: spin 1s linear infinite;

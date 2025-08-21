@@ -55,6 +55,9 @@ export class HtmlHandlesLayer {
             const id = ids[0];
             const pixi = this.core.pixi.objects.get(id);
             if (!pixi) { this.hide(); return; }
+            // Не показываем рамку/ручки для комментариев
+            const mb = pixi._mb || {};
+            if (mb.type === 'comment') { this.hide(); return; }
             const b = pixi.getBounds();
             this._showBounds({ x: b.x, y: b.y, width: b.width, height: b.height }, id);
         } else {

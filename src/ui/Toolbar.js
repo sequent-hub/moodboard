@@ -201,8 +201,22 @@ export class Toolbar {
                 return;
             }
 
-            // Заглушки для новых кнопок (пока без действий)
-            if (toolType === 'custom-comments' || toolType === 'custom-attachments') {
+            // Комментарии — включаем режим размещения comment
+            if (toolType === 'custom-comments') {
+                this.animateButton(button);
+                this.closeShapesPopup();
+                this.closeDrawPopup();
+                this.closeEmojiPopup();
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                this.placeSelectedButtonId = 'comments';
+                this.setActiveToolbarButton('place');
+                // Увеличенный размер по умолчанию
+                this.eventBus.emit(Events.Place.Set, { type: 'comment', properties: { width: 72, height: 72 } });
+                return;
+            }
+
+            // Заглушка для прикреплений (оставим без действия пока)
+            if (toolType === 'custom-attachments') {
                 this.animateButton(button);
                 this.closeShapesPopup();
                 this.closeDrawPopup();

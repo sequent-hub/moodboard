@@ -11,6 +11,7 @@ import { DataManager } from './DataManager.js';
 import { ActionHandler } from './ActionHandler.js';
 import { HtmlTextLayer } from '../ui/HtmlTextLayer.js';
 import { HtmlHandlesLayer } from '../ui/HtmlHandlesLayer.js';
+import { CommentPopover } from '../ui/CommentPopover.js';
 
 /**
  * Готовый MoodBoard с UI - главный класс пакета
@@ -78,6 +79,9 @@ export class MoodBoard {
             this.htmlTextLayer.attach();
             this.htmlHandlesLayer = new HtmlHandlesLayer(this.canvasContainer, this.coreMoodboard.eventBus, this.coreMoodboard);
             this.htmlHandlesLayer.attach();
+            // Поповер для комментариев
+            this.commentPopover = new CommentPopover(this.canvasContainer, this.coreMoodboard.eventBus, this.coreMoodboard);
+            this.commentPopover.attach();
             
             // Загружаем данные (сначала пробуем загрузить с сервера, потом дефолтные)
             await this.loadExistingBoard();
