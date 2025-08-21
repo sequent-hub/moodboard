@@ -15,6 +15,7 @@ export class ActionHandler {
             case 'frame':
             case 'simple-text':
             case 'text':
+            case 'note':
             case 'shape':
             case 'drawing':
             case 'emoji':

@@ -30,6 +30,7 @@ export class Toolbar {
             { id: 'pan', icon: '✋', title: 'Панорамирование (Пробел)', type: 'activate-pan' },
             { id: 'divider', type: 'divider' },
             { id: 'text-add', icon: 'T+', title: 'Добавить текст (клик сразу откроет редактирование)', type: 'text-add' },
+            { id: 'note', icon: '📝', title: 'Добавить записку', type: 'note-add' },
             { id: 'image', icon: '🖼️', title: 'Добавить картинку', type: 'image-add' },
             { id: 'shapes', icon: '🔷', title: 'Фигуры', type: 'custom-shapes' },
             { id: 'pencil', icon: '✏️', title: 'Рисование', type: 'custom-draw' },
@@ -186,6 +187,29 @@ export class Toolbar {
                 return;
             }
 
+            // Добавление записки: включаем placement и ждём клика для выбора позиции
+            if (toolType === 'note-add') {
+                this.animateButton(button);
+                this.closeShapesPopup();
+                this.closeDrawPopup();
+                this.closeEmojiPopup();
+                // Активируем place, устанавливаем pending для note
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                this.placeSelectedButtonId = 'note';
+                this.setActiveToolbarButton('place');
+                // Устанавливаем свойства записки по умолчанию
+                this.eventBus.emit(Events.Place.Set, { 
+                    type: 'note', 
+                    properties: { 
+                        content: 'Новая записка',
+                        fontSize: 14,
+                        width: 160,
+                        height: 100
+                    }
+                });
+                return;
+            }
+
             // Добавление картинки: включаем placement и ждём клика для выбора позиции, затем открываем файловый диалог
             if (toolType === 'image-add') {
                 this.animateButton(button);
@@ -320,7 +344,7 @@ export class Toolbar {
         };
         let btnId = map[toolName];
         if (!btnId && toolName === 'place') {
-            // Подсвечиваем тот источник place, который активен (текст/фигуры/фрейм/эмоджи)
+            // Подсвечиваем тот источник place, который активен (текст/фигуры/фрейм/эмоджи/записки)
             btnId = this.placeSelectedButtonId || 'shapes';
         }
         if (!btnId) return;

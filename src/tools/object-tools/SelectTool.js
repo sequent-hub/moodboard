@@ -99,11 +99,11 @@ export class SelectTool extends BaseTool {
 			});
             this.eventBus.on(Events.Tool.ObjectEdit, ({ object, create }) => {
                 // object: { id?, type, position, properties }
-                if (!object || object.type !== 'text') return;
+                if (!object || (object.type !== 'text' && object.type !== 'note')) return;
                 if (create) {
                     // Создаём пустой textarea на позиции и ждём завершения редактирования
                     this.eventBus.emit(Events.UI.TextEditStart, { objectId: object.id || null });
-                    this._openTextEditor(null, object.position, object.properties || {});
+                    this._openTextEditor(null, object.position, object.properties || {}, object.type);
                 } else if (object && object.id) {
                     // Редактирование существующего: запросим данные и откроем
                     const posData = { objectId: object.id, position: null };
@@ -115,7 +115,7 @@ export class SelectTool extends BaseTool {
                     const meta = pixiReq.pixiObject && pixiReq.pixiObject._mb ? pixiReq.pixiObject._mb.properties || {} : {};
                     const props = { content: meta.content || object.properties?.content || '', fontSize: meta.fontSize || object.properties?.fontSize };
                     this.eventBus.emit(Events.UI.TextEditStart, { objectId: object.id });
-                    this._openTextEditor(object.id, posData.position || { x: 0, y: 0 }, props, sizeData.size || null);
+                    this._openTextEditor(object.id, posData.position || { x: 0, y: 0 }, props, sizeData.size || null, object.type);
                 }
             });
 		}
@@ -127,6 +127,7 @@ export class SelectTool extends BaseTool {
             world: null,
             position: null, // world top-left
             properties: null, // { fontSize }
+            objectType: 'text', // 'text' or 'note'
             isResizing: false,
         };
     }
@@ -321,13 +322,19 @@ export class SelectTool extends BaseTool {
         const hitResult = this.hitTest(event.x, event.y);
         
         if (hitResult.type === 'object') {
-            // если это текст — войдём в режим редактирования через ObjectEdit
+            // если это текст или записка — войдём в режим редактирования через ObjectEdit
             const req = { objectId: hitResult.object, pixiObject: null };
             this.emit(Events.Tool.GetObjectPixi, req);
             const pix = req.pixiObject;
             const isText = !!(pix && pix._mb && pix._mb.type === 'text');
+            const isNote = !!(pix && pix._mb && pix._mb.type === 'note');
             if (isText) {
                 this.emit(Events.Tool.ObjectEdit, { object: { id: hitResult.object, type: 'text', properties: { content: pix?.text || '' } }, create: false });
+                return;
+            }
+            if (isNote) {
+                const noteProps = pix._mb.properties || {};
+                this.emit(Events.Tool.ObjectEdit, { object: { id: hitResult.object, type: 'note', properties: { content: noteProps.content || '' } }, create: false });
                 return;
             }
             this.editObject(hitResult.object);
@@ -1338,7 +1345,7 @@ export class SelectTool extends BaseTool {
         return { x: offsetX, y: offsetY };
     }
 
-    _openTextEditor(objectId, position, properties, initialSize = null) {
+    _openTextEditor(objectId, position, properties, initialSize = null, objectType = 'text') {
         if (this.textEditor.active) this._closeTextEditor(true);
         const app = this.app;
         const world = app?.stage?.getChildByName && app.stage.getChildByName('worldLayer');
@@ -1502,7 +1509,7 @@ export class SelectTool extends BaseTool {
         const phSize = Math.max(12, Math.round(fontSize * 0.8));
         styleEl.textContent = `.${uid}::placeholder{font-size:${phSize}px;opacity:.6;}`;
         document.head.appendChild(styleEl);
-        this.textEditor = { active: true, objectId, textarea, wrapper, world: this.textEditor.world, position, properties: { fontSize }, _phStyle: styleEl };
+        this.textEditor = { active: true, objectId, textarea, wrapper, world: this.textEditor.world, position, properties: { fontSize }, objectType, _phStyle: styleEl };
         // Ресайз мышью
         const onHandleDown = (e) => {
             e.preventDefault(); e.stopPropagation();
@@ -1590,25 +1597,29 @@ export class SelectTool extends BaseTool {
         if (!textarea) return;
         const value = textarea.value.trim();
         const commitValue = commit && value.length > 0;
+        const objectType = this.textEditor.objectType || 'text';
+        const objectId = this.textEditor.objectId;
+        const position = this.textEditor.position;
+        const properties = this.textEditor.properties;
         textarea.remove();
-        this.textEditor = { active: false, objectId: null, textarea: null, world: null };
+        this.textEditor = { active: false, objectId: null, textarea: null, world: null, objectType: 'text' };
         if (!commitValue) return;
-        if (this.textEditor.objectId == null) {
-            // Создаём новый текстовый объект через ToolbarAction
+        if (objectId == null) {
+            // Создаём новый объект через ToolbarAction
             this.eventBus.emit(Events.UI.ToolbarAction, {
-                type: 'text',
-                id: 'text',
-                position: { x: this.textEditor.position.x, y: this.textEditor.position.y },
-                properties: { content: value, fontSize: this.textEditor.properties.fontSize }
+                type: objectType,
+                id: objectType,
+                position: { x: position.x, y: position.y },
+                properties: { content: value, fontSize: properties.fontSize }
             });
         } else {
             // Обновление существующего: через команду изменения свойств пока нет, упростим — удалим и создадим
-            this.emit(Events.Tool.ObjectsDelete, { objects: [this.textEditor.objectId] });
+            this.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
             this.eventBus.emit(Events.UI.ToolbarAction, {
-                type: 'text',
-                id: 'text',
-                position: { x: this.textEditor.position.x, y: this.textEditor.position.y },
-                properties: { content: value, fontSize: this.textEditor.properties.fontSize }
+                type: objectType,
+                id: objectType,
+                position: { x: position.x, y: position.y },
+                properties: { content: value, fontSize: properties.fontSize }
             });
         }
     }
