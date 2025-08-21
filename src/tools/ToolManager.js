@@ -129,6 +129,19 @@ export class ToolManager {
         this.container.addEventListener('mouseleave', () => { this.isMouseOverContainer = false; });
         // Убираем отдельные слушатели aux-pan на контейнере, чтобы не дублировать mousedown/mouseup
 
+        // Drag & Drop — поддержка перетаскивания изображений на холст
+        this.container.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+        });
+        this.container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+        });
+        this.container.addEventListener('dragleave', (e) => {
+            // можно снимать подсветку, если добавим в будущем
+        });
+        this.container.addEventListener('drop', (e) => this.handleDrop(e));
+
         // Глобальные события мыши — чтобы корректно завершать drag/resize при отпускании за пределами холста
         document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
         document.addEventListener('mouseup', (e) => {
@@ -324,6 +337,99 @@ export class ToolManager {
             e.preventDefault();
         }
     }
+
+    async handleDrop(e) {
+        e.preventDefault();
+        const rect = this.container.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        this.lastMousePos = { x, y };
+        this.eventBus.emit(Events.UI.CursorMove, { x, y });
+
+        const dt = e.dataTransfer;
+        if (!dt) return;
+
+        const emitAt = (src, name, offsetIndex = 0) => {
+            const offset = 25 * offsetIndex;
+            this.eventBus.emit(Events.UI.PasteImageAt, { x: x + offset, y: y + offset, src, name });
+        };
+
+        // 1) Файлы с рабочего стола
+        const files = dt.files ? Array.from(dt.files) : [];
+        const imageFiles = files.filter(f => f.type && f.type.startsWith('image/'));
+        if (imageFiles.length > 0) {
+            let index = 0;
+            for (const file of imageFiles) {
+                await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => { emitAt(reader.result, file.name || 'image', index++); resolve(); };
+                    reader.readAsDataURL(file);
+                });
+            }
+            return;
+        }
+
+        // 2) Перетаскивание с другой вкладки: HTML/URI/PLAIN
+        const html = dt.getData('text/html');
+        if (html && html.includes('<img')) {
+            const m = html.match(/<img[^>]*src\s*=\s*"([^"]+)"/i);
+            if (m && m[1]) {
+                const url = m[1];
+                if (/^data:image\//i.test(url)) { emitAt(url, 'clipboard-image.png'); return; }
+                if (/^https?:\/\//i.test(url)) {
+                    try {
+                        const resp = await fetch(url, { mode: 'cors' });
+                        const blob = await resp.blob();
+                        const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+                        emitAt(dataUrl, url.split('/').pop() || 'image');
+                    } catch (_) {
+                        emitAt(url, url.split('/').pop() || 'image');
+                    }
+                    return;
+                }
+            }
+        }
+
+        const uriList = dt.getData('text/uri-list') || '';
+        if (uriList) {
+            const lines = uriList.split('\n').filter(l => !!l && !l.startsWith('#'));
+            const urls = lines.filter(l => /^https?:\/\//i.test(l));
+            let index = 0;
+            for (const url of urls) {
+                const isImage = /(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(url);
+                if (!isImage) continue;
+                try {
+                    const resp = await fetch(url, { mode: 'cors' });
+                    const blob = await resp.blob();
+                    const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+                    emitAt(dataUrl, url.split('/').pop() || 'image', index++);
+                } catch (_) {
+                    emitAt(url, url.split('/').pop() || 'image', index++);
+                }
+            }
+            if (index > 0) return;
+        }
+
+        const text = dt.getData('text/plain') || '';
+        if (text) {
+            const trimmed = text.trim();
+            const isDataUrl = /^data:image\//i.test(trimmed);
+            const isHttpUrl = /^https?:\/\//i.test(trimmed);
+            const looksLikeImage = /(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(trimmed);
+            if (isDataUrl) { emitAt(trimmed, 'clipboard-image.png'); return; }
+            if (isHttpUrl && looksLikeImage) {
+                try {
+                    const resp = await fetch(trimmed, { mode: 'cors' });
+                    const blob = await resp.blob();
+                    const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+                    emitAt(dataUrl, trimmed.split('/').pop() || 'image');
+                } catch (_) {
+                    emitAt(trimmed, trimmed.split('/').pop() || 'image');
+                }
+                return;
+            }
+        }
+    }
     
     handleKeyDown(e) {
         // Обработка горячих клавиш для переключения инструментов
@@ -429,6 +535,10 @@ export class ToolManager {
             this.container.removeEventListener('dblclick', this.handleDoubleClick);
             this.container.removeEventListener('wheel', this.handleMouseWheel);
             this.container.removeEventListener('contextmenu', (e) => e.preventDefault());
+            this.container.removeEventListener('dragenter', (e) => e.preventDefault());
+            this.container.removeEventListener('dragover', (e) => e.preventDefault());
+            this.container.removeEventListener('dragleave', () => {});
+            this.container.removeEventListener('drop', this.handleDrop);
         }
         document.removeEventListener('mousemove', this.handleMouseMove);
         document.removeEventListener('mouseup', this.handleMouseUp);

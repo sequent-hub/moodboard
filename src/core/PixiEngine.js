@@ -82,9 +82,10 @@ export class PixiEngine {
                 // Компенсируем смещение после центрирования anchor, если координаты ещё не скомпенсированы
                 const needsCompensation = !objectData.transform || !objectData.transform.pivotCompensated;
                 if (needsCompensation) {
-                    const b = pixiObject.getBounds();
-                    const halfW = (b?.width || 0) / 2;
-                    const halfH = (b?.height || 0) / 2;
+                    // Используем запрошенные размеры объекта (objectData.width/height),
+                    // т.к. текстура спрайта может ещё не загрузиться и getBounds() вернёт 0
+                    const halfW = (objectData.width || 0) / 2;
+                    const halfH = (objectData.height || 0) / 2;
                     pixiObject.x += halfW;
                     pixiObject.y += halfH;
                 }
