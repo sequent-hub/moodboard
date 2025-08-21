@@ -231,6 +231,30 @@ export class CoreMoodBoard {
             }
         });
 
+        // Вставка изображения из буфера обмена в центр экрана
+        this.eventBus.on(Events.UI.PasteImage, ({ src, name }) => {
+            if (!src) return;
+            const view = this.pixi.app.view;
+            const world = this.pixi.worldLayer || this.pixi.app.stage;
+            const s = world?.scale?.x || 1;
+            const cx = view.clientWidth / 2;
+            const cy = view.clientHeight / 2;
+            const worldX = (cx - (world?.x || 0)) / s;
+            const worldY = (cy - (world?.y || 0)) / s;
+            // Создаём image объект 300px шириной, сохраняем пропорции после загрузки текстуры
+            this.createObject('image', { x: Math.round(worldX - 150), y: Math.round(worldY - 100) }, { src, name, width: 300, height: 200 });
+        });
+
+        // Вставка изображения из буфера обмена по контекстному клику (координаты на экране)
+        this.eventBus.on(Events.UI.PasteImageAt, ({ x, y, src, name }) => {
+            if (!src) return;
+            const world = this.pixi.worldLayer || this.pixi.app.stage;
+            const s = world?.scale?.x || 1;
+            const worldX = (x - (world?.x || 0)) / s;
+            const worldY = (y - (world?.y || 0)) / s;
+            this.createObject('image', { x: Math.round(worldX - 150), y: Math.round(worldY - 100) }, { src, name, width: 300, height: 200 });
+        });
+
         // Слойность: изменение порядка отрисовки (локальные операции)
         const applyZOrderFromState = () => {
             const arr = this.state.state.objects || [];

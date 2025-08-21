@@ -215,6 +215,88 @@ export class ContextMenu {
             });
             list.appendChild(item);
 
+            // Вставить картинку из буфера обмена (если есть)
+            const itemImg = document.createElement('div');
+            itemImg.className = 'moodboard-contextmenu__item';
+            const leftImg = document.createElement('span');
+            leftImg.className = 'moodboard-contextmenu__label';
+            leftImg.textContent = 'Вставить картинку';
+            const rightImg = document.createElement('span');
+            rightImg.className = 'moodboard-contextmenu__shortcut';
+            rightImg.textContent = 'Ctrl+V';
+            itemImg.appendChild(leftImg);
+            itemImg.appendChild(rightImg);
+            itemImg.addEventListener('click', async () => {
+                this.hide();
+                try {
+                    const items = (navigator.clipboard && navigator.clipboard.read) ? await navigator.clipboard.read() : [];
+                    let src = null;
+                    let name = 'clipboard-image.png';
+                    for (const it of items) {
+                        const types = it.types || [];
+                        const imgType = types.find(t => t.startsWith('image/'));
+                        if (!imgType) continue;
+                        const blob = await it.getType(imgType);
+                        src = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+                        name = `clipboard.${imgType.split('/')[1] || 'png'}`;
+                        break;
+                    }
+                    // Fallback: попробовать текст с URL
+                    if (!src && navigator.clipboard && navigator.clipboard.readText) {
+                        const text = (await navigator.clipboard.readText())?.trim();
+                        if (text) {
+                            const isData = /^data:image\//i.test(text);
+                            const isHttp = /^https?:\/\//i.test(text) && /(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(text);
+                            if (isData) {
+                                src = text;
+                                name = 'clipboard-image.png';
+                            } else if (isHttp) {
+                                try {
+                                    const resp = await fetch(text, { mode: 'cors' });
+                                    const blob = await resp.blob();
+                                    src = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+                                    name = text.split('/').pop() || 'image';
+                                } catch (_) {
+                                    // как крайний случай, отдадим прямой URL — если CORS запрещает, объект может не загрузиться
+                                    src = text;
+                                    name = text.split('/').pop() || 'image';
+                                }
+                            }
+                        }
+                    }
+                    // Fallback: диалог выбора файла
+                    if (!src) {
+                        await new Promise((resolve) => setTimeout(resolve, 0));
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        input.style.position = 'fixed';
+                        input.style.left = '-9999px';
+                        document.body.appendChild(input);
+                        input.addEventListener('change', () => {
+                            const file = input.files && input.files[0];
+                            if (file) {
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                    const dataUrl = reader.result;
+                                    this.eventBus.emit(Events.UI.PasteImageAt, { x: this.lastX, y: this.lastY, src: dataUrl, name: file.name });
+                                    document.body.removeChild(input);
+                                };
+                                reader.readAsDataURL(file);
+                            } else {
+                                document.body.removeChild(input);
+                            }
+                        }, { once: true });
+                        input.click();
+                        return;
+                    }
+                    if (src) this.eventBus.emit(Events.UI.PasteImageAt, { x: this.lastX, y: this.lastY, src, name });
+                } catch (err) {
+                    // no-op (браузер мог запретить доступ к буферу)
+                }
+            });
+            list.appendChild(itemImg);
+
             // Разделитель
             const divider = document.createElement('div');
             divider.className = 'moodboard-contextmenu__divider';

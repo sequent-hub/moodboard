@@ -52,6 +52,8 @@ export const Events = {
 		CopyObject: 'ui:copy-object',
 		CopyGroup: 'ui:copy-group',
 		PasteAt: 'ui:paste-at',
+        PasteImage: 'ui:paste-image',
+        PasteImageAt: 'ui:paste-image-at',
 		ZoomIn: 'ui:zoom:in',
 		ZoomOut: 'ui:zoom:out',
 		ZoomReset: 'ui:zoom:reset',

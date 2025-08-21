@@ -22,6 +22,131 @@ export class KeyboardManager {
         
         this.targetElement.addEventListener('keydown', this.handleKeyDown);
         this.targetElement.addEventListener('keyup', this.handleKeyUp);
+        // Вставка изображений из буфера обмена
+        this.targetElement.addEventListener('paste', async (e) => {
+            try {
+                const cd = e.clipboardData;
+                if (!cd) return;
+                let handled = false;
+                // 1) items API
+                const items = cd.items ? Array.from(cd.items) : [];
+                const imageItem = items.find(i => i.type && i.type.startsWith('image/'));
+                if (imageItem) {
+                    e.preventDefault();
+                    const file = imageItem.getAsFile();
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            const dataUrl = reader.result;
+                            this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: file.name });
+                        };
+                        reader.readAsDataURL(file);
+                        handled = true;
+                    }
+                }
+                if (handled) return;
+                // 2) files API
+                const files = cd.files ? Array.from(cd.files) : [];
+                const imgFile = files.find(f => f.type && f.type.startsWith('image/'));
+                if (imgFile) {
+                    e.preventDefault();
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const dataUrl = reader.result;
+                        this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: imgFile.name });
+                    };
+                    reader.readAsDataURL(imgFile);
+                    return;
+                }
+                // 3) text/html with <img src="...">
+                const html = cd.getData && cd.getData('text/html');
+                if (html && html.includes('<img')) {
+                    const m = html.match(/<img[^>]*src\s*=\s*"([^"]+)"/i);
+                    if (m && m[1]) {
+                        const srcInHtml = m[1];
+                        if (/^data:image\//i.test(srcInHtml)) {
+                            e.preventDefault();
+                            this.eventBus.emit(Events.UI.PasteImage, { src: srcInHtml, name: 'clipboard-image.png' });
+                            return;
+                        }
+                        if (/^https?:\/\//i.test(srcInHtml)) {
+                            e.preventDefault();
+                            try {
+                                const resp = await fetch(srcInHtml, { mode: 'cors' });
+                                const blob = await resp.blob();
+                                const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+                                this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: srcInHtml.split('/').pop() || 'image' });
+                            } catch (_) {
+                                // как fallback, попробуем напрямую URL
+                                this.eventBus.emit(Events.UI.PasteImage, { src: srcInHtml, name: srcInHtml.split('/').pop() || 'image' });
+                            }
+                            return;
+                        }
+                        if (/^blob:/i.test(srcInHtml)) {
+                            // Попробуем прочитать из системного буфера, если браузер разрешит
+                            try {
+                                if (navigator.clipboard && navigator.clipboard.read) {
+                                    const itemsFromAPI = await navigator.clipboard.read();
+                                    for (const it of itemsFromAPI) {
+                                        const imgType = (it.types || []).find(t => t.startsWith('image/'));
+                                        if (!imgType) continue;
+                                        const blob = await it.getType(imgType);
+                                        const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+                                        e.preventDefault();
+                                        this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: `clipboard.${imgType.split('/')[1] || 'png'}` });
+                                        return;
+                                    }
+                                }
+                            } catch (_) {}
+                        }
+                    }
+                }
+                // 4) text/plain with image URL or data URL
+                const text = cd.getData && cd.getData('text/plain');
+                if (text) {
+                    const trimmed = text.trim();
+                    const isDataUrl = /^data:image\//i.test(trimmed);
+                    const isHttpUrl = /^https?:\/\//i.test(trimmed);
+                    const looksLikeImage = /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(trimmed);
+                    if (isDataUrl) {
+                        e.preventDefault();
+                        this.eventBus.emit(Events.UI.PasteImage, { src: trimmed, name: 'clipboard-image.png' });
+                        return;
+                    }
+                    if (isHttpUrl && looksLikeImage) {
+                        e.preventDefault();
+                        try {
+                            const resp = await fetch(trimmed, { mode: 'cors' });
+                            const blob = await resp.blob();
+                            const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+                            this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: trimmed.split('/').pop() || 'image' });
+                            return;
+                        } catch (_) {
+                            // Если не удалось из-за CORS, попробуем напрямую URL (PIXI загрузит)
+                            this.eventBus.emit(Events.UI.PasteImage, { src: trimmed, name: trimmed.split('/').pop() || 'image' });
+                            return;
+                        }
+                    }
+                }
+                // 5) Fallback: попробовать Clipboard API напрямую
+                try {
+                    if (!handled && navigator.clipboard && navigator.clipboard.read) {
+                        const itemsFromAPI = await navigator.clipboard.read();
+                        for (const it of itemsFromAPI) {
+                            const imgType = (it.types || []).find(t => t.startsWith('image/'));
+                            if (!imgType) continue;
+                            const blob = await it.getType(imgType);
+                            const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+                            e.preventDefault();
+                            this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: `clipboard.${imgType.split('/')[1] || 'png'}` });
+                            return;
+                        }
+                    }
+                } catch(_) {}
+            } catch (err) {
+                // no-op
+            }
+        }, { capture: true });
         this.isListening = true;
         
         // Регистрируем стандартные горячие клавиши
@@ -360,11 +485,11 @@ export class KeyboardManager {
         
         this.registerShortcut('ctrl+v', () => {
             this.eventBus.emit(Events.Keyboard.Paste);
-        }, { description: 'Вставить', preventDefault: true });
+        }, { description: 'Вставить', preventDefault: false });
         
         this.registerShortcut('ctrl+м', () => { // русская 'м' на той же клавише что и 'v'
             this.eventBus.emit(Events.Keyboard.Paste);
-        }, { description: 'Вставить (рус)', preventDefault: true });
+        }, { description: 'Вставить (рус)', preventDefault: false });
 
         // Слойность (латиница и русская раскладка)
         this.registerShortcut(']', () => {
