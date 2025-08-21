@@ -105,7 +105,8 @@ export class HtmlHandlesLayer {
         });
         this.layer.appendChild(box);
 
-        const mk = (dir, x, y, cursor) => {
+        // Угловые ручки для ресайза
+        const mkCorner = (dir, x, y, cursor) => {
             const h = document.createElement('div');
             h.dataset.dir = dir; h.dataset.id = id;
             Object.assign(h.style, {
@@ -119,15 +120,31 @@ export class HtmlHandlesLayer {
             box.appendChild(h);
         };
 
-        const x0 = 0, y0 = 0, x1 = width, y1 = height, cx = width / 2, cy = height / 2;
-        mk('nw', x0, y0, 'nwse-resize');
-        mk('n', cx, y0, 'n-resize');
-        mk('ne', x1, y0, 'nesw-resize');
-        mk('e', x1, cy, 'e-resize');
-        mk('se', x1, y1, 'nwse-resize');
-        mk('s', cx, y1, 's-resize');
-        mk('sw', x0, y1, 'nesw-resize');
-        mk('w', x0, cy, 'w-resize');
+        const x0 = 0, y0 = 0, x1 = width, y1 = height;
+        mkCorner('nw', x0, y0, 'nwse-resize');
+        mkCorner('ne', x1, y0, 'nesw-resize');
+        mkCorner('se', x1, y1, 'nwse-resize');
+        mkCorner('sw', x0, y1, 'nesw-resize');
+
+        // Кликабельные грани для ресайза
+        const edgeSize = 14; // увеличенная область хвата
+        const makeEdge = (name, style, cursor) => {
+            const e = document.createElement('div');
+            e.dataset.edge = name; e.dataset.id = id;
+            Object.assign(e.style, style, {
+                position: 'absolute', pointerEvents: 'auto', cursor, zIndex: 1,
+            });
+            e.addEventListener('mousedown', (evt) => this._onEdgeResizeDown(evt));
+            box.appendChild(e);
+        };
+        // top
+        makeEdge('top', { left: `-${edgeSize/2}px`, top: `-${edgeSize/2}px`, width: `${width + edgeSize}px`, height: `${edgeSize}px` }, 'ns-resize');
+        // bottom
+        makeEdge('bottom', { left: `-${edgeSize/2}px`, top: `${height - edgeSize/2}px`, width: `${width + edgeSize}px`, height: `${edgeSize}px` }, 'ns-resize');
+        // left
+        makeEdge('left', { left: `-${edgeSize/2}px`, top: `0px`, width: `${edgeSize}px`, height: `${height}px` }, 'ew-resize');
+        // right
+        makeEdge('right', { left: `${width - edgeSize/2}px`, top: `0px`, width: `${edgeSize}px`, height: `${height}px` }, 'ew-resize');
 
         // Ручка вращения (опционально можно добавить позже)
         this.visible = true;
@@ -207,8 +224,8 @@ export class HtmlHandlesLayer {
             box.style.top = `${newTop}px`;
             box.style.width = `${newW}px`;
             box.style.height = `${newH}px`;
-            // Пересоберём ручки
-            this.update();
+            // Переставим ручки без перестроения слоя
+            this._repositionBoxChildren(box);
 
             // Перевод в мировые координаты
             const screenX = (newLeft - offsetLeft) * res;
@@ -267,6 +284,157 @@ export class HtmlHandlesLayer {
         };
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
+    }
+
+    _onEdgeResizeDown(e) {
+        e.preventDefault(); e.stopPropagation();
+        const id = e.currentTarget.dataset.id;
+        const isGroup = id === '__group__';
+        const edge = e.currentTarget.dataset.edge;
+        const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
+        const s = world?.scale?.x || 1;
+        const tx = world?.x || 0;
+        const ty = world?.y || 0;
+        const res = (this.core.pixi.app.renderer?.resolution) || 1;
+        const view = this.core.pixi.app.view;
+        const containerRect = this.container.getBoundingClientRect();
+        const viewRect = view.getBoundingClientRect();
+        const offsetLeft = viewRect.left - containerRect.left;
+        const offsetTop = viewRect.top - containerRect.top;
+
+        const box = e.currentTarget.parentElement;
+        const startCSS = {
+            left: parseFloat(box.style.left),
+            top: parseFloat(box.style.top),
+            width: parseFloat(box.style.width),
+            height: parseFloat(box.style.height),
+        };
+        const startScreen = {
+            x: (startCSS.left - offsetLeft) * res,
+            y: (startCSS.top - offsetTop) * res,
+            w: startCSS.width * res,
+            h: startCSS.height * res,
+        };
+        const startWorld = {
+            x: (startScreen.x - tx) / s,
+            y: (startScreen.y - ty) / s,
+            width: startScreen.w / s,
+            height: startScreen.h / s,
+        };
+
+        let objects = [id];
+        if (isGroup) {
+            const req = { selection: [] };
+            this.eventBus.emit(Events.Tool.GetSelection, req);
+            objects = req.selection || [];
+            this.eventBus.emit(Events.Tool.GroupResizeStart, { objects, startBounds: { ...startWorld } });
+        } else {
+            this.eventBus.emit(Events.Tool.ResizeStart, { object: id, handle: edge === 'top' ? 'n' : edge === 'bottom' ? 's' : edge === 'left' ? 'w' : 'e' });
+        }
+
+        const startMouse = { x: e.clientX, y: e.clientY };
+        const onMove = (ev) => {
+            const dxCSS = ev.clientX - startMouse.x;
+            const dyCSS = ev.clientY - startMouse.y;
+            // Новые CSS-габариты и позиция
+            let newLeft = startCSS.left;
+            let newTop = startCSS.top;
+            let newW = startCSS.width;
+            let newH = startCSS.height;
+            if (edge === 'right') newW = Math.max(1, startCSS.width + dxCSS);
+            if (edge === 'bottom') newH = Math.max(1, startCSS.height + dyCSS);
+            if (edge === 'left') { newW = Math.max(1, startCSS.width - dxCSS); newLeft = startCSS.left + dxCSS; }
+            if (edge === 'top') { newH = Math.max(1, startCSS.height - dyCSS); newTop = startCSS.top + dyCSS; }
+
+            // Обновим визуально
+            box.style.left = `${newLeft}px`;
+            box.style.top = `${newTop}px`;
+            box.style.width = `${newW}px`;
+            box.style.height = `${newH}px`;
+            // Переставим ручки/грани
+            this._repositionBoxChildren(box);
+
+            // Перевод в мировые координаты
+            const screenX = (newLeft - offsetLeft) * res;
+            const screenY = (newTop - offsetTop) * res;
+            const screenW = newW * res;
+            const screenH = newH * res;
+            const worldX = (screenX - tx) / s;
+            const worldY = (screenY - ty) / s;
+            const worldW = screenW / s;
+            const worldH = screenH / s;
+
+            if (isGroup) {
+                this.eventBus.emit(Events.Tool.GroupResizeUpdate, {
+                    objects,
+                    startBounds: { ...startWorld },
+                    newBounds: { x: worldX, y: worldY, width: worldW, height: worldH }
+                });
+            } else {
+                this.eventBus.emit(Events.Tool.ResizeUpdate, {
+                    object: id,
+                    size: { width: worldW, height: worldH },
+                    position: { x: worldX, y: worldY }
+                });
+            }
+        };
+        const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            const endCSS = {
+                left: parseFloat(box.style.left),
+                top: parseFloat(box.style.top),
+                width: parseFloat(box.style.width),
+                height: parseFloat(box.style.height),
+            };
+            const screenX = (endCSS.left - offsetLeft) * res;
+            const screenY = (endCSS.top - offsetTop) * res;
+            const screenW = endCSS.width * res;
+            const screenH = endCSS.height * res;
+            const worldX = (screenX - tx) / s;
+            const worldY = (screenY - ty) / s;
+            const worldW = screenW / s;
+            const worldH = screenH / s;
+
+            if (isGroup) {
+                this.eventBus.emit(Events.Tool.GroupResizeEnd, { objects });
+            } else {
+                this.eventBus.emit(Events.Tool.ResizeEnd, {
+                    object: id,
+                    oldSize: { width: startWorld.width, height: startWorld.height },
+                    newSize: { width: worldW, height: worldH },
+                    oldPosition: { x: startWorld.x, y: startWorld.y },
+                    newPosition: { x: worldX, y: worldY },
+                });
+            }
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }
+
+    _repositionBoxChildren(box) {
+        const width = parseFloat(box.style.width);
+        const height = parseFloat(box.style.height);
+        // corners
+        box.querySelectorAll('[data-dir]').forEach(h => {
+            const dir = h.dataset.dir;
+            switch (dir) {
+                case 'nw': h.style.left = `${-6}px`; h.style.top = `${-6}px`; break;
+                case 'ne': h.style.left = `${Math.max(-6, width - 6)}px`; h.style.top = `${-6}px`; break;
+                case 'se': h.style.left = `${Math.max(-6, width - 6)}px`; h.style.top = `${Math.max(-6, height - 6)}px`; break;
+                case 'sw': h.style.left = `${-6}px`; h.style.top = `${Math.max(-6, height - 6)}px`; break;
+            }
+        });
+        // edges
+        const edgeSize = 14;
+        const top = box.querySelector('[data-edge="top"]');
+        const bottom = box.querySelector('[data-edge="bottom"]');
+        const left = box.querySelector('[data-edge="left"]');
+        const right = box.querySelector('[data-edge="right"]');
+        if (top) Object.assign(top.style, { left: `-${edgeSize/2}px`, top: `-${edgeSize/2}px`, width: `${width + edgeSize}px`, height: `${edgeSize}px` });
+        if (bottom) Object.assign(bottom.style, { left: `-${edgeSize/2}px`, top: `${height - edgeSize/2}px`, width: `${width + edgeSize}px`, height: `${edgeSize}px` });
+        if (left) Object.assign(left.style, { left: `-${edgeSize/2}px`, top: `0px`, width: `${edgeSize}px`, height: `${height}px` });
+        if (right) Object.assign(right.style, { left: `${width - edgeSize/2}px`, top: `0px`, width: `${edgeSize}px`, height: `${height}px` });
     }
 }
 

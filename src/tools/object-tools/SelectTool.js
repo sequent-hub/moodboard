@@ -1357,6 +1357,7 @@ export class SelectTool extends BaseTool {
             top: '0px',
             transformOrigin: '0 0',
             boxSizing: 'border-box',
+            border: '1px solid #007ACC',
             zIndex: 10000,
         });
         const textarea = document.createElement('textarea');
@@ -1387,8 +1388,8 @@ export class SelectTool extends BaseTool {
             MozOsxFontSmoothing: 'grayscale',
         });
         wrapper.appendChild(textarea);
-        // Ручки ресайза
-        const handles = ['nw','ne','se','sw'].map(dir => {
+        // Ручки ресайза (8 штук)
+        const handles = ['nw','n','ne','e','se','s','sw','w'].map(dir => {
             const h = document.createElement('div');
             h.dataset.dir = dir;
             Object.assign(h.style, {
@@ -1398,12 +1399,57 @@ export class SelectTool extends BaseTool {
             return h;
         });
         const placeHandles = () => {
+            const w = wrapper.offsetWidth;
+            const h = wrapper.offsetHeight;
             handles.forEach(hd => {
                 const dir = hd.dataset.dir;
-                if (dir === 'nw') { hd.style.left = '-4px'; hd.style.top = '-4px'; hd.style.cursor = 'nwse-resize'; }
-                if (dir === 'ne') { hd.style.right = '-4px'; hd.style.top = '-4px'; hd.style.cursor = 'nesw-resize'; }
-                if (dir === 'se') { hd.style.right = '-4px'; hd.style.bottom = '-4px'; hd.style.cursor = 'nwse-resize'; }
-                if (dir === 'sw') { hd.style.left = '-4px'; hd.style.bottom = '-4px'; hd.style.cursor = 'nesw-resize'; }
+                // default reset
+                hd.style.left = '0px';
+                hd.style.top = '0px';
+                hd.style.right = '';
+                hd.style.bottom = '';
+                switch (dir) {
+                    case 'nw':
+                        hd.style.left = `${-6}px`;
+                        hd.style.top = `${-6}px`;
+                        hd.style.cursor = 'nwse-resize';
+                        break;
+                    case 'n':
+                        hd.style.left = `${Math.round(w / 2 - 6)}px`;
+                        hd.style.top = `${-6}px`;
+                        hd.style.cursor = 'n-resize';
+                        break;
+                    case 'ne':
+                        hd.style.left = `${Math.max(-6, w - 6)}px`;
+                        hd.style.top = `${-6}px`;
+                        hd.style.cursor = 'nesw-resize';
+                        break;
+                    case 'e':
+                        hd.style.left = `${Math.max(-6, w - 6)}px`;
+                        hd.style.top = `${Math.round(h / 2 - 6)}px`;
+                        hd.style.cursor = 'e-resize';
+                        break;
+                    case 'se':
+                        hd.style.left = `${Math.max(-6, w - 6)}px`;
+                        hd.style.top = `${Math.max(-6, h - 6)}px`;
+                        hd.style.cursor = 'nwse-resize';
+                        break;
+                    case 's':
+                        hd.style.left = `${Math.round(w / 2 - 6)}px`;
+                        hd.style.top = `${Math.max(-6, h - 6)}px`;
+                        hd.style.cursor = 's-resize';
+                        break;
+                    case 'sw':
+                        hd.style.left = `${-6}px`;
+                        hd.style.top = `${Math.max(-6, h - 6)}px`;
+                        hd.style.cursor = 'nesw-resize';
+                        break;
+                    case 'w':
+                        hd.style.left = `${-6}px`;
+                        hd.style.top = `${Math.round(h / 2 - 6)}px`;
+                        hd.style.cursor = 'w-resize';
+                        break;
+                }
             });
         };
         handles.forEach(h => wrapper.appendChild(h));
@@ -1516,7 +1562,17 @@ export class SelectTool extends BaseTool {
                 });
             }
         };
-        textarea.addEventListener('blur', () => finalize(true));
+        textarea.addEventListener('blur', (e) => {
+            // Не закрываем новый пустой текст по потере фокуса — чтобы поле не исчезало сразу
+            const isNew = objectId == null;
+            const value = (textarea.value || '').trim();
+            if (isNew && value.length === 0) {
+                // Вернём фокус обратно, чтобы пользователь мог ввести текст
+                setTimeout(() => textarea.focus(), 0);
+                return;
+            }
+            finalize(true);
+        });
         textarea.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
