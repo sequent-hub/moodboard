@@ -731,6 +731,10 @@
     box-shadow: 0 12px 28px rgba(0,0,0,0.18);
     min-width: 220px;
     max-width: 320px;
+    min-height: 140px; /* меньшее окно по умолчанию */
+    max-height: 260px;
+    display: flex;
+    flex-direction: column;
     pointer-events: auto;
     overflow: hidden;
     z-index: 3300;
@@ -756,7 +760,33 @@
     cursor: pointer;
 }
 .comment-popover__close:hover { color: #111827; }
-.comment-popover__body { padding: 12px; font-size: 14px; color: #374151; }
+.comment-popover__body { padding: 12px; font-size: 14px; color: #374151; flex: 1; overflow-y: auto; min-height: 0; }
+.comment-popover__footer {
+    padding: 10px 12px;
+    border-top: 1px solid #e5e7eb;
+    background: #fafafa;
+}
+.comment-popover__form { display: flex; gap: 8px; }
+.comment-popover__input {
+    flex: 1;
+    height: 34px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 0 10px;
+    font-size: 14px;
+}
+.comment-popover__button {
+    height: 34px;
+    padding: 0 12px;
+    border: none;
+    border-radius: 8px;
+    background: #1d4ed8;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+}
+.comment-popover__button:hover { filter: brightness(0.95); }
+.comment-popover__row { padding: 6px 2px; border-bottom: 1px dashed #e5e7eb; }
 
 /* Status Animation */
 .moodboard-save-status.status-saving .save-icon {

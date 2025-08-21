@@ -10,8 +10,16 @@ export class CommentPopover {
         this.core = core;
         this.layer = null;
         this.popover = null;
+        this.header = null;
+        this.body = null;
+        this.footer = null;
+        this.input = null;
+        this.button = null;
         this.currentId = null;
+        // Память комментариев: { [objectId]: string[] }
+        this.commentsById = new Map();
         this._onDocMouseDown = this._onDocMouseDown.bind(this);
+        this._onSubmit = this._onSubmit.bind(this);
     }
 
     attach() {
@@ -34,6 +42,7 @@ export class CommentPopover {
         this.eventBus.on(Events.Tool.PanUpdate, () => this.reposition());
         this.eventBus.on(Events.Object.Deleted, ({ objectId }) => {
             if (this.currentId && objectId === this.currentId) this.hide();
+            // По желанию можно очистить: this.commentsById.delete(objectId);
         });
     }
 
@@ -54,6 +63,7 @@ export class CommentPopover {
         if (mb.type !== 'comment') { this.hide(); return; }
         this.currentId = id;
         this.showFor(id);
+        this._renderBodyFor(id);
     }
 
     showFor(id) {
@@ -63,8 +73,10 @@ export class CommentPopover {
             this.layer.appendChild(this.popover);
             document.addEventListener('mousedown', this._onDocMouseDown, true);
         }
-        this.popover.style.display = 'block';
+        this.popover.style.display = 'flex';
         this.reposition();
+        // автофокус в input
+        if (this.input) this.input.focus();
     }
 
     hide() {
@@ -76,10 +88,10 @@ export class CommentPopover {
     _createPopover() {
         const el = document.createElement('div');
         el.className = 'comment-popover';
-        Object.assign(el.style, { position: 'absolute', pointerEvents: 'auto' });
+        Object.assign(el.style, { position: 'absolute', pointerEvents: 'auto', display: 'flex', flexDirection: 'column' });
         // Header
-        const header = document.createElement('div');
-        header.className = 'comment-popover__header';
+        this.header = document.createElement('div');
+        this.header.className = 'comment-popover__header';
         const title = document.createElement('div');
         title.className = 'comment-popover__title';
         title.textContent = 'Комментарий';
@@ -88,14 +100,33 @@ export class CommentPopover {
         close.className = 'comment-popover__close';
         close.textContent = '✕';
         close.addEventListener('click', () => this.hide());
-        header.appendChild(title);
-        header.appendChild(close);
-        // Body (пустой, под содержание)
-        const body = document.createElement('div');
-        body.className = 'comment-popover__body';
-        body.textContent = '';
-        el.appendChild(header);
-        el.appendChild(body);
+        this.header.appendChild(title);
+        this.header.appendChild(close);
+        // Body
+        this.body = document.createElement('div');
+        this.body.className = 'comment-popover__body';
+        Object.assign(this.body.style, { overflowY: 'auto', maxHeight: '240px' });
+        // Footer
+        this.footer = document.createElement('div');
+        this.footer.className = 'comment-popover__footer';
+        const form = document.createElement('form');
+        form.className = 'comment-popover__form';
+        form.addEventListener('submit', this._onSubmit);
+        this.input = document.createElement('input');
+        this.input.type = 'text';
+        this.input.placeholder = 'Напишите комментарий';
+        this.input.className = 'comment-popover__input';
+        this.button = document.createElement('button');
+        this.button.type = 'submit';
+        this.button.textContent = 'Добавить';
+        this.button.className = 'comment-popover__button';
+        form.appendChild(this.input);
+        form.appendChild(this.button);
+        this.footer.appendChild(form);
+
+        el.appendChild(this.header);
+        el.appendChild(this.body);
+        el.appendChild(this.footer);
         return el;
     }
 
@@ -103,6 +134,34 @@ export class CommentPopover {
         if (!this.popover || this.popover.style.display === 'none') return;
         if (this.popover.contains(e.target)) return; // клик внутри окна — не закрываем
         this.hide();
+    }
+
+    _onSubmit(e) {
+        e.preventDefault();
+        if (!this.input || !this.currentId) return;
+        const text = this.input.value.trim();
+        if (!text) return;
+        // Записываем в список комментов текущего объекта
+        const list = this.commentsById.get(this.currentId) || [];
+        list.push(text);
+        this.commentsById.set(this.currentId, list);
+        // Перерисовываем body
+        this._renderBodyFor(this.currentId);
+        this.input.value = '';
+        this.input.focus();
+        // В дальнейшем можно сохранить в объекте/сервере
+    }
+
+    _renderBodyFor(id) {
+        if (!this.body) return;
+        this.body.innerHTML = '';
+        const list = this.commentsById.get(id) || [];
+        list.forEach((text) => {
+            const row = document.createElement('div');
+            row.className = 'comment-popover__row';
+            row.textContent = text;
+            this.body.appendChild(row);
+        });
     }
 
     reposition() {
@@ -123,5 +182,6 @@ export class CommentPopover {
 
         this.popover.style.left = `${Math.round(left)}px`;
         this.popover.style.top = `${Math.round(top)}px`;
+        this.popover.style.minHeight = '180px';
     }
 }
