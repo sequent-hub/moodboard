@@ -30,10 +30,8 @@ export class Toolbar {
             { id: 'pan', icon: '✋', title: 'Панорамирование (Пробел)', type: 'activate-pan' },
             { id: 'divider', type: 'divider' },
             { id: 'text-add', icon: 'T+', title: 'Добавить текст (клик сразу откроет редактирование)', type: 'text-add' },
-            { id: 'big-t', icon: 'T', title: 'Текст', type: 'custom-t' },
             { id: 'shapes', icon: '🔷', title: 'Фигуры', type: 'custom-shapes' },
             { id: 'pencil', icon: '✏️', title: 'Рисование', type: 'custom-draw' },
-            { id: 'frame-tool', icon: '📌', title: 'Фрейм', type: 'custom-frame' },
             { id: 'comments', icon: '💬', title: 'Комментарии', type: 'custom-comments' },
             { id: 'attachments', icon: '📎', title: 'Файлы', type: 'custom-attachments' },
             { id: 'emoji', icon: '🙂', title: 'Эмоджи', type: 'custom-emoji' }
@@ -42,10 +40,8 @@ export class Toolbar {
         // Существующие элементы ниже новых
         const existingTools = [
             { id: 'frame', icon: '🖼️', title: 'Добавить рамку', type: 'frame' },
-            { id: 'text', icon: '📝', title: 'Добавить текст', type: 'simple-text' },
             { id: 'divider', type: 'divider' },
             { id: 'clear', icon: '🗑️', title: 'Очистить холст', type: 'clear' },
-            { id: 'export', icon: '💾', title: 'Экспорт', type: 'export' },
             { id: 'divider', type: 'divider' },
             { id: 'undo', icon: '↶', title: 'Отменить (Ctrl+Z)', type: 'undo', disabled: true },
             { id: 'redo', icon: '↷', title: 'Повторить (Ctrl+Y)', type: 'redo', disabled: true }
