@@ -221,6 +221,7 @@ export class BaseTool {
             ['context:menu:show', Events.Tool.ContextMenuShow],
             ['objects:delete', Events.Tool.ObjectsDelete],
             ['object:edit', Events.Tool.ObjectEdit],
+            ['update:object:content', Events.Tool.UpdateObjectContent],
             ['selection:add', Events.Tool.SelectionAdd],
             ['selection:remove', Events.Tool.SelectionRemove],
             ['selection:clear', Events.Tool.SelectionClear],

@@ -986,6 +986,14 @@ export class CoreMoodBoard {
                 data.rotation = 0;
             }
         });
+
+        // Обновление содержимого объекта
+        this.eventBus.on(Events.Tool.UpdateObjectContent, (data) => {
+            const { objectId, content } = data;
+            if (objectId && content !== undefined) {
+                this.pixi.updateObjectContent(objectId, content);
+            }
+        });
     }
 
     /**

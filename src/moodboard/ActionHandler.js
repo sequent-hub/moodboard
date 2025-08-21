@@ -45,6 +45,7 @@ export class ActionHandler {
      * Обрабатывает создание объекта
      */
     handleCreateObject(type, position, properties = {}) {
+        console.log(`🔧 ActionHandler: handleCreateObject called with type: ${type}, position:`, position, 'properties:', properties);
         const objectData = this.dataManager.createObject(type, position, properties);
         
         if (objectData) {

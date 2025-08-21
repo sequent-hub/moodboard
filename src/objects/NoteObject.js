@@ -20,13 +20,17 @@ export class NoteObject {
         // Свойства записки
         const props = objectData.properties || {};
         this.content = props.content || '';
-        this.fontSize = props.fontSize || 14;
+        this.fontSize = props.fontSize || 16;
         this.backgroundColor = (typeof props.backgroundColor === 'number') ? props.backgroundColor : 0xFFF9C4; // Светло-желтый
         this.borderColor = (typeof props.borderColor === 'number') ? props.borderColor : 0xF9A825; // Золотистый
-        this.textColor = (typeof props.textColor === 'number') ? props.textColor : 0x37474F; // Темно-серый
+        this.textColor = (typeof props.textColor === 'number') ? props.textColor : 0x1A1A1A; // Почти черный для лучшей контрастности
 
         // Создаем контейнер для записки
         this.container = new PIXI.Container();
+        
+        // Включаем интерактивность для контейнера
+        this.container.interactive = true;
+        this.container.interactiveChildren = true;
         
         // Графика фона
         this.graphics = new PIXI.Graphics();
@@ -37,15 +41,19 @@ export class NoteObject {
             fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
             fontSize: this.fontSize,
             fill: this.textColor,
-            align: 'left',
+            align: 'center',
             wordWrap: true,
             wordWrapWidth: this.width - 16, // Отступы по 8px с каждой стороны
             lineHeight: this.fontSize * 1.2,
             resolution: (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1
         });
-        this.textField.x = 8;
-        this.textField.y = 8;
-        this.container.addChild(this.textField);
+        
+        this._redraw(); // Сначала рисуем фон
+        this.container.addChild(this.textField); // Затем добавляем текст поверх
+        this._updateTextPosition();
+        
+        // Отладочная информация
+        console.log('NoteObject created with content:', this.content);
 
         // Метаданные
         this.container._mb = {
@@ -73,21 +81,39 @@ export class NoteObject {
         this.width = Math.max(80, size.width || this.width);
         this.height = Math.max(60, size.height || this.height);
         
-        // Обновляем ширину переноса текста
-        this.textField.style.wordWrapWidth = this.width - 16;
-        
         this._redraw();
+        this._updateTextPosition();
+        
+        // Обновляем hit area и containsPoint
+        this.container.hitArea = new PIXI.Rectangle(0, 0, this.width, this.height);
+        this.container.containsPoint = (point) => {
+            const bounds = this.container.getBounds();
+            return point.x >= bounds.x && 
+                   point.x <= bounds.x + bounds.width &&
+                   point.y >= bounds.y && 
+                   point.y <= bounds.y + bounds.height;
+        };
     }
 
     setContent(content) {
         this.content = content || '';
         this.textField.text = this.content;
+        this._updateTextPosition();
         if (this.container && this.container._mb) {
             this.container._mb.properties = {
                 ...(this.container._mb.properties || {}),
                 content: this.content
             };
         }
+        console.log('NoteObject setContent called:', this.content);
+        // Перерисовываем фон после обновления содержимого
+        console.log('NoteObject: calling _redraw() to restore background');
+        this._redraw();
+    }
+
+    // Alias для совместимости с TextObject
+    setText(content) {
+        this.setContent(content);
     }
 
     setStyle({ fontSize, backgroundColor, borderColor, textColor } = {}) {
@@ -114,6 +140,7 @@ export class NoteObject {
         }
         
         this._redraw();
+        this._updateTextPosition();
     }
 
     _redraw() {
@@ -146,5 +173,36 @@ export class NoteObject {
             g.moveTo(8, y);
             g.lineTo(w - 8, y);
         }
+        
+        // Устанавливаем hit area для контейнера
+        this.container.hitArea = new PIXI.Rectangle(0, 0, w, h);
+        
+        // Переопределяем containsPoint для правильного hit testing
+        this.container.containsPoint = (point) => {
+            const bounds = this.container.getBounds();
+            return point.x >= bounds.x && 
+                   point.x <= bounds.x + bounds.width &&
+                   point.y >= bounds.y && 
+                   point.y <= bounds.y + bounds.height;
+        };
+    }
+
+    _updateTextPosition() {
+        if (!this.textField) return;
+        
+        // Обновляем стиль текста
+        this.textField.style.wordWrapWidth = this.width - 16;
+        
+        // Ждем, пока PIXI пересчитает размеры текста
+        this.textField.updateText();
+        
+        // Центрируем текст по горизонтали
+        const centerX = this.width / 2;
+        const topMargin = 20; // Отступ от верха (ниже полоски)
+        
+        // Используем anchor для центрирования
+        this.textField.anchor.set(0.5, 0);
+        this.textField.x = centerX;
+        this.textField.y = topMargin;
     }
 }

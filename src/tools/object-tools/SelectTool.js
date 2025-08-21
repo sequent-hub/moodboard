@@ -228,6 +228,13 @@ export class SelectTool extends BaseTool {
     onMouseDown(event) {
         super.onMouseDown(event);
         
+        // Если активен текстовый редактор, закрываем его при клике вне
+        if (this.textEditor.active) {
+            console.log('🔧 SelectTool: closing text editor on mouse down, objectType:', this.textEditor.objectType, 'objectId:', this.textEditor.objectId);
+            this._closeTextEditor(true);
+            return; // Прерываем выполнение, чтобы не обрабатывать клик дальше
+        }
+        
         this.isMultiSelect = event.originalEvent.ctrlKey || event.originalEvent.metaKey;
         
         // Проверяем, что под курсором
@@ -319,25 +326,37 @@ export class SelectTool extends BaseTool {
      * Двойной клик - переход в режим редактирования
      */
     onDoubleClick(event) {
+        console.log('🖱️ Double click detected at:', event.x, event.y);
         const hitResult = this.hitTest(event.x, event.y);
+        console.log('🎯 Hit test result:', hitResult);
         
         if (hitResult.type === 'object') {
             // если это текст или записка — войдём в режим редактирования через ObjectEdit
             const req = { objectId: hitResult.object, pixiObject: null };
             this.emit(Events.Tool.GetObjectPixi, req);
             const pix = req.pixiObject;
+            console.log('🔍 Object PIXI data:', pix?._mb);
+            
             const isText = !!(pix && pix._mb && pix._mb.type === 'text');
             const isNote = !!(pix && pix._mb && pix._mb.type === 'note');
+            
+            console.log('📝 Object types - isText:', isText, 'isNote:', isNote);
+            
             if (isText) {
+                console.log('✏️ Opening text editor for text object');
                 this.emit(Events.Tool.ObjectEdit, { object: { id: hitResult.object, type: 'text', properties: { content: pix?.text || '' } }, create: false });
                 return;
             }
             if (isNote) {
                 const noteProps = pix._mb.properties || {};
+                console.log('📝 Opening text editor for note object with content:', noteProps.content);
                 this.emit(Events.Tool.ObjectEdit, { object: { id: hitResult.object, type: 'note', properties: { content: noteProps.content || '' } }, create: false });
                 return;
             }
+            console.log('🔧 Opening regular object editor');
             this.editObject(hitResult.object);
+        } else {
+            console.log('❌ No object hit on double click');
         }
     }
 
@@ -1470,14 +1489,44 @@ export class SelectTool extends BaseTool {
             return { x: global.x / viewRes, y: global.y / viewRes };
         };
         const screenPos = toScreen(position.x, position.y);
-        wrapper.style.left = `${screenPos.x}px`;
-        wrapper.style.top = `${screenPos.y}px`;
+        
+        // Для записок позиционируем редактор внутри записки
+        if (objectType === 'note') {
+            // Получаем размеры записки для правильного позиционирования
+            const noteWidth = initialSize ? initialSize.width : 160;
+            const noteHeight = initialSize ? initialSize.height : 100;
+            
+            // Позиционируем редактор внутри записки с отступами
+            const editorWidth = Math.min(280, noteWidth - 16); // Ширина редактора с отступами
+            const editorHeight = Math.min(36, noteHeight - 40); // Высота редактора с отступами
+            
+            // Центрируем редактор по горизонтали внутри записки
+            const centerX = (noteWidth - editorWidth) / 2;
+            // Позиционируем ниже полоски (20px от верха)
+            const topY = 20;
+            
+            wrapper.style.left = `${screenPos.x + centerX}px`;
+            wrapper.style.top = `${screenPos.y + topY}px`;
+            
+            // Устанавливаем размеры редактора
+            textarea.style.width = `${editorWidth}px`;
+            textarea.style.height = `${editorHeight}px`;
+            wrapper.style.width = `${editorWidth}px`;
+            wrapper.style.height = `${editorHeight}px`;
+        } else {
+            // Для обычного текста используем стандартное позиционирование
+            wrapper.style.left = `${screenPos.x}px`;
+            wrapper.style.top = `${screenPos.y}px`;
+        }
         // Минимальные границы (зависят от текущего режима: новый объект или редактирование существующего)
         const worldLayerRef = this.textEditor.world || (this.app?.stage);
         const s = worldLayerRef?.scale?.x || 1;
         const viewRes = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
         const initialWpx = initialSize ? Math.max(1, (initialSize.width || 0) * s / viewRes) : null;
         const initialHpx = initialSize ? Math.max(1, (initialSize.height || 0) * s / viewRes) : null;
+        
+        // Для записок размеры уже установлены выше, пропускаем эту логику
+        
         let minWBound = initialWpx || 240;
         let minHBound = 28;
         if (initialWpx) {
@@ -1546,13 +1595,23 @@ export class SelectTool extends BaseTool {
         handles.forEach(h => h.addEventListener('mousedown', onHandleDown));
         // Завершение
         const finalize = (commit) => {
+            console.log('🔧 SelectTool: finalize called with commit:', commit, 'objectId:', objectId, 'objectType:', this.textEditor.objectType);
             const value = textarea.value.trim();
             const commitValue = commit && value.length > 0;
+            
+            // Сохраняем objectType ДО сброса this.textEditor
+            const currentObjectType = this.textEditor.objectType;
+            console.log('🔧 SelectTool: finalize - saved objectType:', currentObjectType);
+            
             wrapper.remove();
             this.textEditor = { active: false, objectId: null, textarea: null, wrapper: null, world: null, position: null, properties: null };
             this.eventBus.emit(Events.UI.TextEditEnd, { objectId: objectId || null });
-            if (!commitValue) return;
+            if (!commitValue) {
+                console.log('🔧 SelectTool: finalize - no commit, returning');
+                return;
+            }
             if (objectId == null) {
+                console.log('🔧 SelectTool: finalize - creating new object');
                 this.eventBus.emit(Events.UI.ToolbarAction, {
                     type: 'text',
                     id: 'text',
@@ -1560,13 +1619,25 @@ export class SelectTool extends BaseTool {
                     properties: { content: value, fontSize }
                 });
             } else {
-                this.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
-                this.eventBus.emit(Events.UI.ToolbarAction, {
-                    type: 'text',
-                    id: 'text',
-                    position: { x: position.x, y: position.y },
-                    properties: { content: value, fontSize }
-                });
+                // Обновление существующего: используем команду обновления содержимого
+                if (currentObjectType === 'note') {
+                    // Для записок обновляем содержимое через PixiEngine
+                    console.log('🔧 SelectTool: finalize - updating note content via UpdateObjectContent');
+                    this.emit(Events.Tool.UpdateObjectContent, { 
+                        objectId: objectId, 
+                        content: value 
+                    });
+                } else {
+                    // Для обычного текста используем старую логику (удаление + создание)
+                    console.log('🔧 SelectTool: finalize - deleting and recreating text object');
+                    this.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
+                    this.eventBus.emit(Events.UI.ToolbarAction, {
+                        type: 'text',
+                        id: 'text',
+                        position: { x: position.x, y: position.y },
+                        properties: { content: value, fontSize }
+                    });
+                }
             }
         };
         textarea.addEventListener('blur', (e) => {
@@ -1593,6 +1664,7 @@ export class SelectTool extends BaseTool {
     }
 
     _closeTextEditor(commit) {
+        console.log('🔧 SelectTool: _closeTextEditor called with commit:', commit);
         const textarea = this.textEditor.textarea;
         if (!textarea) return;
         const value = textarea.value.trim();
@@ -1601,11 +1673,15 @@ export class SelectTool extends BaseTool {
         const objectId = this.textEditor.objectId;
         const position = this.textEditor.position;
         const properties = this.textEditor.properties;
+        
+        console.log('🔧 SelectTool: _closeTextEditor - objectType:', objectType, 'objectId:', objectId, 'commitValue:', commitValue);
+        
         textarea.remove();
         this.textEditor = { active: false, objectId: null, textarea: null, world: null, objectType: 'text' };
         if (!commitValue) return;
         if (objectId == null) {
             // Создаём новый объект через ToolbarAction
+            console.log('🔧 SelectTool: creating new object via ToolbarAction, type:', objectType);
             this.eventBus.emit(Events.UI.ToolbarAction, {
                 type: objectType,
                 id: objectType,
@@ -1613,14 +1689,25 @@ export class SelectTool extends BaseTool {
                 properties: { content: value, fontSize: properties.fontSize }
             });
         } else {
-            // Обновление существующего: через команду изменения свойств пока нет, упростим — удалим и создадим
-            this.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
-            this.eventBus.emit(Events.UI.ToolbarAction, {
-                type: objectType,
-                id: objectType,
-                position: { x: position.x, y: position.y },
-                properties: { content: value, fontSize: properties.fontSize }
-            });
+            // Обновление существующего: используем команду обновления содержимого
+            if (objectType === 'note') {
+                console.log('🔧 SelectTool: updating note content via UpdateObjectContent');
+                // Для записок обновляем содержимое через PixiEngine
+                this.emit(Events.Tool.UpdateObjectContent, { 
+                    objectId: objectId, 
+                    content: value 
+                });
+            } else {
+                // Для обычного текста используем старую логику (удаление + создание)
+                console.log('🔧 SelectTool: deleting and recreating text object');
+                this.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
+                this.eventBus.emit(Events.UI.ToolbarAction, {
+                    type: objectType,
+                    id: objectType,
+                    position: { x: position.x, y: position.y },
+                    properties: { content: value, fontSize: properties.fontSize }
+                });
+            }
         }
     }
 }

@@ -41,6 +41,7 @@ export const Events = {
 		WheelZoom: 'tool:wheel:zoom',
 		ObjectsDelete: 'tool:objects:delete',
 		ObjectEdit: 'tool:object:edit',
+		UpdateObjectContent: 'tool:update:object:content',
 	},
 
 	UI: {

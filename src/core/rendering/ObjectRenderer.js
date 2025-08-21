@@ -7,9 +7,8 @@ import { GeometryUtils } from './GeometryUtils.js';
  * Отвечает за создание, обновление и удаление PIXI объектов
  */
 export class ObjectRenderer {
-    constructor(layerManager) {
-        this.layerManager = layerManager;
-        this.objects = new Map(); // Map<id, pixiObject>
+    constructor(objectsMap) {
+        this.objects = objectsMap; // Map<id, pixiObject> из PixiEngine
     }
 
     /**
@@ -33,7 +32,8 @@ export class ObjectRenderer {
         if (pixiObject) {
             this._setupObjectProperties(pixiObject, objectData);
             this._setupObjectTransform(pixiObject, objectData);
-            this._addObjectToLayer(pixiObject, objectData.id);
+            // Объект добавляется в слой через PixiEngine, здесь только сохраняем в Map
+            this.objects.set(objectData.id, pixiObject);
         }
 
         return pixiObject;
@@ -101,16 +101,7 @@ export class ObjectRenderer {
         }
     }
 
-    /**
-     * Добавить объект в слой
-     * @param {PIXI.DisplayObject} pixiObject - PIXI объект
-     * @param {string} objectId - ID объекта
-     * @private
-     */
-    _addObjectToLayer(pixiObject, objectId) {
-        this.layerManager.addToWorldLayer(pixiObject);
-        this.objects.set(objectId, pixiObject);
-    }
+
 
     /**
      * Создать объект по умолчанию для неизвестных типов
@@ -133,7 +124,7 @@ export class ObjectRenderer {
     removeObject(objectId) {
         const pixiObject = this.objects.get(objectId);
         if (pixiObject) {
-            this.layerManager.removeFromWorldLayer(pixiObject);
+            // Объект удаляется из слоя через PixiEngine, здесь только удаляем из Map
             this.objects.delete(objectId);
         }
     }
@@ -264,6 +255,28 @@ export class ObjectRenderer {
     }
 
     /**
+     * Обновить содержимое объекта
+     * @param {string} objectId - ID объекта
+     * @param {string} content - Новое содержимое
+     */
+    updateObjectContent(objectId, content) {
+        const pixiObject = this.objects.get(objectId);
+        if (!pixiObject) return;
+
+        console.log(`🎨 Обновляем содержимое объекта ${objectId}:`, content);
+        
+        // Делегируем изменение содержимого объекту
+        const meta = pixiObject._mb || {};
+        if (meta.instance) {
+            if (typeof meta.instance.setContent === 'function') {
+                meta.instance.setContent(content);
+            } else if (typeof meta.instance.setText === 'function') {
+                meta.instance.setText(content);
+            }
+        }
+    }
+
+    /**
      * Обновить угол поворота объекта
      * @param {string} objectId - ID объекта
      * @param {number} angleDegrees - Угол в градусах
@@ -316,7 +329,7 @@ export class ObjectRenderer {
      * Очистить все объекты
      */
     clearAllObjects() {
-        this.layerManager.clearWorldLayer();
+        // Слой очищается через PixiEngine, здесь только очищаем Map
         this.objects.clear();
     }
 }

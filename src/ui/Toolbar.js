@@ -202,7 +202,7 @@ export class Toolbar {
                     type: 'note', 
                     properties: { 
                         content: 'Новая записка',
-                        fontSize: 14,
+                        fontSize: 16,
                         width: 160,
                         height: 100
                     }

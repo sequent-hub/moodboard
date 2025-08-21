@@ -310,6 +310,7 @@ export class ToolManager {
         this.lastMousePos = { x: event.x, y: event.y };
         this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
         
+        console.log('🔧 ToolManager: Double click event, active tool:', this.activeTool.constructor.name);
         this.activeTool.onDoubleClick(event);
     }
     
