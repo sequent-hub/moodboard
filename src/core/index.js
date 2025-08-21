@@ -231,17 +231,25 @@ export class CoreMoodBoard {
             }
         });
 
-        // Вставка изображения из буфера обмена в центр экрана
+        // Текущее положение курсора в координатах экрана (CSS-пиксели контейнера)
+        this._cursor = { x: null, y: null };
+        this.eventBus.on(Events.UI.CursorMove, ({ x, y }) => {
+            this._cursor.x = x;
+            this._cursor.y = y;
+        });
+
+        // Вставка изображения из буфера обмена — по курсору, если он над холстом; иначе по центру
         this.eventBus.on(Events.UI.PasteImage, ({ src, name }) => {
             if (!src) return;
             const view = this.pixi.app.view;
             const world = this.pixi.worldLayer || this.pixi.app.stage;
             const s = world?.scale?.x || 1;
-            const cx = view.clientWidth / 2;
-            const cy = view.clientHeight / 2;
-            const worldX = (cx - (world?.x || 0)) / s;
-            const worldY = (cy - (world?.y || 0)) / s;
-            // Создаём image объект 300px шириной, сохраняем пропорции после загрузки текстуры
+            const hasCursor = Number.isFinite(this._cursor.x) && Number.isFinite(this._cursor.y);
+            const screenX = hasCursor ? this._cursor.x : (view.clientWidth / 2);
+            const screenY = hasCursor ? this._cursor.y : (view.clientHeight / 2);
+            const worldX = (screenX - (world?.x || 0)) / s;
+            const worldY = (screenY - (world?.y || 0)) / s;
+            // Центруем изображение под курсором (ширина 300)
             this.createObject('image', { x: Math.round(worldX - 150), y: Math.round(worldY - 100) }, { src, name, width: 300, height: 200 });
         });
 

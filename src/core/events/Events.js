@@ -74,6 +74,7 @@ export const Events = {
 		LayerGroupSendToBack: 'ui:layer-group:send-to-back',
 		MapToggle: 'ui:map:toggle',
 		PaintPick: 'ui:paint:pick',
+		CursorMove: 'ui:cursor:move',
 	},
 
 	Keyboard: {

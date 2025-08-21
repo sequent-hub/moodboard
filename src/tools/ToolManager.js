@@ -15,8 +15,11 @@ export class ToolManager {
         // Состояние для временных инструментов
         this.temporaryTool = null;
         this.previousTool = null;
-  this.spacePressed = false;
-  this.isMouseDown = false;
+        this.spacePressed = false;
+        this.isMouseDown = false;
+        // Последняя позиция курсора относительно контейнера (CSS-пиксели)
+        this.lastMousePos = null;
+        this.isMouseOverContainer = false;
         
         this.initEventListeners();
     }
@@ -122,6 +125,8 @@ export class ToolManager {
         this.container.addEventListener('mousedown', (e) => this.handleMouseDown(e));
         this.container.addEventListener('mousemove', (e) => this.handleMouseMove(e));
         this.container.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        this.container.addEventListener('mouseenter', () => { this.isMouseOverContainer = true; });
+        this.container.addEventListener('mouseleave', () => { this.isMouseOverContainer = false; });
         // Убираем отдельные слушатели aux-pan на контейнере, чтобы не дублировать mousedown/mouseup
 
         // Глобальные события мыши — чтобы корректно завершать drag/resize при отпускании за пределами холста
@@ -184,6 +189,9 @@ export class ToolManager {
             originalEvent: e
         };
         
+        this.lastMousePos = { x: event.x, y: event.y };
+        this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
+        
         this.activeTool.onMouseDown(event);
     }
 
@@ -207,6 +215,8 @@ export class ToolManager {
                 target: e.target,
                 originalEvent: e
             };
+            this.lastMousePos = { x: event.x, y: event.y };
+            this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
             this.activeTool.onMouseDown(event);
         }
     }
@@ -222,6 +232,8 @@ export class ToolManager {
                 target: e.target,
                 originalEvent: e
             };
+            this.lastMousePos = { x: event.x, y: event.y };
+            this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
             this.activeTool.onMouseUp(event);
             this.returnToPreviousTool();
             return;
@@ -238,6 +250,10 @@ export class ToolManager {
             target: e.target,
             originalEvent: e
         };
+        
+        // Запоминаем и рассылаем позицию курсора для использования другими подсистемами
+        this.lastMousePos = { x: event.x, y: event.y };
+        this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
         
         // Если временно активирован pan, проксируем движение именно ему
         if (this.temporaryTool === 'pan' && this.activeTool?.name === 'pan') {
@@ -259,6 +275,8 @@ export class ToolManager {
             target: e.target,
             originalEvent: e
         };
+        this.lastMousePos = { x: event.x, y: event.y };
+        this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
         if (this.temporaryTool === 'pan') {
             this.handleAuxPanEnd(e);
             return;
@@ -276,6 +294,8 @@ export class ToolManager {
             target: e.target,
             originalEvent: e
         };
+        this.lastMousePos = { x: event.x, y: event.y };
+        this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
         
         this.activeTool.onDoubleClick(event);
     }
@@ -292,6 +312,8 @@ export class ToolManager {
             shiftKey: e.shiftKey,
             originalEvent: e
         };
+        this.lastMousePos = { x: event.x, y: event.y };
+        this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
         
         // Глобальный зум колесиком (без Ctrl) — предотвращаем дефолтный скролл страницы
         this.eventBus.emit(Events.Tool.WheelZoom, { x: event.x, y: event.y, delta: e.deltaY });
