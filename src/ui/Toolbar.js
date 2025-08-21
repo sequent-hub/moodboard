@@ -30,6 +30,7 @@ export class Toolbar {
             { id: 'pan', icon: '✋', title: 'Панорамирование (Пробел)', type: 'activate-pan' },
             { id: 'divider', type: 'divider' },
             { id: 'text-add', icon: 'T+', title: 'Добавить текст (клик сразу откроет редактирование)', type: 'text-add' },
+            { id: 'image', icon: '🖼️', title: 'Добавить картинку', type: 'image-add' },
             { id: 'shapes', icon: '🔷', title: 'Фигуры', type: 'custom-shapes' },
             { id: 'pencil', icon: '✏️', title: 'Рисование', type: 'custom-draw' },
             { id: 'comments', icon: '💬', title: 'Комментарии', type: 'custom-comments' },
@@ -182,6 +183,21 @@ export class Toolbar {
                     object: { id: null, type: 'text', position: { x: worldX, y: worldY }, properties: { fontSize: 18, content: '' } },
                     create: true
                 });
+                return;
+            }
+
+            // Добавление картинки: включаем placement и ждём клика для выбора позиции, затем открываем файловый диалог
+            if (toolType === 'image-add') {
+                this.animateButton(button);
+                this.closeShapesPopup();
+                this.closeDrawPopup();
+                this.closeEmojiPopup();
+                // Активируем place, пометим pending как image (файл запросим после клика)
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                this.placeSelectedButtonId = null;
+                this.setActiveToolbarButton('place');
+                // Спец pending для изображения: маркер, что ожидаем клик и выбор файла
+                this.eventBus.emit(Events.Place.Set, { type: 'image', properties: { selectFileOnPlace: true } });
                 return;
             }
 

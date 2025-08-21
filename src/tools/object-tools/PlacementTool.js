@@ -54,6 +54,11 @@ export class PlacementTool extends BaseTool {
 
         const props = this.pending.properties || {};
         const isTextWithEditing = this.pending.type === 'text' && props.editOnCreate;
+        const isImage = this.pending.type === 'image';
+        const presetSize = {
+            width: (this.pending.size && this.pending.size.width) ? this.pending.size.width : 200,
+            height: (this.pending.size && this.pending.size.height) ? this.pending.size.height : 150,
+        };
 
         if (isTextWithEditing) {
             // Переключаемся на select, чтобы у него был доступ к PIXI app, затем открываем редактор
@@ -67,6 +72,41 @@ export class PlacementTool extends BaseTool {
                 },
                 create: true
             });
+        } else if (isImage && props.selectFileOnPlace) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.style.display = 'none';
+            document.body.appendChild(input);
+            input.addEventListener('change', async () => {
+                try {
+                    const file = input.files && input.files[0];
+                    if (!file) return;
+                    // Читаем как DataURL, чтобы не использовать blob: URL (устраняем ERR_FILE_NOT_FOUND)
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const dataUrl = reader.result;
+                        const img = new Image();
+                        img.onload = () => {
+                            const natW = img.naturalWidth || img.width || 1;
+                            const natH = img.naturalHeight || img.height || 1;
+                            const targetW = 300; // дефолтная ширина
+                            const targetH = Math.max(1, Math.round(natH * (targetW / natW)));
+                            this.eventBus.emit(Events.UI.ToolbarAction, {
+                                type: 'image',
+                                id: 'image',
+                                position,
+                                properties: { src: dataUrl, name: file.name, width: targetW, height: targetH }
+                            });
+                        };
+                        img.src = dataUrl;
+                    };
+                    reader.readAsDataURL(file);
+                } finally {
+                    input.remove();
+                }
+            }, { once: true });
+            input.click();
         } else {
             // Обычное размещение через общий канал
             this.eventBus.emit(Events.UI.ToolbarAction, {

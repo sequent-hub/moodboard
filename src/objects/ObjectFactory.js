@@ -3,6 +3,7 @@ import { ShapeObject } from './ShapeObject.js';
 import { DrawingObject } from './DrawingObject.js';
 import { TextObject } from './TextObject.js';
 import { EmojiObject } from './EmojiObject.js';
+import { ImageObject } from './ImageObject.js';
 
 /**
  * Фабрика объектов холста
@@ -15,7 +16,8 @@ export class ObjectFactory {
         ['drawing', DrawingObject],
         ['text', TextObject],
         ['simple-text', TextObject],
-        ['emoji', EmojiObject]
+        ['emoji', EmojiObject],
+        ['image', ImageObject]
     ]);
 
     /**
