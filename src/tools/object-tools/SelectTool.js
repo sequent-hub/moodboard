@@ -102,15 +102,20 @@ export class SelectTool extends BaseTool {
                 if (!object || object.type !== 'text') return;
                 if (create) {
                     // Создаём пустой textarea на позиции и ждём завершения редактирования
+                    this.eventBus.emit(Events.UI.TextEditStart, { objectId: object.id || null });
                     this._openTextEditor(null, object.position, object.properties || {});
                 } else if (object && object.id) {
                     // Редактирование существующего: запросим данные и откроем
                     const posData = { objectId: object.id, position: null };
                     const sizeData = { objectId: object.id, size: null };
+                    const pixiReq = { objectId: object.id, pixiObject: null };
                     this.emit(Events.Tool.GetObjectPosition, posData);
                     this.emit(Events.Tool.GetObjectSize, sizeData);
-                    const props = { content: object.properties?.content || '', fontSize: object.properties?.fontSize };
-                    this._openTextEditor(object.id, posData.position || { x: 0, y: 0 }, props);
+                    this.emit(Events.Tool.GetObjectPixi, pixiReq);
+                    const meta = pixiReq.pixiObject && pixiReq.pixiObject._mb ? pixiReq.pixiObject._mb.properties || {} : {};
+                    const props = { content: meta.content || object.properties?.content || '', fontSize: meta.fontSize || object.properties?.fontSize };
+                    this.eventBus.emit(Events.UI.TextEditStart, { objectId: object.id });
+                    this._openTextEditor(object.id, posData.position || { x: 0, y: 0 }, props, sizeData.size || null);
                 }
             });
 		}
@@ -1321,7 +1326,7 @@ export class SelectTool extends BaseTool {
         return { x: offsetX, y: offsetY };
     }
 
-    _openTextEditor(objectId, position, properties) {
+    _openTextEditor(objectId, position, properties, initialSize = null) {
         if (this.textEditor.active) this._closeTextEditor(true);
         const app = this.app;
         const world = app?.stage?.getChildByName && app.stage.getChildByName('worldLayer');
@@ -1343,6 +1348,7 @@ export class SelectTool extends BaseTool {
         const textarea = document.createElement('textarea');
         textarea.className = 'moodboard-text-input';
         textarea.value = properties.content || '';
+        textarea.placeholder = 'напишите что-нибудь';
         const fontSize = properties.fontSize || 18;
         Object.assign(textarea.style, {
             position: 'relative',
@@ -1357,9 +1363,9 @@ export class SelectTool extends BaseTool {
             background: 'white',
             outline: 'none',
             resize: 'none',
-            minWidth: '120px',
+            minWidth: '240px',
             minHeight: '28px',
-            width: '160px',
+            width: '280px',
             height: '36px',
             boxSizing: 'border-box',
             // Повыше чёткость текста в CSS
@@ -1399,12 +1405,28 @@ export class SelectTool extends BaseTool {
         const screenPos = toScreen(position.x, position.y);
         wrapper.style.left = `${screenPos.x}px`;
         wrapper.style.top = `${screenPos.y}px`;
+        // Минимальные границы (зависят от текущего режима: новый объект или редактирование существующего)
+        const worldLayerRef = this.textEditor.world || (this.app?.stage);
+        const s = worldLayerRef?.scale?.x || 1;
+        const viewRes = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
+        const initialWpx = initialSize ? Math.max(1, (initialSize.width || 0) * s / viewRes) : null;
+        const initialHpx = initialSize ? Math.max(1, (initialSize.height || 0) * s / viewRes) : null;
+        let minWBound = initialWpx || 240;
+        let minHBound = 28;
+        if (initialWpx) {
+            textarea.style.width = `${initialWpx}px`;
+            wrapper.style.width = `${initialWpx}px`;
+        }
+        if (initialHpx) {
+            textarea.style.height = `${initialHpx}px`;
+            wrapper.style.height = `${initialHpx}px`;
+        }
         // Автоподгон
         const autoSize = () => {
             textarea.style.height = '1px';
             textarea.style.width = '1px';
-            const w = Math.max(120, textarea.scrollWidth + 8);
-            const h = Math.max(28, textarea.scrollHeight + 4);
+            const w = Math.max(minWBound, textarea.scrollWidth + 8);
+            const h = Math.max(minHBound, textarea.scrollHeight + 4);
             textarea.style.width = `${w}px`;
             textarea.style.height = `${h}px`;
             wrapper.style.width = `${w}px`;
@@ -1413,7 +1435,14 @@ export class SelectTool extends BaseTool {
         };
         autoSize();
         textarea.focus();
-        this.textEditor = { active: true, objectId, textarea, wrapper, world: this.textEditor.world, position, properties: { fontSize } };
+        // Локальная CSS-настройка placeholder (меньше базового шрифта)
+        const uid = 'mbti-' + Math.random().toString(36).slice(2);
+        textarea.classList.add(uid);
+        const styleEl = document.createElement('style');
+        const phSize = Math.max(12, Math.round(fontSize * 0.8));
+        styleEl.textContent = `.${uid}::placeholder{font-size:${phSize}px;opacity:.6;}`;
+        document.head.appendChild(styleEl);
+        this.textEditor = { active: true, objectId, textarea, wrapper, world: this.textEditor.world, position, properties: { fontSize }, _phStyle: styleEl };
         // Ресайз мышью
         const onHandleDown = (e) => {
             e.preventDefault(); e.stopPropagation();
@@ -1436,8 +1465,8 @@ export class SelectTool extends BaseTool {
                 wrapper.style.height = `${newH}px`;
                 wrapper.style.left = `${newLeft}px`;
                 wrapper.style.top = `${newTop}px`;
-                textarea.style.width = `${Math.max(120, newW)}px`;
-                textarea.style.height = `${Math.max(28, newH)}px`;
+                textarea.style.width = `${Math.max(minWBound, newW)}px`;
+                textarea.style.height = `${Math.max(minHBound, newH)}px`;
                 placeHandles();
             };
             const onUp = () => {
@@ -1454,6 +1483,7 @@ export class SelectTool extends BaseTool {
             const commitValue = commit && value.length > 0;
             wrapper.remove();
             this.textEditor = { active: false, objectId: null, textarea: null, wrapper: null, world: null, position: null, properties: null };
+            this.eventBus.emit(Events.UI.TextEditEnd, { objectId: objectId || null });
             if (!commitValue) return;
             if (objectId == null) {
                 this.eventBus.emit(Events.UI.ToolbarAction, {

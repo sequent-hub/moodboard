@@ -42,6 +42,16 @@ export class HtmlTextLayer {
             this.updateOne(objectId);
         });
 
+        // Прятать HTML-текст во время редактирования (textarea)
+        this.eventBus.on(Events.UI.TextEditStart, ({ objectId }) => {
+            const el = this.idToEl.get(objectId);
+            if (el) el.style.visibility = 'hidden';
+        });
+        this.eventBus.on(Events.UI.TextEditEnd, ({ objectId }) => {
+            const el = this.idToEl.get(objectId);
+            if (el) el.style.visibility = '';
+        });
+
         // На все операции зума/пэна — полное обновление
         this.eventBus.on(Events.UI.ZoomPercent, () => this.updateAll());
         this.eventBus.on(Events.Tool.PanUpdate, () => this.updateAll());

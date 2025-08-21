@@ -60,6 +60,8 @@ export const Events = {
 		ZoomPercent: 'ui:zoom:percent',
 		MinimapGetData: 'ui:minimap:get-data',
 		MinimapCenterOn: 'ui:minimap:center-on',
+		TextEditStart: 'ui:text:edit:start',
+		TextEditEnd: 'ui:text:edit:end',
 		LayerBringToFront: 'ui:layer:bring-to-front',
 		LayerBringForward: 'ui:layer:bring-forward',
 		LayerSendBackward: 'ui:layer:send-backward',
