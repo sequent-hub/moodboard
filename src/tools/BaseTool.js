@@ -177,7 +177,8 @@ export class BaseTool {
             'get:object:pixi',
             'get:object:size',
             'get:object:rotation',
-            'get:all:objects'
+            'get:all:objects',
+            'find:object:by:position'
         ]);
 
         if (passThrough.has(name)) {
@@ -188,6 +189,7 @@ export class BaseTool {
                 ['get:object:size', Events.Tool.GetObjectSize],
                 ['get:object:rotation', Events.Tool.GetObjectRotation],
                 ['get:all:objects', Events.Tool.GetAllObjects],
+                ['find:object:by:position', Events.Tool.FindObjectByPosition],
             ]);
             const evt = map.get(name) || `tool:${name}`;
             this.eventBus.emit(evt, data);

@@ -1010,6 +1010,15 @@ export class CoreMoodBoard {
                 this.pixi.showObjectText(objectId);
             }
         });
+
+        // Поиск объекта по позиции
+        this.eventBus.on(Events.Tool.FindObjectByPosition, (data) => {
+            const { position, type } = data;
+            if (position && type) {
+                const foundObject = this.pixi.findObjectByPosition(position, type);
+                data.foundObject = foundObject;
+            }
+        });
     }
 
     /**

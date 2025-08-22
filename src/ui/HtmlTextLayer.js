@@ -52,6 +52,40 @@ export class HtmlTextLayer {
             if (el) el.style.visibility = '';
         });
 
+        // Обработка событий скрытия/показа текста от SelectTool
+        this.eventBus.on(Events.Tool.HideObjectText, ({ objectId }) => {
+            console.log(`🔍 HtmlTextLayer: скрываю текст для объекта ${objectId}`);
+            const el = this.idToEl.get(objectId);
+            if (el) {
+                el.style.visibility = 'hidden';
+                console.log(`🔍 HtmlTextLayer: текст ${objectId} скрыт (visibility: hidden)`);
+            } else {
+                console.warn(`❌ HtmlTextLayer: HTML-элемент для объекта ${objectId} не найден`);
+            }
+        });
+        this.eventBus.on(Events.Tool.ShowObjectText, ({ objectId }) => {
+            console.log(`🔍 HtmlTextLayer: показываю текст для объекта ${objectId}`);
+            const el = this.idToEl.get(objectId);
+            if (el) {
+                el.style.visibility = '';
+                console.log(`🔍 HtmlTextLayer: текст ${objectId} показан (visibility: visible)`);
+            } else {
+                console.warn(`❌ HtmlTextLayer: HTML-элемент для объекта ${objectId} не найден`);
+            }
+        });
+
+        // Обработка обновления содержимого текста
+        this.eventBus.on(Events.Tool.UpdateObjectContent, ({ objectId, content }) => {
+            console.log(`🔍 HtmlTextLayer: обновляю содержимое для объекта ${objectId}:`, content);
+            const el = this.idToEl.get(objectId);
+            if (el && typeof content === 'string') {
+                el.textContent = content;
+                console.log(`🔍 HtmlTextLayer: содержимое обновлено для ${objectId}:`, content);
+            } else {
+                console.warn(`❌ HtmlTextLayer: не удалось обновить содержимое для ${objectId}:`, { el: !!el, content });
+            }
+        });
+
         // На все операции зума/пэна — полное обновление
         this.eventBus.on(Events.UI.ZoomPercent, () => this.updateAll());
         this.eventBus.on(Events.Tool.PanUpdate, () => this.updateAll());
@@ -92,8 +126,11 @@ export class HtmlTextLayer {
     rebuildFromState() {
         if (!this.core?.state) return;
         const objs = this.core.state.state.objects || [];
+        console.log(`🔍 HtmlTextLayer: rebuildFromState, найдено объектов:`, objs.length);
+        
         objs.forEach((o) => {
             if (o.type === 'text' || o.type === 'simple-text') {
+                console.log(`🔍 HtmlTextLayer: создаю HTML-элемент для текстового объекта:`, o);
                 this._ensureTextEl(o.id, o);
             }
         });
@@ -103,6 +140,9 @@ export class HtmlTextLayer {
     _ensureTextEl(objectId, objectData) {
         if (!this.layer || !objectId) return;
         if (this.idToEl.has(objectId)) return;
+        
+        console.log(`🔍 HtmlTextLayer: создаю HTML-элемент для текста ${objectId}:`, objectData);
+        
         const el = document.createElement('div');
         el.className = 'mb-text';
         el.dataset.id = objectId;
@@ -125,6 +165,8 @@ export class HtmlTextLayer {
         el.dataset.baseH = String(bh);
         this.layer.appendChild(el);
         this.idToEl.set(objectId, el);
+        
+        console.log(`🔍 HtmlTextLayer: HTML-элемент создан и добавлен в DOM:`, el);
     }
 
     _removeTextEl(objectId) {
@@ -141,6 +183,9 @@ export class HtmlTextLayer {
     updateOne(objectId) {
         const el = this.idToEl.get(objectId);
         if (!el || !this.core) return;
+        
+        console.log(`🔍 HtmlTextLayer: обновляю позицию для текста ${objectId}`);
+        
         const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
         const s = world?.scale?.x || 1;
         const tx = world?.x || 0;
@@ -182,7 +227,21 @@ export class HtmlTextLayer {
         }
         // Текст
         const content = obj.content || obj.properties?.content;
-        if (typeof content === 'string') el.textContent = content;
+        if (typeof content === 'string') {
+            el.textContent = content;
+            console.log(`🔍 HtmlTextLayer: содержимое обновлено в updateOne для ${objectId}:`, content);
+        }
+        
+        console.log(`🔍 HtmlTextLayer: позиция обновлена для ${objectId}:`, {
+            left: `${left}px`,
+            top: `${top}px`,
+            width: `${Math.max(1, (w * s) / res)}px`,
+            height: `${Math.max(1, (h * s) / res)}px`,
+            fontSize: `${fontSizePx}px`,
+            content: content,
+            visibility: el.style.visibility,
+            textContent: el.textContent
+        });
     }
 }
 

@@ -92,7 +92,15 @@ export class TextObject {
      */
     hideText() {
         // Для TextObject визуализация происходит в HtmlTextLayer
-        // Логика скрытия/показа может быть добавлена позже при необходимости
+        // Эмитим событие для скрытия текста
+        if (this.rect && this.rect._mb && this.rect._mb.objectId) {
+            // Используем EventBus через core, если доступен
+            if (window.moodboard && window.moodboard.eventBus) {
+                window.moodboard.eventBus.emit('tool:hide:object:text', { 
+                    objectId: this.rect._mb.objectId 
+                });
+            }
+        }
     }
 
     /**
@@ -101,7 +109,15 @@ export class TextObject {
      */
     showText() {
         // Для TextObject визуализация происходит в HtmlTextLayer
-        // Логика скрытия/показа может быть добавлена позже при необходимости
+        // Эмитим событие для показа текста
+        if (this.rect && this.rect._mb && this.rect._mb.objectId) {
+            // Используем EventBus через core, если доступен
+            if (window.moodboard && window.moodboard.eventBus) {
+                window.moodboard.eventBus.emit('tool:show:object:text', { 
+                    objectId: this.rect._mb.objectId 
+                });
+            }
+        }
     }
 }
 

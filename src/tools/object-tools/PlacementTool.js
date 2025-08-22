@@ -61,17 +61,29 @@ export class PlacementTool extends BaseTool {
         };
 
         if (isTextWithEditing) {
-            // Переключаемся на select, чтобы у него был доступ к PIXI app, затем открываем редактор
-            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
-            this.eventBus.emit(Events.Tool.ObjectEdit, {
-                object: {
-                    id: null,
-                    type: 'text',
-                    position,
-                    properties: { fontSize: props.fontSize || 18, content: '' }
-                },
-                create: true
+            // Сначала создаем объект через обычный канал
+            this.eventBus.emit(Events.UI.ToolbarAction, {
+                type: 'text',
+                id: 'text',
+                position,
+                properties: { fontSize: props.fontSize || 18, content: '' }
             });
+            
+            // Затем переключаемся на select и открываем редактор для созданного объекта
+            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+            
+            // Небольшая задержка, чтобы объект успел создаться
+            setTimeout(() => {
+                this.eventBus.emit(Events.Tool.ObjectEdit, {
+                    object: {
+                        id: null, // ID будет получен автоматически
+                        type: 'text',
+                        position,
+                        properties: { fontSize: props.fontSize || 18, content: '' }
+                    },
+                    create: false // Теперь это редактирование существующего объекта
+                });
+            }, 50);
         } else if (isImage && props.selectFileOnPlace) {
             const input = document.createElement('input');
             input.type = 'file';

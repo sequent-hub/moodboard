@@ -116,6 +116,26 @@ export class SelectTool extends BaseTool {
                     const props = { content: meta.content || object.properties?.content || '', fontSize: meta.fontSize || object.properties?.fontSize };
                     this.eventBus.emit(Events.UI.TextEditStart, { objectId: object.id });
                     this._openTextEditor(object.id, posData.position || { x: 0, y: 0 }, props, sizeData.size || null, object.type);
+                } else if (object && object.position) {
+                    // Поиск объекта по позиции (для новых объектов)
+                    const findData = { position: object.position, type: object.type };
+                    this.emit('find:object:by:position', findData);
+                    
+                    if (findData.foundObject) {
+                        // Нашли объект, открываем редактор для него
+                        const posData = { objectId: findData.foundObject.id, position: null };
+                        const sizeData = { objectId: findData.foundObject.id, size: null };
+                        const pixiReq = { objectId: findData.foundObject.id, pixiObject: null };
+                        this.emit(Events.Tool.GetObjectPosition, posData);
+                        this.emit(Events.Tool.GetObjectSize, sizeData);
+                        this.emit(Events.Tool.GetObjectPixi, pixiReq);
+                        const meta = pixiReq.pixiObject && pixiReq.pixiObject._mb ? pixiReq.pixiObject._mb.properties || {} : {};
+                        const props = { content: meta.content || object.properties?.content || '', fontSize: meta.fontSize || object.properties?.fontSize };
+                        this.eventBus.emit(Events.UI.TextEditStart, { objectId: findData.foundObject.id });
+                        this._openTextEditor(findData.foundObject.id, posData.position || { x: 0, y: 0 }, props, sizeData.size || null, object.type);
+                    } else {
+                        console.warn('❌ SelectTool: объект для редактирования не найден по позиции:', object.position);
+                    }
                 }
             });
 		}
@@ -1625,7 +1645,17 @@ export class SelectTool extends BaseTool {
 
         // Скрываем статичный текст во время редактирования для всех типов объектов
         if (objectId) {
-            this.emit(Events.Tool.HideObjectText, { objectId });
+            // Проверяем, что HTML-элемент существует перед попыткой скрыть текст
+            if (window.moodboard && window.moodboard.htmlTextLayer) {
+                const el = window.moodboard.htmlTextLayer.idToEl.get(objectId);
+                if (el) {
+                    this.emit(Events.Tool.HideObjectText, { objectId });
+                } else {
+                    console.warn(`❌ SelectTool: HTML-элемент для объекта ${objectId} не найден, пропускаем HideObjectText`);
+                }
+            } else {
+                this.emit(Events.Tool.HideObjectText, { objectId });
+            }
         }
         // Ресайз мышью только для обычного текста
         if (!isNote) {
@@ -1675,7 +1705,17 @@ export class SelectTool extends BaseTool {
             
             // Показываем статичный текст после завершения редактирования для всех типов объектов
             if (objectId) {
-                this.emit(Events.Tool.ShowObjectText, { objectId });
+                // Проверяем, что HTML-элемент существует перед попыткой показать текст
+                if (window.moodboard && window.moodboard.htmlTextLayer) {
+                    const el = window.moodboard.htmlTextLayer.idToEl.get(objectId);
+                    if (el) {
+                        this.emit(Events.Tool.ShowObjectText, { objectId });
+                    } else {
+                        console.warn(`❌ SelectTool: HTML-элемент для объекта ${objectId} не найден, пропускаем ShowObjectText`);
+                    }
+                } else {
+                    this.emit(Events.Tool.ShowObjectText, { objectId });
+                }
             }
             
             wrapper.remove();
@@ -1698,11 +1738,19 @@ export class SelectTool extends BaseTool {
             } else {
                 // Обновление существующего: используем команду обновления содержимого
                 if (currentObjectType === 'note') {
+                    console.log('🔧 SelectTool: updating note content via UpdateObjectContent');
                     // Для записок обновляем содержимое через PixiEngine
-                    console.log('🔧 SelectTool: finalize - updating note content via UpdateObjectContent');
                     this.emit(Events.Tool.UpdateObjectContent, { 
                         objectId: objectId, 
                         content: value 
+                    });
+                    
+                    // Обновляем состояние объекта в StateManager
+                    this.eventBus.emit(Events.Object.StateChanged, {
+                        objectId: objectId,
+                        updates: {
+                            content: value
+                        }
                     });
                 } else {
                     // Для обычного текста тоже используем обновление содержимого
@@ -1710,6 +1758,14 @@ export class SelectTool extends BaseTool {
                     this.emit(Events.Tool.UpdateObjectContent, { 
                         objectId: objectId, 
                         content: value 
+                    });
+                    
+                    // Обновляем состояние объекта в StateManager
+                    this.eventBus.emit(Events.Object.StateChanged, {
+                        objectId: objectId,
+                        updates: {
+                            content: value
+                        }
                     });
                 }
             }
@@ -1755,7 +1811,17 @@ export class SelectTool extends BaseTool {
         
         // Показываем статичный текст после завершения редактирования для всех типов объектов
         if (objectId) {
-            this.emit(Events.Tool.ShowObjectText, { objectId });
+            // Проверяем, что HTML-элемент существует перед попыткой показать текст
+            if (window.moodboard && window.moodboard.htmlTextLayer) {
+                const el = window.moodboard.htmlTextLayer.idToEl.get(objectId);
+                if (el) {
+                    this.emit(Events.Tool.ShowObjectText, { objectId });
+                } else {
+                    console.warn(`❌ SelectTool: HTML-элемент для объекта ${objectId} не найден, пропускаем ShowObjectText`);
+                }
+            } else {
+                this.emit(Events.Tool.ShowObjectText, { objectId });
+            }
         }
         
         textarea.remove();
@@ -1779,6 +1845,14 @@ export class SelectTool extends BaseTool {
                     objectId: objectId, 
                     content: value 
                 });
+                
+                // Обновляем состояние объекта в StateManager
+                this.eventBus.emit(Events.Object.StateChanged, {
+                    objectId: objectId,
+                    updates: {
+                        content: value
+                    }
+                });
             } else {
                 // Для обычного текста тоже используем обновление содержимого
                 console.log('🔧 SelectTool: updating text content via UpdateObjectContent');
@@ -1786,7 +1860,17 @@ export class SelectTool extends BaseTool {
                     objectId: objectId, 
                     content: value 
                 });
+                
+                // Обновляем состояние объекта в StateManager
+                this.eventBus.emit(Events.Object.StateChanged, {
+                    objectId: objectId,
+                    updates: {
+                        content: value
+                    }
+                });
             }
         }
     }
+
+
 }

@@ -44,6 +44,7 @@ export const Events = {
 		UpdateObjectContent: 'tool:update:object:content',
 		HideObjectText: 'tool:hide:object:text',
 		ShowObjectText: 'tool:show:object:text',
+		FindObjectByPosition: 'tool:find:object:by:position',
 	},
 
 	UI: {

@@ -400,6 +400,38 @@ export class PixiEngine {
         return Math.hypot(px - closestX, py - closestY);
     }
 
+    /**
+     * Поиск объекта по позиции и типу
+     * @param {Object} position - позиция {x, y}
+     * @param {string} type - тип объекта
+     * @returns {Object|null} найденный объект или null
+     */
+    findObjectByPosition(position, type) {
+        for (const [objectId, pixiObject] of this.objects) {
+            if (!pixiObject || !pixiObject._mb) continue;
+            
+            const childMeta = pixiObject._mb;
+            if (childMeta.type !== type) continue;
+            
+            // Получаем границы объекта
+            const bounds = pixiObject.getBounds();
+            if (!bounds) continue;
+            
+            // Проверяем, находится ли позиция в пределах объекта
+            if (bounds.x <= position.x && position.x <= bounds.x + bounds.width &&
+                bounds.y <= position.y && position.y <= bounds.y + bounds.height) {
+                return {
+                    id: objectId,
+                    type: childMeta.type,
+                    position: { x: pixiObject.x, y: pixiObject.y },
+                    size: { width: bounds.width, height: bounds.height }
+                };
+            }
+        }
+        
+        return null;
+    }
+
     destroy() {
         this.app.destroy(true);
     }
