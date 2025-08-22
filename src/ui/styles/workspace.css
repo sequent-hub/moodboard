@@ -546,12 +546,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border: none;
     border-radius: 8px;
-    background: #f0f0f0;
-    color: #333;
+    /* background: #f0f0f0; */
+    /* color: #333; */
     font-size: 16px;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -559,15 +559,15 @@
 
 /* Стили для SVG иконок в кнопках верхней панели */
 .moodboard-topbar__button svg {
-    width: 18px;
-    height: 18px;
-    fill: currentColor;
-    stroke: currentColor;
+    width: 16px;
+    height: 16px;
+    /* fill: currentColor;
+    stroke: currentColor; */
     transition: all 0.2s ease;
 }
 
 .moodboard-topbar__button:hover svg {
-    transform: scale(1.1);
+    /* transform: scale(1.1); */
 }
 
 .moodboard-topbar__button:hover {
