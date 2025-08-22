@@ -12,6 +12,7 @@ import { ActionHandler } from './ActionHandler.js';
 import { HtmlTextLayer } from '../ui/HtmlTextLayer.js';
 import { HtmlHandlesLayer } from '../ui/HtmlHandlesLayer.js';
 import { CommentPopover } from '../ui/CommentPopover.js';
+import { TextPropertiesPanel } from '../ui/TextPropertiesPanel.js';
 
 /**
  * Готовый MoodBoard с UI - главный класс пакета
@@ -82,6 +83,9 @@ export class MoodBoard {
             // Поповер для комментариев
             this.commentPopover = new CommentPopover(this.canvasContainer, this.coreMoodboard.eventBus, this.coreMoodboard);
             this.commentPopover.attach();
+            // Панель свойств текста
+            this.textPropertiesPanel = new TextPropertiesPanel(this.canvasContainer, this.coreMoodboard.eventBus, this.coreMoodboard);
+            this.textPropertiesPanel.attach();
             
             // Загружаем данные (сначала пробуем загрузить с сервера, потом дефолтные)
             await this.loadExistingBoard();
@@ -285,6 +289,14 @@ export class MoodBoard {
         
         if (this.saveStatus) {
             this.saveStatus.destroy();
+        }
+        
+        if (this.textPropertiesPanel) {
+            this.textPropertiesPanel.destroy();
+        }
+        
+        if (this.commentPopover) {
+            this.commentPopover.destroy();
         }
         
         if (this.coreMoodboard) {
