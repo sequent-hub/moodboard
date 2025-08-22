@@ -131,7 +131,7 @@ export class TextPropertiesPanel {
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
             fontSize: '14px',
             fontFamily: 'Arial, sans-serif',
-            minWidth: '250px',
+            minWidth: '400px',
             height: '44px'
         });
 
@@ -191,6 +191,45 @@ export class TextPropertiesPanel {
         });
 
         panel.appendChild(this.fontSelect);
+
+        // Лейбл для размера
+        const sizeLabel = document.createElement('span');
+        sizeLabel.textContent = 'Размер:';
+        sizeLabel.style.fontSize = '12px';
+        sizeLabel.style.color = '#666';
+        sizeLabel.style.fontWeight = '500';
+        sizeLabel.style.marginLeft = '8px';
+        panel.appendChild(sizeLabel);
+
+        // Выпадающий список размеров шрифта
+        this.fontSizeSelect = document.createElement('select');
+        this.fontSizeSelect.className = 'font-size-select';
+        Object.assign(this.fontSizeSelect.style, {
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            padding: '4px 8px',
+            fontSize: '13px',
+            backgroundColor: 'white',
+            cursor: 'pointer',
+            minWidth: '70px'
+        });
+
+        // Популярные размеры шрифта
+        const fontSizes = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 60, 72];
+
+        fontSizes.forEach(size => {
+            const option = document.createElement('option');
+            option.value = size;
+            option.textContent = `${size}px`;
+            this.fontSizeSelect.appendChild(option);
+        });
+
+        // Обработчик изменения размера шрифта
+        this.fontSizeSelect.addEventListener('change', (e) => {
+            this._changeFontSize(parseInt(e.target.value));
+        });
+
+        panel.appendChild(this.fontSizeSelect);
     }
 
     _changeFontFamily(fontFamily) {
@@ -210,12 +249,32 @@ export class TextPropertiesPanel {
         this._updateTextAppearance(this.currentId, { fontFamily });
     }
 
+    _changeFontSize(fontSize) {
+        if (!this.currentId) return;
+
+        console.log('🔧 TextPropertiesPanel: Changing font size to:', fontSize);
+
+        // Обновляем свойства объекта через StateManager
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: {
+                fontSize: fontSize
+            }
+        });
+
+        // Также обновляем визуальное отображение
+        this._updateTextAppearance(this.currentId, { fontSize });
+    }
+
     _updateTextAppearance(objectId, properties) {
         // Обновляем HTML текст через HtmlTextLayer
         const htmlElement = document.querySelector(`[data-id="${objectId}"]`);
         if (htmlElement) {
             if (properties.fontFamily) {
                 htmlElement.style.fontFamily = properties.fontFamily;
+            }
+            if (properties.fontSize) {
+                htmlElement.style.fontSize = `${properties.fontSize}px`;
             }
         }
 
@@ -240,7 +299,7 @@ export class TextPropertiesPanel {
     }
 
     _updateControlsFromObject() {
-        if (!this.currentId || !this.fontSelect) return;
+        if (!this.currentId || !this.fontSelect || !this.fontSizeSelect) return;
 
         // Получаем текущие свойства объекта
         const pixiData = { objectId: this.currentId, pixiObject: null };
@@ -257,9 +316,18 @@ export class TextPropertiesPanel {
                 // Устанавливаем дефолтный шрифт
                 this.fontSelect.value = 'Arial, sans-serif';
             }
+
+            // Устанавливаем размер шрифта в селекте
+            if (properties.fontSize) {
+                this.fontSizeSelect.value = properties.fontSize;
+            } else {
+                // Устанавливаем дефолтный размер
+                this.fontSizeSelect.value = '18';
+            }
         } else {
             // Дефолтные значения
             this.fontSelect.value = 'Arial, sans-serif';
+            this.fontSizeSelect.value = '18';
         }
     }
 

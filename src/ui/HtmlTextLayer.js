@@ -94,6 +94,10 @@ export class HtmlTextLayer {
                     el.style.fontFamily = updates.fontFamily;
                     console.log(`🔍 HtmlTextLayer: обновлен шрифт для ${objectId}:`, updates.fontFamily);
                 }
+                if (updates.fontSize) {
+                    el.style.fontSize = `${updates.fontSize}px`;
+                    console.log(`🔍 HtmlTextLayer: обновлен размер шрифта для ${objectId}:`, updates.fontSize);
+                }
                 // Здесь можно добавить обработку других свойств текста
             }
         });
