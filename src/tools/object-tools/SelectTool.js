@@ -1611,8 +1611,8 @@ export class SelectTool extends BaseTool {
         document.head.appendChild(styleEl);
         this.textEditor = { active: true, objectId, textarea, wrapper, world: this.textEditor.world, position, properties: { fontSize }, objectType, _phStyle: styleEl };
 
-        // Для записок скрываем статичный текст во время редактирования
-        if (isNote && objectId) {
+        // Скрываем статичный текст во время редактирования для всех типов объектов
+        if (objectId) {
             this.emit(Events.Tool.HideObjectText, { objectId });
         }
         // Ресайз мышью только для обычного текста
@@ -1661,8 +1661,8 @@ export class SelectTool extends BaseTool {
             const currentObjectType = this.textEditor.objectType;
             console.log('🔧 SelectTool: finalize - saved objectType:', currentObjectType);
             
-            // Для записок показываем статичный текст после завершения редактирования
-            if (currentObjectType === 'note' && objectId) {
+            // Показываем статичный текст после завершения редактирования для всех типов объектов
+            if (objectId) {
                 this.emit(Events.Tool.ShowObjectText, { objectId });
             }
             
@@ -1744,8 +1744,8 @@ export class SelectTool extends BaseTool {
         
         console.log('🔧 SelectTool: _closeTextEditor - objectType:', objectType, 'objectId:', objectId, 'commitValue:', commitValue);
         
-        // Для записок показываем статичный текст после завершения редактирования
-        if (objectType === 'note' && objectId) {
+        // Показываем статичный текст после завершения редактирования для всех типов объектов
+        if (objectId) {
             this.emit(Events.Tool.ShowObjectText, { objectId });
         }
         

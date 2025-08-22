@@ -320,25 +320,19 @@ export class PixiEngine {
      * Поиск объекта в указанной позиции
      */
     hitTest(x, y) {
-        // Hit test at coordinates
-        console.log('🎯 PixiEngine hitTest at:', x, y);
-        
         // Получаем все объекты в позиции (PIXI автоматически учитывает трансформации)
         const point = new PIXI.Point(x, y);
         
         // Проходим по объектам в worldLayer от верхних к нижним
         const container = this.worldLayer || this.app.stage;
-        console.log('🔍 Checking', container.children.length, 'children in worldLayer');
         
         for (let i = container.children.length - 1; i >= 0; i--) {
             const child = container.children[i];
-            console.log('🔍 Testing child', i, 'type:', child.constructor.name, 'bounds:', child.getBounds(), 'contains:', child.containsPoint ? child.containsPoint(point) : 'no containsPoint');
             
             if (child.containsPoint && child.containsPoint(point)) {
                 // Находим ID объекта
                 for (const [objectId, pixiObject] of this.objects.entries()) {
                     if (pixiObject === child) {
-                        console.log('✅ Hit found! Object ID:', objectId);
                         return {
                             type: 'object',
                             object: objectId,
