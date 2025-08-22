@@ -1417,6 +1417,18 @@ export class CoreMoodBoard {
         return this.state.serialize();
     }
 
+    /**
+     * Получает список дочерних объектов фрейма
+     * @param {string} frameId - ID фрейма
+     * @returns {string[]} - массив ID дочерних объектов
+     */
+    _getFrameChildren(frameId) {
+        // Пока что возвращаем пустой массив, т.к. логика привязки объектов к фрейму
+        // еще не реализована. В будущем здесь будет поиск объектов, которые
+        // находятся внутри границ фрейма или связаны с ним другим способом.
+        return [];
+    }
+
     destroy() {
         this.saveManager.destroy();
         this.keyboard.destroy();
