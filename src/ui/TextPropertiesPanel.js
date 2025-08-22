@@ -112,6 +112,7 @@ export class TextPropertiesPanel {
             this.panel.style.display = 'none';
         }
         this._hideColorDropdown(); // Закрываем выпадающую панель цветов
+        this._hideBgColorDropdown(); // Закрываем выпадающую панель фона
         document.removeEventListener('mousedown', this._onDocMouseDown, true);
     }
 
@@ -132,7 +133,7 @@ export class TextPropertiesPanel {
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
             fontSize: '14px',
             fontFamily: 'Arial, sans-serif',
-            minWidth: '450px',
+            minWidth: '550px',
             height: '44px'
         });
 
@@ -241,8 +242,20 @@ export class TextPropertiesPanel {
         colorLabel.style.marginLeft = '8px';
         panel.appendChild(colorLabel);
 
-        // Создаем компактный селектор цвета
+        // Создаем компактный селектор цвета текста
         this._createCompactColorSelector(panel);
+
+        // Лейбл для выделения
+        const bgColorLabel = document.createElement('span');
+        bgColorLabel.textContent = 'Выделение:';
+        bgColorLabel.style.fontSize = '12px';
+        bgColorLabel.style.color = '#666';
+        bgColorLabel.style.fontWeight = '500';
+        bgColorLabel.style.marginLeft = '8px';
+        panel.appendChild(bgColorLabel);
+
+        // Создаем компактный селектор цвета фона
+        this._createCompactBackgroundSelector(panel);
     }
 
     _createCompactColorSelector(panel) {
@@ -436,6 +449,253 @@ export class TextPropertiesPanel {
         }
     }
 
+    _createCompactBackgroundSelector(panel) {
+        // Контейнер для селектора фона
+        const bgSelectorContainer = document.createElement('div');
+        bgSelectorContainer.style.cssText = `
+            position: relative;
+            display: inline-block;
+            margin-left: 4px;
+        `;
+
+        // Кнопка показывающая текущий цвет фона
+        this.currentBgColorButton = document.createElement('button');
+        this.currentBgColorButton.type = 'button';
+        this.currentBgColorButton.title = 'Выбрать цвет выделения';
+        this.currentBgColorButton.style.cssText = `
+            width: 32px;
+            height: 24px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            background-color: transparent;
+            cursor: pointer;
+            margin: 0;
+            padding: 0;
+            display: block;
+            box-sizing: border-box;
+            position: relative;
+        `;
+
+        // Создаем выпадающую панель с цветами фона
+        this.bgColorDropdown = document.createElement('div');
+        this.bgColorDropdown.style.cssText = `
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            padding: 8px;
+            display: none;
+            z-index: 10000;
+            min-width: 200px;
+        `;
+
+        // Создаем сетку цветов фона
+        this._createBackgroundColorGrid(this.bgColorDropdown);
+
+        // Обработчик клика по кнопке
+        this.currentBgColorButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._toggleBgColorDropdown();
+        });
+
+        // Закрываем панель при клике вне её
+        document.addEventListener('click', (e) => {
+            if (!bgSelectorContainer.contains(e.target)) {
+                this._hideBgColorDropdown();
+            }
+        });
+
+        bgSelectorContainer.appendChild(this.currentBgColorButton);
+        bgSelectorContainer.appendChild(this.bgColorDropdown);
+        panel.appendChild(bgSelectorContainer);
+    }
+
+    _createBackgroundColorGrid(container) {
+        // Цвета для выделения текста (включая прозрачный)
+        const bgColors = [
+            { color: 'transparent', name: 'Без выделения' },
+            { color: '#ffff99', name: 'Желтый' },
+            { color: '#ffcc99', name: 'Оранжевый' },
+            { color: '#ff9999', name: 'Розовый' },
+            { color: '#ccffcc', name: 'Зеленый' },
+            { color: '#99ccff', name: 'Голубой' },
+            { color: '#cc99ff', name: 'Фиолетовый' },
+            { color: '#f0f0f0', name: 'Светло-серый' },
+            { color: '#d0d0d0', name: 'Серый' },
+            { color: '#ffffff', name: 'Белый' },
+            { color: '#000000', name: 'Черный' },
+            { color: '#333333', name: 'Темно-серый' }
+        ];
+
+        // Сетка заготовленных цветов фона
+        const presetsGrid = document.createElement('div');
+        presetsGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 4px;
+            margin-bottom: 8px;
+        `;
+
+        bgColors.forEach(preset => {
+            const colorButton = document.createElement('button');
+            colorButton.type = 'button';
+            colorButton.title = preset.name;
+            
+            if (preset.color === 'transparent') {
+                // Специальная кнопка для "без выделения"
+                colorButton.style.cssText = `
+                    width: 24px;
+                    height: 24px;
+                    border: 1px solid #ddd;
+                    border-radius: 3px;
+                    background: white;
+                    cursor: pointer;
+                    margin: 0;
+                    padding: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    box-sizing: border-box;
+                    position: relative;
+                `;
+                
+                // Добавляем диагональную линию для обозначения "нет"
+                const line = document.createElement('div');
+                line.style.cssText = `
+                    width: 20px;
+                    height: 1px;
+                    background: #ff0000;
+                    transform: rotate(45deg);
+                `;
+                colorButton.appendChild(line);
+            } else {
+                colorButton.style.cssText = `
+                    width: 24px;
+                    height: 24px;
+                    border: 1px solid #ddd;
+                    border-radius: 3px;
+                    background-color: ${preset.color};
+                    cursor: pointer;
+                    margin: 0;
+                    padding: 0;
+                    display: block;
+                    box-sizing: border-box;
+                    ${preset.color === '#ffffff' ? 'border-color: #ccc;' : ''}
+                `;
+            }
+
+            colorButton.addEventListener('click', () => {
+                this._selectBgColor(preset.color);
+            });
+
+            presetsGrid.appendChild(colorButton);
+        });
+
+        container.appendChild(presetsGrid);
+
+        // Разделитель
+        const separator = document.createElement('div');
+        separator.style.cssText = `
+            height: 1px;
+            background: #eee;
+            margin: 8px 0;
+        `;
+        container.appendChild(separator);
+
+        // Кастомный color picker для фона
+        const customContainer = document.createElement('div');
+        customContainer.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        `;
+
+        const customLabel = document.createElement('span');
+        customLabel.textContent = 'Свой цвет:';
+        customLabel.style.cssText = `
+            font-size: 12px;
+            color: #666;
+        `;
+
+        this.bgColorInput = document.createElement('input');
+        this.bgColorInput.type = 'color';
+        this.bgColorInput.style.cssText = `
+            width: 32px;
+            height: 24px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            cursor: pointer;
+            padding: 0;
+        `;
+
+        this.bgColorInput.addEventListener('change', (e) => {
+            this._selectBgColor(e.target.value);
+        });
+
+        customContainer.appendChild(customLabel);
+        customContainer.appendChild(this.bgColorInput);
+        container.appendChild(customContainer);
+    }
+
+    _toggleBgColorDropdown() {
+        if (this.bgColorDropdown.style.display === 'none') {
+            this.bgColorDropdown.style.display = 'block';
+        } else {
+            this.bgColorDropdown.style.display = 'none';
+        }
+    }
+
+    _hideBgColorDropdown() {
+        if (this.bgColorDropdown) {
+            this.bgColorDropdown.style.display = 'none';
+        }
+    }
+
+    _selectBgColor(color) {
+        this._changeBackgroundColor(color);
+        this._updateCurrentBgColorButton(color);
+        this._hideBgColorDropdown();
+    }
+
+    _updateCurrentBgColorButton(color) {
+        if (this.currentBgColorButton) {
+            if (color === 'transparent') {
+                this.currentBgColorButton.style.backgroundColor = 'white';
+                this.currentBgColorButton.title = 'Без выделения';
+                // Добавляем диагональную линию если её нет
+                if (!this.currentBgColorButton.querySelector('div')) {
+                    const line = document.createElement('div');
+                    line.style.cssText = `
+                        width: 20px;
+                        height: 1px;
+                        background: #ff0000;
+                        transform: rotate(45deg);
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform-origin: center;
+                        transform: translate(-50%, -50%) rotate(45deg);
+                    `;
+                    this.currentBgColorButton.appendChild(line);
+                }
+            } else {
+                this.currentBgColorButton.style.backgroundColor = color;
+                this.currentBgColorButton.title = `Цвет выделения: ${color}`;
+                // Убираем диагональную линию если есть
+                const line = this.currentBgColorButton.querySelector('div');
+                if (line) {
+                    line.remove();
+                }
+            }
+        }
+        if (this.bgColorInput) {
+            this.bgColorInput.value = color === 'transparent' ? '#ffff99' : color;
+        }
+    }
+
     _changeFontFamily(fontFamily) {
         if (!this.currentId) return;
 
@@ -487,6 +747,23 @@ export class TextPropertiesPanel {
         this._updateTextAppearance(this.currentId, { color });
     }
 
+    _changeBackgroundColor(backgroundColor) {
+        if (!this.currentId) return;
+
+        console.log('🔧 TextPropertiesPanel: Changing background color to:', backgroundColor);
+
+        // Обновляем свойства объекта через StateManager
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: {
+                backgroundColor: backgroundColor
+            }
+        });
+
+        // Также обновляем визуальное отображение
+        this._updateTextAppearance(this.currentId, { backgroundColor });
+    }
+
     _updateTextAppearance(objectId, properties) {
         // Обновляем HTML текст через HtmlTextLayer
         const htmlElement = document.querySelector(`[data-id="${objectId}"]`);
@@ -499,6 +776,13 @@ export class TextPropertiesPanel {
             }
             if (properties.color) {
                 htmlElement.style.color = properties.color;
+            }
+            if (properties.backgroundColor !== undefined) {
+                if (properties.backgroundColor === 'transparent') {
+                    htmlElement.style.backgroundColor = '';
+                } else {
+                    htmlElement.style.backgroundColor = properties.backgroundColor;
+                }
             }
         }
 
@@ -556,11 +840,20 @@ export class TextPropertiesPanel {
                 // Устанавливаем дефолтный цвет (черный)
                 this._updateCurrentColorButton('#000000');
             }
+
+            // Устанавливаем цвет фона
+            if (properties.backgroundColor !== undefined) {
+                this._updateCurrentBgColorButton(properties.backgroundColor);
+            } else {
+                // Устанавливаем дефолтный фон (прозрачный)
+                this._updateCurrentBgColorButton('transparent');
+            }
         } else {
             // Дефолтные значения
             this.fontSelect.value = 'Arial, sans-serif';
             this.fontSizeSelect.value = '18';
             this._updateCurrentColorButton('#000000');
+            this._updateCurrentBgColorButton('transparent');
         }
     }
 

@@ -100,7 +100,8 @@ export class PlacementTool extends BaseTool {
                     fontSize: props.fontSize || 18, 
                     content: '',
                     fontFamily: 'Arial, sans-serif', // Дефолтный шрифт
-                    color: '#000000' // Дефолтный цвет (черный)
+                    color: '#000000', // Дефолтный цвет (черный)
+                    backgroundColor: 'transparent' // Дефолтный фон (прозрачный)
                 }
             });
         } else if (isImage && props.selectFileOnPlace) {

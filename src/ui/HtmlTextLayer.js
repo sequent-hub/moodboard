@@ -102,6 +102,10 @@ export class HtmlTextLayer {
                     el.style.color = updates.color;
                     console.log(`🔍 HtmlTextLayer: обновлен цвет для ${objectId}:`, updates.color);
                 }
+                if (updates.backgroundColor !== undefined) {
+                    el.style.backgroundColor = updates.backgroundColor === 'transparent' ? '' : updates.backgroundColor;
+                    console.log(`🔍 HtmlTextLayer: обновлен фон для ${objectId}:`, updates.backgroundColor);
+                }
                 // Здесь можно добавить обработку других свойств текста
             }
         });
@@ -169,6 +173,7 @@ export class HtmlTextLayer {
         // Получаем свойства из properties объекта
         const fontFamily = objectData.fontFamily || objectData.properties?.fontFamily || 'Arial, sans-serif';
         const color = objectData.color || objectData.properties?.color || '#000000';
+        const backgroundColor = objectData.backgroundColor || objectData.properties?.backgroundColor || 'transparent';
         
         Object.assign(el.style, {
             position: 'absolute',
@@ -177,7 +182,8 @@ export class HtmlTextLayer {
             whiteSpace: 'pre-wrap',
             pointerEvents: 'none', // всё взаимодействие остаётся на PIXI
             userSelect: 'none',
-            fontFamily: fontFamily
+            fontFamily: fontFamily,
+            backgroundColor: backgroundColor === 'transparent' ? '' : backgroundColor
         });
         const content = objectData.content || objectData.properties?.content || '';
         el.textContent = content;
