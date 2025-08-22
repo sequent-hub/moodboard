@@ -77,6 +77,11 @@ export class TopbarIconLoader {
             </svg>`
         };
 
+        // Загружаем иконки статически
+        for (const [iconName, svgContent] of Object.entries(builtInIcons)) {
+            this.icons.set(iconName, svgContent);
+        }
+        
         // Добавляем встроенные иконки в Map
         Object.entries(builtInIcons).forEach(([name, content]) => {
             this.icons.set(name, content);

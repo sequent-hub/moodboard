@@ -42,7 +42,6 @@ export class IconLoader {
                 if (iconModules[index] && iconModules[index].default) {
                     this.icons[name] = iconModules[index].default;
                     this.cache.set(name, iconModules[index].default);
-                    console.log(`✅ Иконка ${name} загружена статически`);
                 } else {
                     console.warn(`⚠️ Иконка ${name} не загружена, используем fallback`);
                     this.icons[name] = this.getFallbackIcon(name);

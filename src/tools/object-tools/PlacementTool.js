@@ -76,14 +76,14 @@ export class PlacementTool extends BaseTool {
             setTimeout(() => {
                 this.eventBus.emit(Events.Tool.ObjectEdit, {
                     object: {
-                        id: null, // ID будет получен автоматически
+                        id: null, // ID будет получен автоматически по позиции
                         type: 'text',
                         position,
                         properties: { fontSize: props.fontSize || 18, content: '' }
                     },
-                    create: false // Теперь это редактирование существующего объекта
+                    create: true // Это создание нового объекта с редактированием
                 });
-            }, 50);
+            }, 100);
         } else if (isImage && props.selectFileOnPlace) {
             const input = document.createElement('input');
             input.type = 'file';

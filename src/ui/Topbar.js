@@ -11,8 +11,9 @@ export class Topbar {
         this.theme = theme;
         this.element = null;
         this._paintPopover = null;
+        // Загружаем иконки
         this.iconLoader = new TopbarIconLoader();
-        this.icons = {};
+        this.icons = this.iconLoader.icons;
         this.init();
     }
 
@@ -20,7 +21,6 @@ export class Topbar {
         try {
             // Загружаем все иконки
             this.icons = await this.iconLoader.loadAllIcons();
-            console.log('✅ Иконки верхней панели загружены:', Object.keys(this.icons));
         } catch (error) {
             console.error('❌ Ошибка загрузки иконок верхней панели:', error);
         }

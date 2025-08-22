@@ -2,16 +2,17 @@
  * Панель инструментов для MoodBoard
  */
 import { Events } from '../core/events/Events.js';
-import { iconLoader } from '../utils/iconLoader.js';
+import { IconLoader } from '../utils/iconLoader.js';
 
 export class Toolbar {
     constructor(container, eventBus, theme = 'light') {
         this.container = container;
         this.eventBus = eventBus;
         this.theme = theme;
-        this.element = null;
-        // Какой именно place-поток активен: 'big-t' | 'shapes' | 'emoji' | 'frame-tool' | null
-        this.placeSelectedButtonId = null;
+        
+        // Инициализируем IconLoader
+        this.iconLoader = new IconLoader();
+        
         // Кэш для SVG иконок
         this.icons = {};
         
@@ -24,9 +25,8 @@ export class Toolbar {
     async init() {
         try {
             // Инициализируем IconLoader и загружаем все иконки
-            await iconLoader.init();
-            this.icons = await iconLoader.loadAllIcons();
-            console.log('✅ Иконки загружены:', Object.keys(this.icons));
+            await this.iconLoader.init();
+            this.icons = await this.iconLoader.loadAllIcons();
         } catch (error) {
             console.error('❌ Ошибка загрузки иконок:', error);
         }
@@ -920,7 +920,7 @@ export class Toolbar {
         console.log(`🔄 Начинаем обновление иконки ${iconName} в тулбаре...`);
         try {
             // Перезагружаем иконку
-            const newSvgContent = await iconLoader.reloadIcon(iconName);
+            const newSvgContent = await this.iconLoader.reloadIcon(iconName);
             this.icons[iconName] = newSvgContent;
             
             // Находим кнопку с этой иконкой и обновляем её

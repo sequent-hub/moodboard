@@ -255,21 +255,16 @@ export class MoodBoard {
             const boardId = this.options.boardId;
             
             if (!boardId || !this.options.loadEndpoint) {
-                console.log('📋 Создаем новую доску (нет boardId или loadEndpoint)');
                 this.dataManager.loadData(this.data);
                 return;
             }
-            
-            console.log(`🔄 Загружаем доску: ${boardId}`);
             
             // Пытаемся загрузить с сервера
             const boardData = await this.coreMoodboard.saveManager.loadBoardData(boardId);
             
             if (boardData && boardData.objects) {
-                console.log(`✅ Доска загружена: ${boardData.objects.length} объектов`);
                 this.dataManager.loadData(boardData);
             } else {
-                console.log('📋 Создаем новую доску (данные не найдены)');
                 this.dataManager.loadData(this.data);
             }
             

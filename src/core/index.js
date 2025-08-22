@@ -1019,6 +1019,25 @@ export class CoreMoodBoard {
                 data.foundObject = foundObject;
             }
         });
+
+        // Обновление состояния объекта
+        this.eventBus.on(Events.Object.StateChanged, (data) => {
+            const { objectId, updates } = data;
+            if (objectId && updates && this.state) {
+                console.log(`🔧 Обновляем состояние объекта ${objectId}:`, updates);
+                const objects = this.state.getObjects();
+                const object = objects.find(obj => obj.id === objectId);
+                if (object) {
+                    // Обновляем свойства объекта
+                    Object.assign(object, updates);
+                    // Сохраняем изменения
+                    this.state.markDirty();
+                    console.log(`✅ Состояние объекта ${objectId} обновлено`);
+                } else {
+                    console.warn(`❌ Объект ${objectId} не найден в состоянии`);
+                }
+            }
+        });
     }
 
     /**
