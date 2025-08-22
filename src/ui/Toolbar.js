@@ -134,9 +134,9 @@ export class Toolbar {
             const svg = tempDiv.querySelector('svg');
             
             if (svg) {
-                // Устанавливаем размер и стили для SVG
-                svg.style.width = '20px';
-                svg.style.height = '20px';
+                // Убираем inline размеры, чтобы CSS мог их контролировать
+                svg.removeAttribute('width');
+                svg.removeAttribute('height');
                 svg.style.display = 'block';
                 
                 // Добавляем SVG в кнопку

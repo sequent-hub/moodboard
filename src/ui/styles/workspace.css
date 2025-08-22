@@ -1,5 +1,19 @@
 /* MoodBoard Workspace Styles */
 
+/* Основные контейнеры */
+.moodboard-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.moodboard-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
 .moodboard-workspace {
     position: fixed;
     inset: 0;
@@ -15,11 +29,7 @@
     color: #333;
 }
 
-/* Dark Theme */
-.moodboard-workspace--dark {
-    background: #1a1a1a;
-    color: #e0e0e0;
-}
+
 
 /* Toolbar Container */
 .moodboard-workspace__toolbar {
@@ -184,11 +194,7 @@
     width: 56px;
 }
 
-.moodboard-toolbar--dark {
-    background: #2a2a2a;
-    border-color: #404040;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-}
+
 
 /* Toolbar Buttons */
 .moodboard-toolbar__button {
@@ -199,18 +205,19 @@
     height: 40px;
     border: none;
     border-radius: 8px;
-    background: #f0f0f0;
-    color: #333;
+    background: #E1F5FE;
+    color: #212121;
     font-size: 18px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
     text-align: center;
-    position: relative; /* Для позиционирования tooltip */
+    position: relative;
+    margin: 2px;
 }
 
 .moodboard-toolbar__button:hover {
-    background: #e0e0e0;
+    background: #BBDEFB;
     transform: translateY(-1px);
 }
 
@@ -218,65 +225,20 @@
     transform: translateY(0);
 }
 
-/* Dark theme buttons */
-.moodboard-toolbar--dark .moodboard-toolbar__button {
-    background: #404040;
-    color: #e0e0e0;
+/* Активное состояние кнопок */
+.moodboard-toolbar__button--active {
+    background: #84FFFF !important;
+    color: #212121 !important;
+    /* box-shadow: inset 0 0 0 1px #42A5F5; */
 }
 
-.moodboard-toolbar--dark .moodboard-toolbar__button:hover {
-    background: #505050;
-}
-
-/* Specific button styles */
-.moodboard-toolbar__button--frame {
-    background: #e8f5e8;
-    color: #388e3c;
-}
-
-.moodboard-toolbar__button--frame:hover {
-    background: #c8e6c9;
-}
-
-.moodboard-toolbar__button--text-add {
-    background: #e8f5e8;
-    color: #388e3c;
-}
-
-.moodboard-toolbar__button--text-add:hover {
-    background: #c8e6c9;
-}
-
-
-
-/* Undo/Redo buttons */
-.moodboard-toolbar__button--undo {
-    background: #e8f5e8;
-    color: #388e3c;
-}
-
-.moodboard-toolbar__button--undo:hover:not(:disabled) {
-    background: #c8e6c9;
-}
-
-.moodboard-toolbar__button--redo {
-    background: #e8f5e8;
-    color: #388e3c;
-}
-
-.moodboard-toolbar__button--redo:hover:not(:disabled) {
-    background: #c8e6c9;
-}
-
-/* Disabled state for undo/redo buttons */
+/* Отключенное состояние */
 .moodboard-toolbar__button--disabled {
     opacity: 0.4;
     cursor: not-allowed;
-    background: #f5f5f5 !important;
-    color: #999 !important;
 }
 
-/* SVG Icons */
+/* Стили для SVG иконок */
 .moodboard-toolbar__button svg {
     width: 20px;
     height: 20px;
@@ -293,71 +255,9 @@
     opacity: 0.4;
 }
 
-.moodboard-toolbar--dark .moodboard-toolbar__button--disabled {
-    background: #2a2a2a !important;
-    color: #555 !important;
-}
 
-.moodboard-toolbar__button--clear {
-    background: #e8f5e8;
-    color: #388e3c;
-}
 
-.moodboard-toolbar__button--clear:hover {
-    background: #c8e6c9;
-}
-
-.moodboard-toolbar__button--export {
-    background: #e8f5e8;
-    color: #388e3c;
-}
-
-.moodboard-toolbar__button--export:hover {
-    background: #c8e6c9;
-}
-
-/* Big T button */
-.moodboard-toolbar__button--big-t {
-    font-size: 24px;
-    font-weight: 800;
-}
-
-/* Новые кнопки тулбара — небольшие визуальные акценты */
-.moodboard-toolbar__button--select,
-.moodboard-toolbar__button--pan,
-.moodboard-toolbar__button--shapes,
-.moodboard-toolbar__button--pencil,
-.moodboard-toolbar__button--frame,
-.moodboard-toolbar__button--comments,
-.moodboard-toolbar__button--attachments,
-.moodboard-toolbar__button--emoji {
-    opacity: 0.95;
-}
-
-.moodboard-toolbar__button--select { background: #e8f5e8; color: #388e3c; }
-.moodboard-toolbar__button--pan { background: #e8f5e8; color: #388e3c; }
-.moodboard-toolbar__button--shapes { background: #e8f5e8; color: #388e3c; }
-.moodboard-toolbar__button--pencil { background: #e8f5e8; color: #388e3c; }
-.moodboard-toolbar__button--frame { background: #e8f5e8; color: #388e3c; }
-.moodboard-toolbar__button--comments { background: #e8f5e8; color: #388e3c; }
-.moodboard-toolbar__button--attachments { background: #e8f5e8; color: #388e3c; }
-.moodboard-toolbar__button--emoji { background: #e8f5e8; color: #388e3c; }
-.moodboard-toolbar__button--note { background: #e8f5e8; color: #388e3c; }
-.moodboard-toolbar__button--image { background: #e8f5e8; color: #388e3c; }
-
-/* Hover states for all buttons */
-.moodboard-toolbar__button--select:hover,
-.moodboard-toolbar__button--pan:hover,
-.moodboard-toolbar__button--shapes:hover,
-.moodboard-toolbar__button--pencil:hover,
-.moodboard-toolbar__button--frame:hover,
-.moodboard-toolbar__button--comments:hover,
-.moodboard-toolbar__button--attachments:hover,
-.moodboard-toolbar__button--emoji:hover,
-.moodboard-toolbar__button--note:hover,
-.moodboard-toolbar__button--image:hover {
-    background: #c8e6c9;
-}
+/* Specific button styles */
 
 /* Попап для фигур */
 .moodboard-toolbar__popup {
@@ -534,13 +434,7 @@
 }
 .shape-arrow { font-size: 16px; color: #1d4ed8; line-height: 1; }
 
-/* Dark theme button overrides */
-.moodboard-toolbar--dark .moodboard-toolbar__button--frame,
-.moodboard-toolbar--dark .moodboard-toolbar__button--text-add,
-.moodboard-toolbar--dark .moodboard-toolbar__button--clear,
-.moodboard-toolbar--dark .moodboard-toolbar__button--export {
-    opacity: 0.9;
-}
+
 
 /* Toolbar Divider */
 .moodboard-toolbar__divider {
@@ -550,9 +444,7 @@
     margin: 6px 0;
 }
 
-.moodboard-toolbar--dark .moodboard-toolbar__divider {
-    background: #404040;
-}
+
 
 /* Save Status Indicator */
 .moodboard-save-status {
@@ -693,11 +585,6 @@
 }
 
 /* Active state for toolbar buttons */
-.moodboard-toolbar__button--active {
-    background: #dbeafe !important;
-    color: #1d4ed8 !important;
-    box-shadow: inset 0 0 0 1px #93c5fd;
-}
 
 .moodboard-contextmenu__item {
     padding: 8px 12px;
@@ -896,13 +783,4 @@
     transform: translateY(0);
 }
 
-/* Dark theme tooltips */
-.moodboard-toolbar--dark .moodboard-tooltip {
-    background: rgba(255, 255, 255, 0.95);
-    color: #1a1a1a;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
 
-.moodboard-toolbar--dark .moodboard-tooltip::before {
-    border-right-color: rgba(255, 255, 255, 0.95);
-}
