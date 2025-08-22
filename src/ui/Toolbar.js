@@ -273,42 +273,22 @@ export class Toolbar {
                 return;
             }
 
-            // «Текст» (новый сценарий): после клика по кнопке кликаем по холсту — открывается поле ввода
-            if (toolType === 'custom-t') {
+
+
+            // Добавление текста: включаем placement и ждём клика для выбора позиции
+            if (toolType === 'text-add') {
                 this.animateButton(button);
                 this.closeShapesPopup();
                 this.closeDrawPopup();
                 this.closeEmojiPopup();
                 // Переходим в универсальный placement tool и задаем pending конфигурацию
                 this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                this.placeSelectedButtonId = 'big-t';
+                this.placeSelectedButtonId = 'text';
                 this.setActiveToolbarButton('place');
                 this.eventBus.emit(Events.Place.Set, {
                     type: 'text',
                     // Специальный флаг: не создавать сразу объект, а открыть форму ввода на холсте
                     properties: { editOnCreate: true, fontSize: 18 }
-                });
-                return;
-            }
-
-            // Новая отдельная кнопка: добавить текст по клику (мгновенно, без выбора места)
-            if (toolType === 'text-add') {
-                this.animateButton(button);
-                this.closeShapesPopup();
-                this.closeDrawPopup();
-                this.closeEmojiPopup();
-                // Центр холста в мировых координатах как место вставки
-                const req = {};
-                this.eventBus.emit(Events.UI.MinimapGetData, req);
-                const view = req.view || { width: 800, height: 600 };
-                const world = req.world || { x: 0, y: 0, scale: 1 };
-                const worldX = (view.width / 2 - world.x) / (world.scale || 1);
-                const worldY = (view.height / 2 - world.y) / (world.scale || 1);
-                // Сообщаем select-инструменту открыть редактор
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
-                this.eventBus.emit(Events.Tool.ObjectEdit, {
-                    object: { id: null, type: 'text', position: { x: worldX, y: worldY }, properties: { fontSize: 18, content: '' } },
-                    create: true
                 });
                 return;
             }

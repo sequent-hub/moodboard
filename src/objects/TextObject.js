@@ -26,6 +26,7 @@ export class TextObject {
         this.rect._mb = {
             ...(this.rect._mb || {}),
             type: 'text',
+            instance: this, // Ссылка на сам объект для вызова методов
             properties: {
                 content: this.content,
                 fontSize: this.fontSize,

@@ -28,8 +28,8 @@ export class NoteObject {
         // Создаем контейнер для записки
         this.container = new PIXI.Container();
         
-        // Включаем интерактивность для контейнера
-        this.container.interactive = true;
+        // Включаем интерактивность для контейнера (PixiJS v7.2.0+)
+        this.container.eventMode = 'static';
         this.container.interactiveChildren = true;
         
         // Графика фона
@@ -59,6 +59,7 @@ export class NoteObject {
         this.container._mb = {
             ...(this.container._mb || {}),
             type: 'note',
+            instance: this, // Ссылка на сам объект для вызова методов
             properties: { 
                 content: this.content,
                 fontSize: this.fontSize,

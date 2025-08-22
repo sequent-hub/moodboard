@@ -141,6 +141,11 @@ export class SelectTool extends BaseTool {
 		// Сохраняем ссылку на PIXI app для оверлеев (рамка выделения)
 		this.app = app;
         
+        // Устанавливаем стандартный курсор для select инструмента
+        if (this.app && this.app.view) {
+            this.app.view.style.cursor = 'default';
+        }
+        
         // Инициализируем систему ручек изменения размера
         if (!this.resizeHandles && app) {
             this.resizeHandles = new ResizeHandles(app);
@@ -219,6 +224,11 @@ export class SelectTool extends BaseTool {
         this.clearSelection();
         if (this.resizeHandles) {
             this.resizeHandles.hideHandles();
+        }
+        
+        // Сбрасываем курсор на стандартный
+        if (this.app && this.app.view) {
+            this.app.view.style.cursor = '';
         }
     }
     
@@ -1562,10 +1572,12 @@ export class SelectTool extends BaseTool {
         const initialWpx = initialSize ? Math.max(1, (initialSize.width || 0) * s / viewRes) : null;
         const initialHpx = initialSize ? Math.max(1, (initialSize.height || 0) * s / viewRes) : null;
         
+        // Определяем минимальные границы для всех типов объектов
+        let minWBound = initialWpx || 240;
+        let minHBound = 28;
+        
         // Для записок размеры уже установлены выше, пропускаем эту логику
         if (!isNote) {
-            let minWBound = initialWpx || 240;
-            let minHBound = 28;
             if (initialWpx) {
                 textarea.style.width = `${initialWpx}px`;
                 wrapper.style.width = `${initialWpx}px`;
@@ -1693,14 +1705,11 @@ export class SelectTool extends BaseTool {
                         content: value 
                     });
                 } else {
-                    // Для обычного текста используем старую логику (удаление + создание)
-                    console.log('🔧 SelectTool: finalize - deleting and recreating text object');
-                    this.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
-                    this.eventBus.emit(Events.UI.ToolbarAction, {
-                        type: 'text',
-                        id: 'text',
-                        position: { x: position.x, y: position.y },
-                        properties: { content: value, fontSize }
+                    // Для обычного текста тоже используем обновление содержимого
+                    console.log('🔧 SelectTool: finalize - updating text content via UpdateObjectContent');
+                    this.emit(Events.Tool.UpdateObjectContent, { 
+                        objectId: objectId, 
+                        content: value 
                     });
                 }
             }
@@ -1771,14 +1780,11 @@ export class SelectTool extends BaseTool {
                     content: value 
                 });
             } else {
-                // Для обычного текста используем старую логику (удаление + создание)
-                console.log('🔧 SelectTool: deleting and recreating text object');
-                this.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
-                this.eventBus.emit(Events.UI.ToolbarAction, {
-                    type: 'text',
-                    id: 'text',
-                    position: { x: position.x, y: position.y },
-                    properties: { content: value, fontSize: properties.fontSize }
+                // Для обычного текста тоже используем обновление содержимого
+                console.log('🔧 SelectTool: updating text content via UpdateObjectContent');
+                this.emit(Events.Tool.UpdateObjectContent, { 
+                    objectId: objectId, 
+                    content: value 
                 });
             }
         }
