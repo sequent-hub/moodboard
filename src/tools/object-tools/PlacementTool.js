@@ -61,29 +61,43 @@ export class PlacementTool extends BaseTool {
         };
 
         if (isTextWithEditing) {
-            // Сначала создаем объект через обычный канал
+            // Слушаем событие создания объекта, чтобы получить его ID
+            const handleObjectCreated = (objectData) => {
+                if (objectData.type === 'text') {
+                    // Убираем слушатель, чтобы не реагировать на другие объекты
+                    this.eventBus.off('object:created', handleObjectCreated);
+                    
+                    // Переключаемся на select
+                    this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+                    
+
+                    
+                    // Даем небольшую задержку, чтобы HTML-элемент успел создаться
+                    setTimeout(() => {
+                        // Открываем редактор с правильным ID и данными объекта
+                        this.eventBus.emit(Events.Tool.ObjectEdit, {
+                            object: {
+                                id: objectData.id,
+                                type: 'text',
+                                position: objectData.position,
+                                properties: { fontSize: props.fontSize || 18, content: '' }
+                            },
+                            create: true // Это создание нового объекта с редактированием
+                        });
+                    }, 50); // 50ms задержка
+                }
+            };
+            
+            // Подписываемся на событие создания объекта
+            this.eventBus.on('object:created', handleObjectCreated);
+            
+            // Создаем объект через обычный канал
             this.eventBus.emit(Events.UI.ToolbarAction, {
                 type: 'text',
                 id: 'text',
                 position,
                 properties: { fontSize: props.fontSize || 18, content: '' }
             });
-            
-            // Затем переключаемся на select и открываем редактор для созданного объекта
-            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
-            
-            // Небольшая задержка, чтобы объект успел создаться
-            setTimeout(() => {
-                this.eventBus.emit(Events.Tool.ObjectEdit, {
-                    object: {
-                        id: null, // ID будет получен автоматически по позиции
-                        type: 'text',
-                        position,
-                        properties: { fontSize: props.fontSize || 18, content: '' }
-                    },
-                    create: true // Это создание нового объекта с редактированием
-                });
-            }, 100);
         } else if (isImage && props.selectFileOnPlace) {
             const input = document.createElement('input');
             input.type = 'file';

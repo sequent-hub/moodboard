@@ -115,6 +115,11 @@ export class CoreMoodBoard {
         const placementToolModule = await import('../tools/object-tools/PlacementTool.js');
         const placementTool = new placementToolModule.PlacementTool(this.eventBus);
         this.toolManager.registerTool(placementTool);
+
+        // Инструмент текста
+        const textToolModule = await import('../tools/object-tools/TextTool.js');
+        const textTool = new textToolModule.TextTool(this.eventBus);
+        this.toolManager.registerTool(textTool);
         
         // Сохраняем ссылку на selectTool для обновления ручек
         this.selectTool = selectTool;

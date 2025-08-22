@@ -833,4 +833,22 @@
     transform: translateY(0);
 }
 
+/* Стили для текстового редактора */
+.moodboard-text-editor {
+    /* Убираем рамки и тени */
+}
+
+.moodboard-text-input {
+    border-radius: 2px;
+    transition: all 0.2s ease;
+    outline: 2px solid #007ACC;
+    outline-offset: 1px;
+}
+
+.moodboard-text-input:focus {
+    /* Убираем дополнительную тень при фокусе */
+    outline: 2px solid #007ACC;
+    outline-offset: 1px;
+}
+
 

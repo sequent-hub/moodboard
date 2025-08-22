@@ -97,45 +97,13 @@ export class SelectTool extends BaseTool {
 				if (!data || !data.map) return;
 				this.onGroupDuplicateReady(data.map);
 			});
-            this.eventBus.on(Events.Tool.ObjectEdit, ({ object, create }) => {
-                // object: { id?, type, position, properties }
-                if (!object || (object.type !== 'text' && object.type !== 'note')) return;
-                if (create) {
-                    // Создаём пустой textarea на позиции и ждём завершения редактирования
-                    this.eventBus.emit(Events.UI.TextEditStart, { objectId: object.id || null });
-                    this._openTextEditor(null, object.position, object.properties || {}, object.type);
-                } else if (object && object.id) {
-                    // Редактирование существующего: запросим данные и откроем
-                    const posData = { objectId: object.id, position: null };
-                    const sizeData = { objectId: object.id, size: null };
-                    const pixiReq = { objectId: object.id, pixiObject: null };
-                    this.emit(Events.Tool.GetObjectPosition, posData);
-                    this.emit(Events.Tool.GetObjectSize, sizeData);
-                    this.emit(Events.Tool.GetObjectPixi, pixiReq);
-                    const meta = pixiReq.pixiObject && pixiReq.pixiObject._mb ? pixiReq.pixiObject._mb.properties || {} : {};
-                    const props = { content: meta.content || object.properties?.content || '', fontSize: meta.fontSize || object.properties?.fontSize };
-                    this.eventBus.emit(Events.UI.TextEditStart, { objectId: object.id });
-                    this._openTextEditor(object.id, posData.position || { x: 0, y: 0 }, props, sizeData.size || null, object.type);
-                } else if (object && object.position) {
-                    // Поиск объекта по позиции (для новых объектов)
-                    const findData = { position: object.position, type: object.type };
-                    this.emit('find:object:by:position', findData);
-                    
-                    if (findData.foundObject) {
-                        // Нашли объект, открываем редактор для него
-                        const posData = { objectId: findData.foundObject.id, position: null };
-                        const sizeData = { objectId: findData.foundObject.id, size: null };
-                        const pixiReq = { objectId: findData.foundObject.id, pixiObject: null };
-                        this.emit(Events.Tool.GetObjectPosition, posData);
-                        this.emit(Events.Tool.GetObjectSize, sizeData);
-                        this.emit(Events.Tool.GetObjectPixi, pixiReq);
-                        const meta = pixiReq.pixiObject && pixiReq.pixiObject._mb ? pixiReq.pixiObject._mb.properties || {} : {};
-                        const props = { content: meta.content || object.properties?.content || '', fontSize: meta.fontSize || object.properties?.fontSize };
-                        this.eventBus.emit(Events.UI.TextEditStart, { objectId: findData.foundObject.id });
-                        this._openTextEditor(findData.foundObject.id, posData.position || { x: 0, y: 0 }, props, sizeData.size || null, object.type);
-                    } else {
-                        console.warn('❌ SelectTool: объект для редактирования не найден по позиции:', object.position);
-                    }
+            this.eventBus.on(Events.Tool.ObjectEdit, (object) => {
+                if (object.create) {
+                    // Создание нового объекта с редактированием
+                    this._openTextEditor(object, true);
+                } else {
+                    // Редактирование существующего объекта
+                    this._openTextEditor(object, false);
                 }
             });
 		}
@@ -1394,8 +1362,63 @@ export class SelectTool extends BaseTool {
         return { x: offsetX, y: offsetY };
     }
 
-    _openTextEditor(objectId, position, properties, initialSize = null, objectType = 'text') {
+    _openTextEditor(object, create = false) {
+
+        
+        // Проверяем структуру объекта и извлекаем данные
+        let objectId, objectType, position, properties;
+        
+        if (create) {
+            // Для создания нового объекта - данные в object.object
+            const objData = object.object || object;
+            objectId = objData.id || null;
+            objectType = objData.type || 'text';
+            position = objData.position;
+            properties = objData.properties || {};
+        } else {
+            // Для редактирования существующего объекта - данные в корне
+            objectId = object.id;
+            objectType = object.type || 'text';
+            position = object.position;
+            properties = object.properties || {};
+        }
+
+        
+        const { fontSize = 18, content = '', initialSize } = properties;
+        
+        // Определяем тип объекта
+        const isNote = objectType === 'note';
+        
+        // Проверяем, что position существует
+        if (!position) {
+            console.error('❌ SelectTool: position is undefined in _openTextEditor', { object, create });
+            return;
+        }
+        
+        // Закрываем предыдущий редактор, если он открыт
         if (this.textEditor.active) this._closeTextEditor(true);
+        
+        // Если это редактирование существующего объекта, получаем его данные
+        if (!create && objectId) {
+            const posData = { objectId, position: null };
+            const sizeData = { objectId, size: null };
+            const pixiReq = { objectId, pixiObject: null };
+            this.eventBus.emit(Events.Tool.GetObjectPosition, posData);
+            this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+            this.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
+            
+            // Обновляем данные из полученной информации
+            if (posData.position) position = posData.position;
+            if (sizeData.size) initialSize = sizeData.size;
+            
+            const meta = pixiReq.pixiObject && pixiReq.pixiObject._mb ? pixiReq.pixiObject._mb.properties || {} : {};
+            if (meta.content) properties.content = meta.content;
+            if (meta.fontSize) properties.fontSize = meta.fontSize;
+        }
+        
+        // Уведомляем о начале редактирования
+        this.eventBus.emit(Events.UI.TextEditStart, { objectId: objectId || null });
+        
         const app = this.app;
         const world = app?.stage?.getChildByName && app.stage.getChildByName('worldLayer');
         this.textEditor.world = world || null;
@@ -1408,43 +1431,40 @@ export class SelectTool extends BaseTool {
         const wrapper = document.createElement('div');
         wrapper.className = 'moodboard-text-editor';
         
-        // Для записок убираем рамку и делаем фон прозрачным
-        const isNote = objectType === 'note';
-        
+        // Убираем рамки и ручки для всех типов объектов в режиме редактирования
         Object.assign(wrapper.style, {
             position: 'absolute',
             left: '0px',
             top: '0px',
             transformOrigin: '0 0',
             boxSizing: 'border-box',
-            border: isNote ? 'none' : '1px solid #007ACC',
+            border: 'none', // Убираем рамку для всех типов
             background: 'transparent',
             zIndex: 10000,
         });
         
         const textarea = document.createElement('textarea');
         textarea.className = 'moodboard-text-input';
-        textarea.value = properties.content || '';
+        textarea.value = content || '';
         textarea.placeholder = 'напишите что-нибудь';
-        const fontSize = properties.fontSize || 18;
         
         Object.assign(textarea.style, {
             position: 'relative',
             left: '0px',
             top: '0px',
             border: 'none',
-            padding: '2px 4px',
+            padding: '6px 8px', // Увеличиваем отступы для лучшего отображения
             fontSize: `${fontSize}px`,
             fontFamily: 'Arial, sans-serif',
             lineHeight: '1.2',
-            color: isNote ? '#000' : '#111', // Для записок делаем текст черным для лучшей видимости
-            background: isNote ? 'transparent' : 'white',
+            color: '#111', // Для записок делаем текст черным для лучшей видимости
+            background: 'white',
             outline: 'none',
             resize: 'none',
-            minWidth: isNote ? '80px' : '240px', // Для заметок уменьшаем минимальную ширину
-            minHeight: isNote ? '20px' : '28px', // Для заметок уменьшаем минимальную высоту
-            width: isNote ? '160px' : '280px', // Для заметок уменьшаем начальную ширину
-            height: isNote ? '24px' : '36px', // Для заметок уменьшаем начальную высоту
+            minWidth: '240px', // Для заметок уменьшаем минимальную ширину
+            minHeight: '28px', // Для заметок уменьшаем минимальную высоту
+            width: '280px', // Для заметок уменьшаем начальную ширину
+            height: '36px', // Для заметок уменьшаем начальную высоту
             boxSizing: 'border-box',
             // Повыше чёткость текста в CSS
             WebkitFontSmoothing: 'antialiased',
@@ -1453,80 +1473,85 @@ export class SelectTool extends BaseTool {
         
         wrapper.appendChild(textarea);
         
-        // Ручки ресайза только для обычного текста, для записок не показываем
-        let handles = [];
-        let placeHandles = () => {};
+        // Убираем ручки ресайза для всех типов объектов
+        // let handles = [];
+        // let placeHandles = () => {};
         
-        if (!isNote) {
-            // Ручки ресайза (8 штук) только для обычного текста
-            handles = ['nw','n','ne','e','se','s','sw','w'].map(dir => {
-                const h = document.createElement('div');
-                h.dataset.dir = dir;
-                Object.assign(h.style, {
-                    position: 'absolute', width: '12px', height: '12px', background: '#007ACC',
-                    border: '1px solid #fff', boxSizing: 'border-box', zIndex: 10001,
-                });
-                return h;
-            });
-            
-            placeHandles = () => {
-                const w = wrapper.offsetWidth;
-                const h = wrapper.offsetHeight;
-                handles.forEach(hd => {
-                    const dir = hd.dataset.dir;
-                    // default reset
-                    hd.style.left = '0px';
-                    hd.style.top = '0px';
-                    hd.style.right = '';
-                    hd.style.bottom = '';
-                    switch (dir) {
-                        case 'nw':
-                            hd.style.left = `${-6}px`;
-                            hd.style.top = `${-6}px`;
-                            hd.style.cursor = 'nwse-resize';
-                            break;
-                        case 'n':
-                            hd.style.left = `${Math.round(w / 2 - 6)}px`;
-                            hd.style.top = `${-6}px`;
-                            hd.style.cursor = 'n-resize';
-                            break;
-                        case 'ne':
-                            hd.style.left = `${Math.max(-6, w - 6)}px`;
-                            hd.style.top = `${-6}px`;
-                            hd.style.cursor = 'nesw-resize';
-                            break;
-                        case 'e':
-                            hd.style.left = `${Math.max(-6, w - 6)}px`;
-                            hd.style.top = `${Math.round(h / 2 - 6)}px`;
-                            hd.style.cursor = 'e-resize';
-                            break;
-                        case 'se':
-                            hd.style.left = `${Math.max(-6, w - 6)}px`;
-                            hd.style.top = `${Math.max(-6, h - 6)}px`;
-                            hd.style.cursor = 'nwse-resize';
-                            break;
-                        case 's':
-                            hd.style.left = `${Math.round(w / 2 - 6)}px`;
-                            hd.style.top = `${Math.max(-6, h - 6)}px`;
-                            hd.style.cursor = 's-resize';
-                            break;
-                        case 'sw':
-                            hd.style.left = `${-6}px`;
-                            hd.style.top = `${Math.max(-6, h - 6)}px`;
-                            hd.style.cursor = 'nesw-resize';
-                            break;
-                        case 'w':
-                            hd.style.left = `${-6}px`;
-                            hd.style.top = `${Math.round(h / 2 - 6)}px`;
-                            hd.style.cursor = 'w-resize';
-                            break;
-                    }
-                });
-            };
-            
-            handles.forEach(h => wrapper.appendChild(h));
-        }
+        // if (!isNote) {
+        //     // Ручки ресайза (8 штук) только для обычного текста
+        //     handles = ['nw','n','ne','e','se','s','sw','w'].map(dir => {
+        //         const h = document.createElement('div');
+        //         h.dataset.dir = dir;
+        //         Object.assign(h.style, {
+        //             position: 'absolute', width: '12px', height: '12px', background: '#007ACC',
+        //             border: '1px solid #fff', boxSizing: 'border-box', zIndex: 10001,
+        //         });
+        //         return h;
+        //     });
+        //     
+        //     placeHandles = () => {
+        //         const w = wrapper.offsetWidth;
+        //         const h = wrapper.offsetHeight;
+        //         handles.forEach(hd => {
+        //             const dir = hd.dataset.dir;
+        //             // default reset
+        //             hd.style.left = '0px';
+        //             hd.style.top = '0px';
+        //             hd.style.right = '';
+        //             hd.style.bottom = '';
+        //             switch (dir) {
+        //                 case 'nw':
+        //                     hd.style.left = `${-6}px`;
+        //                     hd.style.top = `${-6}px`;
+        //                             hd.style.cursor = 'nwse-resize';
+        //                             break;
+        //                         case 'n':
+        //                             hd.style.left = `${Math.round(w / 2 - 6)}px`;
+        //                             hd.style.top = `${-6}px`;
+        //                             hd.style.cursor = 'n-resize';
+        //                             break;
+        //                         case 'ne':
+        //                             hd.style.left = `${Math.max(-6, w - 6)}px`;
+        //                             hd.style.top = `${-6}px`;
+        //                             hd.style.cursor = 'nesw-resize';
+        //                             break;
+        //                         case 'e':
+        //                             hd.style.left = `${Math.max(-6, w - 6)}px`;
+        //                             hd.style.top = `${Math.round(h / 2 - 6)}px`;
+        //                             hd.style.cursor = 'e-resize';
+        //                             break;
+        //                         case 'se':
+        //                             hd.style.left = `${Math.max(-6, w - 6)}px`;
+        //                             hd.style.top = `${Math.max(-6, h - 6)}px`;
+        //                             hd.style.cursor = 'nwse-resize';
+        //                             break;
+        //                         case 's':
+        //                             hd.style.left = `${Math.round(w / 2 - 6)}px`;
+        //                             hd.style.top = `${Math.max(-6, h - 6)}px`;
+        //                             hd.style.cursor = 's-resize';
+        //                             break;
+        //                         case 'sw':
+        //                             hd.style.left = `${-6}px`;
+        //                             hd.style.top = `${Math.max(-6, h - 6)}px`;
+        //                             hd.style.cursor = 'nesw-resize';
+        //                             break;
+        //                         case 'w':
+        //                             hd.style.left = `${-6}px`;
+        //                             hd.style.top = `${Math.round(h / 2 - 6)}px`;
+        //                             hd.style.cursor = 'w-resize';
+        //                             break;
+        //                     }
+        //                 });
+        //             }
+        //         }
+        
+        // Добавляем в DOM
+        wrapper.appendChild(textarea);
         view.parentElement.appendChild(wrapper);
+        
+        // Автоматически устанавливаем фокус на textarea
+        textarea.focus();
+        
         // Позиция обертки по миру → экран
         const toScreen = (wx, wy) => {
             const worldLayer = this.textEditor.world || (this.app?.stage);
@@ -1549,7 +1574,7 @@ export class SelectTool extends BaseTool {
             } else if (objectId) {
                 // Если размер не передан, пытаемся получить его из объекта
                 const sizeData = { objectId, size: null };
-                this.emit(Events.Tool.GetObjectSize, sizeData);
+                this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
                 if (sizeData.size) {
                     noteWidth = sizeData.size.width;
                     noteHeight = sizeData.size.height;
@@ -1625,7 +1650,7 @@ export class SelectTool extends BaseTool {
             wrapper.style.width = `${w}px`;
             wrapper.style.height = `${h}px`;
             // Обновляем ручки только для обычного текста
-            placeHandles();
+            // placeHandles();
         };
         
         // Вызываем autoSize только для обычного текста
@@ -1649,12 +1674,12 @@ export class SelectTool extends BaseTool {
             if (window.moodboard && window.moodboard.htmlTextLayer) {
                 const el = window.moodboard.htmlTextLayer.idToEl.get(objectId);
                 if (el) {
-                    this.emit(Events.Tool.HideObjectText, { objectId });
+                    this.eventBus.emit(Events.Tool.HideObjectText, { objectId });
                 } else {
                     console.warn(`❌ SelectTool: HTML-элемент для объекта ${objectId} не найден, пропускаем HideObjectText`);
                 }
             } else {
-                this.emit(Events.Tool.HideObjectText, { objectId });
+                this.eventBus.emit(Events.Tool.HideObjectText, { objectId });
             }
         }
         // Ресайз мышью только для обычного текста
@@ -1682,7 +1707,7 @@ export class SelectTool extends BaseTool {
                     wrapper.style.top = `${newTop}px`;
                     textarea.style.width = `${Math.max(minWBound, newW)}px`;
                     textarea.style.height = `${Math.max(minHBound, newH)}px`;
-                    placeHandles();
+                    // placeHandles();
                 };
                 const onUp = () => {
                     document.removeEventListener('mousemove', onMove);
@@ -1691,7 +1716,7 @@ export class SelectTool extends BaseTool {
                 document.addEventListener('mousemove', onMove);
                 document.addEventListener('mouseup', onUp);
             };
-            handles.forEach(h => h.addEventListener('mousedown', onHandleDown));
+            // handles.forEach(h => h.addEventListener('mousedown', onHandleDown));
         }
         // Завершение
         const finalize = (commit) => {
@@ -1709,12 +1734,12 @@ export class SelectTool extends BaseTool {
                 if (window.moodboard && window.moodboard.htmlTextLayer) {
                     const el = window.moodboard.htmlTextLayer.idToEl.get(objectId);
                     if (el) {
-                        this.emit(Events.Tool.ShowObjectText, { objectId });
+                        this.eventBus.emit(Events.Tool.ShowObjectText, { objectId });
                     } else {
                         console.warn(`❌ SelectTool: HTML-элемент для объекта ${objectId} не найден, пропускаем ShowObjectText`);
                     }
                 } else {
-                    this.emit(Events.Tool.ShowObjectText, { objectId });
+                    this.eventBus.emit(Events.Tool.ShowObjectText, { objectId });
                 }
             }
             
@@ -1740,7 +1765,7 @@ export class SelectTool extends BaseTool {
                 if (currentObjectType === 'note') {
                     console.log('🔧 SelectTool: updating note content via UpdateObjectContent');
                     // Для записок обновляем содержимое через PixiEngine
-                    this.emit(Events.Tool.UpdateObjectContent, { 
+                    this.eventBus.emit(Events.Tool.UpdateObjectContent, { 
                         objectId: objectId, 
                         content: value 
                     });
@@ -1755,7 +1780,7 @@ export class SelectTool extends BaseTool {
                 } else {
                     // Для обычного текста тоже используем обновление содержимого
                     console.log('🔧 SelectTool: finalize - updating text content via UpdateObjectContent');
-                    this.emit(Events.Tool.UpdateObjectContent, { 
+                    this.eventBus.emit(Events.Tool.UpdateObjectContent, { 
                         objectId: objectId, 
                         content: value 
                     });
@@ -1815,12 +1840,12 @@ export class SelectTool extends BaseTool {
             if (window.moodboard && window.moodboard.htmlTextLayer) {
                 const el = window.moodboard.htmlTextLayer.idToEl.get(objectId);
                 if (el) {
-                    this.emit(Events.Tool.ShowObjectText, { objectId });
+                    this.eventBus.emit(Events.Tool.ShowObjectText, { objectId });
                 } else {
                     console.warn(`❌ SelectTool: HTML-элемент для объекта ${objectId} не найден, пропускаем ShowObjectText`);
                 }
             } else {
-                this.emit(Events.Tool.ShowObjectText, { objectId });
+                this.eventBus.emit(Events.Tool.ShowObjectText, { objectId });
             }
         }
         
@@ -1841,7 +1866,7 @@ export class SelectTool extends BaseTool {
             if (objectType === 'note') {
                 console.log('🔧 SelectTool: updating note content via UpdateObjectContent');
                 // Для записок обновляем содержимое через PixiEngine
-                this.emit(Events.Tool.UpdateObjectContent, { 
+                this.eventBus.emit(Events.Tool.UpdateObjectContent, { 
                     objectId: objectId, 
                     content: value 
                 });
@@ -1856,7 +1881,7 @@ export class SelectTool extends BaseTool {
             } else {
                 // Для обычного текста тоже используем обновление содержимого
                 console.log('🔧 SelectTool: updating text content via UpdateObjectContent');
-                this.emit(Events.Tool.UpdateObjectContent, { 
+                this.eventBus.emit(Events.Tool.UpdateObjectContent, { 
                     objectId: objectId, 
                     content: value 
                 });

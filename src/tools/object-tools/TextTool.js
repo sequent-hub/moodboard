@@ -8,6 +8,7 @@ export class TextTool extends BaseTool {
         super('text', eventBus);
         this.cursor = 'text';
         this.hotkey = 't';
+        this.container = null;
         
         // Состояние редактирования
         this.isEditing = false;
@@ -288,8 +289,14 @@ export class TextTool extends BaseTool {
      * Получение контейнера для размещения input
      */
     getContainer() {
-        // TODO: Получить контейнер MoodBoard
-        return document.body; // Временная заглушка
+        return this.container || document.body;
+    }
+
+    /**
+     * Установка контейнера (вызывается при активации инструмента)
+     */
+    setContainer(container) {
+        this.container = container;
     }
     
     /**
@@ -372,6 +379,18 @@ export class TextTool extends BaseTool {
         });
     }
     
+    /**
+     * Активация инструмента
+     */
+    activate(pixiApp) {
+        super.activate();
+        
+        // Устанавливаем контейнер для размещения input
+        if (pixiApp && pixiApp.view && pixiApp.view.parentElement) {
+            this.setContainer(pixiApp.view.parentElement);
+        }
+    }
+
     /**
      * Деактивация инструмента
      */
