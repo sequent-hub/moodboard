@@ -2,6 +2,7 @@
  * Панель инструментов для MoodBoard
  */
 import { Events } from '../core/events/Events.js';
+import { iconLoader } from '../utils/iconLoader.js';
 
 export class Toolbar {
     constructor(container, eventBus, theme = 'light') {
@@ -11,6 +12,24 @@ export class Toolbar {
         this.element = null;
         // Какой именно place-поток активен: 'big-t' | 'shapes' | 'emoji' | 'frame-tool' | null
         this.placeSelectedButtonId = null;
+        // Кэш для SVG иконок
+        this.icons = {};
+        
+        this.init();
+    }
+
+    /**
+     * Инициализация тулбара
+     */
+    async init() {
+        try {
+            // Инициализируем IconLoader и загружаем все иконки
+            await iconLoader.init();
+            this.icons = await iconLoader.loadAllIcons();
+            console.log('✅ Иконки загружены:', Object.keys(this.icons));
+        } catch (error) {
+            console.error('❌ Ошибка загрузки иконок:', error);
+        }
         
         this.createToolbar();
         this.attachEvents();
@@ -26,27 +45,27 @@ export class Toolbar {
         
         // Новые элементы интерфейса (без функционала)
         const newTools = [
-            { id: 'select', icon: '↖', title: 'Инструмент выделения (V)', type: 'activate-select' },
-            { id: 'pan', icon: '✋', title: 'Панорамирование (Пробел)', type: 'activate-pan' },
+            { id: 'select', iconName: 'select', title: 'Инструмент выделения (V)', type: 'activate-select' },
+            { id: 'pan', iconName: 'pan', title: 'Панорамирование (Пробел)', type: 'activate-pan' },
             { id: 'divider', type: 'divider' },
-                         { id: 'text-add', icon: 'T+', title: 'Добавить текст', type: 'text-add' },
-            { id: 'note', icon: '📝', title: 'Добавить записку', type: 'note-add' },
-            { id: 'image', icon: '🖼️', title: 'Добавить картинку', type: 'image-add' },
-            { id: 'shapes', icon: '🔷', title: 'Фигуры', type: 'custom-shapes' },
-            { id: 'pencil', icon: '✏️', title: 'Рисование', type: 'custom-draw' },
-            { id: 'comments', icon: '💬', title: 'Комментарии', type: 'custom-comments' },
-            { id: 'attachments', icon: '📎', title: 'Файлы', type: 'custom-attachments' },
-            { id: 'emoji', icon: '🙂', title: 'Эмоджи', type: 'custom-emoji' }
+                         { id: 'text-add', iconName: 'text-add', title: 'Добавить текст', type: 'text-add' },
+            { id: 'note', iconName: 'note', title: 'Добавить записку', type: 'note-add' },
+            { id: 'image', iconName: 'image', title: 'Добавить картинку', type: 'image-add' },
+            { id: 'shapes', iconName: 'shapes', title: 'Фигуры', type: 'custom-shapes' },
+            { id: 'pencil', iconName: 'pencil', title: 'Рисование', type: 'custom-draw' },
+            { id: 'comments', iconName: 'comments', title: 'Комментарии', type: 'custom-comments' },
+            { id: 'attachments', iconName: 'attachments', title: 'Файлы', type: 'custom-attachments' },
+            { id: 'emoji', iconName: 'emoji', title: 'Эмоджи', type: 'custom-emoji' }
         ];
 
         // Существующие элементы ниже новых
         const existingTools = [
-                         { id: 'frame', icon: '🖼️', title: 'Добавить фрейм', type: 'frame' },
+                         { id: 'frame', iconName: 'frame', title: 'Добавить фрейм', type: 'frame' },
             { id: 'divider', type: 'divider' },
-            { id: 'clear', icon: '🗑️', title: 'Очистить холст', type: 'clear' },
+            { id: 'clear', iconName: 'clear', title: 'Очистить холст', type: 'clear' },
             { id: 'divider', type: 'divider' },
-            { id: 'undo', icon: '↶', title: 'Отменить (Ctrl+Z)', type: 'undo', disabled: true },
-            { id: 'redo', icon: '↷', title: 'Повторить (Ctrl+Y)', type: 'redo', disabled: true }
+            { id: 'undo', iconName: 'undo', title: 'Отменить (Ctrl+Z)', type: 'undo', disabled: true },
+            { id: 'redo', iconName: 'redo', title: 'Повторить (Ctrl+Y)', type: 'redo', disabled: true }
         ];
         
         [...newTools, ...existingTools].forEach(tool => {
@@ -82,7 +101,6 @@ export class Toolbar {
     createButton(tool) {
         const button = document.createElement('button');
         button.className = `moodboard-toolbar__button moodboard-toolbar__button--${tool.id}`;
-        button.textContent = tool.icon || '';
         button.dataset.tool = tool.type;
         button.dataset.toolId = tool.id;
         
@@ -97,9 +115,41 @@ export class Toolbar {
             this.createTooltip(button, tool.title);
         }
         
-        // Специальных визуальных замен нет
+        // Создаем SVG иконку
+        if (tool.iconName) {
+            this.createSvgIcon(button, tool.iconName);
+        }
 
         return button;
+    }
+
+    /**
+     * Создает SVG иконку для кнопки
+     */
+    createSvgIcon(button, iconName) {
+        if (this.icons[iconName]) {
+            // Создаем SVG элемент из загруженного содержимого
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = this.icons[iconName];
+            const svg = tempDiv.querySelector('svg');
+            
+            if (svg) {
+                // Устанавливаем размер и стили для SVG
+                svg.style.width = '20px';
+                svg.style.height = '20px';
+                svg.style.display = 'block';
+                
+                // Добавляем SVG в кнопку
+                button.appendChild(svg);
+            }
+        } else {
+            // Fallback: создаем простую текстовую иконку
+            const fallbackIcon = document.createElement('span');
+            fallbackIcon.textContent = iconName.charAt(0).toUpperCase();
+            fallbackIcon.style.fontSize = '14px';
+            fallbackIcon.style.fontWeight = 'bold';
+            button.appendChild(fallbackIcon);
+        }
     }
     
     /**
@@ -880,5 +930,36 @@ export class Toolbar {
         
         // Отписываемся от событий
         this.eventBus.removeAllListeners(Events.UI.UpdateHistoryButtons);
+    }
+
+    /**
+     * Принудительно обновляет иконку (для отладки)
+     * @param {string} iconName - имя иконки
+     */
+    async reloadToolbarIcon(iconName) {
+        console.log(`🔄 Начинаем обновление иконки ${iconName} в тулбаре...`);
+        try {
+            // Перезагружаем иконку
+            const newSvgContent = await iconLoader.reloadIcon(iconName);
+            this.icons[iconName] = newSvgContent;
+            
+            // Находим кнопку с этой иконкой и обновляем её
+            const button = this.element.querySelector(`[data-tool-id="${iconName}"]`);
+            if (button) {
+                // Очищаем старый SVG
+                const oldSvg = button.querySelector('svg');
+                if (oldSvg) {
+                    oldSvg.remove();
+                }
+                
+                // Добавляем новый SVG
+                this.createSvgIcon(button, iconName);
+                console.log(`✅ Иконка ${iconName} обновлена в интерфейсе!`);
+            } else {
+                console.warn(`⚠️ Кнопка с иконкой ${iconName} не найдена`);
+            }
+        } catch (error) {
+            console.error(`❌ Ошибка обновления иконки ${iconName}:`, error);
+        }
     }
 }

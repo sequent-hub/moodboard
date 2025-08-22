@@ -124,6 +124,11 @@ export class MoodBoard {
             this.options.theme
         );
         
+        // Добавляем функцию для отладки иконок в window
+        if (typeof window !== 'undefined') {
+            window.reloadIcon = (iconName) => this.toolbar.reloadToolbarIcon(iconName);
+        }
+        
         // Инициализируем индикатор сохранения (с фиксированными настройками)
         this.saveStatus = new SaveStatus(
             this.workspaceElement,

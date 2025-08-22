@@ -230,40 +230,33 @@
 
 /* Specific button styles */
 .moodboard-toolbar__button--frame {
-    background: #e3f2fd;
-    color: #1976d2;
-}
-
-.moodboard-toolbar__button--frame:hover {
-    background: #bbdefb;
-}
-
-.moodboard-toolbar__button--text {
     background: #e8f5e8;
     color: #388e3c;
 }
 
-.moodboard-toolbar__button--text:hover {
+.moodboard-toolbar__button--frame:hover {
     background: #c8e6c9;
 }
 
-.moodboard-toolbar__button--shape {
-    background: #fff3e0;
-    color: #f57c00;
+.moodboard-toolbar__button--text-add {
+    background: #e8f5e8;
+    color: #388e3c;
 }
 
-.moodboard-toolbar__button--shape:hover {
-    background: #ffe0b2;
+.moodboard-toolbar__button--text-add:hover {
+    background: #c8e6c9;
 }
+
+
 
 /* Undo/Redo buttons */
 .moodboard-toolbar__button--undo {
-    background: #f3e5f5;
-    color: #7b1fa2;
+    background: #e8f5e8;
+    color: #388e3c;
 }
 
 .moodboard-toolbar__button--undo:hover:not(:disabled) {
-    background: #e1bee7;
+    background: #c8e6c9;
 }
 
 .moodboard-toolbar__button--redo {
@@ -283,27 +276,44 @@
     color: #999 !important;
 }
 
+/* SVG Icons */
+.moodboard-toolbar__button svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+    stroke: currentColor;
+    transition: transform 0.2s ease;
+}
+
+.moodboard-toolbar__button:hover svg {
+    transform: scale(1.1);
+}
+
+.moodboard-toolbar__button--disabled svg {
+    opacity: 0.4;
+}
+
 .moodboard-toolbar--dark .moodboard-toolbar__button--disabled {
     background: #2a2a2a !important;
     color: #555 !important;
 }
 
 .moodboard-toolbar__button--clear {
-    background: #ffebee;
-    color: #d32f2f;
+    background: #e8f5e8;
+    color: #388e3c;
 }
 
 .moodboard-toolbar__button--clear:hover {
-    background: #ffcdd2;
+    background: #c8e6c9;
 }
 
 .moodboard-toolbar__button--export {
-    background: #f3e5f5;
-    color: #7b1fa2;
+    background: #e8f5e8;
+    color: #388e3c;
 }
 
 .moodboard-toolbar__button--export:hover {
-    background: #e1bee7;
+    background: #c8e6c9;
 }
 
 /* Big T button */
@@ -317,21 +327,37 @@
 .moodboard-toolbar__button--pan,
 .moodboard-toolbar__button--shapes,
 .moodboard-toolbar__button--pencil,
-.moodboard-toolbar__button--frame-tool,
+.moodboard-toolbar__button--frame,
 .moodboard-toolbar__button--comments,
 .moodboard-toolbar__button--attachments,
 .moodboard-toolbar__button--emoji {
     opacity: 0.95;
 }
 
-.moodboard-toolbar__button--select { background: #eef2ff; color: #1e40af; }
-.moodboard-toolbar__button--pan { background: #f0fdf4; color: #166534; }
-.moodboard-toolbar__button--shapes { background: #eff6ff; color: #1d4ed8; }
-.moodboard-toolbar__button--pencil { background: #fff7ed; color: #9a3412; }
-.moodboard-toolbar__button--frame-tool { background: #f5f3ff; color: #6d28d9; }
-.moodboard-toolbar__button--comments { background: #f0f9ff; color: #075985; }
-.moodboard-toolbar__button--attachments { background: #f8fafc; color: #334155; }
-.moodboard-toolbar__button--emoji { background: #fefce8; color: #854d0e; }
+.moodboard-toolbar__button--select { background: #e8f5e8; color: #388e3c; }
+.moodboard-toolbar__button--pan { background: #e8f5e8; color: #388e3c; }
+.moodboard-toolbar__button--shapes { background: #e8f5e8; color: #388e3c; }
+.moodboard-toolbar__button--pencil { background: #e8f5e8; color: #388e3c; }
+.moodboard-toolbar__button--frame { background: #e8f5e8; color: #388e3c; }
+.moodboard-toolbar__button--comments { background: #e8f5e8; color: #388e3c; }
+.moodboard-toolbar__button--attachments { background: #e8f5e8; color: #388e3c; }
+.moodboard-toolbar__button--emoji { background: #e8f5e8; color: #388e3c; }
+.moodboard-toolbar__button--note { background: #e8f5e8; color: #388e3c; }
+.moodboard-toolbar__button--image { background: #e8f5e8; color: #388e3c; }
+
+/* Hover states for all buttons */
+.moodboard-toolbar__button--select:hover,
+.moodboard-toolbar__button--pan:hover,
+.moodboard-toolbar__button--shapes:hover,
+.moodboard-toolbar__button--pencil:hover,
+.moodboard-toolbar__button--frame:hover,
+.moodboard-toolbar__button--comments:hover,
+.moodboard-toolbar__button--attachments:hover,
+.moodboard-toolbar__button--emoji:hover,
+.moodboard-toolbar__button--note:hover,
+.moodboard-toolbar__button--image:hover {
+    background: #c8e6c9;
+}
 
 /* Попап для фигур */
 .moodboard-toolbar__popup {
@@ -510,8 +536,7 @@
 
 /* Dark theme button overrides */
 .moodboard-toolbar--dark .moodboard-toolbar__button--frame,
-.moodboard-toolbar--dark .moodboard-toolbar__button--text,
-.moodboard-toolbar--dark .moodboard-toolbar__button--shape,
+.moodboard-toolbar--dark .moodboard-toolbar__button--text-add,
 .moodboard-toolbar--dark .moodboard-toolbar__button--clear,
 .moodboard-toolbar--dark .moodboard-toolbar__button--export {
     opacity: 0.9;
