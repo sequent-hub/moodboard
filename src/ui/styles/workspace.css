@@ -205,8 +205,8 @@
     height: 40px;
     border: none;
     border-radius: 8px;
-    background: #E1F5FE;
-    color: #212121;
+    /* background: #E1F5FE; */
+    /* color: #212121; */
     font-size: 18px;
     font-weight: 500;
     cursor: pointer;
@@ -242,8 +242,8 @@
 .moodboard-toolbar__button svg {
     width: 20px;
     height: 20px;
-    fill: currentColor;
-    stroke: currentColor;
+    /* fill: currentColor;
+    stroke: currentColor; */
     transition: transform 0.2s ease;
 }
 
@@ -253,6 +253,43 @@
 
 .moodboard-toolbar__button--disabled svg {
     opacity: 0.4;
+}
+
+/* Явные стили для всех кнопок тулбара */
+.moodboard-toolbar__button--select,
+.moodboard-toolbar__button--pan,
+.moodboard-toolbar__button--text-add,
+.moodboard-toolbar__button--note,
+.moodboard-toolbar__button--image,
+.moodboard-toolbar__button--shapes,
+.moodboard-toolbar__button--pencil,
+.moodboard-toolbar__button--comments,
+.moodboard-toolbar__button--attachments,
+.moodboard-toolbar__button--emoji,
+.moodboard-toolbar__button--frame,
+.moodboard-toolbar__button--clear,
+.moodboard-toolbar__button--undo,
+.moodboard-toolbar__button--redo {
+    background: #F5F5F5 !important;
+    /* color: #212121 !important; */
+    /* stroke-width: 1px; */
+}
+
+.moodboard-toolbar__button--select:hover,
+.moodboard-toolbar__button--pan:hover,
+.moodboard-toolbar__button--text-add:hover,
+.moodboard-toolbar__button--note:hover,
+.moodboard-toolbar__button--image:hover,
+.moodboard-toolbar__button--shapes:hover,
+.moodboard-toolbar__button--pencil:hover,
+.moodboard-toolbar__button--comments:hover,
+.moodboard-toolbar__button--attachments:hover,
+.moodboard-toolbar__button--emoji:hover,
+.moodboard-toolbar__button--frame:hover,
+.moodboard-toolbar__button--clear:hover,
+.moodboard-toolbar__button--undo:hover:not(:disabled),
+.moodboard-toolbar__button--redo:hover:not(:disabled) {
+    background: #BBDEFB !important;
 }
 
 
