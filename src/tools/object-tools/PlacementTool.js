@@ -96,7 +96,11 @@ export class PlacementTool extends BaseTool {
                 type: 'text',
                 id: 'text',
                 position,
-                properties: { fontSize: props.fontSize || 18, content: '' }
+                properties: { 
+                    fontSize: props.fontSize || 18, 
+                    content: '',
+                    fontFamily: 'Arial, sans-serif' // Дефолтный шрифт
+                }
             });
         } else if (isImage && props.selectFileOnPlace) {
             const input = document.createElement('input');

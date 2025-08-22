@@ -101,6 +101,9 @@ export class TextPropertiesPanel {
         
         this.panel.style.display = 'flex';
         this.reposition();
+        
+        // Обновляем контролы в соответствии с текущими свойствами объекта
+        this._updateControlsFromObject();
     }
 
     hide() {
@@ -120,25 +123,144 @@ export class TextPropertiesPanel {
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'center',
-            gap: '8px',
-            padding: '8px 12px',
+            gap: '12px',
+            padding: '8px 16px',
             backgroundColor: 'white',
             border: '1px solid #e0e0e0',
             borderRadius: '8px',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
             fontSize: '14px',
             fontFamily: 'Arial, sans-serif',
-            minWidth: '200px',
-            height: '40px'
+            minWidth: '250px',
+            height: '44px'
         });
 
-        // Заглушка для содержимого панели
-        const placeholder = document.createElement('div');
-        placeholder.textContent = 'Панель свойств текста';
-        placeholder.style.color = '#666';
-        panel.appendChild(placeholder);
+        // Создаем контролы
+        this._createFontControls(panel);
 
         return panel;
+    }
+
+    _createFontControls(panel) {
+        // Лейбл для шрифта
+        const fontLabel = document.createElement('span');
+        fontLabel.textContent = 'Шрифт:';
+        fontLabel.style.fontSize = '12px';
+        fontLabel.style.color = '#666';
+        fontLabel.style.fontWeight = '500';
+        panel.appendChild(fontLabel);
+
+        // Выпадающий список шрифтов
+        this.fontSelect = document.createElement('select');
+        this.fontSelect.className = 'font-select';
+        Object.assign(this.fontSelect.style, {
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            padding: '4px 8px',
+            fontSize: '13px',
+            backgroundColor: 'white',
+            cursor: 'pointer',
+            minWidth: '140px'
+        });
+
+        // Список популярных шрифтов
+        const fonts = [
+            { value: 'Arial, sans-serif', name: 'Arial' },
+            { value: 'Helvetica, sans-serif', name: 'Helvetica' },
+            { value: 'Georgia, serif', name: 'Georgia' },
+            { value: 'Times New Roman, serif', name: 'Times New Roman' },
+            { value: 'Courier New, monospace', name: 'Courier New' },
+            { value: 'Verdana, sans-serif', name: 'Verdana' },
+            { value: 'Tahoma, sans-serif', name: 'Tahoma' },
+            { value: 'Impact, sans-serif', name: 'Impact' },
+            { value: 'Comic Sans MS, cursive', name: 'Comic Sans MS' },
+            { value: 'Trebuchet MS, sans-serif', name: 'Trebuchet MS' }
+        ];
+
+        fonts.forEach(font => {
+            const option = document.createElement('option');
+            option.value = font.value;
+            option.textContent = font.name;
+            option.style.fontFamily = font.value;
+            this.fontSelect.appendChild(option);
+        });
+
+        // Обработчик изменения шрифта
+        this.fontSelect.addEventListener('change', (e) => {
+            this._changeFontFamily(e.target.value);
+        });
+
+        panel.appendChild(this.fontSelect);
+    }
+
+    _changeFontFamily(fontFamily) {
+        if (!this.currentId) return;
+
+        console.log('🔧 TextPropertiesPanel: Changing font family to:', fontFamily);
+
+        // Обновляем свойства объекта через StateManager
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: {
+                fontFamily: fontFamily
+            }
+        });
+
+        // Также обновляем визуальное отображение
+        this._updateTextAppearance(this.currentId, { fontFamily });
+    }
+
+    _updateTextAppearance(objectId, properties) {
+        // Обновляем HTML текст через HtmlTextLayer
+        const htmlElement = document.querySelector(`[data-id="${objectId}"]`);
+        if (htmlElement) {
+            if (properties.fontFamily) {
+                htmlElement.style.fontFamily = properties.fontFamily;
+            }
+        }
+
+        // Обновляем PIXI объект и его метаданные
+        const pixiData = { objectId, pixiObject: null };
+        this.eventBus.emit(Events.Tool.GetObjectPixi, pixiData);
+        const pixiObject = pixiData.pixiObject;
+        
+        if (pixiObject && pixiObject._mb) {
+            if (!pixiObject._mb.properties) {
+                pixiObject._mb.properties = {};
+            }
+            
+            // Обновляем свойства в метаданных объекта
+            Object.assign(pixiObject._mb.properties, properties);
+        }
+
+        // Помечаем изменения для автосохранения
+        if (this.core && this.core.state) {
+            this.core.state.markDirty();
+        }
+    }
+
+    _updateControlsFromObject() {
+        if (!this.currentId || !this.fontSelect) return;
+
+        // Получаем текущие свойства объекта
+        const pixiData = { objectId: this.currentId, pixiObject: null };
+        this.eventBus.emit(Events.Tool.GetObjectPixi, pixiData);
+        const pixiObject = pixiData.pixiObject;
+
+        if (pixiObject && pixiObject._mb && pixiObject._mb.properties) {
+            const properties = pixiObject._mb.properties;
+            
+            // Устанавливаем выбранный шрифт в селекте
+            if (properties.fontFamily) {
+                this.fontSelect.value = properties.fontFamily;
+            } else {
+                // Устанавливаем дефолтный шрифт
+                this.fontSelect.value = 'Arial, sans-serif';
+            }
+        } else {
+            // Дефолтные значения
+            this.fontSelect.value = 'Arial, sans-serif';
+        }
     }
 
     reposition() {

@@ -86,6 +86,18 @@ export class HtmlTextLayer {
             }
         });
 
+        // Обработка изменения состояния объекта (для fontFamily и других свойств)
+        this.eventBus.on(Events.Object.StateChanged, ({ objectId, updates }) => {
+            const el = this.idToEl.get(objectId);
+            if (el && updates) {
+                if (updates.fontFamily) {
+                    el.style.fontFamily = updates.fontFamily;
+                    console.log(`🔍 HtmlTextLayer: обновлен шрифт для ${objectId}:`, updates.fontFamily);
+                }
+                // Здесь можно добавить обработку других свойств текста
+            }
+        });
+
         // На все операции зума/пэна — полное обновление
         this.eventBus.on(Events.UI.ZoomPercent, () => this.updateAll());
         this.eventBus.on(Events.Tool.PanUpdate, () => this.updateAll());
@@ -146,6 +158,9 @@ export class HtmlTextLayer {
         const el = document.createElement('div');
         el.className = 'mb-text';
         el.dataset.id = objectId;
+        // Получаем fontFamily из properties объекта
+        const fontFamily = objectData.fontFamily || objectData.properties?.fontFamily || 'Arial, sans-serif';
+        
         Object.assign(el.style, {
             position: 'absolute',
             transformOrigin: 'top left',
@@ -153,6 +168,7 @@ export class HtmlTextLayer {
             whiteSpace: 'pre-wrap',
             pointerEvents: 'none', // всё взаимодействие остаётся на PIXI
             userSelect: 'none',
+            fontFamily: fontFamily
         });
         const content = objectData.content || objectData.properties?.content || '';
         el.textContent = content;
