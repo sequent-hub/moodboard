@@ -98,6 +98,10 @@ export class HtmlTextLayer {
                     el.style.fontSize = `${updates.fontSize}px`;
                     console.log(`🔍 HtmlTextLayer: обновлен размер шрифта для ${objectId}:`, updates.fontSize);
                 }
+                if (updates.color) {
+                    el.style.color = updates.color;
+                    console.log(`🔍 HtmlTextLayer: обновлен цвет для ${objectId}:`, updates.color);
+                }
                 // Здесь можно добавить обработку других свойств текста
             }
         });
@@ -162,13 +166,14 @@ export class HtmlTextLayer {
         const el = document.createElement('div');
         el.className = 'mb-text';
         el.dataset.id = objectId;
-        // Получаем fontFamily из properties объекта
+        // Получаем свойства из properties объекта
         const fontFamily = objectData.fontFamily || objectData.properties?.fontFamily || 'Arial, sans-serif';
+        const color = objectData.color || objectData.properties?.color || '#000000';
         
         Object.assign(el.style, {
             position: 'absolute',
             transformOrigin: 'top left',
-            color: '#111',
+            color: color,
             whiteSpace: 'pre-wrap',
             pointerEvents: 'none', // всё взаимодействие остаётся на PIXI
             userSelect: 'none',

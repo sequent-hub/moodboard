@@ -111,6 +111,7 @@ export class TextPropertiesPanel {
         if (this.panel) {
             this.panel.style.display = 'none';
         }
+        this._hideColorDropdown(); // Закрываем выпадающую панель цветов
         document.removeEventListener('mousedown', this._onDocMouseDown, true);
     }
 
@@ -131,7 +132,7 @@ export class TextPropertiesPanel {
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
             fontSize: '14px',
             fontFamily: 'Arial, sans-serif',
-            minWidth: '400px',
+            minWidth: '450px',
             height: '44px'
         });
 
@@ -230,6 +231,209 @@ export class TextPropertiesPanel {
         });
 
         panel.appendChild(this.fontSizeSelect);
+
+        // Лейбл для цвета
+        const colorLabel = document.createElement('span');
+        colorLabel.textContent = 'Цвет:';
+        colorLabel.style.fontSize = '12px';
+        colorLabel.style.color = '#666';
+        colorLabel.style.fontWeight = '500';
+        colorLabel.style.marginLeft = '8px';
+        panel.appendChild(colorLabel);
+
+        // Создаем компактный селектор цвета
+        this._createCompactColorSelector(panel);
+    }
+
+    _createCompactColorSelector(panel) {
+        // Контейнер для селектора цвета
+        const colorSelectorContainer = document.createElement('div');
+        colorSelectorContainer.style.cssText = `
+            position: relative;
+            display: inline-block;
+            margin-left: 4px;
+        `;
+
+        // Кнопка показывающая текущий цвет
+        this.currentColorButton = document.createElement('button');
+        this.currentColorButton.type = 'button';
+        this.currentColorButton.title = 'Выбрать цвет';
+        this.currentColorButton.style.cssText = `
+            width: 32px;
+            height: 24px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            background-color: #000000;
+            cursor: pointer;
+            margin: 0;
+            padding: 0;
+            display: block;
+            box-sizing: border-box;
+            position: relative;
+        `;
+
+        // Создаем выпадающую панель с цветами
+        this.colorDropdown = document.createElement('div');
+        this.colorDropdown.style.cssText = `
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            padding: 8px;
+            display: none;
+            z-index: 10000;
+            min-width: 200px;
+        `;
+
+        // Создаем сетку цветов
+        this._createColorGrid(this.colorDropdown);
+
+        // Обработчик клика по кнопке
+        this.currentColorButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._toggleColorDropdown();
+        });
+
+        // Закрываем панель при клике вне её
+        document.addEventListener('click', (e) => {
+            if (!colorSelectorContainer.contains(e.target)) {
+                this._hideColorDropdown();
+            }
+        });
+
+        colorSelectorContainer.appendChild(this.currentColorButton);
+        colorSelectorContainer.appendChild(this.colorDropdown);
+        panel.appendChild(colorSelectorContainer);
+    }
+
+    _createColorGrid(container) {
+        // Популярные цвета для текста
+        const presetColors = [
+            { color: '#000000', name: 'Черный' },
+            { color: '#333333', name: 'Темно-серый' },
+            { color: '#666666', name: 'Серый' },
+            { color: '#999999', name: 'Светло-серый' },
+            { color: '#ffffff', name: 'Белый' },
+            { color: '#ff0000', name: 'Красный' },
+            { color: '#00ff00', name: 'Зеленый' },
+            { color: '#0000ff', name: 'Синий' },
+            { color: '#ffff00', name: 'Желтый' },
+            { color: '#ff00ff', name: 'Фиолетовый' },
+            { color: '#00ffff', name: 'Голубой' },
+            { color: '#ffa500', name: 'Оранжевый' }
+        ];
+
+        // Сетка заготовленных цветов
+        const presetsGrid = document.createElement('div');
+        presetsGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 4px;
+            margin-bottom: 8px;
+        `;
+
+        presetColors.forEach(preset => {
+            const colorButton = document.createElement('button');
+            colorButton.type = 'button';
+            colorButton.title = preset.name;
+            colorButton.style.cssText = `
+                width: 24px;
+                height: 24px;
+                border: 1px solid #ddd;
+                border-radius: 3px;
+                background-color: ${preset.color};
+                cursor: pointer;
+                margin: 0;
+                padding: 0;
+                display: block;
+                box-sizing: border-box;
+                ${preset.color === '#ffffff' ? 'border-color: #ccc;' : ''}
+            `;
+
+            colorButton.addEventListener('click', () => {
+                this._selectColor(preset.color);
+            });
+
+            presetsGrid.appendChild(colorButton);
+        });
+
+        container.appendChild(presetsGrid);
+
+        // Разделитель
+        const separator = document.createElement('div');
+        separator.style.cssText = `
+            height: 1px;
+            background: #eee;
+            margin: 8px 0;
+        `;
+        container.appendChild(separator);
+
+        // Кастомный color picker
+        const customContainer = document.createElement('div');
+        customContainer.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        `;
+
+        const customLabel = document.createElement('span');
+        customLabel.textContent = 'Свой цвет:';
+        customLabel.style.cssText = `
+            font-size: 12px;
+            color: #666;
+        `;
+
+        this.colorInput = document.createElement('input');
+        this.colorInput.type = 'color';
+        this.colorInput.style.cssText = `
+            width: 32px;
+            height: 24px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            cursor: pointer;
+            padding: 0;
+        `;
+
+        this.colorInput.addEventListener('change', (e) => {
+            this._selectColor(e.target.value);
+        });
+
+        customContainer.appendChild(customLabel);
+        customContainer.appendChild(this.colorInput);
+        container.appendChild(customContainer);
+    }
+
+    _toggleColorDropdown() {
+        if (this.colorDropdown.style.display === 'none') {
+            this.colorDropdown.style.display = 'block';
+        } else {
+            this.colorDropdown.style.display = 'none';
+        }
+    }
+
+    _hideColorDropdown() {
+        if (this.colorDropdown) {
+            this.colorDropdown.style.display = 'none';
+        }
+    }
+
+    _selectColor(color) {
+        this._changeTextColor(color);
+        this._updateCurrentColorButton(color);
+        this._hideColorDropdown();
+    }
+
+    _updateCurrentColorButton(color) {
+        if (this.currentColorButton) {
+            this.currentColorButton.style.backgroundColor = color;
+            this.currentColorButton.title = `Текущий цвет: ${color}`;
+        }
+        if (this.colorInput) {
+            this.colorInput.value = color;
+        }
     }
 
     _changeFontFamily(fontFamily) {
@@ -266,6 +470,23 @@ export class TextPropertiesPanel {
         this._updateTextAppearance(this.currentId, { fontSize });
     }
 
+    _changeTextColor(color) {
+        if (!this.currentId) return;
+
+        console.log('🔧 TextPropertiesPanel: Changing text color to:', color);
+
+        // Обновляем свойства объекта через StateManager
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: {
+                color: color
+            }
+        });
+
+        // Также обновляем визуальное отображение
+        this._updateTextAppearance(this.currentId, { color });
+    }
+
     _updateTextAppearance(objectId, properties) {
         // Обновляем HTML текст через HtmlTextLayer
         const htmlElement = document.querySelector(`[data-id="${objectId}"]`);
@@ -275,6 +496,9 @@ export class TextPropertiesPanel {
             }
             if (properties.fontSize) {
                 htmlElement.style.fontSize = `${properties.fontSize}px`;
+            }
+            if (properties.color) {
+                htmlElement.style.color = properties.color;
             }
         }
 
@@ -324,10 +548,19 @@ export class TextPropertiesPanel {
                 // Устанавливаем дефолтный размер
                 this.fontSizeSelect.value = '18';
             }
+
+            // Устанавливаем цвет текста
+            if (properties.color) {
+                this._updateCurrentColorButton(properties.color);
+            } else {
+                // Устанавливаем дефолтный цвет (черный)
+                this._updateCurrentColorButton('#000000');
+            }
         } else {
             // Дефолтные значения
             this.fontSelect.value = 'Arial, sans-serif';
             this.fontSizeSelect.value = '18';
+            this._updateCurrentColorButton('#000000');
         }
     }
 

@@ -99,7 +99,8 @@ export class PlacementTool extends BaseTool {
                 properties: { 
                     fontSize: props.fontSize || 18, 
                     content: '',
-                    fontFamily: 'Arial, sans-serif' // Дефолтный шрифт
+                    fontFamily: 'Arial, sans-serif', // Дефолтный шрифт
+                    color: '#000000' // Дефолтный цвет (черный)
                 }
             });
         } else if (isImage && props.selectFileOnPlace) {
