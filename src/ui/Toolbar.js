@@ -333,7 +333,8 @@ export class Toolbar {
                         width: 200,
                         height: 300,
                         borderColor: 0x333333,
-                        fillColor: 0xFFFFFF
+                        fillColor: 0xFFFFFF,
+                        title: 'Новый' // Название по умолчанию
                     }
                 });
                 return;

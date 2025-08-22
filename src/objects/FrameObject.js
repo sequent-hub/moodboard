@@ -15,8 +15,26 @@ export class FrameObject {
         this.borderWidth = 2;
         this.fillColor = 0xFFFFFF; // Непрозрачный белый
         this.strokeColor = this.objectData.borderColor || 0x333333;
+        this.title = this.objectData.title || this.objectData.properties?.title || 'Новый';
 
+        // Создаем контейнер для фрейма и заголовка
+        this.container = new PIXI.Container();
+        
+        // Графика для прямоугольника фрейма
         this.graphics = new PIXI.Graphics();
+        this.container.addChild(this.graphics);
+        
+        // Текст заголовка
+        this.titleText = new PIXI.Text(this.title, {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: 14,
+            fill: 0x333333,
+            fontWeight: 'bold'
+        });
+        this.titleText.anchor.set(0, 1); // Левый нижний угол текста
+        this.titleText.y = -5; // Немного выше фрейма
+        this.container.addChild(this.titleText);
+        
         this._draw(this.width, this.height, this.fillColor);
     }
 
@@ -24,7 +42,7 @@ export class FrameObject {
      * Возвращает PIXI-объект
      */
     getPixi() {
-        return this.graphics;
+        return this.container;
     }
 
     /**
@@ -36,6 +54,17 @@ export class FrameObject {
             this.fillColor = color;
         }
         this._redrawPreserveTransform(this.width, this.height, this.fillColor);
+    }
+
+    /**
+     * Установить заголовок фрейма
+     * @param {string} title Новый заголовок
+     */
+    setTitle(title) {
+        this.title = title || 'Новый';
+        if (this.titleText) {
+            this.titleText.text = this.title;
+        }
     }
 
     /**
@@ -55,19 +84,19 @@ export class FrameObject {
      * Перерисовать с сохранением трансформаций (позиция, pivot, rotation)
      */
     _redrawPreserveTransform(width, height, color) {
-        const g = this.graphics;
-        const x = g.x;
-        const y = g.y;
-        const rot = g.rotation || 0;
-        const pivotX = g.pivot?.x || 0;
-        const pivotY = g.pivot?.y || 0;
+        const container = this.container;
+        const x = container.x;
+        const y = container.y;
+        const rot = container.rotation || 0;
+        const pivotX = container.pivot?.x || 0;
+        const pivotY = container.pivot?.y || 0;
 
         this._draw(width, height, color);
 
-        g.pivot.set(pivotX, pivotY);
-        g.x = x;
-        g.y = y;
-        g.rotation = rot;
+        container.pivot.set(pivotX, pivotY);
+        container.x = x;
+        container.y = y;
+        container.rotation = rot;
     }
 
     /**
