@@ -316,6 +316,29 @@ export class Toolbar {
                 return;
             }
 
+            // Добавление фрейма: включаем placement и ждём клика для выбора позиции
+            if (toolType === 'frame') {
+                this.animateButton(button);
+                this.closeShapesPopup();
+                this.closeDrawPopup();
+                this.closeEmojiPopup();
+                // Активируем place, устанавливаем pending для frame
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                this.placeSelectedButtonId = 'frame';
+                this.setActiveToolbarButton('place');
+                // Устанавливаем свойства фрейма по умолчанию
+                this.eventBus.emit(Events.Place.Set, { 
+                    type: 'frame', 
+                    properties: { 
+                        width: 200,
+                        height: 300,
+                        borderColor: 0x333333,
+                        fillColor: 0xFFFFFF
+                    }
+                });
+                return;
+            }
+
             // Добавление картинки: включаем placement и ждём клика для выбора позиции, затем открываем файловый диалог
             if (toolType === 'image-add') {
                 this.animateButton(button);
