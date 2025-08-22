@@ -557,6 +557,19 @@
     transition: all 0.2s ease;
 }
 
+/* Стили для SVG иконок в кнопках верхней панели */
+.moodboard-topbar__button svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+    stroke: currentColor;
+    transition: all 0.2s ease;
+}
+
+.moodboard-topbar__button:hover svg {
+    transform: scale(1.1);
+}
+
 .moodboard-topbar__button:hover {
     background: #e6e6e6;
 }

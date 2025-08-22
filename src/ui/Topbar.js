@@ -2,6 +2,7 @@
  * Горизонтальная верхняя панель (пока пустая)
  */
 import { Events } from '../core/events/Events.js';
+import { TopbarIconLoader } from '../utils/topbarIconLoader.js';
 
 export class Topbar {
     constructor(container, eventBus, theme = 'light') {
@@ -10,6 +11,20 @@ export class Topbar {
         this.theme = theme;
         this.element = null;
         this._paintPopover = null;
+        this.iconLoader = new TopbarIconLoader();
+        this.icons = {};
+        this.init();
+    }
+
+    async init() {
+        try {
+            // Загружаем все иконки
+            this.icons = await this.iconLoader.loadAllIcons();
+            console.log('✅ Иконки верхней панели загружены:', Object.keys(this.icons));
+        } catch (error) {
+            console.error('❌ Ошибка загрузки иконок верхней панели:', error);
+        }
+        
         this.createTopbar();
         this.attachEvents();
         // Активируем дефолтную кнопку (line) до прихода события из ядра
@@ -26,16 +41,28 @@ export class Topbar {
         this.element.className = `moodboard-topbar moodboard-topbar--${this.theme}`;
         // Кнопки выбора вида сетки (без функциональности)
         const buttons = [
-            { id: 'grid-line', icon: '▦', title: 'Сетка: линии', type: 'line' },
-            { id: 'grid-dot', icon: '⋯', title: 'Сетка: точки', type: 'dot' },
-            { id: 'grid-cross', icon: '+', title: 'Сетка: крестики', type: 'cross' },
-            { id: 'grid-off', icon: '⊘', title: 'Сетка: выкл', type: 'off' }
+            { id: 'grid-line', icon: 'grid-line', title: 'Сетка: линии', type: 'line' },
+            { id: 'grid-dot', icon: 'grid-dot', title: 'Сетка: точки', type: 'dot' },
+            { id: 'grid-cross', icon: 'grid-cross', title: 'Сетка: крестики', type: 'cross' },
+            { id: 'grid-off', icon: 'grid-off', title: 'Сетка: выкл', type: 'off' }
         ];
 
         buttons.forEach(cfg => {
             const btn = document.createElement('button');
             btn.className = 'moodboard-topbar__button';
-            btn.textContent = cfg.icon;
+            
+            // Создаем SVG иконку
+            if (this.icons[cfg.icon]) {
+                this.createSvgIcon(btn, cfg.icon);
+            } else {
+                // Fallback: создаем простую текстовую иконку
+                const fallbackIcon = document.createElement('span');
+                fallbackIcon.textContent = cfg.icon.charAt(0).toUpperCase();
+                fallbackIcon.style.fontSize = '14px';
+                fallbackIcon.style.fontWeight = 'bold';
+                btn.appendChild(fallbackIcon);
+            }
+            
             btn.title = cfg.title;
             btn.dataset.grid = cfg.type;
             this.element.appendChild(btn);
@@ -50,14 +77,46 @@ export class Topbar {
         const paintBtn = document.createElement('button');
         paintBtn.className = 'moodboard-topbar__button moodboard-topbar__button--paint';
         paintBtn.title = 'Палитра фона';
-        // простая svg-иконка банки с краской
-        paintBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 3h6l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V3z" stroke="#333" stroke-width="2" fill="#fff"/><path d="M11 3v5h5" stroke="#333" stroke-width="2"/><path d="M17 12s2 2 2 4a2 2 0 0 1-4 0c0-2 2-4 2-4z" fill="#4ade80" stroke="#333" stroke-width="1"/></svg>';
+        
+        // Создаем SVG иконку
+        if (this.icons['paint']) {
+            this.createSvgIcon(paintBtn, 'paint');
+        } else {
+            // Fallback: создаем простую текстовую иконку
+            const fallbackIcon = document.createElement('span');
+            fallbackIcon.textContent = '🎨';
+            fallbackIcon.style.fontSize = '16px';
+            paintBtn.appendChild(fallbackIcon);
+        }
+        
         paintBtn.dataset.action = 'paint-toggle';
         this.element.appendChild(paintBtn);
 
         // (кнопки зума вынесены в отдельную панель справа)
 
         this.container.appendChild(this.element);
+    }
+
+    /**
+     * Создает SVG иконку для кнопки
+     */
+    createSvgIcon(button, iconName) {
+        if (this.icons[iconName]) {
+            // Создаем SVG элемент из загруженного содержимого
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = this.icons[iconName];
+            const svg = tempDiv.querySelector('svg');
+            
+            if (svg) {
+                // Убираем inline размеры, чтобы CSS мог их контролировать
+                svg.removeAttribute('width');
+                svg.removeAttribute('height');
+                svg.style.display = 'block';
+                
+                // Добавляем SVG в кнопку
+                button.appendChild(svg);
+            }
+        }
     }
 
     attachEvents() {
