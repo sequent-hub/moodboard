@@ -1583,6 +1583,7 @@ export class SelectTool extends BaseTool {
                 return;
             }
             
+            // Для обычного текста восстанавливаем автоподгон
             textarea.style.height = '1px';
             textarea.style.width = '1px';
             const w = Math.max(minWBound, textarea.scrollWidth + 8);
@@ -1594,7 +1595,11 @@ export class SelectTool extends BaseTool {
             // Обновляем ручки только для обычного текста
             placeHandles();
         };
-        autoSize();
+        
+        // Вызываем autoSize только для обычного текста
+        if (!isNote) {
+            autoSize();
+        }
         textarea.focus();
         // Локальная CSS-настройка placeholder (меньше базового шрифта)
         const uid = 'mbti-' + Math.random().toString(36).slice(2);
@@ -1662,7 +1667,7 @@ export class SelectTool extends BaseTool {
             }
             
             wrapper.remove();
-            this.textEditor = { active: false, objectId: null, textarea: null, wrapper: null, world: null, position: null, properties: null };
+            this.textEditor = { active: false, objectId: null, textarea: null, wrapper: null, world: null, position: null, properties: null, objectType: 'text' };
             this.eventBus.emit(Events.UI.TextEditEnd, { objectId: objectId || null });
             if (!commitValue) {
                 console.log('🔧 SelectTool: finalize - no commit, returning');
@@ -1670,9 +1675,11 @@ export class SelectTool extends BaseTool {
             }
             if (objectId == null) {
                 console.log('🔧 SelectTool: finalize - creating new object');
+                // Создаем объект с правильным типом
+                const objectType = currentObjectType || 'text';
                 this.eventBus.emit(Events.UI.ToolbarAction, {
-                    type: 'text',
-                    id: 'text',
+                    type: objectType,
+                    id: objectType,
                     position: { x: position.x, y: position.y },
                     properties: { content: value, fontSize }
                 });
@@ -1718,7 +1725,10 @@ export class SelectTool extends BaseTool {
                 finalize(false);
             }
         });
-        textarea.addEventListener('input', autoSize);
+        // Автоподгон при вводе только для обычного текста
+        if (!isNote) {
+            textarea.addEventListener('input', autoSize);
+        }
     }
 
     _closeTextEditor(commit) {
@@ -1765,8 +1775,8 @@ export class SelectTool extends BaseTool {
                 console.log('🔧 SelectTool: deleting and recreating text object');
                 this.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
                 this.eventBus.emit(Events.UI.ToolbarAction, {
-                    type: objectType,
-                    id: objectType,
+                    type: 'text',
+                    id: 'text',
                     position: { x: position.x, y: position.y },
                     properties: { content: value, fontSize: properties.fontSize }
                 });
