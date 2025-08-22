@@ -324,37 +324,50 @@ export class SelectTool extends BaseTool {
      * Двойной клик - переход в режим редактирования
      */
     onDoubleClick(event) {
-        console.log('🖱️ Double click detected at:', event.x, event.y);
         const hitResult = this.hitTest(event.x, event.y);
-        console.log('🎯 Hit test result:', hitResult);
         
         if (hitResult.type === 'object') {
             // если это текст или записка — войдём в режим редактирования через ObjectEdit
             const req = { objectId: hitResult.object, pixiObject: null };
             this.emit(Events.Tool.GetObjectPixi, req);
             const pix = req.pixiObject;
-            console.log('🔍 Object PIXI data:', pix?._mb);
             
             const isText = !!(pix && pix._mb && pix._mb.type === 'text');
             const isNote = !!(pix && pix._mb && pix._mb.type === 'note');
             
-            console.log('📝 Object types - isText:', isText, 'isNote:', isNote);
-            
             if (isText) {
-                console.log('✏️ Opening text editor for text object');
-                this.emit(Events.Tool.ObjectEdit, { object: { id: hitResult.object, type: 'text', properties: { content: pix?.text || '' } }, create: false });
+                // Получаем позицию объекта для редактирования
+                const posData = { objectId: hitResult.object, position: null };
+                this.emit(Events.Tool.GetObjectPosition, posData);
+                
+                // Получаем содержимое из properties объекта
+                const textContent = pix._mb?.properties?.content || '';
+                
+                this.emit(Events.Tool.ObjectEdit, { 
+                    id: hitResult.object, 
+                    type: 'text', 
+                    position: posData.position,
+                    properties: { content: textContent },
+                    create: false 
+                });
                 return;
             }
             if (isNote) {
                 const noteProps = pix._mb.properties || {};
-                console.log('📝 Opening text editor for note object with content:', noteProps.content);
-                this.emit(Events.Tool.ObjectEdit, { object: { id: hitResult.object, type: 'note', properties: { content: noteProps.content || '' } }, create: false });
+                // Получаем позицию объекта для редактирования
+                const posData = { objectId: hitResult.object, position: null };
+                this.emit(Events.Tool.GetObjectPosition, posData);
+                
+                this.emit(Events.Tool.ObjectEdit, { 
+                    id: hitResult.object, 
+                    type: 'note', 
+                    position: posData.position,
+                    properties: { content: noteProps.content || '' },
+                    create: false 
+                });
                 return;
             }
-            console.log('🔧 Opening regular object editor');
             this.editObject(hitResult.object);
-        } else {
-            console.log('❌ No object hit on double click');
         }
     }
 
@@ -1384,7 +1397,7 @@ export class SelectTool extends BaseTool {
         }
 
         
-        const { fontSize = 18, content = '', initialSize } = properties;
+        let { fontSize = 18, content = '', initialSize } = properties;
         
         // Определяем тип объекта
         const isNote = objectType === 'note';
