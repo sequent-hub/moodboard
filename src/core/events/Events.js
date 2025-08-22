@@ -42,6 +42,8 @@ export const Events = {
 		ObjectsDelete: 'tool:objects:delete',
 		ObjectEdit: 'tool:object:edit',
 		UpdateObjectContent: 'tool:update:object:content',
+		HideObjectText: 'tool:hide:object:text',
+		ShowObjectText: 'tool:show:object:text',
 	},
 
 	UI: {

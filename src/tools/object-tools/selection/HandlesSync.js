@@ -27,7 +27,16 @@ export class HandlesSync {
             const objectId = this.selection.toArray()[0];
             const req = { objectId, pixiObject: null };
             this.emit('get:object:pixi', req);
-            if (req.pixiObject) this.resizeHandles.showHandles(req.pixiObject, objectId);
+            if (req.pixiObject) {
+                // Проверяем тип объекта - для записок не показываем ручки
+                const meta = req.pixiObject._mb || {};
+                if (meta.type === 'note') {
+                    console.log(`📝 Скрываем ручки для записки ${objectId} - записки не должны иметь ручек`);
+                    this.resizeHandles.hideHandles();
+                } else {
+                    this.resizeHandles.showHandles(req.pixiObject, objectId);
+                }
+            }
             return;
         }
         // Группа: считаем границы и показываем ручки на невидимом прямоугольнике

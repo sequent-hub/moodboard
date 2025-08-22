@@ -994,6 +994,22 @@ export class CoreMoodBoard {
                 this.pixi.updateObjectContent(objectId, content);
             }
         });
+
+        // Скрытие текста объекта (во время редактирования)
+        this.eventBus.on(Events.Tool.HideObjectText, (data) => {
+            const { objectId } = data;
+            if (objectId) {
+                this.pixi.hideObjectText(objectId);
+            }
+        });
+
+        // Показ текста объекта (после завершения редактирования)
+        this.eventBus.on(Events.Tool.ShowObjectText, (data) => {
+            const { objectId } = data;
+            if (objectId) {
+                this.pixi.showObjectText(objectId);
+            }
+        });
     }
 
     /**

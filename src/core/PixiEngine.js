@@ -275,6 +275,20 @@ export class PixiEngine {
     }
 
     /**
+     * Скрыть текст объекта (используется во время редактирования)
+     */
+    hideObjectText(objectId) {
+        this.renderer.hideObjectText(objectId);
+    }
+
+    /**
+     * Показать текст объекта (используется после завершения редактирования)
+     */
+    showObjectText(objectId) {
+        this.renderer.showObjectText(objectId);
+    }
+
+    /**
      * Обновить угол поворота объекта
      */
     updateObjectRotation(objectId, angleDegrees) {

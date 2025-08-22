@@ -116,6 +116,24 @@ export class NoteObject {
         this.setContent(content);
     }
 
+    /**
+     * Скрывает текст записки (используется во время редактирования)
+     */
+    hideText() {
+        if (this.textField) {
+            this.textField.visible = false;
+        }
+    }
+
+    /**
+     * Показывает текст записки (используется после завершения редактирования)
+     */
+    showText() {
+        if (this.textField) {
+            this.textField.visible = true;
+        }
+    }
+
     setStyle({ fontSize, backgroundColor, borderColor, textColor } = {}) {
         if (typeof fontSize === 'number') {
             this.fontSize = fontSize;

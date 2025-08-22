@@ -1377,20 +1377,27 @@ export class SelectTool extends BaseTool {
         // Обертка для рамки + textarea + ручек
         const wrapper = document.createElement('div');
         wrapper.className = 'moodboard-text-editor';
+        
+        // Для записок убираем рамку и делаем фон прозрачным
+        const isNote = objectType === 'note';
+        
         Object.assign(wrapper.style, {
             position: 'absolute',
             left: '0px',
             top: '0px',
             transformOrigin: '0 0',
             boxSizing: 'border-box',
-            border: '1px solid #007ACC',
+            border: isNote ? 'none' : '1px solid #007ACC',
+            background: 'transparent',
             zIndex: 10000,
         });
+        
         const textarea = document.createElement('textarea');
         textarea.className = 'moodboard-text-input';
         textarea.value = properties.content || '';
         textarea.placeholder = 'напишите что-нибудь';
         const fontSize = properties.fontSize || 18;
+        
         Object.assign(textarea.style, {
             position: 'relative',
             left: '0px',
@@ -1400,85 +1407,95 @@ export class SelectTool extends BaseTool {
             fontSize: `${fontSize}px`,
             fontFamily: 'Arial, sans-serif',
             lineHeight: '1.2',
-            color: '#111',
-            background: 'white',
+            color: isNote ? '#000' : '#111', // Для записок делаем текст черным для лучшей видимости
+            background: isNote ? 'transparent' : 'white',
             outline: 'none',
             resize: 'none',
-            minWidth: '240px',
-            minHeight: '28px',
-            width: '280px',
-            height: '36px',
+            minWidth: isNote ? '80px' : '240px', // Для заметок уменьшаем минимальную ширину
+            minHeight: isNote ? '20px' : '28px', // Для заметок уменьшаем минимальную высоту
+            width: isNote ? '160px' : '280px', // Для заметок уменьшаем начальную ширину
+            height: isNote ? '24px' : '36px', // Для заметок уменьшаем начальную высоту
             boxSizing: 'border-box',
             // Повыше чёткость текста в CSS
             WebkitFontSmoothing: 'antialiased',
             MozOsxFontSmoothing: 'grayscale',
         });
+        
         wrapper.appendChild(textarea);
-        // Ручки ресайза (8 штук)
-        const handles = ['nw','n','ne','e','se','s','sw','w'].map(dir => {
-            const h = document.createElement('div');
-            h.dataset.dir = dir;
-            Object.assign(h.style, {
-                position: 'absolute', width: '12px', height: '12px', background: '#007ACC',
-                border: '1px solid #fff', boxSizing: 'border-box', zIndex: 10001,
+        
+        // Ручки ресайза только для обычного текста, для записок не показываем
+        let handles = [];
+        let placeHandles = () => {};
+        
+        if (!isNote) {
+            // Ручки ресайза (8 штук) только для обычного текста
+            handles = ['nw','n','ne','e','se','s','sw','w'].map(dir => {
+                const h = document.createElement('div');
+                h.dataset.dir = dir;
+                Object.assign(h.style, {
+                    position: 'absolute', width: '12px', height: '12px', background: '#007ACC',
+                    border: '1px solid #fff', boxSizing: 'border-box', zIndex: 10001,
+                });
+                return h;
             });
-            return h;
-        });
-        const placeHandles = () => {
-            const w = wrapper.offsetWidth;
-            const h = wrapper.offsetHeight;
-            handles.forEach(hd => {
-                const dir = hd.dataset.dir;
-                // default reset
-                hd.style.left = '0px';
-                hd.style.top = '0px';
-                hd.style.right = '';
-                hd.style.bottom = '';
-                switch (dir) {
-                    case 'nw':
-                        hd.style.left = `${-6}px`;
-                        hd.style.top = `${-6}px`;
-                        hd.style.cursor = 'nwse-resize';
-                        break;
-                    case 'n':
-                        hd.style.left = `${Math.round(w / 2 - 6)}px`;
-                        hd.style.top = `${-6}px`;
-                        hd.style.cursor = 'n-resize';
-                        break;
-                    case 'ne':
-                        hd.style.left = `${Math.max(-6, w - 6)}px`;
-                        hd.style.top = `${-6}px`;
-                        hd.style.cursor = 'nesw-resize';
-                        break;
-                    case 'e':
-                        hd.style.left = `${Math.max(-6, w - 6)}px`;
-                        hd.style.top = `${Math.round(h / 2 - 6)}px`;
-                        hd.style.cursor = 'e-resize';
-                        break;
-                    case 'se':
-                        hd.style.left = `${Math.max(-6, w - 6)}px`;
-                        hd.style.top = `${Math.max(-6, h - 6)}px`;
-                        hd.style.cursor = 'nwse-resize';
-                        break;
-                    case 's':
-                        hd.style.left = `${Math.round(w / 2 - 6)}px`;
-                        hd.style.top = `${Math.max(-6, h - 6)}px`;
-                        hd.style.cursor = 's-resize';
-                        break;
-                    case 'sw':
-                        hd.style.left = `${-6}px`;
-                        hd.style.top = `${Math.max(-6, h - 6)}px`;
-                        hd.style.cursor = 'nesw-resize';
-                        break;
-                    case 'w':
-                        hd.style.left = `${-6}px`;
-                        hd.style.top = `${Math.round(h / 2 - 6)}px`;
-                        hd.style.cursor = 'w-resize';
-                        break;
-                }
-            });
-        };
-        handles.forEach(h => wrapper.appendChild(h));
+            
+            placeHandles = () => {
+                const w = wrapper.offsetWidth;
+                const h = wrapper.offsetHeight;
+                handles.forEach(hd => {
+                    const dir = hd.dataset.dir;
+                    // default reset
+                    hd.style.left = '0px';
+                    hd.style.top = '0px';
+                    hd.style.right = '';
+                    hd.style.bottom = '';
+                    switch (dir) {
+                        case 'nw':
+                            hd.style.left = `${-6}px`;
+                            hd.style.top = `${-6}px`;
+                            hd.style.cursor = 'nwse-resize';
+                            break;
+                        case 'n':
+                            hd.style.left = `${Math.round(w / 2 - 6)}px`;
+                            hd.style.top = `${-6}px`;
+                            hd.style.cursor = 'n-resize';
+                            break;
+                        case 'ne':
+                            hd.style.left = `${Math.max(-6, w - 6)}px`;
+                            hd.style.top = `${-6}px`;
+                            hd.style.cursor = 'nesw-resize';
+                            break;
+                        case 'e':
+                            hd.style.left = `${Math.max(-6, w - 6)}px`;
+                            hd.style.top = `${Math.round(h / 2 - 6)}px`;
+                            hd.style.cursor = 'e-resize';
+                            break;
+                        case 'se':
+                            hd.style.left = `${Math.max(-6, w - 6)}px`;
+                            hd.style.top = `${Math.max(-6, h - 6)}px`;
+                            hd.style.cursor = 'nwse-resize';
+                            break;
+                        case 's':
+                            hd.style.left = `${Math.round(w / 2 - 6)}px`;
+                            hd.style.top = `${Math.max(-6, h - 6)}px`;
+                            hd.style.cursor = 's-resize';
+                            break;
+                        case 'sw':
+                            hd.style.left = `${-6}px`;
+                            hd.style.top = `${Math.max(-6, h - 6)}px`;
+                            hd.style.cursor = 'nesw-resize';
+                            break;
+                        case 'w':
+                            hd.style.left = `${-6}px`;
+                            hd.style.top = `${Math.round(h / 2 - 6)}px`;
+                            hd.style.cursor = 'w-resize';
+                            break;
+                    }
+                });
+            };
+            
+            handles.forEach(h => wrapper.appendChild(h));
+        }
         view.parentElement.appendChild(wrapper);
         // Позиция обертки по миру → экран
         const toScreen = (wx, wy) => {
@@ -1492,21 +1509,41 @@ export class SelectTool extends BaseTool {
         
         // Для записок позиционируем редактор внутри записки
         if (objectType === 'note') {
-            // Получаем размеры записки для правильного позиционирования
-            const noteWidth = initialSize ? initialSize.width : 160;
-            const noteHeight = initialSize ? initialSize.height : 100;
+            // Получаем актуальные размеры записки
+            let noteWidth = 160;
+            let noteHeight = 100;
             
-            // Позиционируем редактор внутри записки с отступами
-            const editorWidth = Math.min(280, noteWidth - 16); // Ширина редактора с отступами
-            const editorHeight = Math.min(36, noteHeight - 40); // Высота редактора с отступами
+            if (initialSize) {
+                noteWidth = initialSize.width;
+                noteHeight = initialSize.height;
+            } else if (objectId) {
+                // Если размер не передан, пытаемся получить его из объекта
+                const sizeData = { objectId, size: null };
+                this.emit(Events.Tool.GetObjectSize, sizeData);
+                if (sizeData.size) {
+                    noteWidth = sizeData.size.width;
+                    noteHeight = sizeData.size.height;
+                }
+            }
             
-            // Центрируем редактор по горизонтали внутри записки
-            const centerX = (noteWidth - editorWidth) / 2;
-            // Позиционируем ниже полоски (20px от верха)
-            const topY = 20;
+            // Позиционируем редактор точно там, где находится текст на заметке
+            // В NoteObject текст позиционируется с topMargin = 20 и центрируется по горизонтали
+            const topMargin = 20; // Отступ от верха (ниже полоски)
+            const horizontalPadding = 8; // Отступы по горизонтали
+            const editorWidth = Math.min(280, noteWidth - (horizontalPadding * 2));
+            const editorHeight = Math.min(36, noteHeight - topMargin - horizontalPadding);
             
-            wrapper.style.left = `${screenPos.x + centerX}px`;
-            wrapper.style.top = `${screenPos.y + topY}px`;
+            // Позиционируем редактор точно там, где находится текст
+            // Текст центрирован по горизонтали и имеет отступ topMargin от верха
+            const textCenterX = noteWidth / 2; // центр текста по горизонтали
+            const textTopY = topMargin; // позиция текста по вертикали
+            
+            // Позиционируем редактор так, чтобы его центр совпадал с центром текста
+            const editorLeft = textCenterX - (editorWidth / 2);
+            const editorTop = textTopY;
+            
+            wrapper.style.left = `${screenPos.x + editorLeft}px`;
+            wrapper.style.top = `${screenPos.y + editorTop}px`;
             
             // Устанавливаем размеры редактора
             textarea.style.width = `${editorWidth}px`;
@@ -1526,19 +1563,26 @@ export class SelectTool extends BaseTool {
         const initialHpx = initialSize ? Math.max(1, (initialSize.height || 0) * s / viewRes) : null;
         
         // Для записок размеры уже установлены выше, пропускаем эту логику
-        
-        let minWBound = initialWpx || 240;
-        let minHBound = 28;
-        if (initialWpx) {
-            textarea.style.width = `${initialWpx}px`;
-            wrapper.style.width = `${initialWpx}px`;
-        }
-        if (initialHpx) {
-            textarea.style.height = `${initialHpx}px`;
-            wrapper.style.height = `${initialHpx}px`;
+        if (!isNote) {
+            let minWBound = initialWpx || 240;
+            let minHBound = 28;
+            if (initialWpx) {
+                textarea.style.width = `${initialWpx}px`;
+                wrapper.style.width = `${initialWpx}px`;
+            }
+            if (initialHpx) {
+                textarea.style.height = `${initialHpx}px`;
+                wrapper.style.height = `${initialHpx}px`;
+            }
         }
         // Автоподгон
         const autoSize = () => {
+            if (isNote) {
+                // Для заметок используем фиксированные размеры, вычисленные выше
+                // Не вызываем autoSize, чтобы сохранить точное позиционирование
+                return;
+            }
+            
             textarea.style.height = '1px';
             textarea.style.width = '1px';
             const w = Math.max(minWBound, textarea.scrollWidth + 8);
@@ -1547,6 +1591,7 @@ export class SelectTool extends BaseTool {
             textarea.style.height = `${h}px`;
             wrapper.style.width = `${w}px`;
             wrapper.style.height = `${h}px`;
+            // Обновляем ручки только для обычного текста
             placeHandles();
         };
         autoSize();
@@ -1556,43 +1601,51 @@ export class SelectTool extends BaseTool {
         textarea.classList.add(uid);
         const styleEl = document.createElement('style');
         const phSize = Math.max(12, Math.round(fontSize * 0.8));
-        styleEl.textContent = `.${uid}::placeholder{font-size:${phSize}px;opacity:.6;}`;
+        const placeholderOpacity = isNote ? '0.4' : '0.6'; // Для записок делаем placeholder менее заметным
+        styleEl.textContent = `.${uid}::placeholder{font-size:${phSize}px;opacity:${placeholderOpacity};}`;
         document.head.appendChild(styleEl);
         this.textEditor = { active: true, objectId, textarea, wrapper, world: this.textEditor.world, position, properties: { fontSize }, objectType, _phStyle: styleEl };
-        // Ресайз мышью
-        const onHandleDown = (e) => {
-            e.preventDefault(); e.stopPropagation();
-            const dir = e.target.dataset.dir;
-            if (!dir) return;
-            const start = {
-                x: e.clientX, y: e.clientY,
-                w: wrapper.offsetWidth, h: wrapper.offsetHeight,
-                left: parseFloat(wrapper.style.left), top: parseFloat(wrapper.style.top), dir
+
+        // Для записок скрываем статичный текст во время редактирования
+        if (isNote && objectId) {
+            this.emit(Events.Tool.HideObjectText, { objectId });
+        }
+        // Ресайз мышью только для обычного текста
+        if (!isNote) {
+            const onHandleDown = (e) => {
+                e.preventDefault(); e.stopPropagation();
+                const dir = e.target.dataset.dir;
+                if (!dir) return;
+                const start = {
+                    x: e.clientX, y: e.clientY,
+                    w: wrapper.offsetWidth, h: wrapper.offsetHeight,
+                    left: parseFloat(wrapper.style.left), top: parseFloat(wrapper.style.top), dir
+                };
+                const onMove = (ev) => {
+                    const dx = ev.clientX - start.x;
+                    const dy = ev.clientY - start.y;
+                    let newW = start.w, newH = start.h, newLeft = start.left, newTop = start.top;
+                    if (dir.includes('e')) newW = Math.max(80, start.w + dx);
+                    if (dir.includes('s')) newH = Math.max(24, start.h + dy);
+                    if (dir.includes('w')) { newW = Math.max(80, start.w - dx); newLeft = start.left + dx; }
+                    if (dir.includes('n')) { newH = Math.max(24, start.h - dy); newTop = start.top + dy; }
+                    wrapper.style.width = `${newW}px`;
+                    wrapper.style.height = `${newH}px`;
+                    wrapper.style.left = `${newLeft}px`;
+                    wrapper.style.top = `${newTop}px`;
+                    textarea.style.width = `${Math.max(minWBound, newW)}px`;
+                    textarea.style.height = `${Math.max(minHBound, newH)}px`;
+                    placeHandles();
+                };
+                const onUp = () => {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                };
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
             };
-            const onMove = (ev) => {
-                const dx = ev.clientX - start.x;
-                const dy = ev.clientY - start.y;
-                let newW = start.w, newH = start.h, newLeft = start.left, newTop = start.top;
-                if (dir.includes('e')) newW = Math.max(80, start.w + dx);
-                if (dir.includes('s')) newH = Math.max(24, start.h + dy);
-                if (dir.includes('w')) { newW = Math.max(80, start.w - dx); newLeft = start.left + dx; }
-                if (dir.includes('n')) { newH = Math.max(24, start.h - dy); newTop = start.top + dy; }
-                wrapper.style.width = `${newW}px`;
-                wrapper.style.height = `${newH}px`;
-                wrapper.style.left = `${newLeft}px`;
-                wrapper.style.top = `${newTop}px`;
-                textarea.style.width = `${Math.max(minWBound, newW)}px`;
-                textarea.style.height = `${Math.max(minHBound, newH)}px`;
-                placeHandles();
-            };
-            const onUp = () => {
-                document.removeEventListener('mousemove', onMove);
-                document.removeEventListener('mouseup', onUp);
-            };
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
-        };
-        handles.forEach(h => h.addEventListener('mousedown', onHandleDown));
+            handles.forEach(h => h.addEventListener('mousedown', onHandleDown));
+        }
         // Завершение
         const finalize = (commit) => {
             console.log('🔧 SelectTool: finalize called with commit:', commit, 'objectId:', objectId, 'objectType:', this.textEditor.objectType);
@@ -1602,6 +1655,11 @@ export class SelectTool extends BaseTool {
             // Сохраняем objectType ДО сброса this.textEditor
             const currentObjectType = this.textEditor.objectType;
             console.log('🔧 SelectTool: finalize - saved objectType:', currentObjectType);
+            
+            // Для записок показываем статичный текст после завершения редактирования
+            if (currentObjectType === 'note' && objectId) {
+                this.emit(Events.Tool.ShowObjectText, { objectId });
+            }
             
             wrapper.remove();
             this.textEditor = { active: false, objectId: null, textarea: null, wrapper: null, world: null, position: null, properties: null };
@@ -1675,6 +1733,11 @@ export class SelectTool extends BaseTool {
         const properties = this.textEditor.properties;
         
         console.log('🔧 SelectTool: _closeTextEditor - objectType:', objectType, 'objectId:', objectId, 'commitValue:', commitValue);
+        
+        // Для записок показываем статичный текст после завершения редактирования
+        if (objectType === 'note' && objectId) {
+            this.emit(Events.Tool.ShowObjectText, { objectId });
+        }
         
         textarea.remove();
         this.textEditor = { active: false, objectId: null, textarea: null, world: null, objectType: 'text' };

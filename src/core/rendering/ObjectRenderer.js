@@ -277,6 +277,34 @@ export class ObjectRenderer {
     }
 
     /**
+     * Скрыть текст объекта (используется во время редактирования)
+     * @param {string} objectId - ID объекта
+     */
+    hideObjectText(objectId) {
+        const pixiObject = this.objects.get(objectId);
+        if (!pixiObject) return;
+
+        const meta = pixiObject._mb || {};
+        if (meta.instance && typeof meta.instance.hideText === 'function') {
+            meta.instance.hideText();
+        }
+    }
+
+    /**
+     * Показать текст объекта (используется после завершения редактирования)
+     * @param {string} objectId - ID объекта
+     */
+    showObjectText(objectId) {
+        const pixiObject = this.objects.get(objectId);
+        if (!pixiObject) return;
+
+        const meta = pixiObject._mb || {};
+        if (meta.instance && typeof meta.instance.showText === 'function') {
+            meta.instance.showText();
+        }
+    }
+
+    /**
      * Обновить угол поворота объекта
      * @param {string} objectId - ID объекта
      * @param {number} angleDegrees - Угол в градусах
