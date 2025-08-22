@@ -29,7 +29,7 @@ export class Toolbar {
             { id: 'select', icon: '↖', title: 'Инструмент выделения (V)', type: 'activate-select' },
             { id: 'pan', icon: '✋', title: 'Панорамирование (Пробел)', type: 'activate-pan' },
             { id: 'divider', type: 'divider' },
-            { id: 'text-add', icon: 'T+', title: 'Добавить текст (клик сразу откроет редактирование)', type: 'text-add' },
+                         { id: 'text-add', icon: 'T+', title: 'Добавить текст', type: 'text-add' },
             { id: 'note', icon: '📝', title: 'Добавить записку', type: 'note-add' },
             { id: 'image', icon: '🖼️', title: 'Добавить картинку', type: 'image-add' },
             { id: 'shapes', icon: '🔷', title: 'Фигуры', type: 'custom-shapes' },
@@ -41,7 +41,7 @@ export class Toolbar {
 
         // Существующие элементы ниже новых
         const existingTools = [
-            { id: 'frame', icon: '🖼️', title: 'Добавить рамку', type: 'frame' },
+                         { id: 'frame', icon: '🖼️', title: 'Добавить фрейм', type: 'frame' },
             { id: 'divider', type: 'divider' },
             { id: 'clear', icon: '🗑️', title: 'Очистить холст', type: 'clear' },
             { id: 'divider', type: 'divider' },
@@ -85,7 +85,6 @@ export class Toolbar {
         button.textContent = tool.icon || '';
         button.dataset.tool = tool.type;
         button.dataset.toolId = tool.id;
-        if (tool.title) button.title = tool.title;
         
         // Устанавливаем disabled состояние если указано
         if (tool.disabled) {
@@ -93,9 +92,86 @@ export class Toolbar {
             button.classList.add('moodboard-toolbar__button--disabled');
         }
         
+        // Создаем tooltip если есть title
+        if (tool.title) {
+            this.createTooltip(button, tool.title);
+        }
+        
         // Специальных визуальных замен нет
 
         return button;
+    }
+    
+    /**
+     * Создает tooltip для кнопки
+     */
+    createTooltip(button, text) {
+        // Создаем элемент tooltip
+        const tooltip = document.createElement('div');
+        tooltip.className = 'moodboard-tooltip';
+        tooltip.textContent = text;
+        
+        // Добавляем tooltip в DOM
+        document.body.appendChild(tooltip);
+        
+        // Переменные для управления tooltip
+        let showTimeout;
+        let hideTimeout;
+        
+        // Показываем tooltip при наведении
+        button.addEventListener('mouseenter', () => {
+            clearTimeout(hideTimeout);
+            showTimeout = setTimeout(() => {
+                this.showTooltip(tooltip, button);
+            }, 300); // Задержка 300ms перед показом
+        });
+        
+        // Скрываем tooltip при уходе мыши
+        button.addEventListener('mouseleave', () => {
+            clearTimeout(showTimeout);
+            hideTimeout = setTimeout(() => {
+                this.hideTooltip(tooltip);
+            }, 100); // Задержка 100ms перед скрытием
+        });
+        
+        // Скрываем tooltip при клике
+        button.addEventListener('click', () => {
+            clearTimeout(showTimeout);
+            this.hideTooltip(tooltip);
+        });
+        
+        // Сохраняем ссылку на tooltip в кнопке для очистки
+        button._tooltip = tooltip;
+    }
+    
+    /**
+     * Показывает tooltip
+     */
+    showTooltip(tooltip, button) {
+        // Получаем позицию кнопки
+        const buttonRect = button.getBoundingClientRect();
+        const toolbarRect = this.element.getBoundingClientRect();
+        
+        // Позиционируем tooltip справа от кнопки
+        const left = buttonRect.right + 8; // 8px отступ справа от кнопки
+        const top = buttonRect.top + (buttonRect.height / 2) - (tooltip.offsetHeight / 2); // центрируем по вертикали
+        
+        // Проверяем, чтобы tooltip не выходил за правую границу экрана
+        const maxLeft = window.innerWidth - tooltip.offsetWidth - 8;
+        const adjustedLeft = Math.min(left, maxLeft);
+        
+        tooltip.style.left = `${adjustedLeft}px`;
+        tooltip.style.top = `${top}px`;
+        
+        // Показываем tooltip
+        tooltip.classList.add('moodboard-tooltip--show');
+    }
+    
+    /**
+     * Скрывает tooltip
+     */
+    hideTooltip(tooltip) {
+        tooltip.classList.remove('moodboard-tooltip--show');
     }
     
     /**
@@ -789,6 +865,15 @@ export class Toolbar {
      */
     destroy() {
         if (this.element) {
+            // Очищаем все tooltips перед удалением элемента
+            const buttons = this.element.querySelectorAll('.moodboard-toolbar__button');
+            buttons.forEach(button => {
+                if (button._tooltip) {
+                    button._tooltip.remove();
+                    button._tooltip = null;
+                }
+            });
+            
             this.element.remove();
             this.element = null;
         }

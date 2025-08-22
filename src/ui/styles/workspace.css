@@ -206,6 +206,7 @@
     cursor: pointer;
     transition: all 0.2s ease;
     text-align: center;
+    position: relative; /* Для позиционирования tooltip */
 }
 
 .moodboard-toolbar__button:hover {
@@ -829,4 +830,54 @@
         overflow-x: auto;
         padding: 10px;
     }
+}
+
+/* Tooltips */
+.moodboard-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 10000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    transform: translateX(-4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.moodboard-tooltip::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -4px;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-right: 4px solid rgba(0, 0, 0, 0.9);
+}
+
+.moodboard-tooltip--show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+/* Dark theme tooltips */
+.moodboard-toolbar--dark .moodboard-tooltip {
+    background: rgba(255, 255, 255, 0.95);
+    color: #1a1a1a;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.moodboard-toolbar--dark .moodboard-tooltip::before {
+    border-right-color: rgba(255, 255, 255, 0.95);
 }
