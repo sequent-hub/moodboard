@@ -180,6 +180,12 @@ export class FilePropertiesPanel {
             const objects = this.core.state.getObjects();
             const fileObject = objects.find(obj => obj.id === this.currentId);
             
+            console.log('📎 FilePropertiesPanel: Скачивание файла:', {
+                currentId: this.currentId,
+                fileObject: fileObject,
+                hasFileUploadService: !!this.core?.fileUploadService
+            });
+            
             if (!fileObject || fileObject.type !== 'file') {
                 console.warn('FilePropertiesPanel: объект не найден или не является файлом');
                 return;
@@ -187,6 +193,12 @@ export class FilePropertiesPanel {
 
             const fileId = fileObject.fileId;
             const fileName = fileObject.properties?.fileName || 'file';
+
+            console.log('📎 FilePropertiesPanel: Данные файла для скачивания:', {
+                fileId,
+                fileName,
+                downloadUrl: this.core.fileUploadService.getDownloadUrl(fileId)
+            });
 
             if (!fileId) {
                 console.warn('FilePropertiesPanel: у файла нет fileId');
@@ -207,6 +219,7 @@ export class FilePropertiesPanel {
 
             // Скачиваем файл
             await this.core.fileUploadService.downloadFile(fileId, fileName);
+            console.log('✅ Файл скачан:', fileName);
 
             // Восстанавливаем кнопку
             setTimeout(() => {

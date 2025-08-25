@@ -395,10 +395,20 @@ export class KeyboardManager {
         
         // Удаление выделенных объектов
         this.registerShortcut('delete', () => {
+            // Проверяем, не активен ли какой-либо текстовый редактор
+            if (this._isTextEditorActive()) {
+                console.log('🔒 KeyboardManager: Текстовый редактор активен, пропускаем удаление объектов');
+                return;
+            }
             this.eventBus.emit(Events.Keyboard.Delete);
         }, { description: 'Удалить выделенные объекты' });
         
         this.registerShortcut('backspace', () => {
+            // Проверяем, не активен ли какой-либо текстовый редактор
+            if (this._isTextEditorActive()) {
+                console.log('🔒 KeyboardManager: Текстовый редактор активен, пропускаем удаление объектов');
+                return;
+            }
             this.eventBus.emit(Events.Keyboard.Delete);
         }, { description: 'Удалить выделенные объекты' });
         
@@ -580,10 +590,20 @@ export class KeyboardManager {
         
         // Удаление
         this.registerShortcut('delete', () => {
+            // Проверяем, не активен ли какой-либо текстовый редактор
+            if (this._isTextEditorActive()) {
+                console.log('🔒 KeyboardManager: Текстовый редактор активен, пропускаем удаление объектов');
+                return;
+            }
             this.eventBus.emit(Events.Keyboard.Delete);
         }, { description: 'Удалить объект', preventDefault: true });
         
         this.registerShortcut('backspace', () => {
+            // Проверяем, не активен ли какой-либо текстовый редактор
+            if (this._isTextEditorActive()) {
+                console.log('🔒 KeyboardManager: Текстовый редактор активен, пропускаем удаление объектов');
+                return;
+            }
             this.eventBus.emit(Events.Keyboard.Delete);
         }, { description: 'Удалить объект', preventDefault: true });
         
@@ -647,6 +667,37 @@ export class KeyboardManager {
         }, { description: 'Переместить вправо', preventDefault: true });
 
 
+    }
+
+    /**
+     * Проверяет, активен ли какой-либо текстовый редактор
+     * @private
+     */
+    _isTextEditorActive() {
+        // Проверяем фокус на стандартных HTML элементах ввода
+        const activeElement = document.activeElement;
+        
+        if (activeElement && (
+            activeElement.tagName === 'INPUT' || 
+            activeElement.tagName === 'TEXTAREA' ||
+            activeElement.contentEditable === 'true'
+        )) {
+            return true;
+        }
+        
+        // Проверяем наличие активных редакторов названий файлов
+        const fileNameEditor = document.querySelector('.moodboard-file-name-editor');
+        if (fileNameEditor && fileNameEditor.style.display !== 'none') {
+            return true;
+        }
+        
+        // Проверяем наличие активных редакторов текста
+        const textEditor = document.querySelector('.moodboard-text-editor');
+        if (textEditor && textEditor.style.display !== 'none') {
+            return true;
+        }
+        
+        return false;
     }
 
     /**
