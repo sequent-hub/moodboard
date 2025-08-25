@@ -7,13 +7,14 @@ import * as PIXI from 'pixi.js';
  * Логика: выбираем инструмент/вариант на тулбаре → кликаем на холст → объект создаётся → возврат к Select
  */
 export class PlacementTool extends BaseTool {
-    constructor(eventBus) {
+    constructor(eventBus, core = null) {
         super('place', eventBus);
         this.cursor = 'crosshair';
         this.hotkey = null;
         this.app = null;
         this.world = null;
         this.pending = null; // { type, properties }
+        this.core = core;
 
         if (this.eventBus) {
             this.eventBus.on(Events.Place.Set, (cfg) => {
@@ -115,25 +116,32 @@ export class PlacementTool extends BaseTool {
                     const file = input.files && input.files[0];
                     if (!file) return;
                     // Читаем как DataURL, чтобы не использовать blob: URL (устраняем ERR_FILE_NOT_FOUND)
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        const dataUrl = reader.result;
-                        const img = new Image();
-                        img.onload = () => {
-                            const natW = img.naturalWidth || img.width || 1;
-                            const natH = img.naturalHeight || img.height || 1;
-                            const targetW = 300; // дефолтная ширина
-                            const targetH = Math.max(1, Math.round(natH * (targetW / natW)));
-                            this.eventBus.emit(Events.UI.ToolbarAction, {
-                                type: 'image',
-                                id: 'image',
-                                position,
-                                properties: { src: dataUrl, name: file.name, width: targetW, height: targetH }
-                            });
-                        };
-                        img.src = dataUrl;
-                    };
-                    reader.readAsDataURL(file);
+                    // Загружаем файл на сервер
+                    try {
+                        const uploadResult = await this.core.imageUploadService.uploadImage(file, file.name);
+                        
+                        // Вычисляем целевой размер
+                        const natW = uploadResult.width || 1;
+                        const natH = uploadResult.height || 1;
+                        const targetW = 300; // дефолтная ширина
+                        const targetH = Math.max(1, Math.round(natH * (targetW / natW)));
+                        
+                        this.eventBus.emit(Events.UI.ToolbarAction, {
+                            type: 'image',
+                            id: 'image',
+                            position,
+                            properties: { 
+                                src: uploadResult.url, 
+                                name: uploadResult.name, 
+                                width: targetW, 
+                                height: targetH 
+                            },
+                            imageId: uploadResult.id // Сохраняем ID изображения
+                        });
+                    } catch (error) {
+                        console.error('Ошибка загрузки изображения:', error);
+                        alert('Ошибка загрузки изображения: ' + error.message);
+                    }
                 } finally {
                     input.remove();
                 }

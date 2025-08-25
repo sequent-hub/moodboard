@@ -3,15 +3,41 @@
  */
 import { Events } from './events/Events.js';
 export class KeyboardManager {
-    constructor(eventBus, targetElement = document) {
+    constructor(eventBus, targetElement = document, core = null) {
         this.eventBus = eventBus;
         this.targetElement = targetElement;
+        this.core = core;
         this.shortcuts = new Map();
         this.isListening = false;
         
         // Привязываем контекст методов
         this.handleKeyDown = this.handleKeyDown.bind(this);
         this.handleKeyUp = this.handleKeyUp.bind(this);
+    }
+
+    /**
+     * Обрабатывает загрузку изображения на сервер
+     * @private
+     */
+    async _handleImageUpload(dataUrl, fileName) {
+        try {
+            if (this.core && this.core.imageUploadService) {
+                // Загружаем на сервер
+                const uploadResult = await this.core.imageUploadService.uploadFromDataUrl(dataUrl, fileName);
+                this.eventBus.emit(Events.UI.PasteImage, { 
+                    src: uploadResult.url, 
+                    name: uploadResult.name,
+                    imageId: uploadResult.id
+                });
+            } else {
+                // Fallback к старому способу
+                this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: fileName });
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки изображения:', error);
+            // В случае ошибки используем base64 как fallback
+            this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: fileName });
+        }
     }
     
     /**
@@ -38,7 +64,7 @@ export class KeyboardManager {
                         const reader = new FileReader();
                         reader.onload = () => {
                             const dataUrl = reader.result;
-                            this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: file.name });
+                            this._handleImageUpload(dataUrl, file.name);
                         };
                         reader.readAsDataURL(file);
                         handled = true;
@@ -53,7 +79,7 @@ export class KeyboardManager {
                     const reader = new FileReader();
                     reader.onload = () => {
                         const dataUrl = reader.result;
-                        this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: imgFile.name });
+                        this._handleImageUpload(dataUrl, imgFile.name);
                     };
                     reader.readAsDataURL(imgFile);
                     return;
@@ -66,7 +92,7 @@ export class KeyboardManager {
                         const srcInHtml = m[1];
                         if (/^data:image\//i.test(srcInHtml)) {
                             e.preventDefault();
-                            this.eventBus.emit(Events.UI.PasteImage, { src: srcInHtml, name: 'clipboard-image.png' });
+                            this._handleImageUpload(srcInHtml, 'clipboard-image.png');
                             return;
                         }
                         if (/^https?:\/\//i.test(srcInHtml)) {
@@ -75,7 +101,7 @@ export class KeyboardManager {
                                 const resp = await fetch(srcInHtml, { mode: 'cors' });
                                 const blob = await resp.blob();
                                 const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
-                                this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: srcInHtml.split('/').pop() || 'image' });
+                                this._handleImageUpload(dataUrl, srcInHtml.split('/').pop() || 'image');
                             } catch (_) {
                                 // как fallback, попробуем напрямую URL
                                 this.eventBus.emit(Events.UI.PasteImage, { src: srcInHtml, name: srcInHtml.split('/').pop() || 'image' });
@@ -93,7 +119,7 @@ export class KeyboardManager {
                                         const blob = await it.getType(imgType);
                                         const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
                                         e.preventDefault();
-                                        this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: `clipboard.${imgType.split('/')[1] || 'png'}` });
+                                        this._handleImageUpload(dataUrl, `clipboard.${imgType.split('/')[1] || 'png'}`);
                                         return;
                                     }
                                 }
@@ -110,7 +136,7 @@ export class KeyboardManager {
                     const looksLikeImage = /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(trimmed);
                     if (isDataUrl) {
                         e.preventDefault();
-                        this.eventBus.emit(Events.UI.PasteImage, { src: trimmed, name: 'clipboard-image.png' });
+                        this._handleImageUpload(trimmed, 'clipboard-image.png');
                         return;
                     }
                     if (isHttpUrl && looksLikeImage) {
@@ -119,7 +145,7 @@ export class KeyboardManager {
                             const resp = await fetch(trimmed, { mode: 'cors' });
                             const blob = await resp.blob();
                             const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
-                            this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: trimmed.split('/').pop() || 'image' });
+                            this._handleImageUpload(dataUrl, trimmed.split('/').pop() || 'image');
                             return;
                         } catch (_) {
                             // Если не удалось из-за CORS, попробуем напрямую URL (PIXI загрузит)
@@ -138,7 +164,7 @@ export class KeyboardManager {
                             const blob = await it.getType(imgType);
                             const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
                             e.preventDefault();
-                            this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: `clipboard.${imgType.split('/')[1] || 'png'}` });
+                            this._handleImageUpload(dataUrl, `clipboard.${imgType.split('/')[1] || 'png'}`);
                             return;
                         }
                     }

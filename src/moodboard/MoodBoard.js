@@ -16,6 +16,7 @@ import { TextPropertiesPanel } from '../ui/TextPropertiesPanel.js';
 import { FramePropertiesPanel } from '../ui/FramePropertiesPanel.js';
 import { NotePropertiesPanel } from '../ui/NotePropertiesPanel.js';
 import { AlignmentGuides } from '../tools/AlignmentGuides.js';
+import { ImageUploadService } from '../services/ImageUploadService.js';
 
 /**
  * Готовый MoodBoard с UI - главный класс пакета
@@ -102,6 +103,12 @@ export class MoodBoard {
                 this.coreMoodboard.pixi.app,
                 () => this.coreMoodboard.state.getObjects()
             );
+            
+            // Сервис загрузки изображений
+            this.imageUploadService = new ImageUploadService(this.coreMoodboard.apiClient);
+            
+            // Предоставляем доступ к сервису через core
+            this.coreMoodboard.imageUploadService = this.imageUploadService;
             
             // Загружаем данные (сначала пробуем загрузить с сервера, потом дефолтные)
             await this.loadExistingBoard();
@@ -283,13 +290,25 @@ export class MoodBoard {
             const boardData = await this.coreMoodboard.saveManager.loadBoardData(boardId);
             
             if (boardData && boardData.objects) {
-                this.dataManager.loadData(boardData);
+                // Восстанавливаем URL изображений перед загрузкой (если метод доступен)
+                let restoredData = boardData;
+                if (this.coreMoodboard.apiClient && typeof this.coreMoodboard.apiClient.restoreImageUrls === 'function') {
+                    try {
+                        restoredData = await this.coreMoodboard.apiClient.restoreImageUrls(boardData);
+                    } catch (error) {
+                        console.warn('Не удалось восстановить URL изображений:', error);
+                        restoredData = boardData; // Используем исходные данные
+                    }
+                }
+                this.dataManager.loadData(restoredData);
             } else {
                 this.dataManager.loadData(this.data);
             }
             
         } catch (error) {
             console.warn('⚠️ Ошибка загрузки доски, создаем новую:', error.message);
+            console.debug('ApiClient доступен:', !!this.coreMoodboard.apiClient);
+            console.debug('Метод restoreImageUrls доступен:', !!(this.coreMoodboard.apiClient && typeof this.coreMoodboard.apiClient.restoreImageUrls === 'function'));
             // Если загрузка не удалась, используем дефолтные данные
             this.dataManager.loadData(this.data);
         }

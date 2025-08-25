@@ -5,6 +5,8 @@ import { EventBus } from './EventBus.js';
 import { KeyboardManager } from './KeyboardManager.js';
 import { SaveManager } from './SaveManager.js';
 import { HistoryManager } from './HistoryManager.js';
+import { ApiClient } from './ApiClient.js';
+import { ImageUploadService } from '../services/ImageUploadService.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
 import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand, GroupRotateCommand, GroupResizeCommand, ReorderZCommand, GroupReorderZCommand } from './commands/index.js';
@@ -37,9 +39,11 @@ export class CoreMoodBoard {
         this.eventBus = new EventBus();
         this.state = new StateManager(this.eventBus);
         this.pixi = new PixiEngine(this.container, this.eventBus, this.options);
-        this.keyboard = new KeyboardManager(this.eventBus);
+        this.keyboard = new KeyboardManager(this.eventBus, document, this);
         this.saveManager = new SaveManager(this.eventBus, this.options);
         this.history = new HistoryManager(this.eventBus);
+        this.apiClient = new ApiClient();
+        this.imageUploadService = new ImageUploadService(this.apiClient);
         this.toolManager = null; // Инициализируется в init()
         
         // Для отслеживания перетаскивания
@@ -113,7 +117,7 @@ export class CoreMoodBoard {
 
         // Инструмент размещения объектов по клику (универсальный)
         const placementToolModule = await import('../tools/object-tools/PlacementTool.js');
-        const placementTool = new placementToolModule.PlacementTool(this.eventBus);
+        const placementTool = new placementToolModule.PlacementTool(this.eventBus, this);
         this.toolManager.registerTool(placementTool);
 
         // Инструмент текста
@@ -244,7 +248,7 @@ export class CoreMoodBoard {
         });
 
         // Вставка изображения из буфера обмена — по курсору, если он над холстом; иначе по центру
-        this.eventBus.on(Events.UI.PasteImage, ({ src, name }) => {
+        this.eventBus.on(Events.UI.PasteImage, ({ src, name, imageId }) => {
             if (!src) return;
             const view = this.pixi.app.view;
             const world = this.pixi.worldLayer || this.pixi.app.stage;
@@ -255,17 +259,21 @@ export class CoreMoodBoard {
             const worldX = (screenX - (world?.x || 0)) / s;
             const worldY = (screenY - (world?.y || 0)) / s;
             // Центруем изображение под курсором (ширина 300)
-            this.createObject('image', { x: Math.round(worldX - 150), y: Math.round(worldY - 100) }, { src, name, width: 300, height: 200 });
+            const properties = { src, name, width: 300, height: 200 };
+            const extraData = imageId ? { imageId } : {};
+            this.createObject('image', { x: Math.round(worldX - 150), y: Math.round(worldY - 100) }, properties, extraData);
         });
 
         // Вставка изображения из буфера обмена по контекстному клику (координаты на экране)
-        this.eventBus.on(Events.UI.PasteImageAt, ({ x, y, src, name }) => {
+        this.eventBus.on(Events.UI.PasteImageAt, ({ x, y, src, name, imageId }) => {
             if (!src) return;
             const world = this.pixi.worldLayer || this.pixi.app.stage;
             const s = world?.scale?.x || 1;
             const worldX = (x - (world?.x || 0)) / s;
             const worldY = (y - (world?.y || 0)) / s;
-            this.createObject('image', { x: Math.round(worldX - 150), y: Math.round(worldY - 100) }, { src, name, width: 300, height: 200 });
+            const properties = { src, name, width: 300, height: 200 };
+            const extraData = imageId ? { imageId } : {};
+            this.createObject('image', { x: Math.round(worldX - 150), y: Math.round(worldY - 100) }, properties, extraData);
         });
 
         // Слойность: изменение порядка отрисовки (локальные операции)
@@ -1387,7 +1395,7 @@ export class CoreMoodBoard {
         }
     }
 
-    createObject(type, position, properties = {}) {
+    createObject(type, position, properties = {}, extraData = {}) {
         const exists = (id) => {
             const inState = (this.state.state.objects || []).some(o => o.id === id);
             const inPixi = this.pixi?.objects?.has ? this.pixi.objects.has(id) : false;
@@ -1405,7 +1413,8 @@ export class CoreMoodBoard {
             created: new Date().toISOString(),
             transform: {
                 pivotCompensated: false  // Новые объекты еще не скомпенсированы
-            }
+            },
+            ...extraData  // Добавляем дополнительные данные (например, imageId)
         };
 
         // Создаем и выполняем команду создания объекта
