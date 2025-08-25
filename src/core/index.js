@@ -100,7 +100,7 @@ export class CoreMoodBoard {
         this.workspaceSize = () => ({ width: canvasElement.clientWidth, height: canvasElement.clientHeight });
         
         // Создаем ToolManager
-        this.toolManager = new ToolManager(this.eventBus, canvasElement, this.pixi.app);
+        this.toolManager = new ToolManager(this.eventBus, canvasElement, this.pixi.app, this);
         
         // Регистрируем инструменты
         const selectTool = new SelectTool(this.eventBus);

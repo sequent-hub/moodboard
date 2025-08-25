@@ -4,10 +4,11 @@ import { Events } from '../core/events/Events.js';
  * Менеджер инструментов - управляет активными инструментами и переключением между ними
  */
 export class ToolManager {
-    constructor(eventBus, container, pixiApp = null) {
+    constructor(eventBus, container, pixiApp = null, core = null) {
         this.eventBus = eventBus;
         this.container = container; // DOM элемент для обработки событий
         this.pixiApp = pixiApp; // PIXI Application для передачи в инструменты
+        this.core = core; // Ссылка на core для доступа к imageUploadService
         this.tools = new Map();
         this.activeTool = null;
         this.defaultTool = null;
@@ -350,9 +351,15 @@ export class ToolManager {
         const dt = e.dataTransfer;
         if (!dt) return;
 
-        const emitAt = (src, name, offsetIndex = 0) => {
+        const emitAt = (src, name, imageId = null, offsetIndex = 0) => {
             const offset = 25 * offsetIndex;
-            this.eventBus.emit(Events.UI.PasteImageAt, { x: x + offset, y: y + offset, src, name });
+            this.eventBus.emit(Events.UI.PasteImageAt, { 
+                x: x + offset, 
+                y: y + offset, 
+                src, 
+                name,
+                imageId 
+            });
         };
 
         // 1) Файлы с рабочего стола
@@ -361,11 +368,34 @@ export class ToolManager {
         if (imageFiles.length > 0) {
             let index = 0;
             for (const file of imageFiles) {
-                await new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = () => { emitAt(reader.result, file.name || 'image', index++); resolve(); };
-                    reader.readAsDataURL(file);
-                });
+                try {
+                    // Пытаемся загрузить изображение на сервер
+                    if (this.core && this.core.imageUploadService) {
+                        const uploadResult = await this.core.imageUploadService.uploadImage(file, file.name || 'image');
+                        emitAt(uploadResult.url, uploadResult.name, uploadResult.id, index++);
+                    } else {
+                        // Fallback к старому способу (base64)
+                        await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = () => { 
+                                emitAt(reader.result, file.name || 'image', null, index++); 
+                                resolve(); 
+                            };
+                            reader.readAsDataURL(file);
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Ошибка загрузки изображения через drag-and-drop:', error);
+                    // Fallback к base64 при ошибке
+                    await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = () => { 
+                            emitAt(reader.result, file.name || 'image', null, index++); 
+                            resolve(); 
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                }
             }
             return;
         }
