@@ -44,6 +44,9 @@ export class CoreMoodBoard {
         this.history = new HistoryManager(this.eventBus);
         this.apiClient = new ApiClient();
         this.imageUploadService = new ImageUploadService(this.apiClient);
+        
+        // Связываем SaveManager с ApiClient для правильной обработки изображений
+        this.saveManager.setApiClient(this.apiClient);
         this.toolManager = null; // Инициализируется в init()
         
         // Для отслеживания перетаскивания
@@ -1287,8 +1290,17 @@ export class CoreMoodBoard {
         });
 
         // Обработка успешного сохранения
-        this.eventBus.on(Events.Save.Success, (data) => {
-
+        this.eventBus.on(Events.Save.Success, async (data) => {
+            // Автоматически очищаем неиспользуемые изображения после сохранения
+            try {
+                const result = await this.cleanupUnusedImages();
+                if (result.deletedCount > 0) {
+                    console.log(`✅ Автоматически очищено ${result.deletedCount} неиспользуемых изображений`);
+                }
+            } catch (error) {
+                // Не прерываем выполнение при ошибке cleanup
+                console.warn('⚠️ Не удалось выполнить автоматическую очистку изображений:', error.message);
+            }
         });
     }
 
@@ -1511,6 +1523,45 @@ export class CoreMoodBoard {
      */
     getObjectData(objectId) {
         return this.state.getObjects().find(o => o.id === objectId);
+    }
+
+    /**
+     * Очищает неиспользуемые изображения с сервера
+     * @returns {Promise<{deletedCount: number, errors: Array}>}
+     */
+    async cleanupUnusedImages() {
+        try {
+            if (!this.imageUploadService) {
+                console.warn('ImageUploadService недоступен для очистки изображений');
+                return { deletedCount: 0, errors: ['ImageUploadService недоступен'] };
+            }
+
+            const result = await this.imageUploadService.cleanupUnusedImages();
+            
+            // Проверяем результат на корректность
+            if (!result || typeof result !== 'object') {
+                console.warn('Некорректный ответ от ImageUploadService:', result);
+                return { deletedCount: 0, errors: ['Некорректный ответ сервера'] };
+            }
+
+            const deletedCount = Number(result.deletedCount) || 0;
+            const errors = Array.isArray(result.errors) ? result.errors : [];
+
+            if (deletedCount > 0) {
+                console.log(`Очищено ${deletedCount} неиспользуемых изображений`);
+            }
+            if (errors.length > 0) {
+                console.warn('Ошибки при очистке изображений:', errors);
+            }
+
+            return { deletedCount, errors };
+        } catch (error) {
+            console.error('Ошибка при автоматической очистке изображений:', error);
+            return { 
+                deletedCount: 0, 
+                errors: [error?.message || 'Неизвестная ошибка'] 
+            };
+        }
     }
 
     destroy() {

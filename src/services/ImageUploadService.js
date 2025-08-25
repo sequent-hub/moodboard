@@ -113,6 +113,48 @@ export class ImageUploadService {
     }
 
     /**
+     * Очищает неиспользуемые изображения с сервера
+     * @returns {Promise<{deletedCount: number, errors: Array}>}
+     */
+    async cleanupUnusedImages() {
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            
+            const response = await fetch(`${this.deleteEndpoint}/cleanup`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                throw new Error(errorData?.message || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            
+            if (result.success) {
+                // Защитная проверка на существование result.data
+                const data = result.data || {};
+                return {
+                    deletedCount: data.deleted_count || 0,
+                    errors: data.errors || []
+                };
+            } else {
+                throw new Error(result.message || 'Ошибка очистки изображений');
+            }
+
+        } catch (error) {
+            console.error('Ошибка очистки неиспользуемых изображений:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Получает информацию об изображении
      * @param {string} imageId - ID изображения  
      */

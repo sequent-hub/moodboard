@@ -83,10 +83,10 @@ export class DataManager {
     /**
      * Создает объект на доске
      */
-    createObject(type, position, properties = {}) {
+    createObject(type, position, properties = {}, extraData = {}) {
         if (!this.coreMoodboard) return null;
         
-        return this.coreMoodboard.createObject(type, position, properties);
+        return this.coreMoodboard.createObject(type, position, properties, extraData);
     }
     
     /**

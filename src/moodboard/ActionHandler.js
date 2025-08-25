@@ -21,7 +21,9 @@ export class ActionHandler {
             case 'emoji':
             case 'image':
             case 'comment':
-                return this.handleCreateObject(action.type, action.position, action.properties || {});
+                // Передаем imageId как extraData для изображений
+                const extraData = action.imageId ? { imageId: action.imageId } : {};
+                return this.handleCreateObject(action.type, action.position, action.properties || {}, extraData);
 
             case 'delete-object':
                 if (action.id) {
@@ -44,14 +46,8 @@ export class ActionHandler {
     /**
      * Обрабатывает создание объекта
      */
-    handleCreateObject(type, position, properties = {}) {
-        console.log(`🔧 ActionHandler: handleCreateObject called with type: ${type}, position:`, position, 'properties:', properties);
-        const objectData = this.dataManager.createObject(type, position, properties);
-        
-        if (objectData) {
-            console.log(`Created ${type} object:`, objectData);
-        }
-        
+    handleCreateObject(type, position, properties = {}, extraData = {}) {
+        const objectData = this.dataManager.createObject(type, position, properties, extraData);
         return objectData;
     }
     
@@ -89,8 +85,8 @@ export class ActionHandler {
     /**
      * Обрабатывает программное создание объекта
      */
-    createObject(type, position, properties = {}) {
-        return this.dataManager.createObject(type, position, properties);
+    createObject(type, position, properties = {}, extraData = {}) {
+        return this.dataManager.createObject(type, position, properties, extraData);
     }
     
     /**

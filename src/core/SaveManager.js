@@ -5,6 +5,7 @@ import { Events } from './events/Events.js';
 export class SaveManager {
     constructor(eventBus, options = {}) {
         this.eventBus = eventBus;
+        this.apiClient = null; // Будет установлен позже через setApiClient
         this.options = {
             // Фиксированные настройки автосохранения (не настраиваются клиентом)
             autoSave: true,
@@ -28,6 +29,13 @@ export class SaveManager {
         this.saveStatus = 'idle'; // idle, saving, saved, error
         
         this.setupEventListeners();
+    }
+
+    /**
+     * Устанавливает ApiClient для использования в сохранении
+     */
+    setApiClient(apiClient) {
+        this.apiClient = apiClient;
     }
     
     /**
@@ -135,7 +143,10 @@ export class SaveManager {
             // Отправляем данные на сервер
             const response = await this.sendSaveRequest(saveData);
             
-            if (response.success) {
+            // Проверяем успешность сохранения (разные форматы от ApiClient и прямого запроса)
+            const isSuccess = response.success === true || (response.data !== undefined);
+            
+            if (isSuccess) {
                 this.lastSavedData = JSON.parse(JSON.stringify(saveData));
                 this.hasUnsavedChanges = false;
                 this.retryCount = 0;
@@ -173,6 +184,15 @@ export class SaveManager {
      * Отправка запроса на сохранение
      */
     async sendSaveRequest(data) {
+        const boardId = data.id || 'default';
+        
+        // Если есть ApiClient, используем его (он автоматически очистит данные изображений)
+        if (this.apiClient) {
+            return await this.apiClient.saveBoard(boardId, data);
+        }
+        
+        // Fallback к прямому запросу (без очистки изображений)
+        
         // Получаем CSRF токен
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
         
@@ -181,11 +201,9 @@ export class SaveManager {
         }
 
         const requestBody = {
-            boardId: data.id || 'default',
+            boardId: boardId,
             boardData: data
         };
-
-
 
         const response = await fetch(this.options.saveEndpoint, {
             method: 'POST',
