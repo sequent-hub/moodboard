@@ -39,6 +39,51 @@ export class KeyboardManager {
             this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: fileName });
         }
     }
+
+    /**
+     * Обработка загрузки файла изображения (более эффективно чем DataURL)
+     * @param {File} file - файл изображения 
+     * @param {string} fileName - имя файла
+     * @private
+     */
+    async _handleImageFileUpload(file, fileName) {
+        try {
+            if (this.core && this.core.imageUploadService) {
+                // Прямая загрузка файла на сервер (более эффективно)
+                const uploadResult = await this.core.imageUploadService.uploadImage(file, fileName);
+                this.eventBus.emit(Events.UI.PasteImage, { 
+                    src: uploadResult.url, 
+                    name: uploadResult.name,
+                    imageId: uploadResult.id
+                });
+            } else {
+                // Fallback к старому способу: конвертируем в DataURL
+                const reader = new FileReader();
+                reader.onload = () => {
+                    this.eventBus.emit(Events.UI.PasteImage, { 
+                        src: reader.result, 
+                        name: fileName 
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки файла изображения:', error);
+            // Fallback к DataURL при ошибке
+            try {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    this.eventBus.emit(Events.UI.PasteImage, { 
+                        src: reader.result, 
+                        name: fileName 
+                    });
+                };
+                reader.readAsDataURL(file);
+            } catch (fallbackError) {
+                console.error('Критическая ошибка при чтении файла:', fallbackError);
+            }
+        }
+    }
     
     /**
      * Начать прослушивание клавиатуры
@@ -61,12 +106,7 @@ export class KeyboardManager {
                     e.preventDefault();
                     const file = imageItem.getAsFile();
                     if (file) {
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                            const dataUrl = reader.result;
-                            this._handleImageUpload(dataUrl, file.name);
-                        };
-                        reader.readAsDataURL(file);
+                        await this._handleImageFileUpload(file, file.name || 'clipboard-image.png');
                         handled = true;
                     }
                 }
@@ -76,12 +116,7 @@ export class KeyboardManager {
                 const imgFile = files.find(f => f.type && f.type.startsWith('image/'));
                 if (imgFile) {
                     e.preventDefault();
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        const dataUrl = reader.result;
-                        this._handleImageUpload(dataUrl, imgFile.name);
-                    };
-                    reader.readAsDataURL(imgFile);
+                    await this._handleImageFileUpload(imgFile, imgFile.name || 'clipboard-image.png');
                     return;
                 }
                 // 3) text/html with <img src="...">
@@ -170,7 +205,7 @@ export class KeyboardManager {
                     }
                 } catch(_) {}
             } catch (err) {
-                // no-op
+                console.error('Error in paste handler:', err);
             }
         }, { capture: true });
         this.isListening = true;

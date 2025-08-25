@@ -247,18 +247,30 @@ export class CoreMoodBoard {
             this._cursor.y = y;
         });
 
-        // Вставка изображения из буфера обмена — по курсору, если он над холстом; иначе по центру
+        // Вставка изображения из буфера обмена — по курсору, если он над холстом; иначе по центру видимой области
         this.eventBus.on(Events.UI.PasteImage, ({ src, name, imageId }) => {
             if (!src) return;
             const view = this.pixi.app.view;
             const world = this.pixi.worldLayer || this.pixi.app.stage;
             const s = world?.scale?.x || 1;
             const hasCursor = Number.isFinite(this._cursor.x) && Number.isFinite(this._cursor.y);
-            const screenX = hasCursor ? this._cursor.x : (view.clientWidth / 2);
-            const screenY = hasCursor ? this._cursor.y : (view.clientHeight / 2);
+            
+            let screenX, screenY;
+            if (hasCursor) {
+                // Используем позицию курсора
+                screenX = this._cursor.x;
+                screenY = this._cursor.y;
+            } else {
+                // Центр экрана
+                screenX = view.clientWidth / 2;
+                screenY = view.clientHeight / 2;
+            }
+            
+            // Преобразуем экранные координаты в мировые (с учетом zoom и pan)
             const worldX = (screenX - (world?.x || 0)) / s;
             const worldY = (screenY - (world?.y || 0)) / s;
-            // Центруем изображение под курсором (ширина 300)
+            
+            // Центруем изображение относительно точки вставки
             const properties = { src, name, width: 300, height: 200 };
             const extraData = imageId ? { imageId } : {};
             this.createObject('image', { x: Math.round(worldX - 150), y: Math.round(worldY - 100) }, properties, extraData);
