@@ -55,16 +55,41 @@ export class DeleteObjectCommand extends BaseCommand {
             }
         }
         
+        // Для файлов сохраняем информацию для возможной очистки с сервера
+        if (this.objectData.type === 'file') {
+            console.log('🔧 DEBUG DeleteObjectCommand: исходные данные файла:', {
+                id: this.objectData.id,
+                fileId: this.objectData.fileId,
+                fileName: this.objectData.properties?.fileName
+            });
+            
+            if (this.objectData.fileId) {
+                // Сохраняем fileId для удаления с сервера
+                this.fileIdToDelete = this.objectData.fileId;
+                console.log('🔧 DEBUG DeleteObjectCommand: файл будет удален с сервера:', this.fileIdToDelete);
+            }
+        }
+        
         // Обновляем описание с типом объекта
         this.description = `Удалить ${this.objectData.type}`;
     }
 
-    execute() {
+    async execute() {
         // Удаляем объект из состояния и PIXI
         this.coreMoodboard.state.removeObject(this.objectId);
         this.coreMoodboard.pixi.removeObject(this.objectId);
         
-
+        // Если это файловый объект с fileId, удаляем файл с сервера
+        if (this.fileIdToDelete && this.coreMoodboard.fileUploadService) {
+            try {
+                console.log('🗑️ Удаляем файл с сервера:', this.fileIdToDelete);
+                await this.coreMoodboard.fileUploadService.deleteFile(this.fileIdToDelete);
+                console.log('✅ Файл успешно удален с сервера:', this.fileIdToDelete);
+            } catch (error) {
+                console.warn('⚠️ Ошибка удаления файла с сервера:', error);
+                // Не останавливаем выполнение команды, так как объект уже удален из UI
+            }
+        }
         
         this.coreMoodboard.eventBus.emit(Events.Object.Deleted, { 
             objectId: this.objectId 
@@ -83,10 +108,35 @@ export class DeleteObjectCommand extends BaseCommand {
                 hasBase64Props: !!(this.objectData.properties?.src && this.objectData.properties.src.startsWith('data:'))
             });
         }
-
-        // Восстанавливаем объект с сохраненными данными
-        this.coreMoodboard.state.addObject(this.objectData);
-        this.coreMoodboard.pixi.createObject(this.objectData);
+        
+        // Специальная обработка для файловых объектов
+        if (this.objectData.type === 'file' && this.fileIdToDelete) {
+            console.log('🔄 DEBUG Undo файла:', {
+                id: this.objectData.id,
+                fileId: this.objectData.fileId,
+                fileName: this.objectData.properties?.fileName
+            });
+            
+            // Файл был удален с сервера, создаем объект с предупреждением
+            const restoredObjectData = { ...this.objectData };
+            if (restoredObjectData.properties) {
+                restoredObjectData.properties = {
+                    ...restoredObjectData.properties,
+                    fileName: `[УДАЛЕН] ${restoredObjectData.properties.fileName || 'файл'}`,
+                    isDeleted: true // Флаг для FileObject чтобы показать другую иконку
+                };
+            }
+            
+            // Восстанавливаем объект с измененными данными
+            this.coreMoodboard.state.addObject(restoredObjectData);
+            this.coreMoodboard.pixi.createObject(restoredObjectData);
+            
+            console.warn('⚠️ Файл восстановлен на холсте, но был удален с сервера');
+        } else {
+            // Восстанавливаем объект с сохраненными данными (для всех остальных типов)
+            this.coreMoodboard.state.addObject(this.objectData);
+            this.coreMoodboard.pixi.createObject(this.objectData);
+        }
         
         this.coreMoodboard.eventBus.emit(Events.Object.Created, { 
             objectId: this.objectId, 

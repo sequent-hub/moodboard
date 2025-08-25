@@ -22,6 +22,7 @@ export class FileObject {
         this.fileSize = props.fileSize || 0;
         this.mimeType = props.mimeType || 'application/octet-stream';
         this.content = props.content || null;
+        this.isDeleted = props.isDeleted || false; // Флаг удаленного файла
         
         // Создаем контейнер для файла
         this.container = new PIXI.Container();
@@ -128,9 +129,11 @@ export class FileObject {
         g.drawRoundedRect(2, 2, w, h, 8);
         g.endFill();
         
-        // Основной фон
-        g.beginFill(0xF8F9FA, 1);
-        g.lineStyle(2, 0xDEE2E6, 1);
+        // Основной фон (блеклый для удаленных файлов)
+        const bgColor = this.isDeleted ? 0xF1F3F4 : 0xF8F9FA;
+        const borderColor = this.isDeleted ? 0xDADCE0 : 0xDEE2E6;
+        g.beginFill(bgColor, 1);
+        g.lineStyle(2, borderColor, 1);
         g.drawRoundedRect(0, 0, w, h, 8);
         g.endFill();
         
@@ -141,7 +144,7 @@ export class FileObject {
         
         // Определяем цвет иконки по расширению файла
         const extension = this._getFileExtension();
-        const iconColor = this._getIconColor(extension);
+        const iconColor = this.isDeleted ? 0x6B7280 : this._getIconColor(extension); // Серый цвет для удаленных файлов
         
         // Рисуем иконку файла
         this._drawFileIcon(g, iconX, iconY, iconSize, iconColor, extension);

@@ -43,7 +43,7 @@ export class HistoryManager {
     executeCommand(command) {
         if (this.isExecutingCommand) {
             // Если мы в процессе undo/redo, не добавляем в историю
-            command.execute();
+            this._executeCommandSafely(command);
             return;
         }
 
@@ -66,7 +66,7 @@ export class HistoryManager {
         }
 
         // Выполняем команду
-        command.execute();
+        this._executeCommandSafely(command);
 
         // Удаляем все команды после текущей позиции (если есть)
         if (this.currentIndex < this.history.length - 1) {
@@ -92,6 +92,24 @@ export class HistoryManager {
         });
 
 
+    }
+
+    /**
+     * Безопасно выполняет команду (поддерживает синхронные и асинхронные команды)
+     * @private
+     */
+    _executeCommandSafely(command) {
+        try {
+            const result = command.execute();
+            // Если команда возвращает Promise, обрабатываем асинхронно
+            if (result && typeof result.then === 'function') {
+                result.catch(error => {
+                    console.error('Ошибка выполнения асинхронной команды:', error);
+                });
+            }
+        } catch (error) {
+            console.error('Ошибка выполнения команды:', error);
+        }
     }
 
     /**
@@ -143,7 +161,7 @@ export class HistoryManager {
 
         this.isExecutingCommand = true;
         try {
-            command.execute();
+            this._executeCommandSafely(command);
             
             this.eventBus.emit(Events.History.Changed, {
                 canUndo: this.canUndo(),
