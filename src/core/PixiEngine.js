@@ -52,9 +52,10 @@ export class PixiEngine {
                 ...prevMb,
                 objectId: objectData.id,
                 type: objectData.type,
-                properties: objectData.properties || {},
-                instance
+                instance: instance // Сохраняем ссылку на сам объект
             };
+            this.objects.set(objectData.id, pixiObject);
+            this.worldLayer.addChild(pixiObject);
         } else {
             console.warn(`Unknown object type: ${objectData.type}`);
             pixiObject = this.createDefaultObject(objectData);

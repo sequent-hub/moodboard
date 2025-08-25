@@ -1033,8 +1033,30 @@ export class CoreMoodBoard {
                 const objects = this.state.getObjects();
                 const object = objects.find(obj => obj.id === objectId);
                 if (object) {
-                    // Обновляем свойства объекта
-                    Object.assign(object, updates);
+                    // Глубокое слияние для свойств, чтобы не терять остальные
+                    if (updates.properties && object.properties) {
+                        Object.assign(object.properties, updates.properties);
+                    }
+
+                    // Копируем остальные обновления верхнего уровня
+                    const topLevelUpdates = { ...updates };
+                    delete topLevelUpdates.properties;
+                    Object.assign(object, topLevelUpdates);
+                    
+                    // Обновляем PIXI объект, если есть специфичные обновления
+                    const pixiObject = this.pixi.objects.get(objectId);
+                    if (pixiObject && pixiObject._mb && pixiObject._mb.instance && updates.properties) {
+                        const instance = pixiObject._mb.instance;
+
+                        // Обновляем заголовок фрейма
+                        if (object.type === 'frame' && updates.properties.title !== undefined) {
+                            if (instance.setTitle) {
+                                instance.setTitle(updates.properties.title);
+                                console.log(`🖼️ Обновлен заголовок фрейма ${objectId}: "${updates.properties.title}"`);
+                            }
+                        }
+                    }
+                    
                     // Сохраняем изменения
                     this.state.markDirty();
                     console.log(`✅ Состояние объекта ${objectId} обновлено`);
@@ -1427,6 +1449,15 @@ export class CoreMoodBoard {
         // еще не реализована. В будущем здесь будет поиск объектов, которые
         // находятся внутри границ фрейма или связаны с ним другим способом.
         return [];
+    }
+
+    /**
+     * Получает данные объекта по ID
+     * @param {string} objectId 
+     * @returns {object | undefined}
+     */
+    getObjectData(objectId) {
+        return this.state.getObjects().find(o => o.id === objectId);
     }
 
     destroy() {

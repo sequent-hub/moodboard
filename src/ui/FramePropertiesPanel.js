@@ -112,17 +112,13 @@ export class FramePropertiesPanel {
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
             fontSize: '14px',
             fontFamily: 'Arial, sans-serif',
-            minWidth: '200px',
-            height: '44px',
+            minWidth: '280px',
+            height: '60px',
             zIndex: '10000'
         });
 
-        // Пока панель пустая, добавим только заглушку
-        const placeholder = document.createElement('span');
-        placeholder.textContent = 'Свойства фрейма';
-        placeholder.style.color = '#666';
-        placeholder.style.fontSize = '12px';
-        panel.appendChild(placeholder);
+        // Создаем контролы для фрейма
+        this._createFrameControls(panel);
 
         // Добавляем ID для удобной настройки через DevTools
         panel.id = 'frame-properties-panel';
@@ -186,6 +182,82 @@ export class FramePropertiesPanel {
             left: this.panel.style.left,
             top: this.panel.style.top
         });
+    }
+
+    _createFrameControls(panel) {
+        // Контейнер для названия
+        const titleContainer = document.createElement('div');
+        Object.assign(titleContainer.style, {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 12px'
+        });
+
+        // Лейбл
+        const titleLabel = document.createElement('span');
+        titleLabel.textContent = 'Название:';
+        titleLabel.style.fontSize = '12px';
+        titleLabel.style.color = '#666';
+        titleLabel.style.minWidth = '60px';
+
+        // Поле ввода для названия
+        const titleInput = document.createElement('input');
+        titleInput.type = 'text';
+        titleInput.placeholder = 'Название фрейма';
+        Object.assign(titleInput.style, {
+            flex: '1',
+            padding: '4px 8px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            fontSize: '12px',
+            outline: 'none'
+        });
+
+        // Обработчик изменения названия
+        titleInput.addEventListener('input', () => {
+            if (this.currentId) {
+                this._changeFrameTitle(titleInput.value);
+            }
+        });
+
+        // Обработчик Enter для подтверждения
+        titleInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                titleInput.blur();
+            }
+        });
+
+        // Сохраняем ссылку на поле ввода
+        this.titleInput = titleInput;
+
+        titleContainer.appendChild(titleLabel);
+        titleContainer.appendChild(titleInput);
+        panel.appendChild(titleContainer);
+    }
+
+    _changeFrameTitle(newTitle) {
+        if (!this.currentId) return;
+
+        console.log('🖼️ FramePropertiesPanel: Changing frame title to:', newTitle);
+
+        // Обновляем свойства объекта
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: { properties: { title: newTitle } }
+        });
+    }
+
+    _updateControlsFromObject() {
+        if (!this.currentId) return;
+
+        const objectData = this.core.getObjectData(this.currentId);
+        if (objectData && objectData.properties) {
+            // Обновляем поле названия
+            if (this.titleInput && objectData.properties.title !== undefined) {
+                this.titleInput.value = objectData.properties.title || '';
+            }
+        }
     }
 
     destroy() {
