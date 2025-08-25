@@ -10,7 +10,7 @@ import { ImageUploadService } from '../services/ImageUploadService.js';
 import { FileUploadService } from '../services/FileUploadService.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
-import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand, GroupRotateCommand, GroupResizeCommand, ReorderZCommand, GroupReorderZCommand } from './commands/index.js';
+import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand, GroupRotateCommand, GroupResizeCommand, ReorderZCommand, GroupReorderZCommand, EditFileNameCommand } from './commands/index.js';
 import { BoardService } from '../services/BoardService.js';
 import { ZoomPanController } from '../services/ZoomPanController.js';
 import { ZOrderManager } from '../services/ZOrderManager.js';
@@ -39,6 +39,11 @@ export class CoreMoodBoard {
 
         this.eventBus = new EventBus();
         this.state = new StateManager(this.eventBus);
+        
+        // Экспонируем EventBus глобально для асинхронных операций (например, из ApiClient)
+        if (typeof window !== 'undefined') {
+            window.moodboardEventBus = this.eventBus;
+        }
         this.pixi = new PixiEngine(this.container, this.eventBus, this.options);
         this.keyboard = new KeyboardManager(this.eventBus, document, this);
         this.saveManager = new SaveManager(this.eventBus, this.options);
@@ -1119,6 +1124,57 @@ export class CoreMoodBoard {
                     console.log(`✅ Состояние объекта ${objectId} обновлено`);
                 } else {
                     console.warn(`❌ Объект ${objectId} не найден в состоянии`);
+                }
+            }
+        });
+
+        // Обработка изменения названия файла
+        this.eventBus.on(Events.Object.FileNameChange, (data) => {
+            const { objectId, oldName, newName } = data;
+            if (objectId && oldName !== undefined && newName !== undefined) {
+                console.log(`🔧 Изменение названия файла ${objectId}: "${oldName}" → "${newName}"`);
+                
+                // Создаем команду для истории изменений
+                const command = new EditFileNameCommand(this, objectId, oldName, newName);
+                this.history.executeCommand(command);
+            }
+        });
+
+        // Обработка обновления метаданных файла с сервера
+        this.eventBus.on('file:metadata:updated', (data) => {
+            const { objectId, fileId, metadata } = data;
+            if (objectId && metadata) {
+                console.log(`🔄 Обновляем метаданные файла ${objectId} с сервера:`, metadata);
+                
+                // Обновляем объект в состоянии
+                const objects = this.state.getObjects();
+                const objectData = objects.find(obj => obj.id === objectId);
+                
+                if (objectData && objectData.type === 'file') {
+                    // Обновляем только измененные метаданные
+                    if (!objectData.properties) {
+                        objectData.properties = {};
+                    }
+                    
+                    // Синхронизируем название файла с сервером
+                    if (metadata.name && metadata.name !== objectData.properties.fileName) {
+                        objectData.properties.fileName = metadata.name;
+                        
+                        // Обновляем визуальное представление
+                        const pixiReq = { objectId, pixiObject: null };
+                        this.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
+                        
+                        if (pixiReq.pixiObject && pixiReq.pixiObject._mb && pixiReq.pixiObject._mb.instance) {
+                            const fileInstance = pixiReq.pixiObject._mb.instance;
+                            if (typeof fileInstance.setFileName === 'function') {
+                                fileInstance.setFileName(metadata.name);
+                            }
+                        }
+                        
+                        // Обновляем состояние
+                        this.state.markDirty();
+                        console.log(`✅ Метаданные файла ${objectId} синхронизированы с сервером`);
+                    }
                 }
             }
         });

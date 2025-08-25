@@ -238,13 +238,14 @@ export class ApiClient {
                         hasPropertiesUrl: !!obj.properties?.url
                     });
                     
-                    if (obj.fileId && (!obj.url && !obj.properties?.url)) {
-                        console.log('🔗 DEBUG: восстанавливаем URL для файла');
+                    if (obj.fileId) {
+                        console.log('🔗 DEBUG: восстанавливаем данные для файла');
                         try {
                             // Формируем URL файла для скачивания
                             const fileUrl = `/api/files/${obj.fileId}/download`;
                             
-                            return {
+                            // Создаем обновленный объект с восстановленными данными
+                            const restoredObj = {
                                 ...obj,
                                 url: fileUrl,
                                 properties: {
@@ -252,12 +253,46 @@ export class ApiClient {
                                     url: fileUrl
                                 }
                             };
+                            
+                            // Пытаемся восстановить актуальные метаданные файла с сервера
+                            // (Это будет выполнено асинхронно, чтобы не блокировать загрузку)
+                            setTimeout(async () => {
+                                try {
+                                    const response = await fetch(`/api/files/${obj.fileId}`, {
+                                        headers: {
+                                            'Accept': 'application/json',
+                                            'X-Requested-With': 'XMLHttpRequest'
+                                        },
+                                        credentials: 'same-origin'
+                                    });
+                                    
+                                    if (response.ok) {
+                                        const result = await response.json();
+                                        if (result.success && result.data) {
+                                            console.log('🔄 Обновляем метаданные файла с сервера:', result.data);
+                                            // Эмитим событие для обновления метаданных файла в состоянии
+                                            // (это будет обработано в core, если EventBus доступен)
+                                            if (typeof window !== 'undefined' && window.moodboardEventBus) {
+                                                window.moodboardEventBus.emit('file:metadata:updated', {
+                                                    objectId: obj.id,
+                                                    fileId: obj.fileId,
+                                                    metadata: result.data
+                                                });
+                                            }
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.warn(`Не удалось обновить метаданные файла ${obj.fileId}:`, error);
+                                }
+                            }, 100);
+                            
+                            return restoredObj;
                         } catch (error) {
-                            console.warn(`Не удалось восстановить URL для файла ${obj.fileId}:`, error);
+                            console.warn(`Не удалось восстановить данные для файла ${obj.fileId}:`, error);
                             return obj;
                         }
                     } else {
-                        console.log('🔗 DEBUG: файл уже имеет URL или нет fileId, оставляем как есть');
+                        console.log('🔗 DEBUG: файл не имеет fileId, оставляем как есть');
                         return obj;
                     }
                 }

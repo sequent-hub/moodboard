@@ -117,6 +117,31 @@ export class FileObject {
         this._redraw();
     }
 
+    /**
+     * Скрывает текст названия файла (используется во время редактирования)
+     */
+    hideText() {
+        if (this.fileNameText) {
+            this.fileNameText.visible = false;
+        }
+    }
+
+    /**
+     * Показывает текст названия файла (используется после завершения редактирования)
+     */
+    showText() {
+        if (this.fileNameText) {
+            this.fileNameText.visible = true;
+        }
+    }
+
+    /**
+     * Получает текущее название файла
+     */
+    getFileName() {
+        return this.fileName;
+    }
+
     _redraw() {
         const g = this.graphics;
         const w = this.width;

@@ -98,12 +98,21 @@ export class SelectTool extends BaseTool {
 				this.onGroupDuplicateReady(data.map);
 			});
             this.eventBus.on(Events.Tool.ObjectEdit, (object) => {
-                if (object.create) {
-                    // Создание нового объекта с редактированием
-                    this._openTextEditor(object, true);
+                // Определяем тип редактируемого объекта
+                const objectType = object.type || (object.object && object.object.type) || 'text';
+                
+                if (objectType === 'file') {
+                    // Для файлов используем специальный редактор названия
+                    this._openFileNameEditor(object, object.create || false);
                 } else {
-                    // Редактирование существующего объекта
-                    this._openTextEditor(object, false);
+                    // Для текста и записок используем обычный редактор
+                    if (object.create) {
+                        // Создание нового объекта с редактированием
+                        this._openTextEditor(object, true);
+                    } else {
+                        // Редактирование существующего объекта
+                        this._openTextEditor(object, false);
+                    }
                 }
             });
 		}
@@ -208,6 +217,15 @@ export class SelectTool extends BaseTool {
     deactivate() {
         super.deactivate();
         
+        // Закрываем текстовый/файловый редактор если открыт
+        if (this.textEditor.active) {
+            if (this.textEditor.objectType === 'file') {
+                this._closeFileNameEditor(true);
+            } else {
+                this._closeTextEditor(true);
+            }
+        }
+        
         // Очищаем выделение и ручки
         this.clearSelection();
         if (this.resizeHandles) {
@@ -229,7 +247,11 @@ export class SelectTool extends BaseTool {
         // Если активен текстовый редактор, закрываем его при клике вне
         if (this.textEditor.active) {
             console.log('🔧 SelectTool: closing text editor on mouse down, objectType:', this.textEditor.objectType, 'objectId:', this.textEditor.objectId);
-            this._closeTextEditor(true);
+            if (this.textEditor.objectType === 'file') {
+                this._closeFileNameEditor(true);
+            } else {
+                this._closeTextEditor(true);
+            }
             return; // Прерываем выполнение, чтобы не обрабатывать клик дальше
         }
         
@@ -334,6 +356,7 @@ export class SelectTool extends BaseTool {
             
             const isText = !!(pix && pix._mb && pix._mb.type === 'text');
             const isNote = !!(pix && pix._mb && pix._mb.type === 'note');
+            const isFile = !!(pix && pix._mb && pix._mb.type === 'file');
             
             if (isText) {
                 // Получаем позицию объекта для редактирования
@@ -363,6 +386,22 @@ export class SelectTool extends BaseTool {
                     type: 'note', 
                     position: posData.position,
                     properties: { content: noteProps.content || '' },
+                    create: false 
+                });
+                return;
+            }
+            
+            if (isFile) {
+                const fileProps = pix._mb.properties || {};
+                // Получаем позицию объекта для редактирования
+                const posData = { objectId: hitResult.object, position: null };
+                this.emit(Events.Tool.GetObjectPosition, posData);
+                
+                this.emit(Events.Tool.ObjectEdit, { 
+                    id: hitResult.object, 
+                    type: 'file', 
+                    position: posData.position,
+                    properties: { fileName: fileProps.fileName || 'Untitled' },
                     create: false 
                 });
                 return;
@@ -1832,6 +1871,232 @@ export class SelectTool extends BaseTool {
         if (!isNote) {
             textarea.addEventListener('input', autoSize);
         }
+    }
+
+    /**
+     * Открывает редактор названия файла
+     */
+    _openFileNameEditor(object, create = false) {
+        // Проверяем структуру объекта и извлекаем данные
+        let objectId, position, properties;
+        
+        if (create) {
+            // Для создания нового объекта - данные в object.object
+            const objData = object.object || object;
+            objectId = objData.id || null;
+            position = objData.position;
+            properties = objData.properties || {};
+        } else {
+            // Для редактирования существующего объекта - данные в корне
+            objectId = object.id;
+            position = object.position;
+            properties = object.properties || {};
+        }
+
+        const fileName = properties.fileName || 'Untitled';
+        
+        // Проверяем, что position существует
+        if (!position) {
+            console.error('❌ SelectTool: position is undefined in _openFileNameEditor', { object, create });
+            return;
+        }
+        
+        // Закрываем предыдущий редактор, если он открыт
+        if (this.textEditor.active) {
+            if (this.textEditor.objectType === 'file') {
+                this._closeFileNameEditor(true);
+            } else {
+                this._closeTextEditor(true);
+            }
+        }
+        
+        // Если это редактирование существующего объекта, получаем его данные
+        if (!create && objectId) {
+            const posData = { objectId, position: null };
+            const pixiReq = { objectId, pixiObject: null };
+            this.eventBus.emit(Events.Tool.GetObjectPosition, posData);
+            this.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
+            
+            // Обновляем данные из полученной информации
+            if (posData.position) position = posData.position;
+            
+            const meta = pixiReq.pixiObject && pixiReq.pixiObject._mb ? pixiReq.pixiObject._mb.properties || {} : {};
+            
+            // Скрываем текст файла на время редактирования
+            if (pixiReq.pixiObject && pixiReq.pixiObject._mb && pixiReq.pixiObject._mb.instance) {
+                const fileInstance = pixiReq.pixiObject._mb.instance;
+                if (typeof fileInstance.hideText === 'function') {
+                    fileInstance.hideText();
+                }
+            }
+        }
+        
+        // Создаем wrapper для input
+        const wrapper = document.createElement('div');
+        wrapper.className = 'moodboard-file-name-editor';
+        wrapper.style.cssText = `
+            position: absolute;
+            z-index: 1000;
+            background: white;
+            border: 2px solid #2563eb;
+            border-radius: 6px;
+            padding: 6px 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-width: 140px;
+            max-width: 200px;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        `;
+        
+        // Создаем input для редактирования названия
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = fileName;
+        input.style.cssText = `
+            border: none;
+            outline: none;
+            background: transparent;
+            font-family: inherit;
+            font-size: 12px;
+            text-align: center;
+            width: 100%;
+            padding: 2px 4px;
+            color: #1f2937;
+            font-weight: 500;
+        `;
+        
+        wrapper.appendChild(input);
+        document.body.appendChild(wrapper);
+        
+        // Позиционируем редактор (аналогично _openTextEditor)
+        const toScreen = (wx, wy) => {
+            const worldLayer = this.textEditor.world || (this.app?.stage);
+            if (!worldLayer) return { x: wx, y: wy };
+            const global = worldLayer.toGlobal(new PIXI.Point(wx, wy));
+            const view = this.app?.view || document.querySelector('canvas');
+            const viewRes = (this.app?.renderer?.resolution) || (view && view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
+            return { x: global.x / viewRes, y: global.y / viewRes };
+        };
+        const screenPos = toScreen(position.x, position.y);
+        
+        // Получаем размеры файлового объекта для точного позиционирования
+        let fileWidth = 120;
+        let fileHeight = 140;
+        
+        if (objectId) {
+            const sizeData = { objectId, size: null };
+            this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+            if (sizeData.size) {
+                fileWidth = sizeData.size.width;
+                fileHeight = sizeData.size.height;
+            }
+        }
+        
+        // Позиционируем редактор в нижней части файла (где название)
+        // В FileObject название находится в позиции y = height - 40
+        const nameY = fileHeight - 40;
+        const centerX = fileWidth / 2;
+        
+        wrapper.style.left = `${screenPos.x + centerX - 60}px`;  // Центрируем относительно файла
+        wrapper.style.top = `${screenPos.y + nameY}px`;  // Позиционируем на уровне названия
+        
+        // Сохраняем состояние редактора
+        this.textEditor = {
+            active: true,
+            objectId: objectId,
+            textarea: input,
+            wrapper: wrapper,
+            position: position,
+            properties: properties,
+            objectType: 'file',
+            isResizing: false
+        };
+        
+        // Фокусируем и выделяем весь текст
+        input.focus();
+        input.select();
+        
+        // Функция завершения редактирования
+        const finalize = (commit) => {
+            this._closeFileNameEditor(commit);
+        };
+        
+        // Обработчики событий
+        input.addEventListener('blur', () => finalize(true));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                finalize(true);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                finalize(false);
+            }
+        });
+    }
+
+    /**
+     * Закрывает редактор названия файла
+     */
+    _closeFileNameEditor(commit) {
+        console.log('🔧 SelectTool: _closeFileNameEditor called with commit:', commit);
+        
+        // Проверяем, что редактор существует и не закрыт
+        if (!this.textEditor || !this.textEditor.textarea || this.textEditor.closing) {
+            return;
+        }
+        
+        // Устанавливаем флаг закрытия, чтобы избежать повторных вызовов
+        this.textEditor.closing = true;
+        
+        const input = this.textEditor.textarea;
+        const value = input.value.trim();
+        const commitValue = commit && value.length > 0;
+        const objectId = this.textEditor.objectId;
+        
+        console.log('🔧 SelectTool: _closeFileNameEditor - objectId:', objectId, 'commitValue:', commitValue, 'newName:', value);
+        
+        // Убираем wrapper из DOM
+        if (this.textEditor.wrapper && this.textEditor.wrapper.parentNode) {
+            this.textEditor.wrapper.remove();
+        }
+        
+        // Показываем обратно текст файла
+        if (objectId) {
+            const pixiReq = { objectId, pixiObject: null };
+            this.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
+            
+            if (pixiReq.pixiObject && pixiReq.pixiObject._mb && pixiReq.pixiObject._mb.instance) {
+                const fileInstance = pixiReq.pixiObject._mb.instance;
+                if (typeof fileInstance.showText === 'function') {
+                    fileInstance.showText();
+                }
+                
+                // Применяем изменения если нужно
+                if (commitValue && value !== this.textEditor.properties.fileName) {
+                    console.log('🔧 Применяем новое название файла:', value);
+                    
+                    // Создаем команду изменения названия файла
+                    const oldName = this.textEditor.properties.fileName || 'Untitled';
+                    this.eventBus.emit(Events.Object.FileNameChange, {
+                        objectId: objectId,
+                        oldName: oldName,
+                        newName: value
+                    });
+                }
+            }
+        }
+        
+        // Сбрасываем состояние редактора
+        this.textEditor = {
+            active: false,
+            objectId: null,
+            textarea: null,
+            wrapper: null,
+            world: null,
+            position: null,
+            properties: null,
+            objectType: 'text',
+            isResizing: false
+        };
     }
 
     _closeTextEditor(commit) {

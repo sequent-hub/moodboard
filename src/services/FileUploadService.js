@@ -65,6 +65,51 @@ export class FileUploadService {
     }
 
     /**
+     * Обновляет метаданные файла на сервере
+     * @param {string} fileId - ID файла
+     * @param {Object} metadata - метаданные для обновления
+     * @returns {Promise<Object>}
+     */
+    async updateFileMetadata(fileId, metadata) {
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            
+            if (!csrfToken) {
+                throw new Error('CSRF токен не найден');
+            }
+
+            const response = await fetch(`${this.deleteEndpoint}/${fileId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(metadata)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                throw new Error(errorData?.message || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.message || 'Ошибка обновления метаданных файла');
+            }
+
+            return result.data;
+
+        } catch (error) {
+            console.error('Ошибка обновления метаданных файла:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Удаляет файл с сервера
      * @param {string} fileId - ID файла
      */

@@ -103,6 +103,7 @@ export const Events = {
 		Reordered: 'object:reordered',
 		Pasted: 'object:pasted',
 		StateChanged: 'state:changed',
+		FileNameChange: 'object:filename:change',
 	},
 
 	History: {
