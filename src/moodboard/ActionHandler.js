@@ -21,6 +21,7 @@ export class ActionHandler {
             case 'emoji':
             case 'image':
             case 'comment':
+            case 'file':
                 // Передаем imageId как extraData для изображений
                 const extraData = action.imageId ? { imageId: action.imageId } : {};
                 return this.handleCreateObject(action.type, action.position, action.properties || {}, extraData);

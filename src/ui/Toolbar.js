@@ -369,12 +369,26 @@ export class Toolbar {
                 return;
             }
 
-            // Заглушка для прикреплений (оставим без действия пока)
+            // Файлы — включаем режим размещения file
             if (toolType === 'custom-attachments') {
                 this.animateButton(button);
                 this.closeShapesPopup();
                 this.closeDrawPopup();
                 this.closeEmojiPopup();
+                // Активируем place, устанавливаем pending для file
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                this.placeSelectedButtonId = 'attachments';
+                this.setActiveToolbarButton('place');
+                // Устанавливаем свойства файла: выбор файла после клика
+                this.eventBus.emit(Events.Place.Set, { 
+                    type: 'file', 
+                    properties: { 
+                        selectFileOnPlace: true,
+                        fileName: 'Новый файл',
+                        width: 120,
+                        height: 140
+                    }
+                });
                 return;
             }
 

@@ -56,6 +56,7 @@ export class PlacementTool extends BaseTool {
         const props = this.pending.properties || {};
         const isTextWithEditing = this.pending.type === 'text' && props.editOnCreate;
         const isImage = this.pending.type === 'image';
+        const isFile = this.pending.type === 'file';
         const presetSize = {
             width: (this.pending.size && this.pending.size.width) ? this.pending.size.width : 200,
             height: (this.pending.size && this.pending.size.height) ? this.pending.size.height : 150,
@@ -147,6 +148,48 @@ export class PlacementTool extends BaseTool {
                 }
             }, { once: true });
             input.click();
+        } else if (isFile && props.selectFileOnPlace) {
+            // Создаем диалог выбора файла
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '*/*'; // Принимаем любые файлы
+            input.style.display = 'none';
+            document.body.appendChild(input);
+            input.addEventListener('change', async () => {
+                try {
+                    const file = input.files && input.files[0];
+                    if (!file) return;
+                    
+                    // Получаем информацию о файле
+                    const fileName = file.name;
+                    const fileSize = file.size;
+                    const mimeType = file.type;
+                    
+                    // Создаем объект файла
+                    this.eventBus.emit(Events.UI.ToolbarAction, {
+                        type: 'file',
+                        id: 'file',
+                        position,
+                        properties: { 
+                            fileName: fileName,
+                            fileSize: fileSize,
+                            mimeType: mimeType,
+                            content: file, // Сохраняем файл для возможного использования
+                            width: props.width || 120,
+                            height: props.height || 140
+                        }
+                    });
+                    
+                    // Возвращаемся к инструменту выделения после создания файла
+                    this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+                } catch (error) {
+                    console.error('Ошибка при выборе файла:', error);
+                    alert('Ошибка при выборе файла: ' + error.message);
+                } finally {
+                    input.remove();
+                }
+            }, { once: true });
+            input.click();
         } else {
             // Обычное размещение через общий канал
             this.eventBus.emit(Events.UI.ToolbarAction, {
@@ -159,7 +202,7 @@ export class PlacementTool extends BaseTool {
 
         // Сбрасываем pending и возвращаем стандартное поведение
         this.pending = null;
-        if (!isTextWithEditing) {
+        if (!isTextWithEditing && !(isFile && props.selectFileOnPlace)) {
             this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
         }
     }
