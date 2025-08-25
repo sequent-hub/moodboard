@@ -442,6 +442,7 @@ export class Toolbar {
                 this.closeDrawPopup();
                 this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
                 this.placeSelectedButtonId = 'emoji';
+                this.setActiveToolbarButton('place'); // ← Исправление: подсвечиваем кнопку эмоджи
                 return;
             }
             
@@ -478,22 +479,54 @@ export class Toolbar {
      */
     setActiveToolbarButton(toolName) {
         if (!this.element) return;
+        
+        console.log('🎯 Toolbar: Установка активной кнопки для инструмента:', toolName, 'placeSelectedButtonId:', this.placeSelectedButtonId);
+        
         // Сбрасываем активные классы
-        this.element.querySelectorAll('.moodboard-toolbar__button--active').forEach(el => el.classList.remove('moodboard-toolbar__button--active'));
+        this.element.querySelectorAll('.moodboard-toolbar__button--active').forEach(el => {
+            console.log('🔄 Deactivating button:', el.dataset.toolId);
+            el.classList.remove('moodboard-toolbar__button--active');
+        });
+        
         // Соответствие инструмент → кнопка
         const map = {
             select: 'select',
             pan: 'pan',
-            draw: 'pencil'
+            draw: 'pencil',
+            text: 'text-add'  // Добавляем маппинг для text инструмента
         };
+        
         let btnId = map[toolName];
+        
         if (!btnId && toolName === 'place') {
-            // Подсвечиваем тот источник place, который активен (текст/фигуры/фрейм/эмоджи/записки)
-            btnId = this.placeSelectedButtonId || 'shapes';
+            // Подсвечиваем тот источник place, который активен
+            const placeButtonMap = {
+                'text': 'text-add',
+                'note': 'note',
+                'frame': 'frame',
+                'frame-tool': 'frame',
+                'comments': 'comments',
+                'attachments': 'attachments',
+                'shapes': 'shapes',
+                'emoji': 'emoji',
+                null: 'image'  // для изображений placeSelectedButtonId = null
+            };
+            
+            btnId = placeButtonMap[this.placeSelectedButtonId] || 'shapes';
         }
-        if (!btnId) return;
+        
+        if (!btnId) {
+            console.warn('⚠️ Toolbar: Не найден btnId для инструмента:', toolName);
+            return;
+        }
+        
         const btn = this.element.querySelector(`.moodboard-toolbar__button--${btnId}`);
-        if (btn) btn.classList.add('moodboard-toolbar__button--active');
+        if (btn) {
+            btn.classList.add('moodboard-toolbar__button--active');
+            console.log('✅ Toolbar: Активирована кнопка:', btnId);
+        } else {
+            console.warn('⚠️ Toolbar: Не найдена кнопка с селектором:', `.moodboard-toolbar__button--${btnId}`);
+        }
     }
     
     /**
