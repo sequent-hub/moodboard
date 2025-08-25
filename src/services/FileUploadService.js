@@ -178,6 +178,39 @@ export class FileUploadService {
     }
 
     /**
+     * Скачивает файл с сервера
+     * @param {string} fileId - ID файла 
+     * @param {string} fileName - имя файла для скачивания
+     */
+    async downloadFile(fileId, fileName = null) {
+        try {
+            const downloadUrl = this.getDownloadUrl(fileId);
+            
+            // Создаем временную ссылку для скачивания
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            
+            if (fileName) {
+                link.download = fileName;
+            }
+            
+            // Добавляем и кликаем на ссылку
+            document.body.appendChild(link);
+            link.click();
+            
+            // Убираем ссылку
+            document.body.removeChild(link);
+            
+            console.log('✅ Файл успешно скачан:', fileName || fileId);
+            return true;
+
+        } catch (error) {
+            console.error('Ошибка скачивания файла:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Очищает неиспользуемые файлы с сервера
      * @returns {Promise<{deletedCount: number, errors: Array}>}
      */

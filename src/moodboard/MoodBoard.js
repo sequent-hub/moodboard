@@ -15,6 +15,7 @@ import { CommentPopover } from '../ui/CommentPopover.js';
 import { TextPropertiesPanel } from '../ui/TextPropertiesPanel.js';
 import { FramePropertiesPanel } from '../ui/FramePropertiesPanel.js';
 import { NotePropertiesPanel } from '../ui/NotePropertiesPanel.js';
+import { FilePropertiesPanel } from '../ui/FilePropertiesPanel.js';
 import { AlignmentGuides } from '../tools/AlignmentGuides.js';
 import { ImageUploadService } from '../services/ImageUploadService.js';
 
@@ -96,6 +97,7 @@ export class MoodBoard {
             
             // Панель свойств записки
             this.notePropertiesPanel = new NotePropertiesPanel(this.coreMoodboard.eventBus, this.canvasContainer, this.coreMoodboard);
+            this.filePropertiesPanel = new FilePropertiesPanel(this.coreMoodboard.eventBus, this.canvasContainer, this.coreMoodboard);
             
             // Направляющие линии выравнивания
             this.alignmentGuides = new AlignmentGuides(
