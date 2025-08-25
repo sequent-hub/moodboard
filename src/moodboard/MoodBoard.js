@@ -15,6 +15,7 @@ import { CommentPopover } from '../ui/CommentPopover.js';
 import { TextPropertiesPanel } from '../ui/TextPropertiesPanel.js';
 import { FramePropertiesPanel } from '../ui/FramePropertiesPanel.js';
 import { NotePropertiesPanel } from '../ui/NotePropertiesPanel.js';
+import { AlignmentGuides } from '../tools/AlignmentGuides.js';
 
 /**
  * Готовый MoodBoard с UI - главный класс пакета
@@ -94,6 +95,13 @@ export class MoodBoard {
             
             // Панель свойств записки
             this.notePropertiesPanel = new NotePropertiesPanel(this.coreMoodboard.eventBus, this.canvasContainer, this.coreMoodboard);
+            
+            // Направляющие линии выравнивания
+            this.alignmentGuides = new AlignmentGuides(
+                this.coreMoodboard.eventBus, 
+                this.coreMoodboard.pixi.app,
+                () => this.coreMoodboard.state.getObjects()
+            );
             
             // Загружаем данные (сначала пробуем загрузить с сервера, потом дефолтные)
             await this.loadExistingBoard();
@@ -309,6 +317,10 @@ export class MoodBoard {
         
         if (this.notePropertiesPanel) {
             this.notePropertiesPanel.destroy();
+        }
+        
+        if (this.alignmentGuides) {
+            this.alignmentGuides.destroy();
         }
         
         if (this.commentPopover) {
