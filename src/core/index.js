@@ -1063,6 +1063,30 @@ export class CoreMoodBoard {
                                 console.log(`🎨 Обновлен цвет фона фрейма ${objectId}: ${updates.backgroundColor}`);
                             }
                         }
+
+                        // Обновляем свойства записки
+                        if (object.type === 'note' && updates.properties) {
+                            if (instance.setStyle) {
+                                const styleUpdates = {};
+                                if (updates.properties.backgroundColor !== undefined) {
+                                    styleUpdates.backgroundColor = updates.properties.backgroundColor;
+                                }
+                                if (updates.properties.borderColor !== undefined) {
+                                    styleUpdates.borderColor = updates.properties.borderColor;
+                                }
+                                if (updates.properties.textColor !== undefined) {
+                                    styleUpdates.textColor = updates.properties.textColor;
+                                }
+                                if (updates.properties.fontSize !== undefined) {
+                                    styleUpdates.fontSize = updates.properties.fontSize;
+                                }
+                                
+                                if (Object.keys(styleUpdates).length > 0) {
+                                    instance.setStyle(styleUpdates);
+                                    console.log(`📝 Обновлены свойства записки ${objectId}:`, styleUpdates);
+                                }
+                            }
+                        }
                     }
                     
                     // Сохраняем изменения

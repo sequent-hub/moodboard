@@ -14,6 +14,7 @@ import { HtmlHandlesLayer } from '../ui/HtmlHandlesLayer.js';
 import { CommentPopover } from '../ui/CommentPopover.js';
 import { TextPropertiesPanel } from '../ui/TextPropertiesPanel.js';
 import { FramePropertiesPanel } from '../ui/FramePropertiesPanel.js';
+import { NotePropertiesPanel } from '../ui/NotePropertiesPanel.js';
 
 /**
  * Готовый MoodBoard с UI - главный класс пакета
@@ -90,6 +91,9 @@ export class MoodBoard {
 
             // Панель свойств фрейма
             this.framePropertiesPanel = new FramePropertiesPanel(this.coreMoodboard.eventBus, this.canvasContainer, this.coreMoodboard);
+            
+            // Панель свойств записки
+            this.notePropertiesPanel = new NotePropertiesPanel(this.coreMoodboard.eventBus, this.canvasContainer, this.coreMoodboard);
             
             // Загружаем данные (сначала пробуем загрузить с сервера, потом дефолтные)
             await this.loadExistingBoard();
@@ -301,6 +305,10 @@ export class MoodBoard {
 
         if (this.framePropertiesPanel) {
             this.framePropertiesPanel.destroy();
+        }
+        
+        if (this.notePropertiesPanel) {
+            this.notePropertiesPanel.destroy();
         }
         
         if (this.commentPopover) {
