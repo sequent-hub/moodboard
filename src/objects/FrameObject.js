@@ -13,7 +13,8 @@ export class FrameObject {
         this.width = this.objectData.width || 100;
         this.height = this.objectData.height || 100;
         this.borderWidth = 2;
-        this.fillColor = 0xFFFFFF; // Непрозрачный белый
+        // Используем backgroundColor из данных объекта, если есть, иначе белый
+        this.fillColor = this.objectData.backgroundColor || this.objectData.properties?.backgroundColor || 0xFFFFFF;
         this.strokeColor = this.objectData.borderColor || 0x333333;
         this.title = this.objectData.title || this.objectData.properties?.title || 'Новый';
 
@@ -64,6 +65,17 @@ export class FrameObject {
         this.title = title || 'Новый';
         if (this.titleText) {
             this.titleText.text = this.title;
+        }
+    }
+
+    /**
+     * Установить цвет фона фрейма
+     * @param {number} backgroundColor Цвет фона (hex)
+     */
+    setBackgroundColor(backgroundColor) {
+        if (typeof backgroundColor === 'number') {
+            this.fillColor = backgroundColor;
+            this._redrawPreserveTransform(this.width, this.height, this.fillColor);
         }
     }
 

@@ -1045,14 +1045,22 @@ export class CoreMoodBoard {
                     
                     // Обновляем PIXI объект, если есть специфичные обновления
                     const pixiObject = this.pixi.objects.get(objectId);
-                    if (pixiObject && pixiObject._mb && pixiObject._mb.instance && updates.properties) {
+                    if (pixiObject && pixiObject._mb && pixiObject._mb.instance) {
                         const instance = pixiObject._mb.instance;
 
                         // Обновляем заголовок фрейма
-                        if (object.type === 'frame' && updates.properties.title !== undefined) {
+                        if (object.type === 'frame' && updates.properties && updates.properties.title !== undefined) {
                             if (instance.setTitle) {
                                 instance.setTitle(updates.properties.title);
                                 console.log(`🖼️ Обновлен заголовок фрейма ${objectId}: "${updates.properties.title}"`);
+                            }
+                        }
+
+                        // Обновляем цвет фона фрейма
+                        if (object.type === 'frame' && updates.backgroundColor !== undefined) {
+                            if (instance.setBackgroundColor) {
+                                instance.setBackgroundColor(updates.backgroundColor);
+                                console.log(`🎨 Обновлен цвет фона фрейма ${objectId}: ${updates.backgroundColor}`);
                             }
                         }
                     }
