@@ -7,6 +7,7 @@ import { SaveManager } from './SaveManager.js';
 import { HistoryManager } from './HistoryManager.js';
 import { ApiClient } from './ApiClient.js';
 import { ImageUploadService } from '../services/ImageUploadService.js';
+import { FileUploadService } from '../services/FileUploadService.js';
 import { ToolManager } from '../tools/ToolManager.js';
 import { SelectTool } from '../tools/object-tools/SelectTool.js';
 import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, ResizeObjectCommand, PasteObjectCommand, GroupMoveCommand, GroupRotateCommand, GroupResizeCommand, ReorderZCommand, GroupReorderZCommand } from './commands/index.js';
@@ -44,6 +45,7 @@ export class CoreMoodBoard {
         this.history = new HistoryManager(this.eventBus);
         this.apiClient = new ApiClient();
         this.imageUploadService = new ImageUploadService(this.apiClient);
+        this.fileUploadService = new FileUploadService(this.apiClient);
         
         // Связываем SaveManager с ApiClient для правильной обработки изображений
         this.saveManager.setApiClient(this.apiClient);

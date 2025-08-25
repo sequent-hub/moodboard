@@ -22,8 +22,9 @@ export class ActionHandler {
             case 'image':
             case 'comment':
             case 'file':
-                // Передаем imageId как extraData для изображений
-                const extraData = action.imageId ? { imageId: action.imageId } : {};
+                // Передаем imageId как extraData для изображений, fileId для файлов
+                const extraData = action.imageId ? { imageId: action.imageId } : 
+                                 action.fileId ? { fileId: action.fileId } : {};
                 return this.handleCreateObject(action.type, action.position, action.properties || {}, extraData);
 
             case 'delete-object':

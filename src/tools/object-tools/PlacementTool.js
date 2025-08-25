@@ -160,28 +160,55 @@ export class PlacementTool extends BaseTool {
                     const file = input.files && input.files[0];
                     if (!file) return;
                     
-                    // Получаем информацию о файле
-                    const fileName = file.name;
-                    const fileSize = file.size;
-                    const mimeType = file.type;
-                    
-                    // Создаем объект файла
-                    this.eventBus.emit(Events.UI.ToolbarAction, {
-                        type: 'file',
-                        id: 'file',
-                        position,
-                        properties: { 
-                            fileName: fileName,
-                            fileSize: fileSize,
-                            mimeType: mimeType,
-                            content: file, // Сохраняем файл для возможного использования
-                            width: props.width || 120,
-                            height: props.height || 140
-                        }
-                    });
-                    
-                    // Возвращаемся к инструменту выделения после создания файла
-                    this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+                    // Загружаем файл на сервер
+                    try {
+                        const uploadResult = await this.core.fileUploadService.uploadFile(file, file.name);
+                        
+                        // Создаем объект файла с данными с сервера
+                        this.eventBus.emit(Events.UI.ToolbarAction, {
+                            type: 'file',
+                            id: 'file',
+                            position,
+                            properties: { 
+                                fileName: uploadResult.name,
+                                fileSize: uploadResult.size,
+                                mimeType: uploadResult.mimeType,
+                                formattedSize: uploadResult.formattedSize,
+                                url: uploadResult.url,
+                                width: props.width || 120,
+                                height: props.height || 140
+                            },
+                            fileId: uploadResult.id // Сохраняем ID файла
+                        });
+                        
+                        // Возвращаемся к инструменту выделения после создания файла
+                        this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+                    } catch (uploadError) {
+                        console.error('Ошибка загрузки файла на сервер:', uploadError);
+                        // Fallback: создаем объект файла с локальными данными
+                        const fileName = file.name;
+                        const fileSize = file.size;
+                        const mimeType = file.type;
+                        
+                        this.eventBus.emit(Events.UI.ToolbarAction, {
+                            type: 'file',
+                            id: 'file',
+                            position,
+                            properties: { 
+                                fileName: fileName,
+                                fileSize: fileSize,
+                                mimeType: mimeType,
+                                width: props.width || 120,
+                                height: props.height || 140
+                            }
+                        });
+                        
+                        // Возвращаемся к инструменту выделения
+                        this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+                        
+                        // Показываем предупреждение пользователю
+                        alert('Ошибка загрузки файла на сервер. Файл добавлен локально.');
+                    }
                 } catch (error) {
                     console.error('Ошибка при выборе файла:', error);
                     alert('Ошибка при выборе файла: ' + error.message);

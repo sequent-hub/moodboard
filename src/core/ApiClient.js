@@ -42,8 +42,8 @@ export class ApiClient {
 
     async saveBoard(boardId, boardData) {
         try {
-            // Фильтруем объекты изображений - убираем base64, оставляем только imageId
-            const cleanedData = this._cleanImageData(boardData);
+            // Фильтруем объекты изображений и файлов - убираем избыточные данные
+            const cleanedData = this._cleanObjectData(boardData);
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
@@ -80,10 +80,10 @@ export class ApiClient {
     }
 
     /**
-     * Очищает данные изображений от base64, оставляет только ссылки
+     * Очищает данные объектов от избыточной информации
      * @private
      */
-    _cleanImageData(boardData) {
+    _cleanObjectData(boardData) {
         if (!boardData || !boardData.objects) {
             return boardData;
         }
@@ -134,6 +134,51 @@ export class ApiClient {
                 
                 return cleanedObj;
             }
+            
+            if (obj.type === 'file') {
+                console.log('🧹 DEBUG _cleanObjectData: обрабатываем файл:', {
+                    id: obj.id,
+                    fileId: obj.fileId,
+                    hasContent: !!obj.content,
+                    hasPropertiesContent: !!obj.properties?.content
+                });
+                
+                const cleanedObj = { ...obj };
+                
+                // Если есть fileId, убираем content для экономии места
+                if (obj.fileId && typeof obj.fileId === 'string' && obj.fileId.trim().length > 0) {
+                    console.log('🧹 DEBUG _cleanObjectData: у файла есть fileId, убираем content');
+                    
+                    // Убираем content с верхнего уровня
+                    if (cleanedObj.content) {
+                        delete cleanedObj.content;
+                        console.log('🧹 DEBUG: удален content с верхнего уровня');
+                    }
+                    
+                    // Убираем content из properties
+                    if (cleanedObj.properties?.content) {
+                        cleanedObj.properties = { ...cleanedObj.properties };
+                        delete cleanedObj.properties.content;
+                        console.log('🧹 DEBUG: удален content из properties');
+                    }
+                }
+                // Если нет fileId, предупреждаем о наличии content
+                else {
+                    console.log('🧹 DEBUG _cleanObjectData: у файла НЕТ fileId, оставляем content как есть');
+                    if (cleanedObj.properties?.content) {
+                        console.warn('❌ Файл сохраняется с content в properties, так как нет fileId:', cleanedObj.id);
+                    }
+                    if (cleanedObj.content) {
+                        console.warn('❌ Файл сохраняется с content, так как нет fileId:', cleanedObj.id);
+                    }
+                    if (!obj.fileId) {
+                        console.warn('❌ У файла отсутствует fileId:', cleanedObj.id);
+                    }
+                }
+                
+                return cleanedObj;
+            }
+            
             return obj;
         });
 
@@ -144,9 +189,9 @@ export class ApiClient {
     }
 
     /**
-     * Восстанавливает URL изображений при загрузке
+     * Восстанавливает URL изображений и файлов при загрузке
      */
-    async restoreImageUrls(boardData) {
+    async restoreObjectUrls(boardData) {
         if (!boardData || !boardData.objects) {
             return boardData;
         }
@@ -184,6 +229,39 @@ export class ApiClient {
                         return obj;
                     }
                 }
+                
+                if (obj.type === 'file') {
+                    console.log('🔗 DEBUG restoreObjectUrls: обрабатываем файл:', {
+                        id: obj.id,
+                        fileId: obj.fileId,
+                        hasUrl: !!obj.url,
+                        hasPropertiesUrl: !!obj.properties?.url
+                    });
+                    
+                    if (obj.fileId && (!obj.url && !obj.properties?.url)) {
+                        console.log('🔗 DEBUG: восстанавливаем URL для файла');
+                        try {
+                            // Формируем URL файла для скачивания
+                            const fileUrl = `/api/files/${obj.fileId}/download`;
+                            
+                            return {
+                                ...obj,
+                                url: fileUrl,
+                                properties: {
+                                    ...obj.properties,
+                                    url: fileUrl
+                                }
+                            };
+                        } catch (error) {
+                            console.warn(`Не удалось восстановить URL для файла ${obj.fileId}:`, error);
+                            return obj;
+                        }
+                    } else {
+                        console.log('🔗 DEBUG: файл уже имеет URL или нет fileId, оставляем как есть');
+                        return obj;
+                    }
+                }
+                
                 return obj;
             })
         );

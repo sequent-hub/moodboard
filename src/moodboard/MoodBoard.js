@@ -290,13 +290,13 @@ export class MoodBoard {
             const boardData = await this.coreMoodboard.saveManager.loadBoardData(boardId);
             
             if (boardData && boardData.objects) {
-                // Восстанавливаем URL изображений перед загрузкой (если метод доступен)
+                // Восстанавливаем URL изображений и файлов перед загрузкой (если метод доступен)
                 let restoredData = boardData;
-                if (this.coreMoodboard.apiClient && typeof this.coreMoodboard.apiClient.restoreImageUrls === 'function') {
+                if (this.coreMoodboard.apiClient && typeof this.coreMoodboard.apiClient.restoreObjectUrls === 'function') {
                     try {
-                        restoredData = await this.coreMoodboard.apiClient.restoreImageUrls(boardData);
+                        restoredData = await this.coreMoodboard.apiClient.restoreObjectUrls(boardData);
                     } catch (error) {
-                        console.warn('Не удалось восстановить URL изображений:', error);
+                        console.warn('Не удалось восстановить URL объектов:', error);
                         restoredData = boardData; // Используем исходные данные
                     }
                 }
@@ -308,7 +308,7 @@ export class MoodBoard {
         } catch (error) {
             console.warn('⚠️ Ошибка загрузки доски, создаем новую:', error.message);
             console.debug('ApiClient доступен:', !!this.coreMoodboard.apiClient);
-            console.debug('Метод restoreImageUrls доступен:', !!(this.coreMoodboard.apiClient && typeof this.coreMoodboard.apiClient.restoreImageUrls === 'function'));
+            console.debug('Метод restoreObjectUrls доступен:', !!(this.coreMoodboard.apiClient && typeof this.coreMoodboard.apiClient.restoreObjectUrls === 'function'));
             // Если загрузка не удалась, используем дефолтные данные
             this.dataManager.loadData(this.data);
         }
