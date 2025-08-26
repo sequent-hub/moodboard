@@ -340,18 +340,14 @@ export class Toolbar {
                 return;
             }
 
-            // Добавление картинки: включаем placement и ждём клика для выбора позиции, затем открываем файловый диалог
+            // Добавление картинки — сразу открываем диалог выбора изображения
             if (toolType === 'image-add') {
                 this.animateButton(button);
                 this.closeShapesPopup();
                 this.closeDrawPopup();
                 this.closeEmojiPopup();
-                // Активируем place, пометим pending как image (файл запросим после клика)
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                this.placeSelectedButtonId = null;
-                this.setActiveToolbarButton('place');
-                // Спец pending для изображения: маркер, что ожидаем клик и выбор файла
-                this.eventBus.emit(Events.Place.Set, { type: 'image', properties: { selectFileOnPlace: true } });
+                // Открываем диалог выбора изображения
+                this.openImageDialog();
                 return;
             }
 
@@ -968,6 +964,65 @@ export class Toolbar {
             setTimeout(() => {
                 if (input.files.length === 0) {
                     this.eventBus.emit(Events.Place.FileCanceled);
+                    input.remove();
+                }
+                window.removeEventListener('focus', handleCancel);
+            }, 100);
+        };
+        
+        window.addEventListener('focus', handleCancel, { once: true });
+        input.click();
+    }
+
+    /**
+     * Открывает диалог выбора изображения и запускает режим "призрака"
+     */
+    async openImageDialog() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*'; // Принимаем только изображения
+        input.style.display = 'none';
+        document.body.appendChild(input);
+
+        input.addEventListener('change', async () => {
+            try {
+                const file = input.files && input.files[0];
+                if (!file) {
+                    // Пользователь отменил выбор изображения
+                    this.eventBus.emit(Events.Place.ImageCanceled);
+                    return;
+                }
+
+                // Изображение выбрано - запускаем режим "призрака"
+                this.eventBus.emit(Events.Place.ImageSelected, {
+                    file: file,
+                    fileName: file.name,
+                    fileSize: file.size,
+                    mimeType: file.type,
+                    properties: {
+                        width: 300,  // Дефолтная ширина для изображения
+                        height: 200  // Дефолтная высота для изображения (будет пересчитана по пропорциям)
+                    }
+                });
+
+                // Активируем инструмент размещения
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                this.placeSelectedButtonId = 'image';
+                this.setActiveToolbarButton('place');
+
+            } catch (error) {
+                console.error('Ошибка при выборе изображения:', error);
+                alert('Ошибка при выборе изображения: ' + error.message);
+            } finally {
+                input.remove();
+            }
+        }, { once: true });
+
+        // Обработка отмены диалога (клик вне диалога или ESC)
+        const handleCancel = () => {
+            setTimeout(() => {
+                if (input.files.length === 0) {
+                    this.eventBus.emit(Events.Place.ImageCanceled);
                     input.remove();
                 }
                 window.removeEventListener('focus', handleCancel);

@@ -1375,28 +1375,26 @@ export class SelectTool extends BaseTool {
      * Вычисляет смещение позиции при изменении размера через левые/верхние ручки
      */
     calculatePositionOffset(handleType, startBounds, newSize, objectRotation = 0) {
-        // Позиция в состоянии — левый верх. Для левых/верхних ручек топ-лев должен 
-        // смещаться на ту же величину, что и движение мыши в соответствующей оси.
-        // Мы восстанавливаем это через разницу размеров: 
-        // deltaX = start.width - new.width (эквивалентно мировому смещению мыши по X для левых ручек)
-        // deltaY = start.height - new.height (эквивалентно мировому смещению мыши по Y для верхних ручек)
-
-        const deltaX = startBounds.width - newSize.width;
-        const deltaY = startBounds.height - newSize.height;
+        // Позиция в состоянии — левый верх. Для правых/нижних ручек топ-лев остается на месте.
+        // Для левых/верхних ручек топ-лев должен смещаться на полную величину изменения размера.
+        // deltaWidth/deltaHeight = изменение размера (может быть отрицательным при уменьшении)
+        
+        const deltaWidth = newSize.width - startBounds.width;
+        const deltaHeight = newSize.height - startBounds.height;
 
         let offsetX = 0;
         let offsetY = 0;
 
         switch (handleType) {
             case 'nw':
-                offsetX = deltaX; // левый край движется вместе с мышью
-                offsetY = deltaY; // верхний край движется вместе с мышью
+                offsetX = -deltaWidth; // левый край смещается на полную величину изменения ширины
+                offsetY = -deltaHeight; // верхний край смещается на полную величину изменения высоты
                 break;
             case 'n':
-                offsetY = deltaY; // только верхний край
+                offsetY = -deltaHeight; // только верхний край смещается
                 break;
             case 'ne':
-                offsetY = deltaY; // верх двигается, правый — нет
+                offsetY = -deltaHeight; // верх смещается, правый край — нет
                 break;
             case 'e':
                 // правый край — левый верх не смещается
@@ -1408,10 +1406,10 @@ export class SelectTool extends BaseTool {
                 // нижний — левый верх не смещается
                 break;
             case 'sw':
-                offsetX = deltaX; // левый двигается, низ — нет
+                offsetX = -deltaWidth; // левый край смещается, низ — нет
                 break;
             case 'w':
-                offsetX = deltaX; // левый край двигается
+                offsetX = -deltaWidth; // левый край смещается на полную величину
                 break;
         }
 

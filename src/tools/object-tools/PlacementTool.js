@@ -18,7 +18,9 @@ export class PlacementTool extends BaseTool {
         
         // Состояние выбранного файла
         this.selectedFile = null; // { file, fileName, fileSize, mimeType, properties }
-        this.ghostContainer = null; // Контейнер для "призрака" файла
+        // Состояние выбранного изображения
+        this.selectedImage = null; // { file, fileName, fileSize, mimeType, properties }
+        this.ghostContainer = null; // Контейнер для "призрака" файла или изображения
 
         if (this.eventBus) {
             this.eventBus.on(Events.Place.Set, (cfg) => {
@@ -30,6 +32,7 @@ export class PlacementTool extends BaseTool {
                 if (tool === 'select') {
                     this.pending = null;
                     this.selectedFile = null;
+                    this.selectedImage = null;
                     this.hideGhost();
                 }
             });
@@ -37,12 +40,28 @@ export class PlacementTool extends BaseTool {
             // Обработка выбора файла
             this.eventBus.on(Events.Place.FileSelected, (fileData) => {
                 this.selectedFile = fileData;
-                this.showGhost();
+                this.selectedImage = null;
+                this.showFileGhost();
             });
 
             // Обработка отмены выбора файла
             this.eventBus.on(Events.Place.FileCanceled, () => {
                 this.selectedFile = null;
+                this.hideGhost();
+                // Возвращаемся к инструменту выделения
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+            });
+
+            // Обработка выбора изображения
+            this.eventBus.on(Events.Place.ImageSelected, (imageData) => {
+                this.selectedImage = imageData;
+                this.selectedFile = null;
+                this.showImageGhost();
+            });
+
+            // Обработка отмены выбора изображения
+            this.eventBus.on(Events.Place.ImageCanceled, () => {
+                this.selectedImage = null;
                 this.hideGhost();
                 // Возвращаемся к инструменту выделения
                 this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
@@ -61,9 +80,11 @@ export class PlacementTool extends BaseTool {
             this.app.view.addEventListener('mousemove', this._onMouseMove.bind(this));
         }
         
-        // Если есть выбранный файл, показываем призрак
+        // Если есть выбранный файл или изображение, показываем призрак
         if (this.selectedFile) {
-            this.showGhost();
+            this.showFileGhost();
+        } else if (this.selectedImage) {
+            this.showImageGhost();
         }
     }
 
@@ -85,6 +106,12 @@ export class PlacementTool extends BaseTool {
         // Если есть выбранный файл, размещаем его
         if (this.selectedFile) {
             this.placeSelectedFile(event);
+            return;
+        }
+        
+        // Если есть выбранное изображение, размещаем его
+        if (this.selectedImage) {
+            this.placeSelectedImage(event);
             return;
         }
         
@@ -293,7 +320,7 @@ export class PlacementTool extends BaseTool {
      * Обработчик движения мыши для обновления позиции "призрака"
      */
     _onMouseMove(event) {
-        if (this.selectedFile && this.ghostContainer) {
+        if ((this.selectedFile || this.selectedImage) && this.ghostContainer) {
             const worldPoint = this._toWorld(event.offsetX, event.offsetY);
             this.updateGhostPosition(worldPoint.x, worldPoint.y);
         }
@@ -302,7 +329,7 @@ export class PlacementTool extends BaseTool {
     /**
      * Показать "призрак" файла
      */
-    showGhost() {
+    showFileGhost() {
         if (!this.selectedFile || !this.world) return;
         
         this.hideGhost(); // Сначала убираем старый призрак
@@ -435,6 +462,178 @@ export class PlacementTool extends BaseTool {
 
         // Убираем призрак и возвращаемся к инструменту выделения
         this.selectedFile = null;
+        this.hideGhost();
+        this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+    }
+
+    /**
+     * Показать "призрак" изображения
+     */
+    async showImageGhost() {
+        if (!this.selectedImage || !this.world) return;
+        
+        this.hideGhost(); // Сначала убираем старый призрак
+        
+        // Создаем контейнер для призрака
+        this.ghostContainer = new PIXI.Container();
+        this.ghostContainer.alpha = 0.6; // Полупрозрачность
+        
+        // Размеры призрака
+        const maxWidth = this.selectedImage.properties.width || 300;
+        const maxHeight = this.selectedImage.properties.height || 200;
+        
+        try {
+            // Создаем превью изображения
+            const imageUrl = URL.createObjectURL(this.selectedImage.file);
+            const texture = await PIXI.Texture.fromURL(imageUrl);
+            
+            // Вычисляем пропорциональные размеры
+            const imageAspect = texture.width / texture.height;
+            let width = maxWidth;
+            let height = maxWidth / imageAspect;
+            
+            if (height > maxHeight) {
+                height = maxHeight;
+                width = maxHeight * imageAspect;
+            }
+            
+            // Создаем спрайт изображения
+            const sprite = new PIXI.Sprite(texture);
+            sprite.width = width;
+            sprite.height = height;
+            
+            // Рамка вокруг изображения
+            const border = new PIXI.Graphics();
+            border.lineStyle(2, 0xDEE2E6, 0.8);
+            border.drawRoundedRect(-2, -2, width + 4, height + 4, 4);
+            
+            this.ghostContainer.addChild(border);
+            this.ghostContainer.addChild(sprite);
+            
+            // Центрируем контейнер относительно курсора
+            this.ghostContainer.pivot.x = width / 2;
+            this.ghostContainer.pivot.y = height / 2;
+            
+            // Освобождаем URL
+            URL.revokeObjectURL(imageUrl);
+            
+        } catch (error) {
+            console.warn('Не удалось загрузить превью изображения, показываем заглушку:', error);
+            
+            // Fallback: простой прямоугольник-заглушка
+            const graphics = new PIXI.Graphics();
+            graphics.beginFill(0xF8F9FA, 0.8);
+            graphics.lineStyle(2, 0xDEE2E6, 0.8);
+            graphics.drawRoundedRect(0, 0, maxWidth, maxHeight, 8);
+            graphics.endFill();
+            
+            // Иконка изображения
+            graphics.beginFill(0x6C757D, 0.6);
+            graphics.drawRoundedRect(maxWidth * 0.2, maxHeight * 0.15, maxWidth * 0.6, maxHeight * 0.3, 4);
+            graphics.endFill();
+            
+            // Текст названия файла
+            const fileName = this.selectedImage.fileName || 'Image';
+            const displayName = fileName.length > 20 ? fileName.substring(0, 17) + '...' : fileName;
+            
+            const nameText = new PIXI.Text(displayName, {
+                fontFamily: 'Arial, sans-serif',
+                fontSize: 12,
+                fill: 0x495057,
+                align: 'center',
+                wordWrap: true,
+                wordWrapWidth: maxWidth - 10
+            });
+            
+            nameText.x = (maxWidth - nameText.width) / 2;
+            nameText.y = maxHeight * 0.55;
+            
+            this.ghostContainer.addChild(graphics);
+            this.ghostContainer.addChild(nameText);
+            
+            // Центрируем контейнер относительно курсора
+            this.ghostContainer.pivot.x = maxWidth / 2;
+            this.ghostContainer.pivot.y = maxHeight / 2;
+        }
+        
+        this.world.addChild(this.ghostContainer);
+    }
+
+    /**
+     * Разместить выбранное изображение на холсте
+     */
+    async placeSelectedImage(event) {
+        if (!this.selectedImage) return;
+        
+        const worldPoint = this._toWorld(event.x, event.y);
+        
+        try {
+            // Загружаем изображение на сервер
+            const uploadResult = await this.core.imageUploadService.uploadImage(
+                this.selectedImage.file, 
+                this.selectedImage.fileName
+            );
+            
+            // Вычисляем целевой размер
+            const natW = uploadResult.width || 1;
+            const natH = uploadResult.height || 1;
+            const targetW = 300; // дефолтная ширина
+            const targetH = Math.max(1, Math.round(natH * (targetW / natW)));
+            
+            const halfW = targetW / 2;
+            const halfH = targetH / 2;
+            const position = { 
+                x: Math.round(worldPoint.x - halfW), 
+                y: Math.round(worldPoint.y - halfH) 
+            };
+            
+            // Создаем объект изображения с данными с сервера
+            this.eventBus.emit(Events.UI.ToolbarAction, {
+                type: 'image',
+                id: 'image',
+                position,
+                properties: { 
+                    src: uploadResult.url, 
+                    name: uploadResult.name, 
+                    width: targetW, 
+                    height: targetH 
+                },
+                imageId: uploadResult.id // Сохраняем ID изображения
+            });
+            
+        } catch (uploadError) {
+            console.error('Ошибка загрузки изображения на сервер:', uploadError);
+            
+            // Fallback: создаем объект изображения с локальными данными
+            const imageUrl = URL.createObjectURL(this.selectedImage.file);
+            const targetW = this.selectedImage.properties.width || 300;
+            const targetH = this.selectedImage.properties.height || 200;
+            
+            const halfW = targetW / 2;
+            const halfH = targetH / 2;
+            const position = { 
+                x: Math.round(worldPoint.x - halfW), 
+                y: Math.round(worldPoint.y - halfH) 
+            };
+            
+            this.eventBus.emit(Events.UI.ToolbarAction, {
+                type: 'image',
+                id: 'image',
+                position,
+                properties: { 
+                    src: imageUrl,
+                    name: this.selectedImage.fileName,
+                    width: targetW,
+                    height: targetH
+                }
+            });
+            
+            // Показываем предупреждение пользователю
+            alert('Ошибка загрузки изображения на сервер. Изображение добавлено локально.');
+        }
+
+        // Убираем призрак и возвращаемся к инструменту выделения
+        this.selectedImage = null;
         this.hideGhost();
         this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
     }

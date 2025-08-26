@@ -2,8 +2,13 @@ import { Events } from '../core/events/Events.js';
 
 /**
  * HtmlHandlesLayer — HTML-ручки и рамка для выделенных объектов.
+ * 
+ * ✅ АКТИВНО ИСПОЛЬЗУЕТСЯ ✅
+ * Это основная система ручек ресайза в приложении.
  * Показывает ручки для одного объекта или группы, синхронизирует с worldLayer.
  * Эмитит те же события, что и Pixi ResizeHandles через EventBus.
+ * 
+ * Альтернатива: ResizeHandles.js (PIXI-ручки, в данный момент не используются)
  */
 export class HtmlHandlesLayer {
     constructor(container, eventBus, core) {
@@ -104,50 +109,121 @@ export class HtmlHandlesLayer {
         Object.assign(box.style, {
             position: 'absolute', left: `${left}px`, top: `${top}px`,
             width: `${width}px`, height: `${height}px`,
-            border: '1px solid #007ACC', boxSizing: 'border-box', pointerEvents: 'none'
+            border: '1px solid #1DE9B6', boxSizing: 'border-box', pointerEvents: 'none'
         });
         this.layer.appendChild(box);
 
-        // Угловые ручки для ресайза
+        // Угловые ручки для ресайза - круглые с мятно-зелёным цветом и белой серединой
         const mkCorner = (dir, x, y, cursor) => {
             const h = document.createElement('div');
             h.dataset.dir = dir; h.dataset.id = id;
             Object.assign(h.style, {
                 position: 'absolute', width: '12px', height: '12px',
-                background: '#007ACC', border: '1px solid #fff', boxSizing: 'border-box',
-                pointerEvents: 'auto', zIndex: 1, cursor
+                background: '#1DE9B6', 
+                border: '2px solid #1DE9B6', 
+                borderRadius: '50%', // Делаем круглыми
+                boxSizing: 'border-box',
+                pointerEvents: 'auto', 
+                zIndex: 10, // Увеличиваем z-index
+                cursor: cursor
             });
             h.style.left = `${x - 6}px`;
             h.style.top = `${y - 6}px`;
-            h.addEventListener('mousedown', (e) => this._onHandleDown(e, box));
+            
+            // Создаем внутренний белый круг
+            const inner = document.createElement('div');
+            Object.assign(inner.style, {
+                position: 'absolute',
+                top: '1px', left: '1px',
+                width: '6px', height: '6px',
+                background: '#fff',
+                borderRadius: '50%',
+                pointerEvents: 'none', // Важно: не блокируем события
+                zIndex: 1
+            });
+            h.appendChild(inner);
+            
+            // Эффект при наведении
+            h.addEventListener('mouseenter', () => {
+                h.style.background = '#17C29A';
+                h.style.borderColor = '#17C29A';
+                h.style.cursor = cursor; // Принудительно устанавливаем курсор
+            });
+            h.addEventListener('mouseleave', () => {
+                h.style.background = '#1DE9B6';
+                h.style.borderColor = '#1DE9B6';
+            });
+            
+            // Добавляем отладочную информацию
+            h.addEventListener('mousedown', (e) => {
+                console.log(`🖱️ Mousedown на ручке: ${dir}, cursor: ${cursor}`);
+                this._onHandleDown(e, box);
+            });
+            
             box.appendChild(h);
         };
 
-        const x0 = 0, y0 = 0, x1 = width, y1 = height;
+        const x0 = 0, y0 = 0, x1 = width, y1 = height, cx = width / 2, cy = height / 2;
         mkCorner('nw', x0, y0, 'nwse-resize');
         mkCorner('ne', x1, y0, 'nesw-resize');
         mkCorner('se', x1, y1, 'nwse-resize');
         mkCorner('sw', x0, y1, 'nesw-resize');
 
-        // Кликабельные грани для ресайза
-        const edgeSize = 14; // увеличенная область хвата
+        // Боковые ручки (видимые круглые ручки на серединах сторон)
+        mkCorner('n', cx, y0, 'ns-resize');  // верхняя
+        mkCorner('e', x1, cy, 'ew-resize');  // правая
+        mkCorner('s', cx, y1, 'ns-resize');  // нижняя
+        mkCorner('w', x0, cy, 'ew-resize');  // левая
+
+        // Кликабельные грани для ресайза (невидимые области для лучшего UX)
+        // Уменьшаем их, чтобы не перекрывать угловые ручки
+        const edgeSize = 10; // уменьшаем размер
         const makeEdge = (name, style, cursor) => {
             const e = document.createElement('div');
             e.dataset.edge = name; e.dataset.id = id;
             Object.assign(e.style, style, {
-                position: 'absolute', pointerEvents: 'auto', cursor, zIndex: 1,
+                position: 'absolute', pointerEvents: 'auto', cursor, 
+                zIndex: 5, // Меньше чем у ручек (10)
+                background: 'transparent' // невидимые области
             });
             e.addEventListener('mousedown', (evt) => this._onEdgeResizeDown(evt));
             box.appendChild(e);
         };
-        // top
-        makeEdge('top', { left: `-${edgeSize/2}px`, top: `-${edgeSize/2}px`, width: `${width + edgeSize}px`, height: `${edgeSize}px` }, 'ns-resize');
-        // bottom
-        makeEdge('bottom', { left: `-${edgeSize/2}px`, top: `${height - edgeSize/2}px`, width: `${width + edgeSize}px`, height: `${edgeSize}px` }, 'ns-resize');
-        // left
-        makeEdge('left', { left: `-${edgeSize/2}px`, top: `0px`, width: `${edgeSize}px`, height: `${height}px` }, 'ew-resize');
-        // right
-        makeEdge('right', { left: `${width - edgeSize/2}px`, top: `0px`, width: `${edgeSize}px`, height: `${height}px` }, 'ew-resize');
+        
+        // Создаем грани с отступами от углов, чтобы не мешать угловым ручкам
+        const cornerGap = 20; // отступ от углов
+        
+        // top - с отступами от углов
+        makeEdge('top', { 
+            left: `${cornerGap}px`, 
+            top: `-${edgeSize/2}px`, 
+            width: `${Math.max(0, width - 2 * cornerGap)}px`, 
+            height: `${edgeSize}px` 
+        }, 'ns-resize');
+        
+        // bottom - с отступами от углов
+        makeEdge('bottom', { 
+            left: `${cornerGap}px`, 
+            top: `${height - edgeSize/2}px`, 
+            width: `${Math.max(0, width - 2 * cornerGap)}px`, 
+            height: `${edgeSize}px` 
+        }, 'ns-resize');
+        
+        // left - с отступами от углов
+        makeEdge('left', { 
+            left: `-${edgeSize/2}px`, 
+            top: `${cornerGap}px`, 
+            width: `${edgeSize}px`, 
+            height: `${Math.max(0, height - 2 * cornerGap)}px` 
+        }, 'ew-resize');
+        
+        // right - с отступами от углов
+        makeEdge('right', { 
+            left: `${width - edgeSize/2}px`, 
+            top: `${cornerGap}px`, 
+            width: `${edgeSize}px`, 
+            height: `${Math.max(0, height - 2 * cornerGap)}px` 
+        }, 'ew-resize');
 
         // Ручка вращения (опционально можно добавить позже)
         this.visible = true;
@@ -217,6 +293,9 @@ export class HtmlHandlesLayer {
             let newTop = startCSS.top;
             let newW = startCSS.width;
             let newH = startCSS.height;
+            
+            console.log(`🔧 Ресайз ручкой ${dir}: dx=${dx}, dy=${dy}`);
+            
             if (dir.includes('e')) newW = Math.max(1, startCSS.width + dx);
             if (dir.includes('s')) newH = Math.max(1, startCSS.height + dy);
             if (dir.includes('w')) { newW = Math.max(1, startCSS.width - dx); newLeft = startCSS.left + dx; }
@@ -418,26 +497,58 @@ export class HtmlHandlesLayer {
     _repositionBoxChildren(box) {
         const width = parseFloat(box.style.width);
         const height = parseFloat(box.style.height);
-        // corners
+        const cx = width / 2;
+        const cy = height / 2;
+        
+        // Позиционируем все ручки (угловые + боковые)
         box.querySelectorAll('[data-dir]').forEach(h => {
             const dir = h.dataset.dir;
             switch (dir) {
+                // Угловые ручки
                 case 'nw': h.style.left = `${-6}px`; h.style.top = `${-6}px`; break;
                 case 'ne': h.style.left = `${Math.max(-6, width - 6)}px`; h.style.top = `${-6}px`; break;
                 case 'se': h.style.left = `${Math.max(-6, width - 6)}px`; h.style.top = `${Math.max(-6, height - 6)}px`; break;
                 case 'sw': h.style.left = `${-6}px`; h.style.top = `${Math.max(-6, height - 6)}px`; break;
+                // Боковые ручки
+                case 'n': h.style.left = `${cx - 6}px`; h.style.top = `${-6}px`; break;
+                case 'e': h.style.left = `${Math.max(-6, width - 6)}px`; h.style.top = `${cy - 6}px`; break;
+                case 's': h.style.left = `${cx - 6}px`; h.style.top = `${Math.max(-6, height - 6)}px`; break;
+                case 'w': h.style.left = `${-6}px`; h.style.top = `${cy - 6}px`; break;
             }
         });
-        // edges
-        const edgeSize = 14;
+        
+        // Позиционируем невидимые области для захвата с отступами от углов
+        const edgeSize = 10;
+        const cornerGap = 20;
         const top = box.querySelector('[data-edge="top"]');
         const bottom = box.querySelector('[data-edge="bottom"]');
         const left = box.querySelector('[data-edge="left"]');
         const right = box.querySelector('[data-edge="right"]');
-        if (top) Object.assign(top.style, { left: `-${edgeSize/2}px`, top: `-${edgeSize/2}px`, width: `${width + edgeSize}px`, height: `${edgeSize}px` });
-        if (bottom) Object.assign(bottom.style, { left: `-${edgeSize/2}px`, top: `${height - edgeSize/2}px`, width: `${width + edgeSize}px`, height: `${edgeSize}px` });
-        if (left) Object.assign(left.style, { left: `-${edgeSize/2}px`, top: `0px`, width: `${edgeSize}px`, height: `${height}px` });
-        if (right) Object.assign(right.style, { left: `${width - edgeSize/2}px`, top: `0px`, width: `${edgeSize}px`, height: `${height}px` });
+        
+        if (top) Object.assign(top.style, { 
+            left: `${cornerGap}px`, 
+            top: `-${edgeSize/2}px`, 
+            width: `${Math.max(0, width - 2 * cornerGap)}px`, 
+            height: `${edgeSize}px` 
+        });
+        if (bottom) Object.assign(bottom.style, { 
+            left: `${cornerGap}px`, 
+            top: `${height - edgeSize/2}px`, 
+            width: `${Math.max(0, width - 2 * cornerGap)}px`, 
+            height: `${edgeSize}px` 
+        });
+        if (left) Object.assign(left.style, { 
+            left: `-${edgeSize/2}px`, 
+            top: `${cornerGap}px`, 
+            width: `${edgeSize}px`, 
+            height: `${Math.max(0, height - 2 * cornerGap)}px` 
+        });
+        if (right) Object.assign(right.style, { 
+            left: `${width - edgeSize/2}px`, 
+            top: `${cornerGap}px`, 
+            width: `${edgeSize}px`, 
+            height: `${Math.max(0, height - 2 * cornerGap)}px` 
+        });
     }
 }
 

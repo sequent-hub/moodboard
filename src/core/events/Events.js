@@ -132,6 +132,8 @@ export const Events = {
 		Set: 'place:set',
 		FileSelected: 'place:file:selected',
 		FileCanceled: 'place:file:canceled',
+		ImageSelected: 'place:image:selected',
+		ImageCanceled: 'place:image:canceled',
 		GhostShow: 'place:ghost:show',
 		GhostHide: 'place:ghost:hide',
 		GhostUpdate: 'place:ghost:update',

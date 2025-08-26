@@ -1,5 +1,9 @@
 /**
  * Система отображения ручек для изменения размера объектов
+ * 
+ * ⚠️ ВНИМАНИЕ: ДАННЫЙ МОМЕНТ НЕ ИСПОЛЬЗУЕТСЯ ⚠️
+ * Сейчас используются HTML-ручки из HtmlHandlesLayer.js
+ * Этот файл оставлен для совместимости и возможного использования в будущем
  */
 import * as PIXI from 'pixi.js';
 
@@ -194,16 +198,8 @@ export class ResizeHandles {
     createHandle(type, x, y, cursor) {
         const handle = new PIXI.Graphics();
         
-        // Рисуем квадратную ручку
-        handle.beginFill(this.handleColor);
-        handle.lineStyle(1, 0xFFFFFF, 1);
-        handle.drawRect(
-            -this.handleSize / 2, 
-            -this.handleSize / 2, 
-            this.handleSize, 
-            this.handleSize
-        );
-        handle.endFill();
+        // Рисуем круглую ручку - синий круг с белой серединой
+        this.drawCircularHandle(handle, this.handleColor);
         
         // Позиционируем
         handle.x = x;
@@ -222,31 +218,33 @@ export class ResizeHandles {
         // Эффекты при наведении
         handle.on('pointerover', () => {
             handle.clear();
-            handle.beginFill(this.handleHoverColor);
-            handle.lineStyle(1, 0xFFFFFF, 1);
-            handle.drawRect(
-                -this.handleSize / 2, 
-                -this.handleSize / 2, 
-                this.handleSize, 
-                this.handleSize
-            );
-            handle.endFill();
+            this.drawCircularHandle(handle, this.handleHoverColor);
         });
         
         handle.on('pointerout', () => {
             handle.clear();
-            handle.beginFill(this.handleColor);
-            handle.lineStyle(1, 0xFFFFFF, 1);
-            handle.drawRect(
-                -this.handleSize / 2, 
-                -this.handleSize / 2, 
-                this.handleSize, 
-                this.handleSize
-            );
-            handle.endFill();
+            this.drawCircularHandle(handle, this.handleColor);
         });
         
         return handle;
+    }
+    
+    /**
+     * Рисует круглую ручку с синей обводкой и белой серединой
+     */
+    drawCircularHandle(graphics, outerColor) {
+        const radius = this.handleSize / 2;
+        const innerRadius = radius - 2; // Внутренний радиус меньше на 2 пикселя
+        
+        // Рисуем внешний синий круг
+        graphics.beginFill(outerColor);
+        graphics.drawCircle(0, 0, radius);
+        graphics.endFill();
+        
+        // Рисуем внутренний белый круг
+        graphics.beginFill(0xFFFFFF);
+        graphics.drawCircle(0, 0, innerRadius);
+        graphics.endFill();
     }
     
     /**

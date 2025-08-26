@@ -52,15 +52,43 @@ export function calculatePositionOffset(handleType, startBounds, newSize, object
     const deltaWidth = newSize.width - startBounds.width;
     const deltaHeight = newSize.height - startBounds.height;
     let localOffsetX = 0, localOffsetY = 0;
+    
+    // Позиция объекта в системе - это левый верхний угол
+    // При ресайзе за правые/нижние ручки - левый верхний угол остается на месте (offset = 0)
+    // При ресайзе за левые/верхние ручки - левый верхний угол смещается на полную величину изменения
     switch (handleType) {
-        case 'nw': localOffsetX = -deltaWidth / 2; localOffsetY = -deltaHeight / 2; break;
-        case 'n':  localOffsetX = 0;              localOffsetY = -deltaHeight / 2; break;
-        case 'ne': localOffsetX =  deltaWidth / 2; localOffsetY = -deltaHeight / 2; break;
-        case 'e':  localOffsetX =  deltaWidth / 2; localOffsetY = 0; break;
-        case 'se': localOffsetX =  deltaWidth / 2; localOffsetY =  deltaHeight / 2; break;
-        case 's':  localOffsetX = 0;              localOffsetY =  deltaHeight / 2; break;
-        case 'sw': localOffsetX = -deltaWidth / 2; localOffsetY =  deltaHeight / 2; break;
-        case 'w':  localOffsetX = -deltaWidth / 2; localOffsetY = 0; break;
+        case 'nw': 
+            localOffsetX = -deltaWidth; // левый край смещается влево на полную величину
+            localOffsetY = -deltaHeight; // верхний край смещается вверх на полную величину
+            break;
+        case 'n':  
+            localOffsetX = 0;            // горизонтально не смещается
+            localOffsetY = -deltaHeight; // верхний край смещается вверх на полную величину
+            break;
+        case 'ne': 
+            localOffsetX = 0;            // правый край - левый верхний угол не смещается по X
+            localOffsetY = -deltaHeight; // верхний край смещается вверх на полную величину
+            break;
+        case 'e':  
+            localOffsetX = 0;            // правый край - левый верхний угол не смещается
+            localOffsetY = 0;            // вертикально не смещается
+            break;
+        case 'se': 
+            localOffsetX = 0;            // правый край - левый верхний угол не смещается по X
+            localOffsetY = 0;            // нижний край - левый верхний угол не смещается по Y
+            break;
+        case 's':  
+            localOffsetX = 0;            // горизонтально не смещается
+            localOffsetY = 0;            // нижний край - левый верхний угол не смещается по Y
+            break;
+        case 'sw': 
+            localOffsetX = -deltaWidth;  // левый край смещается влево на полную величину
+            localOffsetY = 0;            // нижний край - левый верхний угол не смещается по Y
+            break;
+        case 'w':  
+            localOffsetX = -deltaWidth;  // левый край смещается влево на полную величину
+            localOffsetY = 0;            // вертикально не смещается
+            break;
     }
     const angleRad = objectRotation * Math.PI / 180;
     const cos = Math.cos(angleRad);
