@@ -20,11 +20,16 @@ export class PlacementTool extends BaseTool {
         this.selectedFile = null; // { file, fileName, fileSize, mimeType, properties }
         // Состояние выбранного изображения
         this.selectedImage = null; // { file, fileName, fileSize, mimeType, properties }
-        this.ghostContainer = null; // Контейнер для "призрака" файла или изображения
+        this.ghostContainer = null; // Контейнер для "призрака" файла, изображения или текста
 
         if (this.eventBus) {
             this.eventBus.on(Events.Place.Set, (cfg) => {
                 this.pending = cfg ? { ...cfg } : null;
+                
+                // Показываем призрак для текста, если он активен
+                if (this.pending && this.pending.type === 'text' && this.app && this.world) {
+                    this.showTextGhost();
+                }
             });
             
             // Сброс pending при явном выборе select-инструмента
@@ -85,6 +90,8 @@ export class PlacementTool extends BaseTool {
             this.showFileGhost();
         } else if (this.selectedImage) {
             this.showImageGhost();
+        } else if (this.pending && this.pending.type === 'text') {
+            this.showTextGhost();
         }
     }
 
@@ -298,6 +305,7 @@ export class PlacementTool extends BaseTool {
 
         // Сбрасываем pending и возвращаем стандартное поведение
         this.pending = null;
+        this.hideGhost(); // Скрываем призрак после размещения
         if (!isTextWithEditing && !(isFile && props.selectFileOnPlace)) {
             this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
         }
@@ -320,7 +328,7 @@ export class PlacementTool extends BaseTool {
      * Обработчик движения мыши для обновления позиции "призрака"
      */
     _onMouseMove(event) {
-        if ((this.selectedFile || this.selectedImage) && this.ghostContainer) {
+        if ((this.selectedFile || this.selectedImage || this.pending) && this.ghostContainer) {
             const worldPoint = this._toWorld(event.offsetX, event.offsetY);
             this.updateGhostPosition(worldPoint.x, worldPoint.y);
         }
@@ -555,6 +563,58 @@ export class PlacementTool extends BaseTool {
             this.ghostContainer.pivot.x = maxWidth / 2;
             this.ghostContainer.pivot.y = maxHeight / 2;
         }
+        
+        this.world.addChild(this.ghostContainer);
+    }
+
+    /**
+     * Показать "призрак" текста
+     */
+    showTextGhost() {
+        if (!this.pending || this.pending.type !== 'text' || !this.world) return;
+        
+        this.hideGhost(); // Сначала убираем старый призрак
+        
+        // Создаем контейнер для призрака
+        this.ghostContainer = new PIXI.Container();
+        this.ghostContainer.alpha = 0.6; // Полупрозрачность
+        
+        // Размеры призрака текста
+        const fontSize = this.pending.properties?.fontSize || 18;
+        const width = 120;
+        const height = fontSize + 20; // Высота зависит от размера шрифта
+        
+        // Фон для текста (полупрозрачный прямоугольник)
+        const background = new PIXI.Graphics();
+        background.beginFill(0xFFFFFF, 0.8);
+        background.lineStyle(1, 0x007BFF, 0.8);
+        background.drawRoundedRect(0, 0, width, height, 4);
+        background.endFill();
+        
+        // Текст-заглушка
+        const placeholderText = new PIXI.Text('Текст', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: fontSize,
+            fill: 0x6C757D,
+            align: 'left'
+        });
+        
+        placeholderText.x = 8;
+        placeholderText.y = (height - placeholderText.height) / 2;
+        
+        // Иконка курсора (маленькая вертикальная линия)
+        const cursor = new PIXI.Graphics();
+        cursor.lineStyle(2, 0x007BFF, 0.8);
+        cursor.moveTo(placeholderText.x + placeholderText.width + 4, placeholderText.y);
+        cursor.lineTo(placeholderText.x + placeholderText.width + 4, placeholderText.y + placeholderText.height);
+        
+        this.ghostContainer.addChild(background);
+        this.ghostContainer.addChild(placeholderText);
+        this.ghostContainer.addChild(cursor);
+        
+        // Центрируем контейнер относительно курсора
+        this.ghostContainer.pivot.x = width / 2;
+        this.ghostContainer.pivot.y = height / 2;
         
         this.world.addChild(this.ghostContainer);
     }
