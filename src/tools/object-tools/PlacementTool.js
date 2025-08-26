@@ -20,13 +20,13 @@ export class PlacementTool extends BaseTool {
         this.selectedFile = null; // { file, fileName, fileSize, mimeType, properties }
         // Состояние выбранного изображения
         this.selectedImage = null; // { file, fileName, fileSize, mimeType, properties }
-        this.ghostContainer = null; // Контейнер для "призрака" файла, изображения, текста, записки или эмоджи
+        this.ghostContainer = null; // Контейнер для "призрака" файла, изображения, текста, записки, эмоджи или фрейма
 
         if (this.eventBus) {
             this.eventBus.on(Events.Place.Set, (cfg) => {
                 this.pending = cfg ? { ...cfg } : null;
                 
-                // Показываем призрак для текста, записки или эмоджи, если они активны
+                // Показываем призрак для текста, записки, эмоджи или фрейма, если они активны
                 if (this.pending && this.app && this.world) {
                     if (this.pending.type === 'text') {
                         this.showTextGhost();
@@ -34,6 +34,8 @@ export class PlacementTool extends BaseTool {
                         this.showNoteGhost();
                     } else if (this.pending.type === 'emoji') {
                         this.showEmojiGhost();
+                    } else if (this.pending.type === 'frame') {
+                        this.showFrameGhost();
                     }
                 }
             });
@@ -103,6 +105,8 @@ export class PlacementTool extends BaseTool {
                 this.showNoteGhost();
             } else if (this.pending.type === 'emoji') {
                 this.showEmojiGhost();
+            } else if (this.pending.type === 'frame') {
+                this.showFrameGhost();
             }
         }
     }
@@ -739,6 +743,82 @@ export class PlacementTool extends BaseTool {
         
         this.ghostContainer.addChild(background);
         this.ghostContainer.addChild(emojiText);
+        
+        // Центрируем контейнер относительно курсора
+        this.ghostContainer.pivot.x = width / 2;
+        this.ghostContainer.pivot.y = height / 2;
+        
+        this.world.addChild(this.ghostContainer);
+    }
+
+    /**
+     * Показать "призрак" фрейма
+     */
+    showFrameGhost() {
+        if (!this.pending || this.pending.type !== 'frame' || !this.world) return;
+        
+        this.hideGhost(); // Сначала убираем старый призрак
+        
+        // Создаем контейнер для призрака
+        this.ghostContainer = new PIXI.Container();
+        this.ghostContainer.alpha = 0.6; // Полупрозрачность
+        
+        // Получаем параметры фрейма из pending
+        const width = this.pending.properties?.width || 200;
+        const height = this.pending.properties?.height || 300;
+        const fillColor = this.pending.properties?.fillColor || 0xFFFFFF;
+        const borderColor = this.pending.properties?.borderColor || 0x333333;
+        const title = this.pending.properties?.title || 'Новый';
+        
+        // Создаем фон фрейма (как в FrameObject)
+        const frameGraphics = new PIXI.Graphics();
+        frameGraphics.beginFill(fillColor, 0.8); // Полупрозрачная заливка
+        frameGraphics.lineStyle(2, borderColor, 0.8); // Граница
+        frameGraphics.drawRect(0, 0, width, height);
+        frameGraphics.endFill();
+        
+        // Создаем заголовок фрейма (как в FrameObject)
+        const titleText = new PIXI.Text(title, {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: 14,
+            fill: 0x333333,
+            fontWeight: 'bold'
+        });
+        titleText.anchor.set(0, 1); // Левый нижний угол текста
+        titleText.y = -5; // Немного выше фрейма
+        
+        // Добавляем пунктирную рамку для лучшей видимости призрака
+        const dashedBorder = new PIXI.Graphics();
+        dashedBorder.lineStyle(1, 0x007BFF, 0.6);
+        // Создаем пунктирную линию вручную
+        for (let i = 0; i <= width; i += 10) {
+            if ((i / 10) % 2 === 0) {
+                dashedBorder.moveTo(i, -2);
+                dashedBorder.lineTo(Math.min(i + 5, width), -2);
+            }
+        }
+        for (let i = 0; i <= height; i += 10) {
+            if ((i / 10) % 2 === 0) {
+                dashedBorder.moveTo(-2, i);
+                dashedBorder.lineTo(-2, Math.min(i + 5, height));
+            }
+        }
+        for (let i = 0; i <= width; i += 10) {
+            if ((i / 10) % 2 === 0) {
+                dashedBorder.moveTo(i, height + 2);
+                dashedBorder.lineTo(Math.min(i + 5, width), height + 2);
+            }
+        }
+        for (let i = 0; i <= height; i += 10) {
+            if ((i / 10) % 2 === 0) {
+                dashedBorder.moveTo(width + 2, i);
+                dashedBorder.lineTo(width + 2, Math.min(i + 5, height));
+            }
+        }
+        
+        this.ghostContainer.addChild(frameGraphics);
+        this.ghostContainer.addChild(titleText);
+        this.ghostContainer.addChild(dashedBorder);
         
         // Центрируем контейнер относительно курсора
         this.ghostContainer.pivot.x = width / 2;
