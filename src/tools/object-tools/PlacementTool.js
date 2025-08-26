@@ -20,15 +20,19 @@ export class PlacementTool extends BaseTool {
         this.selectedFile = null; // { file, fileName, fileSize, mimeType, properties }
         // Состояние выбранного изображения
         this.selectedImage = null; // { file, fileName, fileSize, mimeType, properties }
-        this.ghostContainer = null; // Контейнер для "призрака" файла, изображения или текста
+        this.ghostContainer = null; // Контейнер для "призрака" файла, изображения, текста или записки
 
         if (this.eventBus) {
             this.eventBus.on(Events.Place.Set, (cfg) => {
                 this.pending = cfg ? { ...cfg } : null;
                 
-                // Показываем призрак для текста, если он активен
-                if (this.pending && this.pending.type === 'text' && this.app && this.world) {
-                    this.showTextGhost();
+                // Показываем призрак для текста или записки, если они активны
+                if (this.pending && this.app && this.world) {
+                    if (this.pending.type === 'text') {
+                        this.showTextGhost();
+                    } else if (this.pending.type === 'note') {
+                        this.showNoteGhost();
+                    }
                 }
             });
             
@@ -90,8 +94,12 @@ export class PlacementTool extends BaseTool {
             this.showFileGhost();
         } else if (this.selectedImage) {
             this.showImageGhost();
-        } else if (this.pending && this.pending.type === 'text') {
-            this.showTextGhost();
+        } else if (this.pending) {
+            if (this.pending.type === 'text') {
+                this.showTextGhost();
+            } else if (this.pending.type === 'note') {
+                this.showNoteGhost();
+            }
         }
     }
 
@@ -611,6 +619,64 @@ export class PlacementTool extends BaseTool {
         this.ghostContainer.addChild(background);
         this.ghostContainer.addChild(placeholderText);
         this.ghostContainer.addChild(cursor);
+        
+        // Центрируем контейнер относительно курсора
+        this.ghostContainer.pivot.x = width / 2;
+        this.ghostContainer.pivot.y = height / 2;
+        
+        this.world.addChild(this.ghostContainer);
+    }
+
+    /**
+     * Показать "призрак" записки
+     */
+    showNoteGhost() {
+        if (!this.pending || this.pending.type !== 'note' || !this.world) return;
+        
+        this.hideGhost(); // Сначала убираем старый призрак
+        
+        // Создаем контейнер для призрака
+        this.ghostContainer = new PIXI.Container();
+        this.ghostContainer.alpha = 0.6; // Полупрозрачность
+        
+        // Размеры призрака записки (из настроек NoteObject)
+        const width = this.pending.properties?.width || 160;
+        const height = this.pending.properties?.height || 100;
+        const fontSize = this.pending.properties?.fontSize || 16;
+        const content = this.pending.properties?.content || 'Новая записка';
+        
+        // Фон записки (как в NoteObject)
+        const background = new PIXI.Graphics();
+        background.beginFill(0xFFF9C4, 0.8); // Светло-желтый с прозрачностью
+        background.lineStyle(2, 0xF9A825, 0.8); // Золотистая граница
+        background.drawRoundedRect(0, 0, width, height, 8);
+        background.endFill();
+        
+        // Добавляем небольшую тень для реалистичности
+        const shadow = new PIXI.Graphics();
+        shadow.beginFill(0x000000, 0.1);
+        shadow.drawRoundedRect(2, 2, width, height, 8);
+        shadow.endFill();
+        
+        // Текст записки
+        const noteText = new PIXI.Text(content, {
+            fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
+            fontSize: fontSize,
+            fill: 0x1A1A1A, // Темный цвет как в NoteObject
+            align: 'center',
+            wordWrap: true,
+            wordWrapWidth: width - 16, // Отступы по 8px с каждой стороны
+            lineHeight: fontSize * 1.2
+        });
+        
+        // Центрируем текст в записке
+        noteText.x = (width - noteText.width) / 2;
+        noteText.y = (height - noteText.height) / 2;
+        
+        // Добавляем элементы в правильном порядке
+        this.ghostContainer.addChild(shadow);
+        this.ghostContainer.addChild(background);
+        this.ghostContainer.addChild(noteText);
         
         // Центрируем контейнер относительно курсора
         this.ghostContainer.pivot.x = width / 2;
