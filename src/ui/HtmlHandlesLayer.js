@@ -154,11 +154,7 @@ export class HtmlHandlesLayer {
                 h.style.borderColor = '#1DE9B6';
             });
             
-            // Добавляем отладочную информацию
-            h.addEventListener('mousedown', (e) => {
-                console.log(`🖱️ Mousedown на ручке: ${dir}, cursor: ${cursor}`);
-                this._onHandleDown(e, box);
-            });
+            h.addEventListener('mousedown', (e) => this._onHandleDown(e, box));
             
             box.appendChild(h);
         };
@@ -294,12 +290,18 @@ export class HtmlHandlesLayer {
             let newW = startCSS.width;
             let newH = startCSS.height;
             
-            console.log(`🔧 Ресайз ручкой ${dir}: dx=${dx}, dy=${dy}`);
+
             
             if (dir.includes('e')) newW = Math.max(1, startCSS.width + dx);
             if (dir.includes('s')) newH = Math.max(1, startCSS.height + dy);
-            if (dir.includes('w')) { newW = Math.max(1, startCSS.width - dx); newLeft = startCSS.left + dx; }
-            if (dir.includes('n')) { newH = Math.max(1, startCSS.height - dy); newTop = startCSS.top + dy; }
+            if (dir.includes('w')) { 
+                newW = Math.max(1, startCSS.width - dx); 
+                newLeft = startCSS.left + dx; 
+            }
+            if (dir.includes('n')) { 
+                newH = Math.max(1, startCSS.height - dy); 
+                newTop = startCSS.top + dy; 
+            }
 
             // Обновим визуально
             box.style.left = `${newLeft}px`;
@@ -319,6 +321,9 @@ export class HtmlHandlesLayer {
             const worldW = screenW / s;
             const worldH = screenH / s;
 
+            // Определяем, изменилась ли позиция (только для левых/верхних ручек)
+            const positionChanged = (newLeft !== startCSS.left) || (newTop !== startCSS.top);
+
             if (isGroup) {
                 this.eventBus.emit(Events.Tool.GroupResizeUpdate, {
                     objects,
@@ -326,11 +331,17 @@ export class HtmlHandlesLayer {
                     newBounds: { x: worldX, y: worldY, width: worldW, height: worldH }
                 });
             } else {
-                this.eventBus.emit(Events.Tool.ResizeUpdate, {
+                const resizeData = {
                     object: id,
-                    size: { width: worldW, height: worldH },
-                    position: { x: worldX, y: worldY }
-                });
+                    size: { width: worldW, height: worldH }
+                };
+                
+                // Отправляем позицию только если она действительно изменилась
+                if (positionChanged) {
+                    resizeData.position = { x: worldX, y: worldY };
+                }
+                
+                this.eventBus.emit(Events.Tool.ResizeUpdate, resizeData);
             }
         };
         const onUp = () => {
@@ -355,13 +366,22 @@ export class HtmlHandlesLayer {
             if (isGroup) {
                 this.eventBus.emit(Events.Tool.GroupResizeEnd, { objects });
             } else {
-                this.eventBus.emit(Events.Tool.ResizeEnd, {
+                // Определяем, изменилась ли позиция
+                const finalPositionChanged = (endCSS.left !== startCSS.left) || (endCSS.top !== startCSS.top);
+                
+                const resizeEndData = {
                     object: id,
                     oldSize: { width: startWorld.width, height: startWorld.height },
-                    newSize: { width: worldW, height: worldH },
-                    oldPosition: { x: startWorld.x, y: startWorld.y },
-                    newPosition: { x: worldX, y: worldY },
-                });
+                    newSize: { width: worldW, height: worldH }
+                };
+                
+                // Добавляем информацию о позиции только если она действительно изменилась
+                if (finalPositionChanged) {
+                    resizeEndData.oldPosition = { x: startWorld.x, y: startWorld.y };
+                    resizeEndData.newPosition = { x: worldX, y: worldY };
+                }
+                
+                this.eventBus.emit(Events.Tool.ResizeEnd, resizeEndData);
             }
         };
         document.addEventListener('mousemove', onMove);
@@ -425,8 +445,14 @@ export class HtmlHandlesLayer {
             let newH = startCSS.height;
             if (edge === 'right') newW = Math.max(1, startCSS.width + dxCSS);
             if (edge === 'bottom') newH = Math.max(1, startCSS.height + dyCSS);
-            if (edge === 'left') { newW = Math.max(1, startCSS.width - dxCSS); newLeft = startCSS.left + dxCSS; }
-            if (edge === 'top') { newH = Math.max(1, startCSS.height - dyCSS); newTop = startCSS.top + dyCSS; }
+            if (edge === 'left') { 
+                newW = Math.max(1, startCSS.width - dxCSS); 
+                newLeft = startCSS.left + dxCSS; 
+            }
+            if (edge === 'top') { 
+                newH = Math.max(1, startCSS.height - dyCSS); 
+                newTop = startCSS.top + dyCSS; 
+            }
 
             // Обновим визуально
             box.style.left = `${newLeft}px`;
@@ -446,6 +472,9 @@ export class HtmlHandlesLayer {
             const worldW = screenW / s;
             const worldH = screenH / s;
 
+            // Определяем, изменилась ли позиция (только для левых/верхних граней)
+            const edgePositionChanged = (newLeft !== startCSS.left) || (newTop !== startCSS.top);
+
             if (isGroup) {
                 this.eventBus.emit(Events.Tool.GroupResizeUpdate, {
                     objects,
@@ -453,11 +482,17 @@ export class HtmlHandlesLayer {
                     newBounds: { x: worldX, y: worldY, width: worldW, height: worldH }
                 });
             } else {
-                this.eventBus.emit(Events.Tool.ResizeUpdate, {
+                const edgeResizeData = {
                     object: id,
-                    size: { width: worldW, height: worldH },
-                    position: { x: worldX, y: worldY }
-                });
+                    size: { width: worldW, height: worldH }
+                };
+                
+                // Отправляем позицию только если она действительно изменилась
+                if (edgePositionChanged) {
+                    edgeResizeData.position = { x: worldX, y: worldY };
+                }
+                
+                this.eventBus.emit(Events.Tool.ResizeUpdate, edgeResizeData);
             }
         };
         const onUp = () => {
@@ -481,13 +516,22 @@ export class HtmlHandlesLayer {
             if (isGroup) {
                 this.eventBus.emit(Events.Tool.GroupResizeEnd, { objects });
             } else {
-                this.eventBus.emit(Events.Tool.ResizeEnd, {
+                // Определяем, изменилась ли позиция для краевого ресайза
+                const edgeFinalPositionChanged = (endCSS.left !== startCSS.left) || (endCSS.top !== startCSS.top);
+                
+                const edgeResizeEndData = {
                     object: id,
                     oldSize: { width: startWorld.width, height: startWorld.height },
-                    newSize: { width: worldW, height: worldH },
-                    oldPosition: { x: startWorld.x, y: startWorld.y },
-                    newPosition: { x: worldX, y: worldY },
-                });
+                    newSize: { width: worldW, height: worldH }
+                };
+                
+                // Добавляем информацию о позиции только если она действительно изменилась
+                if (edgeFinalPositionChanged) {
+                    edgeResizeEndData.oldPosition = { x: startWorld.x, y: startWorld.y };
+                    edgeResizeEndData.newPosition = { x: worldX, y: worldY };
+                }
+                
+                this.eventBus.emit(Events.Tool.ResizeEnd, edgeResizeEndData);
             }
         };
         document.addEventListener('mousemove', onMove);

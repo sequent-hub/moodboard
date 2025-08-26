@@ -36,21 +36,36 @@ export class ResizeObjectCommand extends BaseCommand {
         const object = objects.find(obj => obj.id === this.objectId);
         const objectType = object ? object.type : null;
         
-        console.log(`🔄 ResizeObjectCommand._setSizeAndPosition: объект ${this.objectId}, тип ${objectType}, размер (${size.width}, ${size.height}), позиция:`, position);
+
+        
+        // Отладка ресайза
+        if (position && object) {
+            console.log(`🔧 Ресайз объекта ${this.objectId}: newSize(${size.width}, ${size.height}), newPosition(${position.x}, ${position.y})`);
+        }
         
         // Обновляем размер в PIXI с указанием типа
         this.coreMoodboard.pixi.updateObjectSize(this.objectId, size, objectType);
 
         // Обновляем позицию если передана (позиция в state — левый-верх; в PIXI — центр)
+        // ВАЖНО: используем НОВЫЙ размер для правильного вычисления центра!
         if (position && object) {
             const pixiObject = this.coreMoodboard.pixi.objects.get(this.objectId);
             if (pixiObject) {
-                const halfW = (size?.width ?? pixiObject.width ?? 0) / 2;
-                const halfH = (size?.height ?? pixiObject.height ?? 0) / 2;
+                const halfW = size.width / 2;
+                const halfH = size.height / 2;
                 pixiObject.x = position.x + halfW;
                 pixiObject.y = position.y + halfH;
                 object.position.x = position.x;
                 object.position.y = position.y;
+                console.log(`🎯 После ресайза: center(${pixiObject.x}, ${pixiObject.y}), leftTop(${position.x}, ${position.y})`);
+                
+                // Проверим, где находятся границы объекта
+                const leftEdge = pixiObject.x - size.width / 2;
+                const rightEdge = pixiObject.x + size.width / 2;
+                const topEdge = pixiObject.y - size.height / 2;
+                const bottomEdge = pixiObject.y + size.height / 2;
+                console.log(`📏 Границы объекта: left=${leftEdge}, right=${rightEdge}, top=${topEdge}, bottom=${bottomEdge}`);
+
             }
         }
         
