@@ -15,16 +15,37 @@ export class PlacementTool extends BaseTool {
         this.world = null;
         this.pending = null; // { type, properties }
         this.core = core;
+        
+        // Состояние выбранного файла
+        this.selectedFile = null; // { file, fileName, fileSize, mimeType, properties }
+        this.ghostContainer = null; // Контейнер для "призрака" файла
 
         if (this.eventBus) {
             this.eventBus.on(Events.Place.Set, (cfg) => {
                 this.pending = cfg ? { ...cfg } : null;
             });
+            
             // Сброс pending при явном выборе select-инструмента
             this.eventBus.on(Events.Tool.Activated, ({ tool }) => {
                 if (tool === 'select') {
                     this.pending = null;
+                    this.selectedFile = null;
+                    this.hideGhost();
                 }
+            });
+
+            // Обработка выбора файла
+            this.eventBus.on(Events.Place.FileSelected, (fileData) => {
+                this.selectedFile = fileData;
+                this.showGhost();
+            });
+
+            // Обработка отмены выбора файла
+            this.eventBus.on(Events.Place.FileCanceled, () => {
+                this.selectedFile = null;
+                this.hideGhost();
+                // Возвращаемся к инструменту выделения
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
             });
         }
     }
@@ -34,18 +55,39 @@ export class PlacementTool extends BaseTool {
         this.app = app;
         this.world = this._getWorldLayer();
         // Курсор указывает на размещение (прицел)
-        if (this.app && this.app.view) this.app.view.style.cursor = 'crosshair';
+        if (this.app && this.app.view) {
+            this.app.view.style.cursor = 'crosshair';
+            // Добавляем обработчик движения мыши для "призрака"
+            this.app.view.addEventListener('mousemove', this._onMouseMove.bind(this));
+        }
+        
+        // Если есть выбранный файл, показываем призрак
+        if (this.selectedFile) {
+            this.showGhost();
+        }
     }
 
     deactivate() {
         super.deactivate();
-        if (this.app && this.app.view) this.app.view.style.cursor = '';
+        if (this.app && this.app.view) {
+            this.app.view.style.cursor = '';
+            // Убираем обработчик движения мыши
+            this.app.view.removeEventListener('mousemove', this._onMouseMove.bind(this));
+        }
+        this.hideGhost();
         this.app = null;
         this.world = null;
     }
 
     onMouseDown(event) {
         super.onMouseDown(event);
+        
+        // Если есть выбранный файл, размещаем его
+        if (this.selectedFile) {
+            this.placeSelectedFile(event);
+            return;
+        }
+        
         if (!this.pending) return;
 
         const worldPoint = this._toWorld(event.x, event.y);
@@ -245,6 +287,156 @@ export class PlacementTool extends BaseTool {
         if (!this.app || !this.app.stage) return null;
         const world = this.app.stage.getChildByName && this.app.stage.getChildByName('worldLayer');
         return world || this.app.stage;
+    }
+
+    /**
+     * Обработчик движения мыши для обновления позиции "призрака"
+     */
+    _onMouseMove(event) {
+        if (this.selectedFile && this.ghostContainer) {
+            const worldPoint = this._toWorld(event.offsetX, event.offsetY);
+            this.updateGhostPosition(worldPoint.x, worldPoint.y);
+        }
+    }
+
+    /**
+     * Показать "призрак" файла
+     */
+    showGhost() {
+        if (!this.selectedFile || !this.world) return;
+        
+        this.hideGhost(); // Сначала убираем старый призрак
+        
+        // Создаем контейнер для призрака
+        this.ghostContainer = new PIXI.Container();
+        this.ghostContainer.alpha = 0.6; // Полупрозрачность
+        
+        // Создаем визуальное представление файла (аналогично FileObject)
+        const graphics = new PIXI.Graphics();
+        const width = this.selectedFile.properties.width || 120;
+        const height = this.selectedFile.properties.height || 140;
+        
+        // Фон файла
+        graphics.beginFill(0xF8F9FA, 0.8);
+        graphics.lineStyle(2, 0xDEE2E6, 0.8);
+        graphics.drawRoundedRect(0, 0, width, height, 8);
+        graphics.endFill();
+        
+        // Иконка файла (простой прямоугольник)
+        graphics.beginFill(0x6C757D, 0.6);
+        graphics.drawRoundedRect(width * 0.2, height * 0.15, width * 0.6, height * 0.3, 4);
+        graphics.endFill();
+        
+        // Текст названия файла
+        const fileName = this.selectedFile.fileName || 'File';
+        const displayName = fileName.length > 15 ? fileName.substring(0, 12) + '...' : fileName;
+        
+        const nameText = new PIXI.Text(displayName, {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: 12,
+            fill: 0x495057,
+            align: 'center',
+            wordWrap: true,
+            wordWrapWidth: width - 10
+        });
+        
+        nameText.x = (width - nameText.width) / 2;
+        nameText.y = height * 0.55;
+        
+        this.ghostContainer.addChild(graphics);
+        this.ghostContainer.addChild(nameText);
+        
+        // Центрируем контейнер относительно курсора
+        this.ghostContainer.pivot.x = width / 2;
+        this.ghostContainer.pivot.y = height / 2;
+        
+        this.world.addChild(this.ghostContainer);
+    }
+
+    /**
+     * Скрыть "призрак" файла
+     */
+    hideGhost() {
+        if (this.ghostContainer && this.world) {
+            this.world.removeChild(this.ghostContainer);
+            this.ghostContainer.destroy();
+            this.ghostContainer = null;
+        }
+    }
+
+    /**
+     * Обновить позицию "призрака" файла
+     */
+    updateGhostPosition(x, y) {
+        if (this.ghostContainer) {
+            this.ghostContainer.x = x;
+            this.ghostContainer.y = y;
+        }
+    }
+
+    /**
+     * Разместить выбранный файл на холсте
+     */
+    async placeSelectedFile(event) {
+        if (!this.selectedFile) return;
+        
+        const worldPoint = this._toWorld(event.x, event.y);
+        const props = this.selectedFile.properties;
+        const halfW = (props.width || 120) / 2;
+        const halfH = (props.height || 140) / 2;
+        const position = { 
+            x: Math.round(worldPoint.x - halfW), 
+            y: Math.round(worldPoint.y - halfH) 
+        };
+
+        try {
+            // Загружаем файл на сервер
+            const uploadResult = await this.core.fileUploadService.uploadFile(
+                this.selectedFile.file, 
+                this.selectedFile.fileName
+            );
+            
+            // Создаем объект файла с данными с сервера
+            this.eventBus.emit(Events.UI.ToolbarAction, {
+                type: 'file',
+                id: 'file',
+                position,
+                properties: { 
+                    fileName: uploadResult.name,
+                    fileSize: uploadResult.size,
+                    mimeType: uploadResult.mimeType,
+                    formattedSize: uploadResult.formattedSize,
+                    url: uploadResult.url,
+                    width: props.width || 120,
+                    height: props.height || 140
+                },
+                fileId: uploadResult.id // Сохраняем ID файла
+            });
+            
+        } catch (uploadError) {
+            console.error('Ошибка загрузки файла на сервер:', uploadError);
+            // Fallback: создаем объект файла с локальными данными
+            this.eventBus.emit(Events.UI.ToolbarAction, {
+                type: 'file',
+                id: 'file',
+                position,
+                properties: { 
+                    fileName: this.selectedFile.fileName,
+                    fileSize: this.selectedFile.fileSize,
+                    mimeType: this.selectedFile.mimeType,
+                    width: props.width || 120,
+                    height: props.height || 140
+                }
+            });
+            
+            // Показываем предупреждение пользователю
+            alert('Ошибка загрузки файла на сервер. Файл добавлен локально.');
+        }
+
+        // Убираем призрак и возвращаемся к инструменту выделения
+        this.selectedFile = null;
+        this.hideGhost();
+        this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
     }
 }
 

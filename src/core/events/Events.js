@@ -130,6 +130,11 @@ export const Events = {
 
 	Place: {
 		Set: 'place:set',
+		FileSelected: 'place:file:selected',
+		FileCanceled: 'place:file:canceled',
+		GhostShow: 'place:ghost:show',
+		GhostHide: 'place:ghost:hide',
+		GhostUpdate: 'place:ghost:update',
 	},
 
 	Draw: {

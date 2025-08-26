@@ -369,26 +369,14 @@ export class Toolbar {
                 return;
             }
 
-            // Файлы — включаем режим размещения file
+            // Файлы — сразу открываем диалог выбора файла
             if (toolType === 'custom-attachments') {
                 this.animateButton(button);
                 this.closeShapesPopup();
                 this.closeDrawPopup();
                 this.closeEmojiPopup();
-                // Активируем place, устанавливаем pending для file
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                this.placeSelectedButtonId = 'attachments';
-                this.setActiveToolbarButton('place');
-                // Устанавливаем свойства файла: выбор файла после клика
-                this.eventBus.emit(Events.Place.Set, { 
-                    type: 'file', 
-                    properties: { 
-                        selectFileOnPlace: true,
-                        fileName: 'Новый файл',
-                        width: 120,
-                        height: 140
-                    }
-                });
+                // Открываем диалог выбора файла
+                this.openFileDialog();
                 return;
             }
 
@@ -929,6 +917,65 @@ export class Toolbar {
         this.eventBus.on(Events.UI.UpdateHistoryButtons, (data) => {
             this.updateHistoryButtons(data.canUndo, data.canRedo);
         });
+    }
+
+    /**
+     * Открывает диалог выбора файла и запускает режим "призрака"
+     */
+    async openFileDialog() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '*/*'; // Принимаем любые файлы
+        input.style.display = 'none';
+        document.body.appendChild(input);
+
+        input.addEventListener('change', async () => {
+            try {
+                const file = input.files && input.files[0];
+                if (!file) {
+                    // Пользователь отменил выбор файла
+                    this.eventBus.emit(Events.Place.FileCanceled);
+                    return;
+                }
+
+                // Файл выбран - запускаем режим "призрака"
+                this.eventBus.emit(Events.Place.FileSelected, {
+                    file: file,
+                    fileName: file.name,
+                    fileSize: file.size,
+                    mimeType: file.type,
+                    properties: {
+                        width: 120,
+                        height: 140
+                    }
+                });
+
+                // Активируем инструмент размещения
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                this.placeSelectedButtonId = 'attachments';
+                this.setActiveToolbarButton('place');
+
+            } catch (error) {
+                console.error('Ошибка при выборе файла:', error);
+                alert('Ошибка при выборе файла: ' + error.message);
+            } finally {
+                input.remove();
+            }
+        }, { once: true });
+
+        // Обработка отмены диалога (клик вне диалога или ESC)
+        const handleCancel = () => {
+            setTimeout(() => {
+                if (input.files.length === 0) {
+                    this.eventBus.emit(Events.Place.FileCanceled);
+                    input.remove();
+                }
+                window.removeEventListener('focus', handleCancel);
+            }, 100);
+        };
+        
+        window.addEventListener('focus', handleCancel, { once: true });
+        input.click();
     }
     
     /**
