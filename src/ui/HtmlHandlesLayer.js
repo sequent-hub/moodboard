@@ -63,8 +63,26 @@ export class HtmlHandlesLayer {
             // Не показываем рамку/ручки для комментариев
             const mb = pixi._mb || {};
             if (mb.type === 'comment') { this.hide(); return; }
-            const b = pixi.getBounds();
-            this._showBounds({ x: b.x, y: b.y, width: b.width, height: b.height }, id);
+            
+            // Получаем данные объекта через события (избегаем проблем с глобальными границами)
+            const positionData = { objectId: id, position: null };
+            const sizeData = { objectId: id, size: null };
+            this.eventBus.emit(Events.Tool.GetObjectPosition, positionData);
+            this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+            
+            if (positionData.position && sizeData.size) {
+                // Используем данные из состояния вместо getBounds() для избежания масштабирования
+                this._showBounds({
+                    x: positionData.position.x,
+                    y: positionData.position.y,
+                    width: sizeData.size.width,
+                    height: sizeData.size.height
+                }, id);
+            } else {
+                // Fallback к getBounds() если события не сработали
+                const b = pixi.getBounds();
+                this._showBounds({ x: b.x, y: b.y, width: b.width, height: b.height }, id);
+            }
         } else {
             // Группа: вычислим общий bbox по PIXI
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -90,26 +108,49 @@ export class HtmlHandlesLayer {
 
     _showBounds(worldBounds, id) {
         if (!this.layer) return;
-        // getBounds() возвращает координаты в экранном (глобальном) пространстве PIXI
-        // Преобразуем их в CSS-пиксели, деля на resolution
+        // Преобразуем world координаты в CSS-пиксели
         const res = (this.core.pixi.app.renderer?.resolution) || 1;
         const view = this.core.pixi.app.view;
         const containerRect = this.container.getBoundingClientRect();
         const viewRect = view.getBoundingClientRect();
         const offsetLeft = viewRect.left - containerRect.left;
         const offsetTop = viewRect.top - containerRect.top;
-        const left = offsetLeft + worldBounds.x / res;
-        const top = offsetTop + worldBounds.y / res;
-        const width = Math.max(1, worldBounds.width / res);
-        const height = Math.max(1, worldBounds.height / res);
+        
+        // Получаем масштаб world layer для правильного преобразования
+        const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
+        const worldScale = world?.scale?.x || 1;
+        const worldX = world?.x || 0;
+        const worldY = world?.y || 0;
+        
+        // Вычисляем позицию и размер в CSS координатах
+        const cssX = offsetLeft + (worldX + worldBounds.x * worldScale) / res;
+        const cssY = offsetTop + (worldY + worldBounds.y * worldScale) / res;
+        const cssWidth = Math.max(1, (worldBounds.width * worldScale) / res);
+        const cssHeight = Math.max(1, (worldBounds.height * worldScale) / res);
+        
+        const left = cssX;
+        const top = cssY;
+        const width = cssWidth;
+        const height = cssHeight;
 
         this.layer.innerHTML = '';
         const box = document.createElement('div');
         box.className = 'mb-handles-box';
+        
+        // Получаем угол поворота объекта для поворота рамки
+        let rotation = 0;
+        if (id !== '__group__') {
+            const rotationData = { objectId: id, rotation: 0 };
+            this.eventBus.emit(Events.Tool.GetObjectRotation, rotationData);
+            rotation = rotationData.rotation || 0; // В градусах
+        }
+        
         Object.assign(box.style, {
             position: 'absolute', left: `${left}px`, top: `${top}px`,
             width: `${width}px`, height: `${height}px`,
-            border: '1px solid #1DE9B6', boxSizing: 'border-box', pointerEvents: 'none'
+            border: '1px solid #1DE9B6', boxSizing: 'border-box', pointerEvents: 'none',
+            transformOrigin: 'center center', // Поворот вокруг центра
+            transform: `rotate(${rotation}deg)` // Применяем поворот
         });
         this.layer.appendChild(box);
 
@@ -221,7 +262,50 @@ export class HtmlHandlesLayer {
             height: `${Math.max(0, height - 2 * cornerGap)}px` 
         }, 'ew-resize');
 
-        // Ручка вращения (опционально можно добавить позже)
+        // Ручка вращения - зеленый круг с символом ↻ возле левого нижнего угла
+        const rotateHandle = document.createElement('div');
+        rotateHandle.dataset.handle = 'rotate'; 
+        rotateHandle.dataset.id = id;
+        Object.assign(rotateHandle.style, {
+            position: 'absolute',
+            width: '20px', height: '20px',
+            background: '#28A745',
+            border: '2px solid #fff',
+            borderRadius: '50%',
+            boxSizing: 'border-box',
+            pointerEvents: 'auto',
+            cursor: 'grab',
+            zIndex: 15, // Выше ручек ресайза
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '12px',
+            color: '#fff',
+            fontWeight: 'bold',
+            userSelect: 'none'
+        });
+        
+        // Позиционируем возле левого нижнего угла с отступом
+        rotateHandle.style.left = `${0 - 10}px`; // центрируем относительно угла
+        rotateHandle.style.top = `${height + 25 - 10}px`; // отступ 25px от нижней грани
+        
+        // Добавляем символ вращения
+        rotateHandle.innerHTML = '↻';
+        
+        // Эффекты при наведении
+        rotateHandle.addEventListener('mouseenter', () => {
+            rotateHandle.style.background = '#34CE57';
+            rotateHandle.style.cursor = 'grab';
+        });
+        rotateHandle.addEventListener('mouseleave', () => {
+            rotateHandle.style.background = '#28A745';
+        });
+        
+        // Обработчик вращения
+        rotateHandle.addEventListener('mousedown', (e) => this._onRotateHandleDown(e, box));
+        
+        box.appendChild(rotateHandle);
+
         this.visible = true;
         this.target = { type: id === '__group__' ? 'group' : 'single', id, bounds: worldBounds };
     }
@@ -538,6 +622,94 @@ export class HtmlHandlesLayer {
         document.addEventListener('mouseup', onUp);
     }
 
+    _onRotateHandleDown(e, box) {
+        e.preventDefault(); e.stopPropagation();
+        
+        const id = e.currentTarget.dataset.id;
+        const isGroup = id === '__group__';
+        
+        // Получаем центр объекта в CSS координатах
+        const boxLeft = parseFloat(box.style.left);
+        const boxTop = parseFloat(box.style.top);
+        const boxWidth = parseFloat(box.style.width);
+        const boxHeight = parseFloat(box.style.height);
+        const centerX = boxLeft + boxWidth / 2;
+        const centerY = boxTop + boxHeight / 2;
+        
+        // Начальный угол от центра объекта до курсора
+        const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+        
+        // Получаем текущий поворот объекта из состояния
+        let startRotation = 0;
+        if (!isGroup) {
+            const rotationData = { objectId: id, rotation: 0 };
+            this.eventBus.emit(Events.Tool.GetObjectRotation, rotationData);
+            startRotation = (rotationData.rotation || 0) * Math.PI / 180; // Преобразуем градусы в радианы
+        }
+        
+        // Изменяем курсор на grabbing
+        e.currentTarget.style.cursor = 'grabbing';
+        
+        // Уведомляем о начале поворота
+        if (isGroup) {
+            const req = { selection: [] };
+            this.eventBus.emit(Events.Tool.GetSelection, req);
+            const objects = req.selection || [];
+            this.eventBus.emit(Events.Tool.GroupRotateStart, { objects });
+        }
+        
+        const onRotateMove = (ev) => {
+            // Вычисляем текущий угол
+            const currentAngle = Math.atan2(ev.clientY - centerY, ev.clientX - centerX);
+            const deltaAngle = currentAngle - startAngle;
+            const newRotation = startRotation + deltaAngle;
+            
+            if (isGroup) {
+                const req = { selection: [] };
+                this.eventBus.emit(Events.Tool.GetSelection, req);
+                const objects = req.selection || [];
+                this.eventBus.emit(Events.Tool.GroupRotateUpdate, { 
+                    objects, 
+                    angle: newRotation * 180 / Math.PI // Преобразуем радианы в градусы
+                });
+            } else {
+                this.eventBus.emit(Events.Tool.RotateUpdate, { 
+                    object: id, 
+                    angle: newRotation * 180 / Math.PI // Преобразуем радианы в градусы
+                });
+            }
+        };
+        
+        const onRotateUp = (ev) => {
+            document.removeEventListener('mousemove', onRotateMove);
+            document.removeEventListener('mouseup', onRotateUp);
+            
+            // Возвращаем курсор
+            e.currentTarget.style.cursor = 'grab';
+            
+            // Вычисляем финальный угол
+            const finalAngle = Math.atan2(ev.clientY - centerY, ev.clientX - centerX);
+            const finalDeltaAngle = finalAngle - startAngle;
+            const finalRotation = startRotation + finalDeltaAngle;
+            
+            if (isGroup) {
+                const req = { selection: [] };
+                this.eventBus.emit(Events.Tool.GetSelection, req);
+                const objects = req.selection || [];
+                this.eventBus.emit(Events.Tool.GroupRotateEnd, { objects });
+            } else {
+                this.eventBus.emit(Events.Tool.RotateEnd, { 
+                    object: id, 
+                    oldAngle: startRotation * 180 / Math.PI, // Преобразуем радианы в градусы
+                    newAngle: finalRotation * 180 / Math.PI  // Преобразуем радианы в градусы
+                });
+            }
+        };
+        
+        document.addEventListener('mousemove', onRotateMove);
+        document.addEventListener('mouseup', onRotateUp);
+    }
+
     _repositionBoxChildren(box) {
         const width = parseFloat(box.style.width);
         const height = parseFloat(box.style.height);
@@ -593,6 +765,13 @@ export class HtmlHandlesLayer {
             width: `${edgeSize}px`, 
             height: `${Math.max(0, height - 2 * cornerGap)}px` 
         });
+        
+        // Позиционируем ручку вращения
+        const rotateHandle = box.querySelector('[data-handle="rotate"]');
+        if (rotateHandle) {
+            rotateHandle.style.left = `${0 - 10}px`; // центрируем относительно левого нижнего угла
+            rotateHandle.style.top = `${height + 25 - 10}px`; // отступ 25px от нижней грани
+        }
     }
 }
 
