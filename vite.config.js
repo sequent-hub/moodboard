@@ -11,6 +11,21 @@ export default defineConfig({
     // Настройки для загрузки SVG
     assetsInclude: ['**/*.svg'],
 
+    build: {
+        lib: {
+            entry: 'src/index.js',
+            name: 'Moodboard',
+            fileName: (format) => `moodboard.${format}.js`
+        },
+        rollupOptions: {
+            // Внешние зависимости, не включаемые в бандл
+            external: [],
+            output: {
+                globals: {}
+            }
+        }
+    },
+
     // Настройки для тестов
     test: {
         // Глобальные переменные тестов
