@@ -1,5 +1,5 @@
 {
-  "name": "@futurello/moodboard",
+  "name": "@sequent-org/moodboard",
   "version": "1.0.0",
   "type": "module",
   "description": "Interactive moodboard",
