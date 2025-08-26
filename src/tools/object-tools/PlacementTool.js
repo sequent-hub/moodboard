@@ -20,13 +20,13 @@ export class PlacementTool extends BaseTool {
         this.selectedFile = null; // { file, fileName, fileSize, mimeType, properties }
         // Состояние выбранного изображения
         this.selectedImage = null; // { file, fileName, fileSize, mimeType, properties }
-        this.ghostContainer = null; // Контейнер для "призрака" файла, изображения, текста, записки, эмоджи или фрейма
+        this.ghostContainer = null; // Контейнер для "призрака" файла, изображения, текста, записки, эмоджи, фрейма или фигур
 
         if (this.eventBus) {
             this.eventBus.on(Events.Place.Set, (cfg) => {
                 this.pending = cfg ? { ...cfg } : null;
                 
-                // Показываем призрак для текста, записки, эмоджи или фрейма, если они активны
+                // Показываем призрак для текста, записки, эмоджи, фрейма или фигур, если они активны
                 if (this.pending && this.app && this.world) {
                     if (this.pending.type === 'text') {
                         this.showTextGhost();
@@ -36,6 +36,8 @@ export class PlacementTool extends BaseTool {
                         this.showEmojiGhost();
                     } else if (this.pending.type === 'frame') {
                         this.showFrameGhost();
+                    } else if (this.pending.type === 'shape') {
+                        this.showShapeGhost();
                     }
                 }
             });
@@ -107,6 +109,8 @@ export class PlacementTool extends BaseTool {
                 this.showEmojiGhost();
             } else if (this.pending.type === 'frame') {
                 this.showFrameGhost();
+            } else if (this.pending.type === 'shape') {
+                this.showShapeGhost();
             }
         }
     }
@@ -819,6 +823,97 @@ export class PlacementTool extends BaseTool {
         this.ghostContainer.addChild(frameGraphics);
         this.ghostContainer.addChild(titleText);
         this.ghostContainer.addChild(dashedBorder);
+        
+        // Центрируем контейнер относительно курсора
+        this.ghostContainer.pivot.x = width / 2;
+        this.ghostContainer.pivot.y = height / 2;
+        
+        this.world.addChild(this.ghostContainer);
+    }
+
+    /**
+     * Показать "призрак" фигуры
+     */
+    showShapeGhost() {
+        if (!this.pending || this.pending.type !== 'shape' || !this.world) return;
+        
+        this.hideGhost(); // Сначала убираем старый призрак
+        
+        // Создаем контейнер для призрака
+        this.ghostContainer = new PIXI.Container();
+        this.ghostContainer.alpha = 0.6; // Полупрозрачность
+        
+        // Получаем параметры фигуры из pending
+        const kind = this.pending.properties?.kind || 'square';
+        const width = 100; // Стандартный размер по умолчанию
+        const height = 100;
+        const fillColor = 0x3b82f6; // Синий цвет как в ShapeObject
+        const cornerRadius = this.pending.properties?.cornerRadius || 10;
+        
+        // Создаем графику фигуры (точно как в ShapeObject._draw)
+        const shapeGraphics = new PIXI.Graphics();
+        shapeGraphics.beginFill(fillColor, 0.8); // Полупрозрачная заливка
+        
+        switch (kind) {
+            case 'circle': {
+                const r = Math.min(width, height) / 2;
+                shapeGraphics.drawCircle(width / 2, height / 2, r);
+                break;
+            }
+            case 'rounded': {
+                const r = cornerRadius || 10;
+                shapeGraphics.drawRoundedRect(0, 0, width, height, r);
+                break;
+            }
+            case 'triangle': {
+                shapeGraphics.moveTo(width / 2, 0);
+                shapeGraphics.lineTo(width, height);
+                shapeGraphics.lineTo(0, height);
+                shapeGraphics.lineTo(width / 2, 0);
+                break;
+            }
+            case 'diamond': {
+                shapeGraphics.moveTo(width / 2, 0);
+                shapeGraphics.lineTo(width, height / 2);
+                shapeGraphics.lineTo(width / 2, height);
+                shapeGraphics.lineTo(0, height / 2);
+                shapeGraphics.lineTo(width / 2, 0);
+                break;
+            }
+            case 'parallelogram': {
+                const skew = Math.min(width * 0.25, 20);
+                shapeGraphics.moveTo(skew, 0);
+                shapeGraphics.lineTo(width, 0);
+                shapeGraphics.lineTo(width - skew, height);
+                shapeGraphics.lineTo(0, height);
+                shapeGraphics.lineTo(skew, 0);
+                break;
+            }
+            case 'arrow': {
+                const shaftH = Math.max(6, height * 0.3);
+                const shaftY = (height - shaftH) / 2;
+                shapeGraphics.drawRect(0, shaftY, width * 0.6, shaftH);
+                shapeGraphics.moveTo(width * 0.6, 0);
+                shapeGraphics.lineTo(width, height / 2);
+                shapeGraphics.lineTo(width * 0.6, height);
+                shapeGraphics.lineTo(width * 0.6, 0);
+                break;
+            }
+            case 'square':
+            default: {
+                shapeGraphics.drawRect(0, 0, width, height);
+                break;
+            }
+        }
+        shapeGraphics.endFill();
+        
+        // Добавляем тонкую рамку для лучшей видимости призрака
+        const border = new PIXI.Graphics();
+        border.lineStyle(2, 0x007BFF, 0.6);
+        border.drawRect(-2, -2, width + 4, height + 4);
+        
+        this.ghostContainer.addChild(border);
+        this.ghostContainer.addChild(shapeGraphics);
         
         // Центрируем контейнер относительно курсора
         this.ghostContainer.pivot.x = width / 2;
