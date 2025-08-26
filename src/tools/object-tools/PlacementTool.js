@@ -20,18 +20,20 @@ export class PlacementTool extends BaseTool {
         this.selectedFile = null; // { file, fileName, fileSize, mimeType, properties }
         // Состояние выбранного изображения
         this.selectedImage = null; // { file, fileName, fileSize, mimeType, properties }
-        this.ghostContainer = null; // Контейнер для "призрака" файла, изображения, текста или записки
+        this.ghostContainer = null; // Контейнер для "призрака" файла, изображения, текста, записки или эмоджи
 
         if (this.eventBus) {
             this.eventBus.on(Events.Place.Set, (cfg) => {
                 this.pending = cfg ? { ...cfg } : null;
                 
-                // Показываем призрак для текста или записки, если они активны
+                // Показываем призрак для текста, записки или эмоджи, если они активны
                 if (this.pending && this.app && this.world) {
                     if (this.pending.type === 'text') {
                         this.showTextGhost();
                     } else if (this.pending.type === 'note') {
                         this.showNoteGhost();
+                    } else if (this.pending.type === 'emoji') {
+                        this.showEmojiGhost();
                     }
                 }
             });
@@ -99,6 +101,8 @@ export class PlacementTool extends BaseTool {
                 this.showTextGhost();
             } else if (this.pending.type === 'note') {
                 this.showNoteGhost();
+            } else if (this.pending.type === 'emoji') {
+                this.showEmojiGhost();
             }
         }
     }
@@ -677,6 +681,64 @@ export class PlacementTool extends BaseTool {
         this.ghostContainer.addChild(shadow);
         this.ghostContainer.addChild(background);
         this.ghostContainer.addChild(noteText);
+        
+        // Центрируем контейнер относительно курсора
+        this.ghostContainer.pivot.x = width / 2;
+        this.ghostContainer.pivot.y = height / 2;
+        
+        this.world.addChild(this.ghostContainer);
+    }
+
+    /**
+     * Показать "призрак" эмоджи
+     */
+    showEmojiGhost() {
+        if (!this.pending || this.pending.type !== 'emoji' || !this.world) return;
+        
+        this.hideGhost(); // Сначала убираем старый призрак
+        
+        // Создаем контейнер для призрака
+        this.ghostContainer = new PIXI.Container();
+        this.ghostContainer.alpha = 0.7; // Немного менее прозрачный для эмоджи
+        
+        // Получаем параметры эмоджи из pending
+        const content = this.pending.properties?.content || '🙂';
+        const fontSize = this.pending.properties?.fontSize || 48;
+        const width = this.pending.properties?.width || fontSize;
+        const height = this.pending.properties?.height || fontSize;
+        
+        // Создаем эмоджи текст (как в EmojiObject)
+        const emojiText = new PIXI.Text(content, {
+            fontFamily: 'Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial',
+            fontSize: fontSize
+        });
+        
+        // Устанавливаем якорь в левом верхнем углу (как в EmojiObject)
+        if (typeof emojiText.anchor?.set === 'function') {
+            emojiText.anchor.set(0, 0);
+        }
+        
+        // Получаем базовые размеры для масштабирования
+        const bounds = emojiText.getLocalBounds();
+        const baseW = Math.max(1, bounds.width || 1);
+        const baseH = Math.max(1, bounds.height || 1);
+        
+        // Применяем равномерное масштабирование для подгонки под целевые размеры
+        const scaleX = width / baseW;
+        const scaleY = height / baseH;
+        const scale = Math.min(scaleX, scaleY); // Равномерное масштабирование
+        
+        emojiText.scale.set(scale, scale);
+        
+        // Добавляем лёгкий фон для лучшей видимости призрака
+        const background = new PIXI.Graphics();
+        background.beginFill(0xFFFFFF, 0.3); // Полупрозрачный белый фон
+        background.lineStyle(1, 0xDDDDDD, 0.5); // Тонкая граница
+        background.drawRoundedRect(-4, -4, width + 8, height + 8, 4);
+        background.endFill();
+        
+        this.ghostContainer.addChild(background);
+        this.ghostContainer.addChild(emojiText);
         
         // Центрируем контейнер относительно курсора
         this.ghostContainer.pivot.x = width / 2;
