@@ -85,6 +85,12 @@ export class MoodBoard {
             this.htmlTextLayer.attach();
             this.htmlHandlesLayer = new HtmlHandlesLayer(this.canvasContainer, this.coreMoodboard.eventBus, this.coreMoodboard);
             this.htmlHandlesLayer.attach();
+            
+            // Устанавливаем глобальные свойства для доступа к слоям
+            if (typeof window !== 'undefined') {
+                window.moodboardHtmlTextLayer = this.htmlTextLayer;
+                window.moodboardHtmlHandlesLayer = this.htmlHandlesLayer;
+            }
             // Поповер для комментариев
             this.commentPopover = new CommentPopover(this.canvasContainer, this.coreMoodboard.eventBus, this.coreMoodboard);
             this.commentPopover.attach();

@@ -1727,8 +1727,8 @@ export class SelectTool extends BaseTool {
         // Скрываем статичный текст во время редактирования для всех типов объектов
         if (objectId) {
             // Проверяем, что HTML-элемент существует перед попыткой скрыть текст
-            if (window.moodboard && window.moodboard.htmlTextLayer) {
-                const el = window.moodboard.htmlTextLayer.idToEl.get(objectId);
+            if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
+                const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
                 if (el) {
                     this.eventBus.emit(Events.Tool.HideObjectText, { objectId });
                 } else {
@@ -1787,8 +1787,8 @@ export class SelectTool extends BaseTool {
             // Показываем статичный текст после завершения редактирования для всех типов объектов
             if (objectId) {
                 // Проверяем, что HTML-элемент существует перед попыткой показать текст
-                if (window.moodboard && window.moodboard.htmlTextLayer) {
-                    const el = window.moodboard.htmlTextLayer.idToEl.get(objectId);
+                if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
+                    const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
                     if (el) {
                         this.eventBus.emit(Events.Tool.ShowObjectText, { objectId });
                     } else {
@@ -2119,8 +2119,8 @@ export class SelectTool extends BaseTool {
         // Показываем статичный текст после завершения редактирования для всех типов объектов
         if (objectId) {
             // Проверяем, что HTML-элемент существует перед попыткой показать текст
-            if (window.moodboard && window.moodboard.htmlTextLayer) {
-                const el = window.moodboard.htmlTextLayer.idToEl.get(objectId);
+            if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
+                const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
                 if (el) {
                     this.eventBus.emit(Events.Tool.ShowObjectText, { objectId });
                 } else {
