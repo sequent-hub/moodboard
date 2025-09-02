@@ -524,7 +524,7 @@ export class SelectTool extends BaseTool {
         const point = new PIXI.Point(x, y);
         
         // Сначала ищем в контейнере ручек (приоритет)
-        if (this.resizeHandles.container.visible) {
+        if (this.resizeHandles.container && this.resizeHandles.container.visible) {
             for (let i = this.resizeHandles.container.children.length - 1; i >= 0; i--) {
                 const child = this.resizeHandles.container.children[i];
                 
@@ -551,7 +551,7 @@ export class SelectTool extends BaseTool {
         const stage = this.resizeHandles.app.stage;
         for (let i = stage.children.length - 1; i >= 0; i--) {
             const child = stage.children[i];
-            if (child !== this.resizeHandles.container && child.containsPoint && child.containsPoint(point)) {
+            if (this.resizeHandles.container && child !== this.resizeHandles.container && child.containsPoint && child.containsPoint(point)) {
 
                 return child;
             }
@@ -1164,6 +1164,11 @@ export class SelectTool extends BaseTool {
     }
 
     clearSelection() {
+        // Проверяем, что инструмент не уничтожен
+        if (this.destroyed) {
+            return;
+        }
+        
         const objects = this.selection.toArray();
         this.selection.clear();
         this.emit(Events.Tool.SelectionClear, { objects });
@@ -1213,6 +1218,11 @@ export class SelectTool extends BaseTool {
      * Обновление ручек изменения размера
      */
     updateResizeHandles() {
+        // Проверяем, что инструмент не уничтожен
+        if (this.destroyed) {
+            return;
+        }
+        
         // Используем HTML-ручки (HtmlHandlesLayer). Прячем Pixi-ручки и групповые графики.
         try {
             if (this.resizeHandles && typeof this.resizeHandles.hideHandles === 'function') {
