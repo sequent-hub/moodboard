@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест исправлений destroy()</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+        }
+        
+        .test-container {
+            width: 800px;
+            height: 600px;
+            border: 2px solid #007acc;
+            border-radius: 8px;
+            background: white;
+            margin: 20px auto;
+            position: relative;
+        }
+        
+        .info {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background: #007acc;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .btn:hover {
+            background: #005a9e;
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .log {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            max-width: 300px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h1>Тест исправлений destroy()</h1>
+        <p>Этот тест проверяет, что после вызова destroy() не возникают ошибки в консоли</p>
+        <p>Откройте консоль браузера (F12) для мониторинга ошибок</p>
+    </div>
+    
+    <div class="controls">
+        <button id="create-btn" class="btn">Создать MoodBoard</button>
+        <button id="destroy-btn" class="btn" disabled>Уничтожить MoodBoard</button>
+        <button id="test-methods-btn" class="btn" disabled>Тест методов после destroy</button>
+        <button id="simulate-events-btn" class="btn" disabled>Симуляция событий</button>
+    </div>
+    
+    <div id="moodboard-test" class="test-container">
+        <div class="log" id="log">
+            <div>Ожидание создания MoodBoard...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { MoodBoard } from './dist/moodboard.es.js';
+        
+        let moodboard = null;
+        const log = document.getElementById('log');
+        const createBtn = document.getElementById('create-btn');
+        const destroyBtn = document.getElementById('destroy-btn');
+        const testMethodsBtn = document.getElementById('test-methods-btn');
+        const simulateEventsBtn = document.getElementById('simulate-events-btn');
+        
+        function addLog(message) {
+            const logElement = document.getElementById('log');
+            const div = document.createElement('div');
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logElement.appendChild(div);
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+        
+        function updateButtons() {
+            createBtn.disabled = moodboard !== null;
+            destroyBtn.disabled = moodboard === null;
+            testMethodsBtn.disabled = moodboard === null;
+            simulateEventsBtn.disabled = moodboard === null;
+        }
+        
+        createBtn.addEventListener('click', () => {
+            try {
+                addLog('Создание MoodBoard...');
+                const container = document.getElementById('moodboard-test');
+                
+                moodboard = new MoodBoard(container, {
+                    theme: 'light',
+                    autoSave: false
+                });
+                
+                addLog('MoodBoard создан успешно');
+                updateButtons();
+                
+                // Симулируем некоторые действия
+                setTimeout(() => {
+                    if (moodboard && !moodboard.destroyed) {
+                        addLog('Добавляем тестовый объект...');
+                        moodboard.createObject('text', { x: 100, y: 100 }, { content: 'Тест' });
+                    }
+                }, 1000);
+                
+            } catch (error) {
+                addLog(`Ошибка создания: ${error.message}`);
+                console.error('Ошибка создания MoodBoard:', error);
+            }
+        });
+        
+        destroyBtn.addEventListener('click', () => {
+            try {
+                addLog('Уничтожение MoodBoard...');
+                
+                if (moodboard) {
+                    moodboard.destroy();
+                    addLog('MoodBoard уничтожен');
+                    moodboard = null;
+                }
+                
+                updateButtons();
+                
+                // Проверяем, что контейнер очищен
+                const container = document.getElementById('moodboard-test');
+                const children = container.children.length;
+                addLog(`Дочерних элементов в контейнере: ${children}`);
+                
+            } catch (error) {
+                addLog(`Ошибка уничтожения: ${error.message}`);
+                console.error('Ошибка уничтожения MoodBoard:', error);
+            }
+        });
+        
+        testMethodsBtn.addEventListener('click', () => {
+            try {
+                addLog('Тестирование методов после destroy...');
+                
+                if (moodboard) {
+                    // Пытаемся вызвать методы после destroy
+                    moodboard.setTheme('dark');
+                    moodboard.createObject('text', { x: 200, y: 200 }, { content: 'Тест после destroy' });
+                    moodboard.deleteObject('test-id');
+                    moodboard.clearBoard();
+                    moodboard.exportBoard();
+                    
+                    addLog('Все методы вызваны без ошибок');
+                } else {
+                    addLog('MoodBoard не создан');
+                }
+                
+            } catch (error) {
+                addLog(`Ошибка при тестировании методов: ${error.message}`);
+                console.error('Ошибка при тестировании методов:', error);
+            }
+        });
+        
+        simulateEventsBtn.addEventListener('click', () => {
+            try {
+                addLog('Симуляция событий мыши...');
+                
+                const container = document.getElementById('moodboard-test');
+                
+                // Симулируем события мыши
+                const mouseEvents = ['mousedown', 'mousemove', 'mouseup', 'click', 'dblclick'];
+                
+                mouseEvents.forEach(eventType => {
+                    const event = new MouseEvent(eventType, {
+                        bubbles: true,
+                        cancelable: true,
+                        clientX: 400,
+                        clientY: 300
+                    });
+                    container.dispatchEvent(event);
+                });
+                
+                addLog('События мыши симулированы');
+                
+            } catch (error) {
+                addLog(`Ошибка при симуляции событий: ${error.message}`);
+                console.error('Ошибка при симуляции событий:', error);
+            }
+        });
+        
+        // Мониторинг ошибок в консоли
+        const originalError = console.error;
+        console.error = function(...args) {
+            addLog(`ОШИБКА: ${args.join(' ')}`);
+            originalError.apply(console, args);
+        };
+        
+        // Инициализация
+        updateButtons();
+        addLog('Тест готов к запуску');
+        
+        // Автоматический тест через 5 секунд
+        setTimeout(() => {
+            if (!moodboard) {
+                addLog('Запуск автоматического теста...');
+                createBtn.click();
+                
+                setTimeout(() => {
+                    if (moodboard) {
+                        addLog('Автоматическое уничтожение...');
+                        destroyBtn.click();
+                        
+                        setTimeout(() => {
+                            addLog('Автоматический тест методов...');
+                            testMethodsBtn.click();
+                            
+                            setTimeout(() => {
+                                addLog('Автоматическая симуляция событий...');
+                                simulateEventsBtn.click();
+                                
+                                setTimeout(() => {
+                                    addLog('Автоматический тест завершен');
+                                }, 1000);
+                            }, 1000);
+                        }, 1000);
+                    }
+                }, 2000);
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

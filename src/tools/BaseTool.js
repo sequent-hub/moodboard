@@ -11,6 +11,9 @@ export class BaseTool {
         this.cursor = 'default';
         this.hotkey = null;
         
+        // Флаг состояния объекта
+        this.destroyed = false;
+        
         // Состояние инструмента
         this.isPressed = false;
         this.startPoint = null;
@@ -251,6 +254,11 @@ export class BaseTool {
      * Очистка ресурсов инструмента
      */
     destroy() {
+        if (this.destroyed) {
+            return;
+        }
+        
+        this.destroyed = true;
         this.deactivate();
         this.eventBus = null;
     }

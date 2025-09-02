@@ -41,6 +41,9 @@ export class MoodBoard {
         
         this.data = data;
         
+        // Флаг состояния объекта
+        this.destroyed = false;
+        
         // Основные компоненты
         this.coreMoodboard = null;
         this.toolbar = null;
@@ -222,6 +225,11 @@ export class MoodBoard {
      * Изменение темы
      */
     setTheme(theme) {
+        if (this.destroyed) {
+            console.warn('MoodBoard уже уничтожен');
+            return;
+        }
+        
         this.options.theme = theme;
         
         // Обновляем тему в менеджерах
@@ -256,6 +264,10 @@ export class MoodBoard {
      * Создание объекта программно
      */
     createObject(type, position, properties = {}) {
+        if (this.destroyed) {
+            console.warn('MoodBoard уже уничтожен');
+            return null;
+        }
         return this.actionHandler ? this.actionHandler.createObject(type, position, properties) : null;
     }
     
@@ -263,6 +275,10 @@ export class MoodBoard {
      * Удаление объекта программно
      */
     deleteObject(objectId) {
+        if (this.destroyed) {
+            console.warn('MoodBoard уже уничтожен');
+            return;
+        }
         if (this.actionHandler) {
             this.actionHandler.deleteObject(objectId);
         }
@@ -272,6 +288,10 @@ export class MoodBoard {
      * Очистка доски программно
      */
     clearBoard() {
+        if (this.destroyed) {
+            console.warn('MoodBoard уже уничтожен');
+            return 0;
+        }
         return this.actionHandler ? this.actionHandler.clearBoard() : 0;
     }
     
@@ -279,6 +299,10 @@ export class MoodBoard {
      * Экспорт данных программно
      */
     exportBoard() {
+        if (this.destroyed) {
+            console.warn('MoodBoard уже уничтожен');
+            return null;
+        }
         return this.actionHandler ? this.actionHandler.exportBoard() : null;
     }
     
@@ -326,40 +350,75 @@ export class MoodBoard {
      * Очистка ресурсов
      */
     destroy() {
+        // Предотвращаем повторное уничтожение
+        if (this.destroyed) {
+            console.warn('MoodBoard уже был уничтожен');
+            return;
+        }
+        
+        // Устанавливаем флаг уничтожения
+        this.destroyed = true;
+        
+        // Уничтожаем UI компоненты
         if (this.toolbar) {
             this.toolbar.destroy();
+            this.toolbar = null;
         }
         
         if (this.saveStatus) {
             this.saveStatus.destroy();
+            this.saveStatus = null;
         }
         
         if (this.textPropertiesPanel) {
             this.textPropertiesPanel.destroy();
+            this.textPropertiesPanel = null;
         }
 
         if (this.framePropertiesPanel) {
             this.framePropertiesPanel.destroy();
+            this.framePropertiesPanel = null;
         }
         
         if (this.notePropertiesPanel) {
             this.notePropertiesPanel.destroy();
+            this.notePropertiesPanel = null;
         }
         
         if (this.alignmentGuides) {
             this.alignmentGuides.destroy();
+            this.alignmentGuides = null;
         }
         
         if (this.commentPopover) {
             this.commentPopover.destroy();
+            this.commentPopover = null;
         }
         
+        if (this.contextMenu) {
+            this.contextMenu.destroy();
+            this.contextMenu = null;
+        }
+        
+        // Уничтожаем ядро
         if (this.coreMoodboard) {
             this.coreMoodboard.destroy();
+            this.coreMoodboard = null;
         }
         
+        // Уничтожаем workspace
         if (this.workspaceManager) {
             this.workspaceManager.destroy();
+            this.workspaceManager = null;
         }
+        
+        // Очищаем ссылки на менеджеры
+        this.dataManager = null;
+        this.actionHandler = null;
+        
+        // Очищаем ссылку на контейнер
+        this.container = null;
+        
+        console.log('MoodBoard успешно уничтожен');
     }
 }

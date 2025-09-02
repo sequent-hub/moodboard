@@ -37,6 +37,9 @@ export class CoreMoodBoard {
             ...options
         };
 
+        // Флаг состояния объекта
+        this.destroyed = false;
+
         this.eventBus = new EventBus();
         this.state = new StateManager(this.eventBus);
         
@@ -1623,10 +1626,63 @@ export class CoreMoodBoard {
     }
 
     destroy() {
-        this.saveManager.destroy();
-        this.keyboard.destroy();
-        this.history.destroy();
-        this.pixi.destroy();
-        this.eventBus.removeAllListeners();
+        // Предотвращаем повторное уничтожение
+        if (this.destroyed) {
+            console.warn('CoreMoodBoard уже был уничтожен');
+            return;
+        }
+        
+        // Устанавливаем флаг уничтожения
+        this.destroyed = true;
+        
+        // Останавливаем ResizeObserver
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
+        
+        // Уничтожаем менеджеры
+        if (this.saveManager) {
+            this.saveManager.destroy();
+            this.saveManager = null;
+        }
+        
+        if (this.keyboard) {
+            this.keyboard.destroy();
+            this.keyboard = null;
+        }
+        
+        if (this.history) {
+            this.history.destroy();
+            this.history = null;
+        }
+        
+        if (this.pixi) {
+            this.pixi.destroy();
+            this.pixi = null;
+        }
+        
+        // Очищаем EventBus
+        if (this.eventBus) {
+            this.eventBus.removeAllListeners();
+            this.eventBus = null;
+        }
+        
+        // Очищаем глобальную ссылку
+        if (typeof window !== 'undefined' && window.moodboardEventBus === this.eventBus) {
+            window.moodboardEventBus = null;
+        }
+        
+        // Очищаем ссылки на менеджеры
+        this.state = null;
+        this.toolManager = null;
+        this.apiClient = null;
+        this.imageUploadService = null;
+        this.fileUploadService = null;
+        
+        // Очищаем контейнер
+        this.container = null;
+        
+        console.log('CoreMoodBoard успешно уничтожен');
     }
 }

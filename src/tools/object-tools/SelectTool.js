@@ -23,6 +23,9 @@ export class SelectTool extends BaseTool {
         this.cursor = 'default';
         this.hotkey = 'v';
         
+        // Флаг состояния объекта
+        this.destroyed = false;
+        
         // Состояние выделения перенесено в модель
         this.selection = new SelectionModel();
         this.isMultiSelect = false;
@@ -501,6 +504,11 @@ export class SelectTool extends BaseTool {
      * Получить PIXI объект по координатам (для внутреннего использования)
      */
     getPixiObjectAt(x, y) {
+        // Проверяем, что инструмент не уничтожен
+        if (this.destroyed) {
+            return null;
+        }
+        
         if (!this.resizeHandles || !this.resizeHandles.app) return null;
         
         const point = new PIXI.Point(x, y);
@@ -2179,5 +2187,39 @@ export class SelectTool extends BaseTool {
         }
     }
 
+    /**
+     * Уничтожение инструмента
+     */
+    destroy() {
+        if (this.destroyed) {
+            return;
+        }
+        
+        this.destroyed = true;
+        
+        // Очищаем выделение
+        this.clearSelection();
+        
+        // Уничтожаем ручки изменения размера
+        if (this.resizeHandles) {
+            this.resizeHandles.destroy();
+            this.resizeHandles = null;
+        }
+        
+        // Очищаем контроллеры
+        this.dragController = null;
+        this.resizeController = null;
+        this.rotateController = null;
+        this.groupDragController = null;
+        this.groupResizeController = null;
+        this.groupRotateController = null;
+        this.boxSelectController = null;
+        
+        // Очищаем модель выделения
+        this.selection = null;
+        
+        // Вызываем destroy родительского класса
+        super.destroy();
+    }
 
 }
