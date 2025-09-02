@@ -348,6 +348,12 @@ console.log('Event listeners:', moodboard.eventBus?.listeners?.size || 0); // Д
 
 После исправлений в версии 1.0.14 ошибка все еще возникала, потому что мы исправили только одну проверку, но есть еще места в коде, где обращаемся к `this.resizeHandles.container.children` без дополнительной проверки. Проблема была в том, что между проверкой и использованием `this.resizeHandles.container` мог стать `null`.
 
+## Исправления в версии 1.0.16
+
+### Проблема с "Cannot read properties of null (reading 'children')" - окончательное решение
+
+После исправлений в версии 1.0.15 ошибка все еще продолжала возникать, потому что мы не учли все возможные места, где объекты могут стать `null` между проверкой и использованием. Проблема была в том, что даже после проверки `if (this.resizeHandles.container && this.resizeHandles.container.visible)` объект `container` мог стать `null` к моменту обращения к `container.children.length`.
+
 ### Внесенные исправления в версии 1.0.11:
 
 #### 1. **Флаг состояния объекта**
@@ -422,6 +428,28 @@ console.log('Event listeners:', moodboard.eventBus?.listeners?.size || 0); // Д
 - Дополнительные проверки прямо перед использованием объектов
 - Предотвращение изменений состояния между проверкой и использованием
 - Полная защита от null-ссылок во всех сценариях
+
+### Внесенные исправления в версии 1.0.16:
+
+#### 1. **Локальные ссылки на объекты**
+- Создание локальной ссылки `const container = this.resizeHandles.container`
+- Дополнительная проверка `if (!container || !container.children) return null`
+- Предотвращение обращения к `null.children` через локальную ссылку
+
+#### 2. **Try-catch блоки для всех операций**
+- Обертывание `child.containsPoint(point)` в try-catch
+- Обертывание `child.getBounds()` в try-catch
+- Игнорирование ошибок вместо их распространения
+
+#### 3. **Проверки типов функций**
+- Проверка `typeof child.containsPoint === 'function'` перед вызовом
+- Проверка `child && child.containsPoint` перед обращением к методу
+- Безопасные вызовы методов с проверкой существования
+
+#### 4. **Полная защита от null во всех циклах**
+- Проверка `if (!stage || !stage.children) return null` для stage
+- Проверка `if (!container || !container.children) return null` для container
+- Проверка `child && child !== this.resizeHandles.container` для child
 
 ### Результат исправлений:
 

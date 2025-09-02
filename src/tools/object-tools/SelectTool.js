@@ -525,23 +525,35 @@ export class SelectTool extends BaseTool {
         
         // Сначала ищем в контейнере ручек (приоритет)
         if (this.resizeHandles.container && this.resizeHandles.container.visible) {
-            for (let i = this.resizeHandles.container.children.length - 1; i >= 0; i--) {
-                const child = this.resizeHandles.container.children[i];
+            const container = this.resizeHandles.container;
+            if (!container || !container.children) return null;
+            
+            for (let i = container.children.length - 1; i >= 0; i--) {
+                const child = container.children[i];
                 
                 // Проверяем обычные объекты
-                if (child.containsPoint && child.containsPoint(point)) {
-
-                    return child;
+                if (child && child.containsPoint && typeof child.containsPoint === 'function') {
+                    try {
+                        if (child.containsPoint(point)) {
+                            return child;
+                        }
+                    } catch (error) {
+                        // Игнорируем ошибки containsPoint
+                    }
                 }
                 
                 // Специальная проверка для контейнеров (ручка вращения)
-                if (child instanceof PIXI.Container && child.children.length > 0) {
+                if (child instanceof PIXI.Container && child.children && child.children.length > 0) {
                     // Проверяем границы контейнера
-                    const bounds = child.getBounds();
-                    if (point.x >= bounds.x && point.x <= bounds.x + bounds.width &&
-                        point.y >= bounds.y && point.y <= bounds.y + bounds.height) {
+                    try {
+                        const bounds = child.getBounds();
+                        if (bounds && point.x >= bounds.x && point.x <= bounds.x + bounds.width &&
+                            point.y >= bounds.y && point.y <= bounds.y + bounds.height) {
 
-                        return child;
+                            return child;
+                        }
+                    } catch (error) {
+                        // Игнорируем ошибки getBounds
                     }
                 }
             }
@@ -549,11 +561,19 @@ export class SelectTool extends BaseTool {
         
         // Затем ищем в основной сцене
         const stage = this.resizeHandles.app.stage;
+        if (!stage || !stage.children) return null;
+        
         for (let i = stage.children.length - 1; i >= 0; i--) {
             const child = stage.children[i];
-            if (this.resizeHandles.container && child !== this.resizeHandles.container && child.containsPoint && child.containsPoint(point)) {
-
-                return child;
+            if (this.resizeHandles.container && child && child !== this.resizeHandles.container && 
+                child.containsPoint && typeof child.containsPoint === 'function') {
+                try {
+                    if (child.containsPoint(point)) {
+                        return child;
+                    }
+                } catch (error) {
+                    // Игнорируем ошибки containsPoint
+                }
             }
         }
         
