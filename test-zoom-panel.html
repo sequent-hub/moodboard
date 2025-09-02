@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест панели масштабирования</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+        }
+        
+        .test-container {
+            width: 800px;
+            height: 600px;
+            border: 2px solid #007acc;
+            border-radius: 8px;
+            background: white;
+            margin: 20px auto;
+            position: relative;
+        }
+        
+        .info {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .instructions {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+            max-width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h1>Тест панели масштабирования</h1>
+        <p>Панель масштабирования должна быть в нижнем правом углу, слева от кнопки карты</p>
+        <p>Размер контейнера: 800x600px</p>
+    </div>
+    
+    <div id="moodboard-test" class="test-container">
+        <div class="instructions">
+            Проверьте:<br>
+            • Панель зума внизу справа<br>
+            • Слева от кнопки карты<br>
+            • Меню зума открывается вверх
+        </div>
+    </div>
+
+    <script type="module">
+        import { MoodBoard } from './dist/moodboard.es.js';
+        
+        window.addEventListener('DOMContentLoaded', () => {
+            try {
+                const container = document.getElementById('moodboard-test');
+                
+                console.log('Создаем MoodBoard в контейнере:', container.clientWidth, 'x', container.clientHeight);
+                
+                const moodboard = new MoodBoard(container, {
+                    theme: 'light'
+                });
+                
+                console.log('MoodBoard создан успешно');
+                
+                // Проверяем через 2 секунды, что панели созданы
+                setTimeout(() => {
+                    const zoomPanel = container.querySelector('.moodboard-zoombar');
+                    const mapPanel = container.querySelector('.moodboard-mapbar');
+                    
+                    if (zoomPanel) {
+                        const rect = zoomPanel.getBoundingClientRect();
+                        console.log('Панель зума найдена:', {
+                            bottom: rect.bottom,
+                            right: rect.right,
+                            position: window.getComputedStyle(zoomPanel).position
+                        });
+                    } else {
+                        console.warn('Панель зума не найдена!');
+                    }
+                    
+                    if (mapPanel) {
+                        const rect = mapPanel.getBoundingClientRect();
+                        console.log('Панель карты найдена:', {
+                            bottom: rect.bottom,
+                            right: rect.right,
+                            position: window.getComputedStyle(mapPanel).position
+                        });
+                    } else {
+                        console.warn('Панель карты не найдена!');
+                    }
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Ошибка создания MoodBoard:', error);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -196,9 +196,9 @@ export class MoodBoard {
     }
 
     initZoombar() {
-        // Рисуем панель зума поверх холста (в том же контейнере, что и topbar)
+        // Рисуем панель зума в правом нижнем углу (внутри workspace контейнера)
         this.zoombar = new ZoomPanel(
-            this.topbarContainer,
+            this.workspaceElement,
             this.coreMoodboard.eventBus
         );
     }

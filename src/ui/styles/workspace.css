@@ -50,11 +50,11 @@
     pointer-events: none;
 }
 
-/* Right top zoom panel container (reuses topbar container area) */
+/* Bottom-right zoom panel container (positioned left of map panel) */
 .moodboard-zoombar {
     position: absolute;
-    top: 16px;
-    right: 16px;
+    bottom: 16px;
+    right: 80px; /* Слева от кнопки карты (36px + 8px gap + 36px button = 80px) */
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -103,7 +103,7 @@
 .moodboard-zoombar__menu {
     position: absolute;
     right: 0;
-    top: 49px;
+    bottom: 49px; /* Открывается вверх от панели зума */
     background: #fff;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
