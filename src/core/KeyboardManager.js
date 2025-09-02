@@ -27,7 +27,7 @@ export class KeyboardManager {
                 this.eventBus.emit(Events.UI.PasteImage, { 
                     src: uploadResult.url, 
                     name: uploadResult.name,
-                    imageId: uploadResult.id
+                    imageId: uploadResult.imageId || uploadResult.id
                 });
             } else {
                 // Fallback к старому способу
@@ -54,7 +54,7 @@ export class KeyboardManager {
                 this.eventBus.emit(Events.UI.PasteImage, { 
                     src: uploadResult.url, 
                     name: uploadResult.name,
-                    imageId: uploadResult.id
+                    imageId: uploadResult.imageId || uploadResult.id
                 });
             } else {
                 // Fallback к старому способу: конвертируем в DataURL

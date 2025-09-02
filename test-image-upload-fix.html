@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="test-csrf-token">
+    <title>Тест исправлений загрузки изображений</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #log {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Тест исправлений загрузки изображений</h1>
+    
+    <div class="test-section">
+        <h2>Тестирование ImageUploadService</h2>
+        <p class="info">Проверяем, что сервис корректно обрабатывает новый формат ответа с imageId</p>
+        <button onclick="testImageUploadService()">Запустить тест</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Тестирование FileUploadService</h2>
+        <p class="info">Проверяем, что сервис корректно обрабатывает новый формат ответа с fileId</p>
+        <button onclick="testFileUploadService()">Запустить тест</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Лог тестов</h2>
+        <div id="log"></div>
+    </div>
+
+    <script type="module">
+        import { ImageUploadService } from './src/services/ImageUploadService.js';
+        import { FileUploadService } from './src/services/FileUploadService.js';
+
+        // Мокаем ApiClient
+        class MockApiClient {
+            constructor() {}
+        }
+
+        // Глобальные переменные для тестов
+        window.imageUploadService = new ImageUploadService(new MockApiClient());
+        window.fileUploadService = new FileUploadService(new MockApiClient());
+
+        // Функция для логирования
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Тест ImageUploadService
+        window.testImageUploadService = async function() {
+            log('Начинаем тест ImageUploadService...');
+            
+            try {
+                // Мокаем fetch для имитации нового формата ответа
+                const originalFetch = window.fetch;
+                window.fetch = async (url, options) => {
+                    if (url === '/api/images/upload') {
+                        return {
+                            ok: true,
+                            json: async () => ({
+                                success: true,
+                                data: {
+                                    imageId: "test-image-uuid-123",
+                                    id: "test-image-uuid-123", // для обратной совместимости
+                                    url: "https://example.com/test-image.jpg",
+                                    width: 800,
+                                    height: 600,
+                                    name: "test-image.jpg",
+                                    size: 1024000
+                                },
+                                message: "Изображение успешно загружено"
+                            })
+                        };
+                    }
+                    return originalFetch(url, options);
+                };
+
+                // Создаем тестовый файл
+                const testBlob = new Blob(['test image data'], { type: 'image/jpeg' });
+                const testFile = new File([testBlob], 'test-image.jpg', { type: 'image/jpeg' });
+
+                // Тестируем загрузку
+                const result = await window.imageUploadService.uploadImage(testFile, 'test-image.jpg');
+                
+                log(`✅ ImageUploadService тест успешен!`, 'success');
+                log(`   imageId: ${result.imageId}`, 'success');
+                log(`   id: ${result.id}`, 'success');
+                log(`   url: ${result.url}`, 'success');
+                log(`   width: ${result.width}`, 'success');
+                log(`   height: ${result.height}`, 'success');
+
+                // Проверяем, что imageId и id одинаковые
+                if (result.imageId === result.id) {
+                    log('✅ imageId и id совпадают - корректно!', 'success');
+                } else {
+                    log('❌ imageId и id не совпадают!', 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Ошибка в тесте ImageUploadService: ${error.message}`, 'error');
+            } finally {
+                // Восстанавливаем оригинальный fetch
+                window.fetch = originalFetch;
+            }
+        };
+
+        // Тест FileUploadService
+        window.testFileUploadService = async function() {
+            log('Начинаем тест FileUploadService...');
+            
+            try {
+                // Мокаем fetch для имитации нового формата ответа
+                const originalFetch = window.fetch;
+                window.fetch = async (url, options) => {
+                    if (url === '/api/files/upload') {
+                        return {
+                            ok: true,
+                            json: async () => ({
+                                success: true,
+                                data: {
+                                    fileId: "test-file-uuid-456",
+                                    id: "test-file-uuid-456", // для обратной совместимости
+                                    url: "https://example.com/test-file.pdf",
+                                    size: 2048000,
+                                    mime_type: "application/pdf",
+                                    formatted_size: "2.0 MB",
+                                    name: "test-file.pdf"
+                                },
+                                message: "Файл успешно загружен"
+                            })
+                        };
+                    }
+                    return originalFetch(url, options);
+                };
+
+                // Создаем тестовый файл
+                const testBlob = new Blob(['test file data'], { type: 'application/pdf' });
+                const testFile = new File([testBlob], 'test-file.pdf', { type: 'application/pdf' });
+
+                // Тестируем загрузку
+                const result = await window.fileUploadService.uploadFile(testFile, 'test-file.pdf');
+                
+                log(`✅ FileUploadService тест успешен!`, 'success');
+                log(`   fileId: ${result.fileId}`, 'success');
+                log(`   id: ${result.id}`, 'success');
+                log(`   url: ${result.url}`, 'success');
+                log(`   size: ${result.size}`, 'success');
+                log(`   mimeType: ${result.mimeType}`, 'success');
+
+                // Проверяем, что fileId и id одинаковые
+                if (result.fileId === result.id) {
+                    log('✅ fileId и id совпадают - корректно!', 'success');
+                } else {
+                    log('❌ fileId и id не совпадают!', 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Ошибка в тесте FileUploadService: ${error.message}`, 'error');
+            } finally {
+                // Восстанавливаем оригинальный fetch
+                window.fetch = originalFetch;
+            }
+        };
+
+        log('Тестовый файл загружен. Готов к тестированию исправлений.');
+    </script>
+</body>
+</html>

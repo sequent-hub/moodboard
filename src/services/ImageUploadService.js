@@ -55,7 +55,8 @@ export class ImageUploadService {
             }
 
             return {
-                id: result.data.id,
+                id: result.data.imageId || result.data.id, // Используем imageId как основное поле, id для обратной совместимости
+                imageId: result.data.imageId || result.data.id, // Добавляем imageId для явного доступа
                 url: result.data.url,
                 width: result.data.width,
                 height: result.data.height,

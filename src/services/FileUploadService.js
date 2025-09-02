@@ -50,7 +50,8 @@ export class FileUploadService {
             }
 
             return {
-                id: result.data.id,
+                id: result.data.fileId || result.data.id, // Используем fileId как основное поле, id для обратной совместимости
+                fileId: result.data.fileId || result.data.id, // Добавляем fileId для явного доступа
                 url: result.data.url,
                 size: result.data.size,
                 mimeType: result.data.mime_type,

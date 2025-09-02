@@ -372,7 +372,7 @@ export class ToolManager {
                     // Пытаемся загрузить изображение на сервер
                     if (this.core && this.core.imageUploadService) {
                         const uploadResult = await this.core.imageUploadService.uploadImage(file, file.name || 'image');
-                        emitAt(uploadResult.url, uploadResult.name, uploadResult.id, index++);
+                        emitAt(uploadResult.url, uploadResult.name, uploadResult.imageId || uploadResult.id, index++);
                     } else {
                         // Fallback к старому способу (base64)
                         await new Promise((resolve) => {

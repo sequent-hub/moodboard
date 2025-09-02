@@ -222,6 +222,7 @@ export class HtmlHandlesLayer {
                 position: 'absolute', pointerEvents: 'auto', cursor, 
                 zIndex: 5, // Меньше чем у ручек (10)
                 background: 'transparent' // невидимые области
+                
             });
             e.addEventListener('mousedown', (evt) => this._onEdgeResizeDown(evt));
             box.appendChild(e);

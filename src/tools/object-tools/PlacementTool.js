@@ -233,7 +233,7 @@ export class PlacementTool extends BaseTool {
                                 width: targetW, 
                                 height: targetH 
                             },
-                            imageId: uploadResult.id // Сохраняем ID изображения
+                            imageId: uploadResult.imageId || uploadResult.id // Сохраняем ID изображения
                         });
                     } catch (error) {
                         console.error('Ошибка загрузки изображения:', error);
@@ -274,7 +274,7 @@ export class PlacementTool extends BaseTool {
                                 width: props.width || 120,
                                 height: props.height || 140
                             },
-                            fileId: uploadResult.id // Сохраняем ID файла
+                            fileId: uploadResult.fileId || uploadResult.id // Сохраняем ID файла
                         });
                         
                         // Возвращаемся к инструменту выделения после создания файла
@@ -465,7 +465,7 @@ export class PlacementTool extends BaseTool {
                     width: props.width || 120,
                     height: props.height || 140
                 },
-                fileId: uploadResult.id // Сохраняем ID файла
+                fileId: uploadResult.fileId || uploadResult.id // Сохраняем ID файла
             });
             
         } catch (uploadError) {
@@ -961,7 +961,7 @@ export class PlacementTool extends BaseTool {
                     width: targetW, 
                     height: targetH 
                 },
-                imageId: uploadResult.id // Сохраняем ID изображения
+                imageId: uploadResult.imageId || uploadResult.id // Сохраняем ID изображения
             });
             
         } catch (uploadError) {
