@@ -9,6 +9,9 @@ export class ContextMenu {
         this.lastX = 0;
         this.lastY = 0;
         this.currentGridType = 'line';
+        
+        // Флаг состояния объекта
+        this.destroyed = false;
 
         this.createElement();
         this.attachEvents();
@@ -334,6 +337,30 @@ export class ContextMenu {
 
         // По умолчанию — пусто
         this.element.innerHTML = '<div style="padding:8px 12px; color:#888;">(пусто)</div>';
+    }
+
+    /**
+     * Уничтожение контекстного меню
+     */
+    destroy() {
+        if (this.destroyed) {
+            return;
+        }
+        
+        this.destroyed = true;
+        
+        // Скрываем меню
+        this.hide();
+        
+        // Удаляем DOM элемент
+        if (this.element && this.element.parentNode) {
+            this.element.parentNode.removeChild(this.element);
+            this.element = null;
+        }
+        
+        // Очищаем ссылки
+        this.container = null;
+        this.eventBus = null;
     }
 }
 

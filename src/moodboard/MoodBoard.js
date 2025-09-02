@@ -347,6 +347,25 @@ export class MoodBoard {
     }
     
     /**
+     * Безопасное уничтожение объекта с проверкой наличия метода destroy
+     * @param {Object} obj - объект для уничтожения
+     * @param {string} name - имя объекта для логирования
+     */
+    _safeDestroy(obj, name) {
+        if (obj) {
+            try {
+                if (typeof obj.destroy === 'function') {
+                    obj.destroy();
+                } else {
+                    console.warn(`Объект ${name} не имеет метода destroy()`);
+                }
+            } catch (error) {
+                console.error(`Ошибка при уничтожении ${name}:`, error);
+            }
+        }
+    }
+
+    /**
      * Очистка ресурсов
      */
     destroy() {
@@ -359,58 +378,44 @@ export class MoodBoard {
         // Устанавливаем флаг уничтожения
         this.destroyed = true;
         
-        // Уничтожаем UI компоненты
-        if (this.toolbar) {
-            this.toolbar.destroy();
-            this.toolbar = null;
-        }
+        // Уничтожаем UI компоненты с безопасными проверками
+        this._safeDestroy(this.toolbar, 'toolbar');
+        this.toolbar = null;
         
-        if (this.saveStatus) {
-            this.saveStatus.destroy();
-            this.saveStatus = null;
-        }
+        this._safeDestroy(this.saveStatus, 'saveStatus');
+        this.saveStatus = null;
         
-        if (this.textPropertiesPanel) {
-            this.textPropertiesPanel.destroy();
-            this.textPropertiesPanel = null;
-        }
+        this._safeDestroy(this.textPropertiesPanel, 'textPropertiesPanel');
+        this.textPropertiesPanel = null;
 
-        if (this.framePropertiesPanel) {
-            this.framePropertiesPanel.destroy();
-            this.framePropertiesPanel = null;
-        }
+        this._safeDestroy(this.framePropertiesPanel, 'framePropertiesPanel');
+        this.framePropertiesPanel = null;
         
-        if (this.notePropertiesPanel) {
-            this.notePropertiesPanel.destroy();
-            this.notePropertiesPanel = null;
-        }
+        this._safeDestroy(this.notePropertiesPanel, 'notePropertiesPanel');
+        this.notePropertiesPanel = null;
         
-        if (this.alignmentGuides) {
-            this.alignmentGuides.destroy();
-            this.alignmentGuides = null;
-        }
+        this._safeDestroy(this.alignmentGuides, 'alignmentGuides');
+        this.alignmentGuides = null;
         
-        if (this.commentPopover) {
-            this.commentPopover.destroy();
-            this.commentPopover = null;
-        }
+        this._safeDestroy(this.commentPopover, 'commentPopover');
+        this.commentPopover = null;
         
-        if (this.contextMenu) {
-            this.contextMenu.destroy();
-            this.contextMenu = null;
-        }
+        this._safeDestroy(this.contextMenu, 'contextMenu');
+        this.contextMenu = null;
+        
+        this._safeDestroy(this.zoombar, 'zoombar');
+        this.zoombar = null;
+        
+        this._safeDestroy(this.mapbar, 'mapbar');
+        this.mapbar = null;
         
         // Уничтожаем ядро
-        if (this.coreMoodboard) {
-            this.coreMoodboard.destroy();
-            this.coreMoodboard = null;
-        }
+        this._safeDestroy(this.coreMoodboard, 'coreMoodboard');
+        this.coreMoodboard = null;
         
         // Уничтожаем workspace
-        if (this.workspaceManager) {
-            this.workspaceManager.destroy();
-            this.workspaceManager = null;
-        }
+        this._safeDestroy(this.workspaceManager, 'workspaceManager');
+        this.workspaceManager = null;
         
         // Очищаем ссылки на менеджеры
         this.dataManager = null;
