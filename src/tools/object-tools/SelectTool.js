@@ -308,6 +308,11 @@ export class SelectTool extends BaseTool {
      * Перемещение мыши
      */
 		onMouseMove(event) {
+        // Проверяем, что инструмент не уничтожен
+        if (this.destroyed) {
+            return;
+        }
+        
         super.onMouseMove(event);
         
         // Обновляем текущие координаты мыши
@@ -468,6 +473,11 @@ export class SelectTool extends BaseTool {
      * Тестирование попадания курсора
      */
     hitTest(x, y) {
+        // Проверяем, что инструмент не уничтожен
+        if (this.destroyed) {
+            return { type: 'empty' };
+        }
+        
         // Сначала проверяем ручки изменения размера (они имеют приоритет)
         if (this.resizeHandles) {
             const pixiObjectAtPoint = this.getPixiObjectAt(x, y);
@@ -509,7 +519,7 @@ export class SelectTool extends BaseTool {
             return null;
         }
         
-        if (!this.resizeHandles || !this.resizeHandles.app) return null;
+        if (!this.resizeHandles || !this.resizeHandles.app || !this.resizeHandles.container) return null;
         
         const point = new PIXI.Point(x, y);
         
@@ -1051,6 +1061,11 @@ export class SelectTool extends BaseTool {
      * Обновление курсора
      */
     updateCursor(event) {
+        // Проверяем, что инструмент не уничтожен
+        if (this.destroyed) {
+            return;
+        }
+        
         const hitResult = this.hitTest(event.x, event.y);
         
         switch (hitResult.type) {

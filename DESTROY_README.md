@@ -336,6 +336,12 @@ console.log('Event listeners:', moodboard.eventBus?.listeners?.size || 0); // Д
 
 В версии 1.0.11 была обнаружена ошибка: метод `MoodBoard.destroy()` пытался вызвать `this.contextMenu.destroy()`, но у объекта `ContextMenu` не было метода `destroy()`.
 
+## Исправления в версии 1.0.14
+
+### Проблема с "Cannot read properties of null (reading 'children')"
+
+После исправлений в версии 1.0.13 вернулась старая ошибка: `Cannot read properties of null (reading 'children')` в методе `SelectTool.getPixiObjectAt()`. Проблема была в том, что мы добавили проверку `if (this.destroyed)`, но не добавили проверку на существование `this.resizeHandles.container` перед обращением к его свойству `children`.
+
 ### Внесенные исправления в версии 1.0.11:
 
 #### 1. **Флаг состояния объекта**
@@ -377,6 +383,22 @@ console.log('Event listeners:', moodboard.eventBus?.listeners?.size || 0); // Д
 - Предупреждения вместо ошибок при отсутствии метода `destroy()`
 - Детальное логирование проблем при уничтожении
 - Продолжение процесса уничтожения даже при ошибках в отдельных компонентах
+
+### Внесенные исправления в версии 1.0.14:
+
+#### 1. **Исправлена проверка resizeHandles.container**
+- Добавлена проверка `!this.resizeHandles.container` в `getPixiObjectAt()`
+- Предотвращение обращения к `null.children`
+
+#### 2. **Добавлены проверки destroyed во все методы SelectTool**
+- `hitTest()` - возвращает `{ type: 'empty' }` при уничтожении
+- `updateCursor()` - выходит из метода при уничтожении
+- `onMouseMove()` - выходит из метода при уничтожении
+
+#### 3. **Полная защита от null-ссылок**
+- Все методы SelectTool теперь проверяют `this.destroyed`
+- Безопасные fallback значения для всех методов
+- Предотвращение выполнения кода после уничтожения инструмента
 
 ### Результат исправлений:
 
