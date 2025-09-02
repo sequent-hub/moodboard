@@ -52,8 +52,14 @@ export class CoreMoodBoard {
         this.saveManager = new SaveManager(this.eventBus, this.options);
         this.history = new HistoryManager(this.eventBus);
         this.apiClient = new ApiClient();
-        this.imageUploadService = new ImageUploadService(this.apiClient);
-        this.fileUploadService = new FileUploadService(this.apiClient);
+        this.imageUploadService = new ImageUploadService(this.apiClient, {
+            requireCsrf: this.options.requireCsrf !== false, // По умолчанию требуем CSRF
+            csrfToken: this.options.csrfToken
+        });
+        this.fileUploadService = new FileUploadService(this.apiClient, {
+            requireCsrf: this.options.requireCsrf !== false, // По умолчанию требуем CSRF
+            csrfToken: this.options.csrfToken
+        });
         
         // Связываем SaveManager с ApiClient для правильной обработки изображений
         this.saveManager.setApiClient(this.apiClient);

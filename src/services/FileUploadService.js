@@ -2,17 +2,54 @@
  * Сервис для загрузки и управления файлами на сервере
  */
 export class FileUploadService {
-    constructor(apiClient) {
+    constructor(apiClient, options = {}) {
         this.apiClient = apiClient;
         this.uploadEndpoint = '/api/files/upload';
         this.deleteEndpoint = '/api/files';
+        this.options = {
+            csrfToken: null, // Можно передать токен напрямую
+            csrfTokenSelector: 'meta[name="csrf-token"]', // Селектор для поиска токена в DOM
+            requireCsrf: true, // Требовать ли CSRF токен
+            ...options
+        };
+    }
+
+    /**
+     * Получает CSRF токен из различных источников
+     * @private
+     */
+    _getCsrfToken() {
+        // 1. Сначала проверяем токен, переданный в опциях
+        if (this.options.csrfToken) {
+            return this.options.csrfToken;
+        }
+
+        // 2. Ищем токен в DOM
+        if (typeof document !== 'undefined') {
+            const tokenElement = document.querySelector(this.options.csrfTokenSelector);
+            if (tokenElement) {
+                return tokenElement.getAttribute('content');
+            }
+        }
+
+        // 3. Проверяем глобальную переменную (для тестирования)
+        if (typeof window !== 'undefined' && window.csrfToken) {
+            return window.csrfToken;
+        }
+
+        // 4. Если CSRF не требуется, возвращаем null
+        if (!this.options.requireCsrf) {
+            return null;
+        }
+
+        return null;
     }
 
     /**
      * Загружает файл на сервер
-     * @param {File|Blob} file - файл
+     * @param {File|Blob} file - файл для загрузки
      * @param {string} name - имя файла
-     * @returns {Promise<{id: string, url: string, size: number, mimeType: string, formattedSize: string}>}
+     * @returns {Promise<{id: string, url: string, size: number, name: string}>}
      */
     async uploadFile(file, name = null) {
         try {
@@ -22,18 +59,24 @@ export class FileUploadService {
             formData.append('name', name || file.name || 'file');
 
             // Получаем CSRF токен
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const csrfToken = this._getCsrfToken();
             
-            if (!csrfToken) {
-                throw new Error('CSRF токен не найден');
+            if (this.options.requireCsrf && !csrfToken) {
+                throw new Error('CSRF токен не найден. Добавьте <meta name="csrf-token" content="{{ csrf_token() }}"> в HTML или передайте токен в опциях.');
+            }
+
+            const headers = {
+                'X-Requested-With': 'XMLHttpRequest'
+            };
+
+            // Добавляем CSRF токен только если он есть
+            if (csrfToken) {
+                headers['X-CSRF-TOKEN'] = csrfToken;
             }
 
             const response = await fetch(this.uploadEndpoint, {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
+                headers,
                 credentials: 'same-origin',
                 body: formData
             });
@@ -54,9 +97,8 @@ export class FileUploadService {
                 fileId: result.data.fileId || result.data.id, // Добавляем fileId для явного доступа
                 url: result.data.url,
                 size: result.data.size,
-                mimeType: result.data.mime_type,
-                formattedSize: result.data.formatted_size,
-                name: result.data.name
+                name: result.data.name,
+                type: result.data.type
             };
 
         } catch (error) {
@@ -73,20 +115,26 @@ export class FileUploadService {
      */
     async updateFileMetadata(fileId, metadata) {
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const csrfToken = this._getCsrfToken();
             
-            if (!csrfToken) {
-                throw new Error('CSRF токен не найден');
+            if (this.options.requireCsrf && !csrfToken) {
+                throw new Error('CSRF токен не найден. Добавьте <meta name="csrf-token" content="{{ csrf_token() }}"> в HTML или передайте токен в опциях.');
+            }
+
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            };
+
+            // Добавляем CSRF токен только если он есть
+            if (csrfToken) {
+                headers['X-CSRF-TOKEN'] = csrfToken;
             }
 
             const response = await fetch(`${this.deleteEndpoint}/${fileId}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json'
-                },
+                headers,
                 credentials: 'same-origin',
                 body: JSON.stringify(metadata)
             });
@@ -116,15 +164,21 @@ export class FileUploadService {
      */
     async deleteFile(fileId) {
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const csrfToken = this._getCsrfToken();
             
+            const headers = {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            };
+
+            // Добавляем CSRF токен только если он есть
+            if (csrfToken) {
+                headers['X-CSRF-TOKEN'] = csrfToken;
+            }
+
             const response = await fetch(`${this.deleteEndpoint}/${fileId}`, {
                 method: 'DELETE',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json'
-                },
+                headers,
                 credentials: 'same-origin'
             });
 
@@ -318,15 +372,21 @@ export class FileUploadService {
      */
     async cleanupUnusedFiles() {
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const csrfToken = this._getCsrfToken();
             
+            const headers = {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            };
+
+            // Добавляем CSRF токен только если он есть
+            if (csrfToken) {
+                headers['X-CSRF-TOKEN'] = csrfToken;
+            }
+
             const response = await fetch(`${this.deleteEndpoint}/cleanup`, {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json'
-                },
+                headers,
                 credentials: 'same-origin'
             });
 

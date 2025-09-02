@@ -2,10 +2,47 @@
  * Сервис для загрузки и управления изображениями на сервере
  */
 export class ImageUploadService {
-    constructor(apiClient) {
+    constructor(apiClient, options = {}) {
         this.apiClient = apiClient;
         this.uploadEndpoint = '/api/images/upload';
         this.deleteEndpoint = '/api/images';
+        this.options = {
+            csrfToken: null, // Можно передать токен напрямую
+            csrfTokenSelector: 'meta[name="csrf-token"]', // Селектор для поиска токена в DOM
+            requireCsrf: true, // Требовать ли CSRF токен
+            ...options
+        };
+    }
+
+    /**
+     * Получает CSRF токен из различных источников
+     * @private
+     */
+    _getCsrfToken() {
+        // 1. Сначала проверяем токен, переданный в опциях
+        if (this.options.csrfToken) {
+            return this.options.csrfToken;
+        }
+
+        // 2. Ищем токен в DOM
+        if (typeof document !== 'undefined') {
+            const tokenElement = document.querySelector(this.options.csrfTokenSelector);
+            if (tokenElement) {
+                return tokenElement.getAttribute('content');
+            }
+        }
+
+        // 3. Проверяем глобальную переменную (для тестирования)
+        if (typeof window !== 'undefined' && window.csrfToken) {
+            return window.csrfToken;
+        }
+
+        // 4. Если CSRF не требуется, возвращаем null
+        if (!this.options.requireCsrf) {
+            return null;
+        }
+
+        return null;
     }
 
     /**
@@ -27,18 +64,24 @@ export class ImageUploadService {
             formData.append('height', dimensions.height.toString());
 
             // Получаем CSRF токен
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const csrfToken = this._getCsrfToken();
             
-            if (!csrfToken) {
-                throw new Error('CSRF токен не найден');
+            if (this.options.requireCsrf && !csrfToken) {
+                throw new Error('CSRF токен не найден. Добавьте <meta name="csrf-token" content="{{ csrf_token() }}"> в HTML или передайте токен в опциях.');
+            }
+
+            const headers = {
+                'X-Requested-With': 'XMLHttpRequest'
+            };
+
+            // Добавляем CSRF токен только если он есть
+            if (csrfToken) {
+                headers['X-CSRF-TOKEN'] = csrfToken;
             }
 
             const response = await fetch(this.uploadEndpoint, {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
+                headers,
                 credentials: 'same-origin',
                 body: formData
             });
@@ -87,15 +130,21 @@ export class ImageUploadService {
      */
     async deleteImage(imageId) {
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const csrfToken = this._getCsrfToken();
             
+            const headers = {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            };
+
+            // Добавляем CSRF токен только если он есть
+            if (csrfToken) {
+                headers['X-CSRF-TOKEN'] = csrfToken;
+            }
+
             const response = await fetch(`${this.deleteEndpoint}/${imageId}`, {
                 method: 'DELETE',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json'
-                },
+                headers,
                 credentials: 'same-origin'
             });
 
@@ -119,15 +168,21 @@ export class ImageUploadService {
      */
     async cleanupUnusedImages() {
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const csrfToken = this._getCsrfToken();
             
+            const headers = {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            };
+
+            // Добавляем CSRF токен только если он есть
+            if (csrfToken) {
+                headers['X-CSRF-TOKEN'] = csrfToken;
+            }
+
             const response = await fetch(`${this.deleteEndpoint}/cleanup`, {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json'
-                },
+                headers,
                 credentials: 'same-origin'
             });
 
