@@ -524,16 +524,16 @@
     line-height: 1.4;
 }
 
-/* Topbar */
+/* Topbar Styles */
 .moodboard-topbar {
     position: absolute;
-    top: 12px;
-    left: 16px;
-    height: 50px;
-    display: inline-flex;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 6px;
+    padding: 8px 12px;
     background: #fff;
     border: 1px solid #e0e0e0;
     border-radius: 10px;
@@ -542,44 +542,53 @@
     pointer-events: auto;
 }
 
+.moodboard-topbar--dark {
+    background: #2a2a2a;
+    border-color: #444;
+    color: #fff;
+}
+
 .moodboard-topbar__button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
     border: none;
     border-radius: 8px;
-    /* background: #f0f0f0; */
-    /* color: #333; */
-    font-size: 16px;
+    background: #f0f0f0;
+    color: #333;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: all 0.2s ease;
-}
-
-/* Стили для SVG иконок в кнопках верхней панели */
-.moodboard-topbar__button svg {
-    width: 16px;
-    height: 16px;
-    /* fill: currentColor;
-    stroke: currentColor; */
-    transition: all 0.2s ease;
-}
-
-.moodboard-topbar__button:hover svg {
-    /* transform: scale(1.1); */
 }
 
 .moodboard-topbar__button:hover {
     background: #e6e6e6;
 }
 
-/* Divider for topbar */
+.moodboard-topbar__button--active {
+    background: #007ACC;
+    color: #fff;
+}
+
+.moodboard-topbar__button--paint {
+    background: #f0f0f0;
+}
+
+.moodboard-topbar__button--paint:hover {
+    background: #e6e6e6;
+}
+
 .moodboard-topbar__divider {
     width: 1px;
-    height: 28px;
-    background: #e5e7eb;
-    margin: 0 6px 0 2px;
+    height: 24px;
+    background: #e0e0e0;
+    margin: 0 4px;
+}
+
+.moodboard-topbar svg {
+    width: 18px;
+    height: 18px;
 }
 
 /* Paint popover */

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест иконок Topbar</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .icon-test {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .icon-display {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .icon-name {
+            font-weight: bold;
+            min-width: 100px;
+        }
+        .icon-svg {
+            width: 24px;
+            height: 24px;
+            border: 1px solid #ccc;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.loading { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Тест загрузки иконок Topbar</h1>
+        <p>Этот тест проверяет загрузку иконок из папки <code>src/assets/icons/topbar/</code></p>
+        
+        <div class="icon-test">
+            <h3>Тест иконок сетки:</h3>
+            <div id="grid-icons"></div>
+        </div>
+        
+        <div class="icon-test">
+            <h3>Тест иконки краски:</h3>
+            <div id="paint-icon"></div>
+        </div>
+        
+        <div class="icon-test">
+            <h3>Логи загрузки:</h3>
+            <div id="logs" style="background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Импортируем TopbarIconLoader
+        import { TopbarIconLoader } from './src/utils/topbarIconLoader.js';
+        
+        const logs = document.getElementById('logs');
+        const gridIcons = document.getElementById('grid-icons');
+        const paintIcon = document.getElementById('paint-icon');
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${timestamp}] ${message}<br>`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        // Перехватываем console.log для отображения в интерфейсе
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            log('LOG: ' + args.join(' '));
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            log('WARN: ' + args.join(' '));
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            log('ERROR: ' + args.join(' '));
+        };
+        
+        async function testIcons() {
+            log('Начинаем тест загрузки иконок...');
+            
+            try {
+                const iconLoader = new TopbarIconLoader();
+                
+                // Ждем инициализации
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Получаем все иконки
+                const icons = await iconLoader.loadAllIcons();
+                
+                log(`Загружено ${Object.keys(icons).length} иконок`);
+                
+                // Тестируем иконки сетки
+                const gridIconNames = ['grid-line', 'grid-dot', 'grid-cross', 'grid-off'];
+                gridIconNames.forEach(name => {
+                    const iconDiv = document.createElement('div');
+                    iconDiv.className = 'icon-display';
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'icon-name';
+                    nameSpan.textContent = name;
+                    
+                    const svgContainer = document.createElement('div');
+                    svgContainer.className = 'icon-svg';
+                    
+                    const status = document.createElement('span');
+                    status.className = 'status';
+                    
+                    if (icons[name]) {
+                        svgContainer.innerHTML = icons[name];
+                        status.textContent = '✓ Загружена';
+                        status.classList.add('success');
+                        log(`✅ Иконка ${name} загружена успешно`);
+                    } else {
+                        status.textContent = '✗ Не найдена';
+                        status.classList.add('error');
+                        log(`❌ Иконка ${name} не найдена`);
+                    }
+                    
+                    iconDiv.appendChild(nameSpan);
+                    iconDiv.appendChild(svgContainer);
+                    iconDiv.appendChild(status);
+                    gridIcons.appendChild(iconDiv);
+                });
+                
+                // Тестируем иконку краски
+                const paintDiv = document.createElement('div');
+                paintDiv.className = 'icon-display';
+                
+                const paintName = document.createElement('span');
+                paintName.className = 'icon-name';
+                paintName.textContent = 'paint';
+                
+                const paintSvg = document.createElement('div');
+                paintSvg.className = 'icon-svg';
+                
+                const paintStatus = document.createElement('span');
+                paintStatus.className = 'status';
+                
+                if (icons['paint']) {
+                    paintSvg.innerHTML = icons['paint'];
+                    paintStatus.textContent = '✓ Загружена';
+                    paintStatus.classList.add('success');
+                    log('✅ Иконка paint загружена успешно');
+                } else {
+                    paintStatus.textContent = '✗ Не найдена';
+                    paintStatus.classList.add('error');
+                    log('❌ Иконка paint не найдена');
+                }
+                
+                paintDiv.appendChild(paintName);
+                paintDiv.appendChild(paintSvg);
+                paintDiv.appendChild(paintStatus);
+                paintIcon.appendChild(paintDiv);
+                
+                log('Тест завершен');
+                
+            } catch (error) {
+                log('❌ Критическая ошибка: ' + error.message);
+                console.error('Ошибка теста:', error);
+            }
+        }
+        
+        // Запускаем тест
+        testIcons();
+    </script>
+</body>
+</html>

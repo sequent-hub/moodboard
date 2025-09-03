@@ -9,21 +9,69 @@ export class TopbarIconLoader {
 
     async init() {
         try {
-            // Всегда используем встроенные иконки для надежности
-            // Это гарантирует работу в любом окружении (npm пакет, CDN, локальная разработка)
-            this.loadBuiltInIcons();
+            // Загружаем иконки из файлов в папке topbar
+            await this.loadTopbarIcons();
             
             console.log('✅ Иконки верхней панели загружены успешно');
             
         } catch (error) {
             console.error('❌ Критическая ошибка загрузки иконок верхней панели:', error);
-            // Даже в случае ошибки пытаемся загрузить встроенные иконки
+            // В случае ошибки загружаем встроенные иконки как fallback
             this.loadBuiltInIcons();
         }
     }
 
-    loadBuiltInIcons() {
-        // Встроенные иконки как основной источник
+    async loadTopbarIcons() {
+        // Список иконок, которые нужно загрузить
+        const iconNames = ['grid-line', 'grid-dot', 'grid-cross', 'grid-off', 'paint'];
+        
+        for (const iconName of iconNames) {
+            try {
+                const svgContent = await this.loadIconFromFile(iconName);
+                this.icons.set(iconName, svgContent);
+                console.log(`✅ Загружена иконка: ${iconName}`);
+            } catch (error) {
+                console.warn(`⚠️ Не удалось загрузить иконку ${iconName}:`, error);
+                // Если не удалось загрузить из файла, используем встроенную версию
+                const builtInIcon = this.getBuiltInIcon(iconName);
+                if (builtInIcon) {
+                    this.icons.set(iconName, builtInIcon);
+                    console.log(`✅ Использована встроенная иконка для: ${iconName}`);
+                }
+            }
+        }
+        
+        console.log(`📦 Загружено ${this.icons.size} иконок верхней панели`);
+    }
+
+    async loadIconFromFile(iconName) {
+        // Пробуем несколько способов загрузки для разных окружений
+        const paths = [
+            `/src/assets/icons/topbar/${iconName}.svg`,
+            `./src/assets/icons/topbar/${iconName}.svg`,
+            `../assets/icons/topbar/${iconName}.svg`,
+            `assets/icons/topbar/${iconName}.svg`
+        ];
+        
+        for (const path of paths) {
+            try {
+                const response = await fetch(path);
+                if (response.ok) {
+                    const svgContent = await response.text();
+                    console.log(`✅ Иконка ${iconName} загружена с пути: ${path}`);
+                    return svgContent;
+                }
+            } catch (error) {
+                console.warn(`⚠️ Не удалось загрузить ${iconName} с пути ${path}:`, error.message);
+                continue;
+            }
+        }
+        
+        throw new Error(`Не удалось загрузить иконку ${iconName} ни с одного из путей`);
+    }
+
+    getBuiltInIcon(iconName) {
+        // Встроенные иконки как fallback
         const builtInIcons = {
             'grid-line': `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M2 2H16V4H2V2Z" fill="currentColor"/>
@@ -71,12 +119,21 @@ export class TopbarIconLoader {
             </svg>`
         };
 
-        // Загружаем иконки статически
-        for (const [iconName, svgContent] of Object.entries(builtInIcons)) {
-            this.icons.set(iconName, svgContent);
+        return builtInIcons[iconName];
+    }
+
+    loadBuiltInIcons() {
+        // Загружаем только встроенные иконки как fallback
+        const iconNames = ['grid-line', 'grid-dot', 'grid-cross', 'grid-off', 'paint'];
+        
+        for (const iconName of iconNames) {
+            const builtInIcon = this.getBuiltInIcon(iconName);
+            if (builtInIcon) {
+                this.icons.set(iconName, builtInIcon);
+            }
         }
         
-        console.log(`📦 Загружено ${this.icons.size} встроенных иконок верхней панели`);
+        console.log(`📦 Загружено ${this.icons.size} встроенных иконок верхней панели (fallback)`);
     }
 
     getIcon(name) {
