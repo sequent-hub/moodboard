@@ -53,14 +53,14 @@ export class Toolbar {
             { id: 'image', iconName: 'image', title: 'Добавить картинку', type: 'image-add' },
             { id: 'shapes', iconName: 'shapes', title: 'Фигуры', type: 'custom-shapes' },
             { id: 'pencil', iconName: 'pencil', title: 'Рисование', type: 'custom-draw' },
-            { id: 'comments', iconName: 'comments', title: 'Комментарии', type: 'custom-comments' },
+            // { id: 'comments', iconName: 'comments', title: 'Комментарии', type: 'custom-comments' }, // Временно скрыто
             { id: 'attachments', iconName: 'attachments', title: 'Файлы', type: 'custom-attachments' },
             { id: 'emoji', iconName: 'emoji', title: 'Эмоджи', type: 'custom-emoji' }
         ];
 
         // Существующие элементы ниже новых
         const existingTools = [
-                         { id: 'frame', iconName: 'frame', title: 'Добавить фрейм', type: 'frame' },
+            // { id: 'frame', iconName: 'frame', title: 'Добавить фрейм', type: 'frame' }, // Временно скрыто
             { id: 'divider', type: 'divider' },
             { id: 'clear', iconName: 'clear', title: 'Очистить холст', type: 'clear' },
             { id: 'divider', type: 'divider' },

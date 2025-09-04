@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест скрытых кнопок Toolbar</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+            margin: 0;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-height: 600px;
+            position: relative;
+        }
+        .status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #333;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 10000;
+        }
+        .status.success { background: #28a745; }
+        .status.error { background: #dc3545; }
+        .status.warning { background: #ffc107; color: #333; }
+        .button-test {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .button-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .button-item {
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .button-item.found { background: #d4edda; border-color: #c3e6cb; }
+        .button-item.not-found { background: #f8d7da; border-color: #f5c6cb; }
+        .button-item.hidden { background: #fff3cd; border-color: #ffeaa7; }
+        .button-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .button-name {
+            font-weight: bold;
+        }
+        .button-status {
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        .status-found { background: #28a745; color: white; }
+        .status-not-found { background: #dc3545; color: white; }
+        .status-hidden { background: #ffc107; color: #333; }
+    </style>
+</head>
+<body>
+    <div id="status" class="status">Загрузка...</div>
+    
+    <div class="test-container">
+        <h1>Тест скрытых кнопок Toolbar</h1>
+        <p>Проверяем, что кнопки "комментарии" и "фрейм" скрыты в панели инструментов</p>
+        
+        <!-- Контейнер для toolbar -->
+        <div id="toolbar-container" style="position: relative; height: 100px; border: 1px dashed #ccc; margin: 20px 0;"></div>
+        
+        <!-- Тест кнопок -->
+        <div class="button-test">
+            <h3>Проверка кнопок в панели инструментов:</h3>
+            <div id="button-test-results"></div>
+        </div>
+        
+        <div id="logs" style="background: #f8f9fa; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; margin-top: 20px;"></div>
+    </div>
+
+    <script type="module">
+        // Импортируем необходимые модули
+        import { Toolbar } from './src/ui/Toolbar.js';
+        import { EventBus } from './src/core/EventBus.js';
+        
+        const status = document.getElementById('status');
+        const logs = document.getElementById('logs');
+        const toolbarContainer = document.getElementById('toolbar-container');
+        const buttonTestResults = document.getElementById('button-test-results');
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${timestamp}] ${message}<br>`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        function updateStatus(message, type = 'success') {
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        // Перехватываем console для отображения в интерфейсе
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            log('LOG: ' + args.join(' '));
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            log('WARN: ' + args.join(' '));
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            log('ERROR: ' + args.join(' '));
+        };
+        
+        async function testHiddenButtons() {
+            try {
+                log('Начинаем тест скрытых кнопок...');
+                updateStatus('Инициализация...', 'warning');
+                
+                // Создаем EventBus
+                const eventBus = new EventBus();
+                
+                // Создаем Toolbar
+                const toolbar = new Toolbar(toolbarContainer, eventBus, 'light');
+                
+                // Ждем инициализации
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Проверяем, что toolbar создался
+                const toolbarElement = toolbarContainer.querySelector('.moodboard-toolbar');
+                if (toolbarElement) {
+                    log('✅ Toolbar элемент создан успешно');
+                    
+                    // Список всех кнопок для проверки
+                    const allButtons = [
+                        { id: 'select', name: 'Выделение', shouldExist: true },
+                        { id: 'pan', name: 'Панорамирование', shouldExist: true },
+                        { id: 'text-add', name: 'Добавить текст', shouldExist: true },
+                        { id: 'note', name: 'Добавить записку', shouldExist: true },
+                        { id: 'image', name: 'Добавить картинку', shouldExist: true },
+                        { id: 'shapes', name: 'Фигуры', shouldExist: true },
+                        { id: 'pencil', name: 'Рисование', shouldExist: true },
+                        { id: 'comments', name: 'Комментарии', shouldExist: false }, // Должна быть скрыта
+                        { id: 'attachments', name: 'Файлы', shouldExist: true },
+                        { id: 'emoji', name: 'Эмоджи', shouldExist: true },
+                        { id: 'frame', name: 'Добавить фрейм', shouldExist: false }, // Должна быть скрыта
+                        { id: 'clear', name: 'Очистить холст', shouldExist: true },
+                        { id: 'undo', name: 'Отменить', shouldExist: true },
+                        { id: 'redo', name: 'Повторить', shouldExist: true }
+                    ];
+                    
+                    // Проверяем каждую кнопку
+                    allButtons.forEach(button => {
+                        const buttonElement = toolbarElement.querySelector(`.moodboard-toolbar__button--${button.id}`);
+                        const buttonDiv = document.createElement('div');
+                        buttonDiv.className = 'button-item';
+                        
+                        const iconDiv = document.createElement('div');
+                        iconDiv.className = 'button-icon';
+                        iconDiv.textContent = buttonElement ? '✓' : '✗';
+                        
+                        const nameDiv = document.createElement('div');
+                        nameDiv.className = 'button-name';
+                        nameDiv.textContent = button.name;
+                        
+                        const statusDiv = document.createElement('div');
+                        statusDiv.className = 'button-status';
+                        
+                        if (buttonElement) {
+                            if (button.shouldExist) {
+                                buttonDiv.classList.add('found');
+                                statusDiv.textContent = 'Найдена';
+                                statusDiv.classList.add('status-found');
+                                log(`✅ Кнопка "${button.name}" найдена (должна быть)`);
+                            } else {
+                                buttonDiv.classList.add('hidden');
+                                statusDiv.textContent = 'Скрыта';
+                                statusDiv.classList.add('status-hidden');
+                                log(`⚠️ Кнопка "${button.name}" найдена, но должна быть скрыта!`);
+                            }
+                        } else {
+                            if (button.shouldExist) {
+                                buttonDiv.classList.add('not-found');
+                                statusDiv.textContent = 'Не найдена';
+                                statusDiv.classList.add('status-not-found');
+                                log(`❌ Кнопка "${button.name}" не найдена, но должна быть!`);
+                            } else {
+                                buttonDiv.classList.add('hidden');
+                                statusDiv.textContent = 'Скрыта';
+                                statusDiv.classList.add('status-hidden');
+                                log(`✅ Кнопка "${button.name}" скрыта (как и должно быть)`);
+                            }
+                        }
+                        
+                        buttonDiv.appendChild(iconDiv);
+                        buttonDiv.appendChild(nameDiv);
+                        buttonDiv.appendChild(statusDiv);
+                        buttonTestResults.appendChild(buttonDiv);
+                    });
+                    
+                    // Проверяем общее количество кнопок
+                    const allButtonElements = toolbarElement.querySelectorAll('.moodboard-toolbar__button');
+                    log(`📊 Общее количество кнопок в toolbar: ${allButtonElements.length}`);
+                    
+                    // Проверяем, что скрытые кнопки действительно отсутствуют
+                    const commentsButton = toolbarElement.querySelector('.moodboard-toolbar__button--comments');
+                    const frameButton = toolbarElement.querySelector('.moodboard-toolbar__button--frame');
+                    
+                    if (!commentsButton && !frameButton) {
+                        updateStatus('✅ Кнопки успешно скрыты!', 'success');
+                        log('✅ Кнопки "комментарии" и "фрейм" успешно скрыты');
+                    } else {
+                        updateStatus('❌ Кнопки не скрыты!', 'error');
+                        log('❌ Одна или обе кнопки не скрыты');
+                    }
+                    
+                } else {
+                    updateStatus('❌ Toolbar не создан', 'error');
+                    log('❌ Элемент toolbar не найден в контейнере');
+                }
+                
+                log('Тест завершен');
+                
+            } catch (error) {
+                updateStatus('❌ Ошибка теста', 'error');
+                log('❌ Критическая ошибка: ' + error.message);
+                console.error('Ошибка теста:', error);
+            }
+        }
+        
+        // Запускаем тест
+        testHiddenButtons();
+    </script>
+</body>
+</html>
