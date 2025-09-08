@@ -60,7 +60,7 @@ export class Toolbar {
 
         // Существующие элементы ниже новых
         const existingTools = [
-            // { id: 'frame', iconName: 'frame', title: 'Добавить фрейм', type: 'frame' }, // Временно скрыто
+            { id: 'frame', iconName: 'frame', title: 'Добавить фрейм', type: 'frame' },
             { id: 'divider', type: 'divider' },
             { id: 'clear', iconName: 'clear', title: 'Очистить холст', type: 'clear' },
             { id: 'divider', type: 'divider' },
