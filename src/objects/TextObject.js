@@ -91,16 +91,7 @@ export class TextObject {
      * Для TextObject фактическая логика скрытия/показа обрабатывается в HtmlTextLayer
      */
     hideText() {
-        // Для TextObject визуализация происходит в HtmlTextLayer
-        // Эмитим событие для скрытия текста
-        if (this.rect && this.rect._mb && this.rect._mb.objectId) {
-            // Используем EventBus через core, если доступен
-            if (typeof window !== 'undefined' && window.moodboardEventBus) {
-                window.moodboardEventBus.emit('tool:hide:object:text', { 
-                    objectId: this.rect._mb.objectId 
-                });
-            }
-        }
+        // Ничего не делаем: скрытие текста обрабатывается HtmlTextLayer по событию
     }
 
     /**
@@ -108,16 +99,7 @@ export class TextObject {
      * Для TextObject фактическая логика скрытия/показа обрабатывается в HtmlTextLayer
      */
     showText() {
-        // Для TextObject визуализация происходит в HtmlTextLayer
-        // Эмитим событие для показа текста
-        if (this.rect && this.rect._mb && this.rect._mb.objectId) {
-            // Используем EventBus через core, если доступен
-            if (typeof window !== 'undefined' && window.moodboardEventBus) {
-                window.moodboardEventBus.emit('tool:show:object:text', { 
-                    objectId: this.rect._mb.objectId 
-                });
-            }
-        }
+        // Ничего не делаем: показ текста обрабатывается HtmlTextLayer по событию
     }
 }
 

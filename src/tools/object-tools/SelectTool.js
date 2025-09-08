@@ -1861,6 +1861,34 @@ export class SelectTool extends BaseTool {
                 }
             }
             
+            // Перед скрытием — если редактировался существующий текст, обновим его размер под текущий редактор
+            if (objectId && (currentObjectType === 'text' || currentObjectType === 'simple-text')) {
+                try {
+                    const worldLayerRef = this.textEditor.world || (this.app?.stage);
+                    const s = worldLayerRef?.scale?.x || 1;
+                    const viewResLocal = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
+                    const wPx = Math.max(1, wrapper.offsetWidth);
+                    const hPx = Math.max(1, wrapper.offsetHeight);
+                    const newW = Math.max(1, Math.round(wPx * viewResLocal / s));
+                    const newH = Math.max(1, Math.round(hPx * viewResLocal / s));
+                    // Получим старые размеры для команды
+                    const sizeReq = { objectId, size: null };
+                    this.eventBus.emit(Events.Tool.GetObjectSize, sizeReq);
+                    const oldSize = sizeReq.size || { width: newW, height: newH };
+                    // Позиция в state хранится как левый-верх
+                    const posReq = { objectId, position: null };
+                    this.eventBus.emit(Events.Tool.GetObjectPosition, posReq);
+                    const oldPos = posReq.position || { x: position.x, y: position.y };
+                    const newSize = { width: newW, height: newH };
+                    // Во время ResizeUpdate ядро обновит и PIXI, и state
+                    this.eventBus.emit(Events.Tool.ResizeUpdate, { object: objectId, size: newSize, position: oldPos });
+                    // Зафиксируем изменение одной командой
+                    this.eventBus.emit(Events.Tool.ResizeEnd, { object: objectId, oldSize: oldSize, newSize: newSize, oldPosition: oldPos, newPosition: oldPos });
+                } catch (err) {
+                    console.warn('⚠️ Не удалось применить размеры после редактирования текста:', err);
+                }
+            }
+
             wrapper.remove();
             this.textEditor = { active: false, objectId: null, textarea: null, wrapper: null, world: null, position: null, properties: null, objectType: 'text' };
             this.eventBus.emit(Events.UI.TextEditEnd, { objectId: objectId || null });

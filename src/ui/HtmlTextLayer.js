@@ -180,6 +180,8 @@ export class HtmlTextLayer {
             transformOrigin: 'top left',
             color: color,
             whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
             pointerEvents: 'none', // всё взаимодействие остаётся на PIXI
             userSelect: 'none',
             fontFamily: fontFamily,
@@ -236,7 +238,11 @@ export class HtmlTextLayer {
         const baseH = parseFloat(el.dataset.baseH || '36') || 36;
         const scaleX = w && baseW ? (w / baseW) : 1;
         const scaleY = h && baseH ? (h / baseH) : 1;
-        const sObj = Math.min(scaleX, scaleY);
+        // Для текстовых объектов не масштабируем шрифт от изменения размеров блока,
+        // чтобы сохранять вид как при редактировании (как в Miro)
+        const sObj = (obj?.type === 'text' || obj?.type === 'simple-text')
+            ? 1
+            : Math.min(scaleX, scaleY);
         const sCss = s / res;
         const fontSizePx = Math.max(1, baseFS * sObj * sCss);
         el.style.fontSize = `${fontSizePx}px`;
