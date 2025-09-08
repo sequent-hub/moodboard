@@ -122,6 +122,14 @@ export class HtmlHandlesLayer {
         const worldX = world?.x || 0;
         const worldY = world?.y || 0;
         
+        // Узнаём тип объекта (нужно, чтобы для file отключить ручки/ресайз)
+        let isFileTarget = false;
+        if (id !== '__group__') {
+            const req = { objectId: id, pixiObject: null };
+            this.eventBus.emit(Events.Tool.GetObjectPixi, req);
+            isFileTarget = !!(req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type === 'file');
+        }
+
         // Вычисляем позицию и размер в CSS координатах, округляем до целых px
         const cssX = offsetLeft + (worldX + worldBounds.x * worldScale) / res;
         const cssY = offsetTop + (worldY + worldBounds.y * worldScale) / res;
@@ -148,7 +156,7 @@ export class HtmlHandlesLayer {
         Object.assign(box.style, {
             position: 'absolute', left: `${left}px`, top: `${top}px`,
             width: `${width}px`, height: `${height}px`,
-            border: '1px solid #1DE9B6', boxSizing: 'content-box', pointerEvents: 'none',
+            border: '1px solid #1DE9B6', borderRadius: '3px', boxSizing: 'content-box', pointerEvents: 'none',
             transformOrigin: 'center center', // Поворот вокруг центра
             transform: `rotate(${rotation}deg)` // Применяем поворот
         });
@@ -164,12 +172,14 @@ export class HtmlHandlesLayer {
                 border: '2px solid #1DE9B6', 
                 borderRadius: '50%', // Делаем круглыми
                 boxSizing: 'border-box',
-                pointerEvents: 'auto', 
+                pointerEvents: isFileTarget ? 'none' : 'auto', 
                 zIndex: 10, // Увеличиваем z-index
                 cursor: cursor
             });
             h.style.left = `${x - 6}px`;
             h.style.top = `${y - 6}px`;
+            // Для файла скрываем ручки, для остальных показываем
+            h.style.display = isFileTarget ? 'none' : 'block';
             
             // Создаем внутренний белый круг
             const inner = document.createElement('div');
@@ -195,7 +205,9 @@ export class HtmlHandlesLayer {
                 h.style.borderColor = '#1DE9B6';
             });
             
-            h.addEventListener('mousedown', (e) => this._onHandleDown(e, box));
+            if (!isFileTarget) {
+                h.addEventListener('mousedown', (e) => this._onHandleDown(e, box));
+            }
             
             box.appendChild(h);
         };
@@ -219,12 +231,15 @@ export class HtmlHandlesLayer {
             const e = document.createElement('div');
             e.dataset.edge = name; e.dataset.id = id;
             Object.assign(e.style, style, {
-                position: 'absolute', pointerEvents: 'auto', cursor, 
+                position: 'absolute', pointerEvents: isFileTarget ? 'none' : 'auto', cursor, 
                 zIndex: 5, // Меньше чем у ручек (10)
-                background: 'transparent' // невидимые области
+                background: 'transparent', // невидимые области
+                display: isFileTarget ? 'none' : 'block'
                 
             });
-            e.addEventListener('mousedown', (evt) => this._onEdgeResizeDown(evt));
+            if (!isFileTarget) {
+                e.addEventListener('mousedown', (evt) => this._onEdgeResizeDown(evt));
+            }
             box.appendChild(e);
         };
         
@@ -264,47 +279,38 @@ export class HtmlHandlesLayer {
         }, 'ew-resize');
 
         // Ручка вращения - зеленый круг с символом ↻ возле левого нижнего угла
+        // Ручка вращения: показываем для всех, кроме файла
         const rotateHandle = document.createElement('div');
         rotateHandle.dataset.handle = 'rotate'; 
         rotateHandle.dataset.id = id;
-        Object.assign(rotateHandle.style, {
-            position: 'absolute',
-            width: '20px', height: '20px',
-            background: '#28A745',
-            border: '2px solid #fff',
-            borderRadius: '50%',
-            boxSizing: 'border-box',
-            pointerEvents: 'auto',
-            cursor: 'grab',
-            zIndex: 15, // Выше ручек ресайза
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '12px',
-            color: '#fff',
-            fontWeight: 'bold',
-            userSelect: 'none'
-        });
-        
-        // Позиционируем возле левого нижнего угла с отступом
-        rotateHandle.style.left = `${0 - 10}px`; // центрируем относительно угла
-        rotateHandle.style.top = `${height + 25 - 10}px`; // отступ 25px от нижней грани
-        
-        // Добавляем символ вращения
-        rotateHandle.innerHTML = '↻';
-        
-        // Эффекты при наведении
-        rotateHandle.addEventListener('mouseenter', () => {
-            rotateHandle.style.background = '#34CE57';
-            rotateHandle.style.cursor = 'grab';
-        });
-        rotateHandle.addEventListener('mouseleave', () => {
-            rotateHandle.style.background = '#28A745';
-        });
-        
-        // Обработчик вращения
-        rotateHandle.addEventListener('mousedown', (e) => this._onRotateHandleDown(e, box));
-        
+        if (isFileTarget) {
+            Object.assign(rotateHandle.style, { display: 'none', pointerEvents: 'none' });
+        } else {
+            Object.assign(rotateHandle.style, {
+                position: 'absolute',
+                width: '20px', height: '20px',
+                background: '#28A745',
+                border: '2px solid #fff',
+                borderRadius: '50%',
+                boxSizing: 'border-box',
+                pointerEvents: 'auto',
+                cursor: 'grab',
+                zIndex: 15,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '12px', color: '#fff', fontWeight: 'bold', userSelect: 'none'
+            });
+            rotateHandle.style.left = `${0 - 10}px`;
+            rotateHandle.style.top = `${height + 25 - 10}px`;
+            rotateHandle.innerHTML = '↻';
+            rotateHandle.addEventListener('mouseenter', () => {
+                rotateHandle.style.background = '#34CE57';
+                rotateHandle.style.cursor = 'grab';
+            });
+            rotateHandle.addEventListener('mouseleave', () => {
+                rotateHandle.style.background = '#28A745';
+            });
+            rotateHandle.addEventListener('mousedown', (e) => this._onRotateHandleDown(e, box));
+        }
         box.appendChild(rotateHandle);
 
         this.visible = true;

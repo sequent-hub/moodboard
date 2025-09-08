@@ -387,41 +387,57 @@ export class PlacementTool extends BaseTool {
         this.ghostContainer = new PIXI.Container();
         this.ghostContainer.alpha = 0.6; // Полупрозрачность
         
-        // Создаем визуальное представление файла (аналогично FileObject)
-        const graphics = new PIXI.Graphics();
+        // Размеры
         const width = this.selectedFile.properties.width || 120;
         const height = this.selectedFile.properties.height || 140;
-        
-        // Фон файла
-        graphics.beginFill(0xF8F9FA, 0.8);
-        graphics.lineStyle(2, 0xDEE2E6, 0.8);
-        graphics.drawRoundedRect(0, 0, width, height, 8);
-        graphics.endFill();
-        
-        // Иконка файла (простой прямоугольник)
-        graphics.beginFill(0x6C757D, 0.6);
-        graphics.drawRoundedRect(width * 0.2, height * 0.15, width * 0.6, height * 0.3, 4);
-        graphics.endFill();
-        
+
+        // Размытая тень (как у FileObject)
+        const shadow = new PIXI.Graphics();
+        try {
+            shadow.filters = [new PIXI.filters.BlurFilter(6)];
+        } catch (e) {}
+        shadow.beginFill(0x000000, 1);
+        shadow.drawRect(0, 0, width, height);
+        shadow.endFill();
+        shadow.x = 2;
+        shadow.y = 3;
+        shadow.alpha = 0.18;
+
+        // Белый прямоугольник без рамки
+        const background = new PIXI.Graphics();
+        background.beginFill(0xFFFFFF, 1);
+        background.drawRect(0, 0, width, height);
+        background.endFill();
+
+        // Иконка-заглушка файла наверху
+        const icon = new PIXI.Graphics();
+        const iconSize = Math.min(48, width * 0.4);
+        const iconX = (width - iconSize) / 2;
+        const iconY = 16;
+        icon.beginFill(0x6B7280, 1);
+        icon.drawRect(iconX, iconY, iconSize * 0.8, iconSize);
+        icon.endFill();
+
         // Текст названия файла
         const fileName = this.selectedFile.fileName || 'File';
         const displayName = fileName.length > 15 ? fileName.substring(0, 12) + '...' : fileName;
-        
         const nameText = new PIXI.Text(displayName, {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
             fontSize: 12,
-            fill: 0x495057,
+            fill: 0x333333,
             align: 'center',
             wordWrap: true,
-            wordWrapWidth: width - 10
+            wordWrapWidth: width - 8
         });
-        
         nameText.x = (width - nameText.width) / 2;
-        nameText.y = height * 0.55;
-        
-        this.ghostContainer.addChild(graphics);
+        nameText.y = height - 40;
+
+        // Добавляем в контейнер в правильном порядке
+        this.ghostContainer.addChild(shadow);
+        this.ghostContainer.addChild(background);
+        this.ghostContainer.addChild(icon);
         this.ghostContainer.addChild(nameText);
-        
+
         // Центрируем контейнер относительно курсора
         this.ghostContainer.pivot.x = width / 2;
         this.ghostContainer.pivot.y = height / 2;

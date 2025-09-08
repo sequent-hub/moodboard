@@ -256,7 +256,10 @@ export class FilePropertiesPanel {
             
             // Показываем/скрываем кнопку скачивания в зависимости от наличия fileId
             if (this.downloadButton) {
-                this.downloadButton.style.display = hasFileId ? 'flex' : 'none';
+                // Всегда показываем кнопку, даже без fileId
+                this.downloadButton.style.display = 'flex';
+                this.downloadButton.disabled = !hasFileId;
+                this.downloadButton.title = hasFileId ? 'Скачать файл' : 'Файл недоступен для скачивания';
             }
         }
     }

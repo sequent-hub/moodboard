@@ -31,6 +31,13 @@ export class FileObject {
         this.container.eventMode = 'static';
         this.container.interactiveChildren = true;
         
+        // Размытая тень (подложка)
+        this.shadow = new PIXI.Graphics();
+        try {
+            this.shadow.filters = [new PIXI.filters.BlurFilter(6)];
+        } catch (e) {}
+        this.container.addChild(this.shadow);
+
         // Графика фона и иконки
         this.graphics = new PIXI.Graphics();
         this.container.addChild(this.graphics);
@@ -147,19 +154,23 @@ export class FileObject {
         const w = this.width;
         const h = this.height;
         
+        // Обновляем тень (прямоугольная, размытая)
+        if (this.shadow) {
+            const s = this.shadow;
+            s.clear();
+            s.beginFill(0x000000, 1);
+            s.drawRect(0, 0, w, h);
+            s.endFill();
+            s.x = 2;
+            s.y = 3;
+            s.alpha = 0.18;
+        }
+        
         g.clear();
         
-        // Тень
-        g.beginFill(0x000000, 0.1);
-        g.drawRoundedRect(2, 2, w, h, 8);
-        g.endFill();
-        
-        // Основной фон (блеклый для удаленных файлов)
-        const bgColor = this.isDeleted ? 0xF1F3F4 : 0xF8F9FA;
-        const borderColor = this.isDeleted ? 0xDADCE0 : 0xDEE2E6;
-        g.beginFill(bgColor, 1);
-        g.lineStyle(2, borderColor, 1);
-        g.drawRoundedRect(0, 0, w, h, 8);
+        // Основной фон — белый, без скруглений и рамки
+        g.beginFill(0xFFFFFF, 1);
+        g.drawRect(0, 0, w, h);
         g.endFill();
         
         // Иконка файла в верхней части
@@ -184,6 +195,9 @@ export class FileObject {
                    point.y >= bounds.y && 
                    point.y <= bounds.y + bounds.height;
         };
+
+        // Важное выравнивание: pivot контейнера по центру, чтобы рамка совпадала
+        this.container.pivot.set(w / 2, h / 2);
     }
 
     _drawFileIcon(graphics, x, y, size, color, extension) {
