@@ -1578,6 +1578,9 @@ export class SelectTool extends BaseTool {
             // Повыше чёткость текста в CSS
             WebkitFontSmoothing: 'antialiased',
             MozOsxFontSmoothing: 'grayscale',
+            // Улучшенное перенесение слов, как в Miro
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
         });
         
         wrapper.appendChild(textarea);
@@ -1727,7 +1730,7 @@ export class SelectTool extends BaseTool {
         const initialHpx = initialSize ? Math.max(1, (initialSize.height || 0) * s / viewRes) : null;
         
         // Определяем минимальные границы для всех типов объектов
-        let minWBound = initialWpx || 240;
+        let minWBound = initialWpx || 120; // Минимальная ширина близка к призраку текста
         let minHBound = 28;
         
         // Для записок размеры уже установлены выше, пропускаем эту логику
@@ -1742,24 +1745,29 @@ export class SelectTool extends BaseTool {
             }
         }
         // Автоподгон
+        const MAX_AUTO_WIDTH = 360; // Поведение как в Miro: авто-ширина до порога, далее перенос строк
         const autoSize = () => {
             if (isNote) {
                 // Для заметок используем фиксированные размеры, вычисленные выше
-                // Не вызываем autoSize, чтобы сохранить точное позиционирование
                 return;
             }
-            
-            // Для обычного текста восстанавливаем автоподгон
-            textarea.style.height = '1px';
-            textarea.style.width = '1px';
-            const w = Math.max(minWBound, textarea.scrollWidth + 8);
-            const h = Math.max(minHBound, textarea.scrollHeight + 4);
-            textarea.style.width = `${w}px`;
-            textarea.style.height = `${h}px`;
-            wrapper.style.width = `${w}px`;
-            wrapper.style.height = `${h}px`;
-            // Обновляем ручки только для обычного текста
-            // placeHandles();
+            // Сначала измеряем естественную ширину без ограничений
+            const prevWidth = textarea.style.width;
+            const prevHeight = textarea.style.height;
+            textarea.style.width = 'auto';
+            textarea.style.height = 'auto';
+
+            // Желаемая ширина: не уже минимальной и не шире максимальной авто-ширины
+            const naturalW = textarea.scrollWidth + 8;
+            const targetW = Math.min(MAX_AUTO_WIDTH, Math.max(minWBound, naturalW));
+            textarea.style.width = `${targetW}px`;
+            wrapper.style.width = `${targetW}px`;
+
+            // Высота по содержимому при установленной ширине
+            textarea.style.height = 'auto';
+            const targetH = Math.max(minHBound, textarea.scrollHeight + 2);
+            textarea.style.height = `${targetH}px`;
+            wrapper.style.height = `${targetH}px`;
         };
         
         // Вызываем autoSize только для обычного текста
@@ -1868,11 +1876,18 @@ export class SelectTool extends BaseTool {
                 console.log('🔧 SelectTool: finalize - creating new object');
                 // Создаем объект с правильным типом
                 const objectType = currentObjectType || 'text';
+                // Конвертируем размеры редактора (px) в мировые единицы
+                const worldLayerRef = this.textEditor.world || (this.app?.stage);
+                const s = worldLayerRef?.scale?.x || 1;
+                const wPx = Math.max(1, wrapper.offsetWidth);
+                const hPx = Math.max(1, wrapper.offsetHeight);
+                const wWorld = Math.max(1, Math.round(wPx * viewRes / s));
+                const hWorld = Math.max(1, Math.round(hPx * viewRes / s));
                 this.eventBus.emit(Events.UI.ToolbarAction, {
                     type: objectType,
                     id: objectType,
                     position: { x: position.x, y: position.y },
-                    properties: { content: value, fontSize }
+                    properties: { content: value, fontSize, width: wWorld, height: hWorld }
                 });
             } else {
                 // Обновление существующего: используем команду обновления содержимого
