@@ -32,6 +32,16 @@ export class NoteObject {
         this.container.eventMode = 'static';
         this.container.interactiveChildren = true;
         
+        // Размытая тень (отдельный слой под фоном)
+        this.shadow = new PIXI.Graphics();
+        // Применяем блёр к тени (мягкая тень)
+        try {
+            this.shadow.filters = [new PIXI.filters.BlurFilter(6)];
+        } catch (e) {
+            // Если фильтры недоступны, тень останется без размытия
+        }
+        this.container.addChild(this.shadow);
+
         // Графика фона
         this.graphics = new PIXI.Graphics();
         this.container.addChild(this.graphics);
@@ -169,29 +179,32 @@ export class NoteObject {
         
         g.clear();
         
-        // Тень записки (эффект приподнятости)
-        g.beginFill(0x000000, 0.1);
-        g.drawRoundedRect(2, 2, w, h, 4);
-        g.endFill();
+        // Прорисовка размытой тени отдельным слоем
+        if (this.shadow) {
+            const s = this.shadow;
+            s.clear();
+            s.beginFill(0x000000, 1);
+            s.drawRect(0, 0, w, h);
+            s.endFill();
+            // Лёгкое смещение тени вниз/вправо
+            s.x = 2;
+            s.y = 3;
+            s.alpha = 0.18; // прозрачность тени
+            // Если есть фильтр Blur, он уже применён в конструкторе
+        }
         
-        // Основной фон записки
+        // Основной фон записки (прямоугольный без скруглений)
         g.beginFill(this.backgroundColor, 1);
         g.lineStyle(1, this.borderColor, 1);
-        g.drawRoundedRect(0, 0, w, h, 4);
+        g.drawRect(0, 0, w, h);
         g.endFill();
         
-        // Небольшая полоска сверху для эффекта стикера
-        g.beginFill(this.borderColor, 0.3);
-        g.drawRoundedRect(0, 0, w, 8, 4);
+        // Прямоугольная шапка сверху, тем же цветом что и рамка
+        g.beginFill(this.borderColor, 1);
+        g.drawRect(0, 0, w, 8);
         g.endFill();
         
-        // Линии на записке (эффект бумаги)
-        g.lineStyle(0.5, this.borderColor, 0.2);
-        const lineSpacing = Math.max(16, this.fontSize + 4);
-        for (let y = 24; y < h - 8; y += lineSpacing) {
-            g.moveTo(8, y);
-            g.lineTo(w - 8, y);
-        }
+        // Линии внутри записки убраны по требованию дизайна
         
         // Устанавливаем hit area для контейнера
         this.container.hitArea = new PIXI.Rectangle(0, 0, w, h);

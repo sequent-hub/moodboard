@@ -662,43 +662,64 @@ export class PlacementTool extends BaseTool {
         this.ghostContainer = new PIXI.Container();
         this.ghostContainer.alpha = 0.6; // Полупрозрачность
         
-        // Размеры призрака записки (из настроек NoteObject)
+        // Размеры и стили, синхронизированные с NoteObject
         const width = this.pending.properties?.width || 160;
         const height = this.pending.properties?.height || 100;
         const fontSize = this.pending.properties?.fontSize || 16;
         const content = this.pending.properties?.content || 'Новая записка';
-        
-        // Фон записки (как в NoteObject)
-        const background = new PIXI.Graphics();
-        background.beginFill(0xFFF9C4, 0.8); // Светло-желтый с прозрачностью
-        background.lineStyle(2, 0xF9A825, 0.8); // Золотистая граница
-        background.drawRoundedRect(0, 0, width, height, 8);
-        background.endFill();
-        
-        // Добавляем небольшую тень для реалистичности
+        const backgroundColor = (typeof this.pending.properties?.backgroundColor === 'number')
+            ? this.pending.properties.backgroundColor
+            : 0xFFF9C4;
+        const borderColor = (typeof this.pending.properties?.borderColor === 'number')
+            ? this.pending.properties.borderColor
+            : 0xF9A825;
+        const textColor = (typeof this.pending.properties?.textColor === 'number')
+            ? this.pending.properties.textColor
+            : 0x1A1A1A;
+
+        // Тень (размытая) под запиской
         const shadow = new PIXI.Graphics();
-        shadow.beginFill(0x000000, 0.1);
-        shadow.drawRoundedRect(2, 2, width, height, 8);
+        try {
+            shadow.filters = [new PIXI.filters.BlurFilter(6)];
+        } catch (e) {}
+        shadow.beginFill(0x000000, 1);
+        shadow.drawRect(0, 0, width, height);
         shadow.endFill();
-        
-        // Текст записки
+        shadow.x = 2;
+        shadow.y = 3;
+        shadow.alpha = 0.18;
+
+        // Основной фон записки (прямоугольник + рамка)
+        const background = new PIXI.Graphics();
+        background.beginFill(backgroundColor, 1);
+        background.lineStyle(1, borderColor, 1);
+        background.drawRect(0, 0, width, height);
+        background.endFill();
+
+        // Прямоугольная шапка сверху, цвет рамки
+        const header = new PIXI.Graphics();
+        header.beginFill(borderColor, 1);
+        header.drawRect(0, 0, width, 8);
+        header.endFill();
+
+        // Текст записки, выровнен как в NoteObject (центр по X, отступ сверху)
         const noteText = new PIXI.Text(content, {
             fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
             fontSize: fontSize,
-            fill: 0x1A1A1A, // Темный цвет как в NoteObject
+            fill: textColor,
             align: 'center',
             wordWrap: true,
-            wordWrapWidth: width - 16, // Отступы по 8px с каждой стороны
+            wordWrapWidth: width - 16,
             lineHeight: fontSize * 1.2
         });
-        
-        // Центрируем текст в записке
-        noteText.x = (width - noteText.width) / 2;
-        noteText.y = (height - noteText.height) / 2;
-        
-        // Добавляем элементы в правильном порядке
+        noteText.anchor.set(0.5, 0);
+        noteText.x = Math.round(width / 2);
+        noteText.y = 20; // как в NoteObject topMargin
+
+        // Порядок добавления: тень → фон → шапка → текст
         this.ghostContainer.addChild(shadow);
         this.ghostContainer.addChild(background);
+        this.ghostContainer.addChild(header);
         this.ghostContainer.addChild(noteText);
         
         // Центрируем контейнер относительно курсора
