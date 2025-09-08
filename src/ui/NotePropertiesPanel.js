@@ -158,17 +158,20 @@ export class NotePropertiesPanel {
         const { x, y } = posData.position;
         const { width, height } = sizeData.size;
 
-        // Позиционируем панель справа от записки
-        const panelX = x + width + 10;
-        const panelY = y;
+        // Позиционируем панель над запиской, по центру
+        const panelRect = this.panel.getBoundingClientRect();
+        const panelW = Math.max(1, panelRect.width || 320);
+        const panelH = Math.max(1, panelRect.height || 40);
+        const panelX = x + (width / 2) - (panelW / 2);
+        const panelY = Math.max(0, y - panelH - 8); // отступ 8px над запиской
         
         console.log('📝 NotePropertiesPanel: Positioning next to note:', { 
             noteX: x, noteY: y, noteWidth: width, noteHeight: height,
             panelX, panelY
         });
 
-        this.panel.style.left = `${panelX}px`;
-        this.panel.style.top = `${panelY}px`;
+        this.panel.style.left = `${Math.round(panelX)}px`;
+        this.panel.style.top = `${Math.round(panelY)}px`;
     }
 
     _createNoteControls(panel) {
