@@ -145,9 +145,11 @@ export class PlacementTool extends BaseTool {
         if (!this.pending) return;
 
         const worldPoint = this._toWorld(event.x, event.y);
-        const halfW = (this.pending.size?.width ?? 100) / 2;
-        const halfH = (this.pending.size?.height ?? 100) / 2;
-        const position = { x: Math.round(worldPoint.x - halfW), y: Math.round(worldPoint.y - halfH) };
+        // Базовая позиция (может быть переопределена для конкретных типов)
+        let position = {
+            x: Math.round(worldPoint.x - (this.pending.size?.width ?? 100) / 2),
+            y: Math.round(worldPoint.y - (this.pending.size?.height ?? 100) / 2)
+        };
 
         const props = this.pending.properties || {};
         const isTextWithEditing = this.pending.type === 'text' && props.editOnCreate;
@@ -159,6 +161,15 @@ export class PlacementTool extends BaseTool {
         };
 
         if (isTextWithEditing) {
+            // Для текста используем те же размеры, что и у "призрака",
+            // чтобы позиция совпадала пиксель-в-пиксель
+            const fontSize = props.fontSize || 18;
+            const ghostWidth = 120;
+            const ghostHeight = fontSize + 20;
+            position = {
+                x: Math.round(worldPoint.x - ghostWidth / 2),
+                y: Math.round(worldPoint.y - ghostHeight / 2)
+            };
             // Слушаем событие создания объекта, чтобы получить его ID
             const handleObjectCreated = (objectData) => {
                 if (objectData.type === 'text') {
