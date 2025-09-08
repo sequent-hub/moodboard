@@ -85,6 +85,7 @@ export class Toolbar {
         this.createShapesPopup();
         this.createDrawPopup();
         this.createEmojiPopup();
+        this.createFramePopup();
 
         // Подсветка активной кнопки на тулбаре по активному инструменту
         this.eventBus.on(Events.Tool.Activated, ({ tool }) => {
@@ -93,6 +94,143 @@ export class Toolbar {
 
         // Текущее состояние попапа рисования
         this.currentDrawTool = 'pencil';
+    }
+
+    createFramePopup() {
+        this.framePopupEl = document.createElement('div');
+        Object.assign(this.framePopupEl.style, {
+            position: 'absolute',
+            display: 'none',
+            padding: '6px',
+            background: 'white',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.08)',
+            zIndex: 1000,
+            boxSizing: 'border-box',
+            width: '160px',
+            height: '160px',
+            gap: '6px',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gridTemplateRows: 'repeat(2, 1fr)'
+        });
+
+        const makeBtn = (label, id, enabled, aspect) => {
+            const btn = document.createElement('button');
+            Object.assign(btn.style, {
+                padding: '4px',
+                borderRadius: '6px',
+                border: 'none',
+                background: 'transparent',
+                color: enabled ? '#111827' : '#9ca3af',
+                cursor: enabled ? 'pointer' : 'not-allowed',
+                fontSize: '12px',
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxSizing: 'border-box',
+                overflow: 'hidden'
+            });
+            btn.dataset.id = id;
+            // Внутри кнопки — превью с нужными пропорциями и подпись
+            const holder = document.createElement('div');
+            Object.assign(holder.style, {
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                boxSizing: 'border-box'
+            });
+            const preview = document.createElement('div');
+            Object.assign(preview.style, {
+                background: '#e5e7eb',
+                border: 'none',
+                borderRadius: '4px',
+                aspectRatio: aspect || '1 / 1',
+                height: '60%',
+                maxWidth: '100%'
+            });
+            const caption = document.createElement('div');
+            caption.textContent = label;
+            Object.assign(caption.style, {
+                fontSize: '12px',
+                lineHeight: '14px',
+                color: enabled ? '#111827' : '#9ca3af'
+            });
+            holder.appendChild(preview);
+            holder.appendChild(caption);
+            btn.appendChild(holder);
+            if (enabled) {
+                // Hover background only for enabled buttons
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.background = '#f3f4f6';
+                });
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.background = 'transparent';
+                });
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    // Активируем place, устанавливаем pending для frame (А4)
+                    this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                    this.placeSelectedButtonId = 'frame';
+                    this.setActiveToolbarButton('place');
+                    // А4: 210x297 (масштабируем до удобных px — 210*1, 297*1)
+                    this.eventBus.emit(Events.Place.Set, {
+                        type: 'frame',
+                        properties: {
+                            width: 210,
+                            height: 297,
+                            borderColor: 0x333333,
+                            fillColor: 0xFFFFFF,
+                            title: 'A4'
+                        }
+                    });
+                    this.closeFramePopup();
+                });
+            }
+            this.framePopupEl.appendChild(btn);
+        };
+
+        makeBtn('A4', 'a4', true, '210 / 297');
+        makeBtn('1:1', '1x1', false, '1 / 1');
+        makeBtn('4:3', '4x3', false, '4 / 3');
+        makeBtn('16:9', '16x9', false, '16 / 9');
+
+        this.container.appendChild(this.framePopupEl);
+    }
+
+    toggleFramePopup(anchorBtn) {
+        if (!this.framePopupEl) return;
+        const visible = this.framePopupEl.style.display !== 'none';
+        if (visible) {
+            this.closeFramePopup();
+            return;
+        }
+        const buttonRect = anchorBtn.getBoundingClientRect();
+        const toolbarRect = this.container.getBoundingClientRect();
+        // Сначала показываем невидимо, чтобы измерить размеры
+        this.framePopupEl.style.display = 'grid';
+        this.framePopupEl.style.visibility = 'hidden';
+        const panelW = this.framePopupEl.offsetWidth || 120;
+        const panelH = this.framePopupEl.offsetHeight || 120;
+        // Горизонтально: как у панели фигур — от правого края тулбара + 8px
+        const targetLeft = this.element.offsetWidth + 8;
+        // Вертикально: центр панели на уровне центра кнопки, с тем же лёгким смещением -4px как у фигур
+        const btnCenterY = buttonRect.top + buttonRect.height / 2;
+        const targetTop = Math.max(0, Math.round(btnCenterY - toolbarRect.top - panelH / 2 - 4));
+        this.framePopupEl.style.left = `${Math.round(targetLeft)}px`;
+        this.framePopupEl.style.top = `${targetTop}px`;
+        // Делаем видимой
+        this.framePopupEl.style.visibility = '';
+    }
+
+    closeFramePopup() {
+        if (this.framePopupEl) this.framePopupEl.style.display = 'none';
     }
     
     /**
@@ -316,27 +454,17 @@ export class Toolbar {
                 return;
             }
 
-            // Добавление фрейма: включаем placement и ждём клика для выбора позиции
+            // Фрейм: показываем всплывающую панель с пресетами
             if (toolType === 'frame') {
                 this.animateButton(button);
+                this.toggleFramePopup(button);
                 this.closeShapesPopup();
                 this.closeDrawPopup();
                 this.closeEmojiPopup();
-                // Активируем place, устанавливаем pending для frame
+                // Активируем place и подсвечиваем кнопку Frame
                 this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
                 this.placeSelectedButtonId = 'frame';
                 this.setActiveToolbarButton('place');
-                // Устанавливаем свойства фрейма по умолчанию
-                this.eventBus.emit(Events.Place.Set, { 
-                    type: 'frame', 
-                    properties: { 
-                        width: 200,
-                        height: 300,
-                        borderColor: 0x333333,
-                        fillColor: 0xFFFFFF,
-                        title: 'Новый' // Название по умолчанию
-                    }
-                });
                 return;
             }
 
@@ -447,13 +575,16 @@ export class Toolbar {
             const isInsideShapesPopup = this.shapesPopupEl && this.shapesPopupEl.contains(e.target);
             const isInsideDrawPopup = this.drawPopupEl && this.drawPopupEl.contains(e.target);
             const isInsideEmojiPopup = this.emojiPopupEl && this.emojiPopupEl.contains(e.target);
+            const isInsideFramePopup = this.framePopupEl && this.framePopupEl.contains(e.target);
             const isShapesButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--shapes');
             const isDrawButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--pencil');
             const isEmojiButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--emoji');
-            if (!isInsideToolbar && !isInsideShapesPopup && !isShapesButton && !isInsideDrawPopup && !isDrawButton && !isInsideEmojiPopup && !isEmojiButton) {
+            const isFrameButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--frame');
+            if (!isInsideToolbar && !isInsideShapesPopup && !isShapesButton && !isInsideDrawPopup && !isDrawButton && !isInsideEmojiPopup && !isEmojiButton && !isInsideFramePopup && !isFrameButton) {
                 this.closeShapesPopup();
                 this.closeDrawPopup();
                 this.closeEmojiPopup();
+                this.closeFramePopup();
             }
         });
     }
