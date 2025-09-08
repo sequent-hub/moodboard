@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тестовый холст MoodBoard</title>
+    <link rel="stylesheet" href="./src/ui/styles/workspace.css">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            background: #f7fbff;
+        }
+        #app {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+    </style>
+ </head>
+<body>
+    <div id="app"></div>
+
+    <script type="module">
+        import { MoodBoard } from './src/index.js';
+
+        const container = document.getElementById('app');
+
+        // Инициализация холста без бекенда и сохранения
+        const moodboard = new MoodBoard(container, {
+            theme: 'light'
+        });
+
+        // Экспорт для отладки в консоли
+        window.moodboard = moodboard;
+    </script>
+</body>
+</html>
+
+
