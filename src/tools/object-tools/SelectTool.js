@@ -1562,7 +1562,7 @@ export class SelectTool extends BaseTool {
             left: '0px',
             top: '0px',
             border: 'none',
-            padding: '6px 8px', // Увеличиваем отступы для лучшего отображения
+            padding: '0',
             fontSize: `${fontSize}px`,
             fontFamily: 'Arial, sans-serif',
             lineHeight: '1.2',
@@ -1758,14 +1758,14 @@ export class SelectTool extends BaseTool {
             textarea.style.height = 'auto';
 
             // Желаемая ширина: не уже минимальной и не шире максимальной авто-ширины
-            const naturalW = textarea.scrollWidth + 8;
+            const naturalW = textarea.scrollWidth + 1;
             const targetW = Math.min(MAX_AUTO_WIDTH, Math.max(minWBound, naturalW));
             textarea.style.width = `${targetW}px`;
             wrapper.style.width = `${targetW}px`;
 
             // Высота по содержимому при установленной ширине
             textarea.style.height = 'auto';
-            const targetH = Math.max(minHBound, textarea.scrollHeight + 2);
+            const targetH = Math.max(minHBound, textarea.scrollHeight + 1);
             textarea.style.height = `${targetH}px`;
             wrapper.style.height = `${targetH}px`;
         };
