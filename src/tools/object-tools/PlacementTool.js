@@ -699,10 +699,9 @@ export class PlacementTool extends BaseTool {
         shadow.y = 3;
         shadow.alpha = 0.18;
 
-        // Основной фон записки (прямоугольник + рамка)
+        // Основной фон записки (прямоугольник без рамки)
         const background = new PIXI.Graphics();
         background.beginFill(backgroundColor, 1);
-        background.lineStyle(1, borderColor, 1);
         background.drawRect(0, 0, width, height);
         background.endFill();
 

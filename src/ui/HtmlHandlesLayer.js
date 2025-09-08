@@ -122,16 +122,16 @@ export class HtmlHandlesLayer {
         const worldX = world?.x || 0;
         const worldY = world?.y || 0;
         
-        // Вычисляем позицию и размер в CSS координатах
+        // Вычисляем позицию и размер в CSS координатах, округляем до целых px
         const cssX = offsetLeft + (worldX + worldBounds.x * worldScale) / res;
         const cssY = offsetTop + (worldY + worldBounds.y * worldScale) / res;
         const cssWidth = Math.max(1, (worldBounds.width * worldScale) / res);
         const cssHeight = Math.max(1, (worldBounds.height * worldScale) / res);
-        
-        const left = cssX;
-        const top = cssY;
-        const width = cssWidth;
-        const height = cssHeight;
+
+        const left = Math.round(cssX);
+        const top = Math.round(cssY);
+        const width = Math.round(cssWidth);
+        const height = Math.round(cssHeight);
 
         this.layer.innerHTML = '';
         const box = document.createElement('div');
@@ -148,7 +148,7 @@ export class HtmlHandlesLayer {
         Object.assign(box.style, {
             position: 'absolute', left: `${left}px`, top: `${top}px`,
             width: `${width}px`, height: `${height}px`,
-            border: '1px solid #1DE9B6', boxSizing: 'border-box', pointerEvents: 'none',
+            border: '1px solid #1DE9B6', boxSizing: 'content-box', pointerEvents: 'none',
             transformOrigin: 'center center', // Поворот вокруг центра
             transform: `rotate(${rotation}deg)` // Применяем поворот
         });
@@ -200,7 +200,7 @@ export class HtmlHandlesLayer {
             box.appendChild(h);
         };
 
-        const x0 = 0, y0 = 0, x1 = width, y1 = height, cx = width / 2, cy = height / 2;
+        const x0 = 0, y0 = 0, x1 = width, y1 = height, cx = Math.round(width / 2), cy = Math.round(height / 2);
         mkCorner('nw', x0, y0, 'nwse-resize');
         mkCorner('ne', x1, y0, 'nesw-resize');
         mkCorner('se', x1, y1, 'nwse-resize');

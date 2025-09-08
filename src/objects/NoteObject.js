@@ -193,9 +193,8 @@ export class NoteObject {
             // Если есть фильтр Blur, он уже применён в конструкторе
         }
         
-        // Основной фон записки (прямоугольный без скруглений)
+        // Основной фон записки (прямоугольный без скруглений, без рамки)
         g.beginFill(this.backgroundColor, 1);
-        g.lineStyle(1, this.borderColor, 1);
         g.drawRect(0, 0, w, h);
         g.endFill();
         
