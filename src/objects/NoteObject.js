@@ -205,6 +205,9 @@ export class NoteObject {
         g.endFill();
         
         // Линии внутри записки убраны по требованию дизайна
+
+        // pivot контейнера строго по центру, чтобы ядро корректно вычисляло левый-верх
+        this.container.pivot.set(w / 2, h / 2);
         
         // Устанавливаем hit area для контейнера
         this.container.hitArea = new PIXI.Rectangle(0, 0, w, h);

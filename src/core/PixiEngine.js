@@ -106,6 +106,13 @@ export class PixiEngine {
                     pixiObject.x += pivotX;
                     pixiObject.y += pivotY;
                 }
+            } else if (pixiObject && pixiObject.pivot && (pixiObject.pivot.x !== 0 || pixiObject.pivot.y !== 0)) {
+                // Общий случай: если инстанс вернул Container с уже установленным pivot — компенсируем смещение
+                const needsCompensation = !objectData.transform || !objectData.transform.pivotCompensated;
+                if (needsCompensation) {
+                    pixiObject.x += pixiObject.pivot.x;
+                    pixiObject.y += pixiObject.pivot.y;
+                }
             }
             
             // Применяем поворот из сохраненного состояния

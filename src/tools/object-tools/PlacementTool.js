@@ -151,7 +151,7 @@ export class PlacementTool extends BaseTool {
             y: Math.round(worldPoint.y - (this.pending.size?.height ?? 100) / 2)
         };
 
-        const props = this.pending.properties || {};
+        let props = this.pending.properties || {};
         const isTextWithEditing = this.pending.type === 'text' && props.editOnCreate;
         const isImage = this.pending.type === 'image';
         const isFile = this.pending.type === 'file';
@@ -325,6 +325,16 @@ export class PlacementTool extends BaseTool {
             }, { once: true });
             input.click();
         } else {
+            // Для записки: выставляем фактические габариты и центрируем по курсору
+            if (this.pending.type === 'note') {
+                const noteW = (typeof props.width === 'number') ? props.width : 160;
+                const noteH = (typeof props.height === 'number') ? props.height : 100;
+                props = { ...props, width: noteW, height: noteH };
+                position = {
+                    x: Math.round(worldPoint.x - noteW / 2),
+                    y: Math.round(worldPoint.y - noteH / 2)
+                };
+            }
             // Обычное размещение через общий канал
             this.eventBus.emit(Events.UI.ToolbarAction, {
                 type: this.pending.type,
