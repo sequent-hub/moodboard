@@ -58,17 +58,18 @@ export class ShapeObject {
     /** Перерисовать с сохранением трансформаций */
     _redrawPreserveTransform(width, height, color, kind, cornerRadius) {
         const g = this.graphics;
-        const x = g.x;
-        const y = g.y;
+        // Сохраняем текущий центр и поворот
+        const centerX = g.x;
+        const centerY = g.y;
         const rot = g.rotation || 0;
-        const pivotX = g.pivot?.x || 0;
-        const pivotY = g.pivot?.y || 0;
 
         this._draw(width, height, color, kind, cornerRadius);
-
-        g.pivot.set(pivotX, pivotY);
-        g.x = x;
-        g.y = y;
+        // ВАЖНО: для согласованности с ядром (позиция — левый-верх, PIXI — центр)
+        // pivot должен всегда быть в центре объекта (w/2, h/2)
+        g.pivot.set(width / 2, height / 2);
+        // Восстанавливаем центр
+        g.x = centerX;
+        g.y = centerY;
         g.rotation = rot;
     }
 

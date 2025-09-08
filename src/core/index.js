@@ -733,6 +733,13 @@ export class CoreMoodBoard {
             const object = objects.find(obj => obj.id === data.object);
             if (object) {
                 this.resizeStartSize = { width: object.width, height: object.height };
+                // Сохраняем контекст активного ресайза для расчёта позиции, если она не будет передана
+                this._activeResize = {
+                    objectId: data.object,
+                    handle: data.handle,
+                    startSize: { width: object.width, height: object.height },
+                    startPosition: { x: object.position.x, y: object.position.y }
+                };
             }
         });
 
@@ -814,8 +821,25 @@ export class CoreMoodBoard {
             const objects = this.state.getObjects();
             const object = objects.find(obj => obj.id === data.object);
             const objectType = object ? object.type : null;
-            
-            this.updateObjectSizeAndPositionDirect(data.object, data.size, data.position, objectType);
+
+            // Если позиция не пришла из UI, вычислим её из контекста активной ручки
+            let position = data.position;
+            if (!position && this._activeResize && this._activeResize.objectId === data.object) {
+                const h = (this._activeResize.handle || '').toLowerCase();
+                const start = this._activeResize.startPosition;
+                const startSize = this._activeResize.startSize;
+                const dw = (data.size?.width || startSize.width) - startSize.width;
+                const dh = (data.size?.height || startSize.height) - startSize.height;
+                let nx = start.x;
+                let ny = start.y;
+                // Для левых/верхних ручек смещаем топ-лев на полную величину изменения
+                if (h.includes('w')) nx = start.x + dw;
+                if (h.includes('n')) ny = start.y + dh;
+                // Для правых/нижних ручек топ-лев остаётся стартовым (nx, ny уже равны start)
+                position = { x: nx, y: ny };
+            }
+
+            this.updateObjectSizeAndPositionDirect(data.object, data.size, position, objectType);
         });
 
         this.eventBus.on(Events.Tool.ResizeEnd, (data) => {
@@ -833,19 +857,33 @@ export class CoreMoodBoard {
                         newPosition: data.newPosition
                     });
                     
+                    // Гарантируем согласованность позиции: если UI не передал, вычислим
+                    let oldPos = data.oldPosition;
+                    let newPos = data.newPosition;
+                    if ((!oldPos || !newPos) && this._activeResize && this._activeResize.objectId === data.object) {
+                        const h = (this._activeResize.handle || '').toLowerCase();
+                        const start = this._activeResize.startPosition;
+                        const startSize = this._activeResize.startSize;
+                        const dw = (data.newSize?.width || startSize.width) - startSize.width;
+                        const dh = (data.newSize?.height || startSize.height) - startSize.height;
+                        const calcNew = { x: start.x + (h.includes('w') ? dw : 0), y: start.y + (h.includes('n') ? dh : 0) };
+                        if (!oldPos) oldPos = { x: start.x, y: start.y };
+                        if (!newPos) newPos = calcNew;
+                    }
                     const command = new ResizeObjectCommand(
                         this, 
                         data.object, 
                         data.oldSize, 
                         data.newSize,
-                        data.oldPosition,
-                        data.newPosition
+                        oldPos,
+                        newPos
                     );
                     command.setEventBus(this.eventBus);
                     this.history.executeCommand(command);
                 }
             }
             this.resizeStartSize = null;
+            this._activeResize = null;
         });
 
         // === ОБРАБОТЧИКИ СОБЫТИЙ ВРАЩЕНИЯ ===
