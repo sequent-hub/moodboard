@@ -1828,6 +1828,7 @@ export class SelectTool extends BaseTool {
             // handles.forEach(h => h.addEventListener('mousedown', onHandleDown));
         }
         // Завершение
+        const isNewCreation = !!create;
         const finalize = (commit) => {
             console.log('🔧 SelectTool: finalize called with commit:', commit, 'objectId:', objectId, 'objectType:', this.textEditor.objectType);
             const value = textarea.value.trim();
@@ -1837,8 +1838,8 @@ export class SelectTool extends BaseTool {
             const currentObjectType = this.textEditor.objectType;
             console.log('🔧 SelectTool: finalize - saved objectType:', currentObjectType);
             
-            // Показываем статичный текст после завершения редактирования для всех типов объектов
-            if (objectId) {
+            // Показываем статичный текст только если не отменяем создание нового пустого
+            if (objectId && (commitValue || !isNewCreation)) {
                 // Проверяем, что HTML-элемент существует перед попыткой показать текст
                 if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
                     const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
@@ -1856,6 +1857,10 @@ export class SelectTool extends BaseTool {
             this.textEditor = { active: false, objectId: null, textarea: null, wrapper: null, world: null, position: null, properties: null, objectType: 'text' };
             this.eventBus.emit(Events.UI.TextEditEnd, { objectId: objectId || null });
             if (!commitValue) {
+                // Если это было создание нового текста и оно отменено — удаляем пустой объект
+                if (isNewCreation && objectId) {
+                    this.eventBus.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
+                }
                 console.log('🔧 SelectTool: finalize - no commit, returning');
                 return;
             }
@@ -1905,12 +1910,10 @@ export class SelectTool extends BaseTool {
             }
         };
         textarea.addEventListener('blur', (e) => {
-            // Не закрываем новый пустой текст по потере фокуса — чтобы поле не исчезало сразу
-            const isNew = objectId == null;
             const value = (textarea.value || '').trim();
-            if (isNew && value.length === 0) {
-                // Вернём фокус обратно, чтобы пользователь мог ввести текст
-                setTimeout(() => textarea.focus(), 0);
+            if (isNewCreation && value.length === 0) {
+                // Клик вне поля при пустом значении — отменяем и удаляем созданный объект
+                finalize(false);
                 return;
             }
             finalize(true);
