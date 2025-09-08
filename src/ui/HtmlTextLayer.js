@@ -246,6 +246,8 @@ export class HtmlTextLayer {
         const sCss = s / res;
         const fontSizePx = Math.max(1, baseFS * sObj * sCss);
         el.style.fontSize = `${fontSizePx}px`;
+        // Синхронизируем межстрочный интервал с режимом редактирования
+        el.style.lineHeight = `${fontSizePx}px`;
 
         // Позиция и габариты в экранных координатах
         const left = (tx + s * x) / res;

@@ -1565,22 +1565,24 @@ export class SelectTool extends BaseTool {
             padding: '0',
             fontSize: `${fontSize}px`,
             fontFamily: 'Arial, sans-serif',
-            lineHeight: '1.2',
+            lineHeight: `${fontSize}px`,
             color: '#111', // Для записок делаем текст черным для лучшей видимости
             background: 'white',
             outline: 'none',
             resize: 'none',
             minWidth: '240px', // Для заметок уменьшаем минимальную ширину
-            minHeight: '28px', // Для заметок уменьшаем минимальную высоту
+            minHeight: `${fontSize}px`,
             width: '280px', // Для заметок уменьшаем начальную ширину
-            height: '36px', // Для заметок уменьшаем начальную высоту
-            boxSizing: 'border-box',
+            height: `${fontSize}px`,
+            boxSizing: 'content-box',
+            overflow: 'hidden',
             // Повыше чёткость текста в CSS
             WebkitFontSmoothing: 'antialiased',
             MozOsxFontSmoothing: 'grayscale',
             // Улучшенное перенесение слов, как в Miro
             overflowWrap: 'anywhere',
             wordBreak: 'break-word',
+            margin: '0',
         });
         
         wrapper.appendChild(textarea);
@@ -1730,8 +1732,22 @@ export class SelectTool extends BaseTool {
         const initialHpx = initialSize ? Math.max(1, (initialSize.height || 0) * s / viewRes) : null;
         
         // Определяем минимальные границы для всех типов объектов
-        let minWBound = initialWpx || 120; // Минимальная ширина близка к призраку текста
-        let minHBound = 28;
+        let minWBound = initialWpx || 120; // базово близко к призраку
+        let minHBound = fontSize; // высота по шрифту, чтобы не было пустого пространства
+
+        // Если создаём новый текст — выставляем стартовый размер, как у призрака, но чуть шире
+        if (create && !isNote) {
+            const ghostWidth = 120;
+            const startWidth = Math.round(ghostWidth * 1.33); // чуть длиннее призрака (~160px)
+            const startHeight = fontSize; // высота равна высоте шрифта
+            textarea.style.width = `${startWidth}px`;
+            textarea.style.height = `${startHeight}px`;
+            wrapper.style.width = `${startWidth}px`;
+            wrapper.style.height = `${startHeight}px`;
+            // Зафиксируем минимальные границы, чтобы авторазмер не схлопывал пустое поле
+            minWBound = startWidth;
+            minHBound = startHeight;
+        }
         
         // Для записок размеры уже установлены выше, пропускаем эту логику
         if (!isNote) {
@@ -1765,7 +1781,16 @@ export class SelectTool extends BaseTool {
 
             // Высота по содержимому при установленной ширине
             textarea.style.height = 'auto';
-            const targetH = Math.max(minHBound, textarea.scrollHeight + 1);
+            // Коррекция высоты: для одной строки принудительно равна line-height,
+            // для нескольких строк используем scrollHeight с небольшим вычетом браузерного запаса
+            const adjust = 2;
+            const computed = (typeof window !== 'undefined') ? window.getComputedStyle(textarea) : null;
+            const lineH = computed ? parseFloat(computed.lineHeight) : (fontSize || 18);
+            const rawH = textarea.scrollHeight;
+            const lines = lineH > 0 ? Math.max(1, Math.round(rawH / lineH)) : 1;
+            const targetH = lines <= 1
+                ? lineH
+                : Math.max(minHBound, Math.max(1, rawH - adjust));
             textarea.style.height = `${targetH}px`;
             wrapper.style.height = `${targetH}px`;
         };
