@@ -73,15 +73,24 @@ export class DrawingObject {
 
     _redrawPreserveTransform(points) {
         const g = this.graphics;
-        const x = g.x;
-        const y = g.y;
+        // Сохраняем текущий центр и поворот
+        const centerX = g.x;
+        const centerY = g.y;
         const rot = g.rotation || 0;
-        const pivotX = g.pivot?.x || 0;
-        const pivotY = g.pivot?.y || 0;
+
+        // Перерисовываем геометрию
         this._draw(points, this.color, this.strokeWidth, this.mode);
-        g.pivot.set(pivotX, pivotY);
-        g.x = x;
-        g.y = y;
+
+        // После перерисовки выставляем pivot по центру новой геометрии,
+        // чтобы ядро корректно сопоставляло левый-верх и центр при ресайзе
+        const b = g.getBounds();
+        const pX = Math.max(0, b.width / 2);
+        const pY = Math.max(0, b.height / 2);
+        g.pivot.set(pX, pY);
+
+        // Восстанавливаем центр и поворот
+        g.x = centerX;
+        g.y = centerY;
         g.rotation = rot;
     }
 
