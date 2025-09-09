@@ -423,7 +423,7 @@ export class PlacementTool extends BaseTool {
                 type: 'frame',
                 id: 'frame',
                 position: { x, y },
-                properties: { width: Math.round(w), height: Math.round(h), title: 'Произвольный' }
+                properties: { width: Math.round(w), height: Math.round(h), title: 'Произвольный', lockedAspect: false, isArbitrary: true }
             });
         }
         // Сбрасываем pending и выходим из режима place → select

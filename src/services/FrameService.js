@@ -7,7 +7,67 @@ export class FrameService {
 		this.state = state;
 	}
 
+	_forceFramesBelow() {
+		const world = this.pixi?.worldLayer || this.pixi?.app?.stage;
+		if (world) world.sortableChildren = true;
+		let z = 0;
+		for (const o of this.state.state.objects || []) {
+			const pix = this.pixi.objects.get(o.id);
+			if (!pix) continue;
+			if (o.type === 'frame') {
+				pix.zIndex = -100000;
+			} else {
+				pix.zIndex = z++;
+			}
+		}
+	}
+
+	_attachIntersectingObjectsToFrame(frameId) {
+		const framePixi = this.pixi.objects.get(frameId);
+		if (!framePixi || !framePixi.getBounds) return false;
+		const fb = framePixi.getBounds();
+		const frameRect = { x: fb.x, y: fb.y, w: fb.width, h: fb.height };
+		let changed = false;
+		for (const obj of this.state.state.objects || []) {
+			if (!obj || obj.id === frameId) continue;
+			if (obj.type === 'frame') continue;
+			const pix = this.pixi.objects.get(obj.id);
+			if (!pix || !pix.getBounds) continue;
+			const ob = pix.getBounds();
+			const objRect = { x: ob.x, y: ob.y, w: ob.width, h: ob.height };
+			// Пересечение прямоугольников (экраные координаты PIXI)
+			const intersects = !(objRect.x > frameRect.x + frameRect.w ||
+				(objRect.x + objRect.w) < frameRect.x ||
+				objRect.y > frameRect.y + frameRect.h ||
+				(objRect.y + objRect.h) < frameRect.y);
+			if (intersects) {
+				obj.properties = obj.properties || {};
+				obj.properties.frameId = frameId;
+				changed = true;
+			}
+		}
+		return changed;
+	}
+
 	attach() {
+		// Автоприкрепление объектов при создании произвольного фрейма
+		this.eventBus.on(Events.Object.Created, ({ objectId, objectData }) => {
+			try {
+				if (!objectData || objectData.type !== 'frame') return;
+				const isArbitrary = (objectData.properties && objectData.properties.lockedAspect === false)
+					|| (objectData.properties && objectData.properties.title === 'Произвольный')
+					|| (objectData.properties && objectData.properties.isArbitrary === true);
+				if (!isArbitrary) return;
+				// Используем фактические bounds PIXI для надёжной проверки попадания
+				const changed = this._attachIntersectingObjectsToFrame(objectId);
+				if (changed) this.state.markDirty();
+				// Принудительно держим фреймы под объектами
+				this._forceFramesBelow();
+				// И оповестим общий менеджер на всякий случай
+				this.eventBus.emit(Events.Object.Reordered, { reason: 'attach_arbitrary_frame_children' });
+			} catch (_) { /* no-op */ }
+		});
+
 		// Визуал подсветки при drag над фреймом и перенос детей на drag
 		this.eventBus.on(Events.Tool.DragStart, (data) => {
 			const moved = this.state.state.objects.find(o => o.id === data.object);
@@ -40,9 +100,7 @@ export class FrameService {
 					let startPos = this._frameDragChildStart?.get(childId);
 					const childPixi = this.pixi.objects.get(childId);
 					if (!startPos) {
-						// Ребёнок мог появиться после начала drag (например, при копировании фрейма)
-						// Запомним его старт как (текущая позиция - уже пройденный сдвиг фрейма),
-						// чтобы не было скачка и далее двигался синхронно
+						// Ребёнок мог появиться после начала drag
 						if (childPixi) {
 							startPos = { x: childPixi.x - dx, y: childPixi.y - dy };
 							this._frameDragChildStart = this._frameDragChildStart || new Map();
@@ -51,7 +109,6 @@ export class FrameService {
 							continue;
 						}
 					}
-					// Применяем позицию = старт + текущий dx/dy (в координатах центра PIXI)
 					const newCenterX = startPos.x + dx;
 					const newCenterY = startPos.y + dy;
 					if (childPixi) { childPixi.x = newCenterX; childPixi.y = newCenterY; }
@@ -63,6 +120,8 @@ export class FrameService {
 						stObj.position.y = newCenterY - halfH;
 					}
 				}
+				// Во время перетаскивания тоже гарантируем порядок
+				this._forceFramesBelow();
 			} else {
 				// Hover-эффект: подсветка фрейма, если центр объекта внутри
 				const centerX = moved.position.x + (moved.width || 0) / 2;
@@ -81,12 +140,10 @@ export class FrameService {
 					}
 				}
 				if (hoverId !== this._frameHoverId) {
-					// Снять подсветку с предыдущего
 					if (this._frameHoverId) {
 						const prev = frames.find(fr => fr.id === this._frameHoverId);
 						if (prev) this.pixi.setFrameFill(prev.id, prev.width, prev.height, 0xFFFFFF);
 					}
-					// Включить подсветку нового
 					if (hoverId) {
 						const cur = frames.find(fr => fr.id === hoverId);
 						if (cur) this.pixi.setFrameFill(cur.id, cur.width, cur.height, 0xEEEEEE);
@@ -99,14 +156,11 @@ export class FrameService {
 		this.eventBus.on(Events.Tool.DragEnd, (data) => {
 			const movedObj = this.state.state.objects.find(o => o.id === data.object);
 			if (!movedObj) return;
-			// Сброс заливки
 			if (movedObj.type === 'frame') {
 				this.pixi.setFrameFill(movedObj.id, movedObj.width, movedObj.height, 0xFFFFFF);
 			}
-
-			// Автопривязка/отвязка объекта к фрейму после перемещения
 			this._recomputeFrameAttachment(movedObj.id);
-			// Сброс временных структур и hover-подсветки
+			this._forceFramesBelow();
 			this._frameDragFrameStart = null;
 			this._frameDragChildStart = null;
 			if (this._frameHoverId) {
@@ -130,7 +184,7 @@ export class FrameService {
 	_recomputeFrameAttachment(objectId) {
 		const obj = (this.state.state.objects || []).find(o => o.id === objectId);
 		if (!obj) return;
-		if (obj.type === 'frame') return; // фрейм к фрейму не крепим
+		if (obj.type === 'frame') return;
 		const center = {
 			x: obj.position.x + (obj.width || 0) / 2,
 			y: obj.position.y + (obj.height || 0) / 2
@@ -153,6 +207,8 @@ export class FrameService {
 			obj.properties = obj.properties || {};
 			obj.properties.frameId = newFrameId || undefined;
 			this.state.markDirty();
+			this._forceFramesBelow();
+			this.eventBus.emit(Events.Object.Reordered, { reason: 'recompute_frame_attachment' });
 		}
 	}
 }
