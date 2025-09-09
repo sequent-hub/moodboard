@@ -151,7 +151,8 @@ export class Toolbar {
                                 borderColor: 0x333333,
                                 fillColor: 0xFFFFFF,
                                 title: titleText,
-                                lockedAspect: true
+                                lockedAspect: true,
+                                type: id
                             }
                         });
                     }

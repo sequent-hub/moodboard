@@ -322,11 +322,7 @@ export class FramePropertiesPanel {
         typeSelect.addEventListener('change', () => {
             if (!this.currentId) return;
             const v = typeSelect.value;
-            // Обновляем properties.type у фрейма
-            this.eventBus.emit(Events.Object.StateChanged, {
-                objectId: this.currentId,
-                updates: { properties: { type: v } }
-            });
+            this._applyFrameType(v);
         });
 
         typeContainer.appendChild(typeLabel);
@@ -510,6 +506,76 @@ export class FramePropertiesPanel {
         const objectData = this.core.getObjectData(this.currentId);
         const t = (objectData && objectData.properties && objectData.properties.type) || 'custom';
         this.frameTypeSelect.value = t;
+    }
+
+    _applyFrameType(typeValue) {
+        if (!this.currentId) return;
+
+        // 1) Обновляем тип и флаг фиксированных пропорций
+        const lockedAspect = typeValue !== 'custom';
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: { properties: { type: typeValue, lockedAspect } }
+        });
+
+        // 2) Для пресетов меняем размеры под аспект, сохраняя центр
+        if (!lockedAspect) return; // Произвольный: без изменения размеров
+
+        // Аспект по типу
+        const aspectMap = {
+            'a4': 210 / 297,
+            '1x1': 1,
+            '4x3': 4 / 3,
+            '16x9': 16 / 9
+        };
+        const aspect = aspectMap[typeValue] || 1;
+
+        // Текущие позиция и размер
+        const posData = { objectId: this.currentId, position: null };
+        const sizeData = { objectId: this.currentId, size: null };
+        this.eventBus.emit(Events.Tool.GetObjectPosition, posData);
+        this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+        if (!posData.position || !sizeData.size) return;
+
+        const oldX = posData.position.x;
+        const oldY = posData.position.y;
+        const oldW = Math.max(1, sizeData.size.width);
+        const oldH = Math.max(1, sizeData.size.height);
+        const cx = oldX + oldW / 2;
+        const cy = oldY + oldH / 2;
+
+        // Вариант 1: менять ширину под текущую высоту
+        const w1 = Math.round(oldH * aspect);
+        const h1 = oldH;
+        const changeW = Math.abs(w1 - oldW) / oldW;
+        // Вариант 2: менять высоту под текущую ширину
+        const h2 = Math.round(oldW / aspect);
+        const w2 = oldW;
+        const changeH = Math.abs(h2 - oldH) / oldH;
+
+        let newW, newH;
+        if (changeW <= changeH) { newW = Math.max(1, w1); newH = h1; }
+        else { newW = w2; newH = Math.max(1, h2); }
+
+        const newX = Math.round(cx - newW / 2);
+        const newY = Math.round(cy - newH / 2);
+
+        // Применяем через события resize для согласованности с историей/ядром
+        this.eventBus.emit(Events.Tool.ResizeUpdate, {
+            object: this.currentId,
+            size: { width: newW, height: newH },
+            position: { x: newX, y: newY }
+        });
+        this.eventBus.emit(Events.Tool.ResizeEnd, {
+            object: this.currentId,
+            oldSize: { width: oldW, height: oldH },
+            newSize: { width: newW, height: newH },
+            oldPosition: { x: oldX, y: oldY },
+            newPosition: { x: newX, y: newY }
+        });
+
+        // Обновим UI сразу
+        this._syncTypeFromObject();
     }
 
     destroy() {
