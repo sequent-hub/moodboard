@@ -511,15 +511,15 @@ export class FramePropertiesPanel {
     _applyFrameType(typeValue) {
         if (!this.currentId) return;
 
-        // 1) Обновляем тип и флаг фиксированных пропорций
-        const lockedAspect = typeValue !== 'custom';
+        // 1) Обновляем тип и временно отключаем фиксацию пропорций на время программного ресайза
+        const willLockAfter = typeValue !== 'custom';
         this.eventBus.emit(Events.Object.StateChanged, {
             objectId: this.currentId,
-            updates: { properties: { type: typeValue, lockedAspect } }
+            updates: { properties: { type: typeValue, lockedAspect: false } }
         });
 
         // 2) Для пресетов меняем размеры под аспект, сохраняя центр
-        if (!lockedAspect) return; // Произвольный: без изменения размеров
+        if (!willLockAfter) return; // Произвольный: без изменения размеров
 
         // Аспект по типу
         const aspectMap = {
@@ -544,18 +544,10 @@ export class FramePropertiesPanel {
         const cx = oldX + oldW / 2;
         const cy = oldY + oldH / 2;
 
-        // Вариант 1: менять ширину под текущую высоту
-        const w1 = Math.round(oldH * aspect);
-        const h1 = oldH;
-        const changeW = Math.abs(w1 - oldW) / oldW;
-        // Вариант 2: менять высоту под текущую ширину
-        const h2 = Math.round(oldW / aspect);
-        const w2 = oldW;
-        const changeH = Math.abs(h2 - oldH) / oldH;
-
-        let newW, newH;
-        if (changeW <= changeH) { newW = Math.max(1, w1); newH = h1; }
-        else { newW = w2; newH = Math.max(1, h2); }
+        // Сохраняем визуальный масштаб: подбираем размеры с тем же приблизительным "площадью"
+        const area = oldW * oldH;
+        let newW = Math.max(1, Math.round(Math.sqrt(area * aspect)));
+        let newH = Math.max(1, Math.round(newW / aspect));
 
         const newX = Math.round(cx - newW / 2);
         const newY = Math.round(cy - newH / 2);
@@ -576,6 +568,12 @@ export class FramePropertiesPanel {
 
         // Обновим UI сразу
         this._syncTypeFromObject();
+
+        // 3) Включаем обратно фиксацию пропорций (для пресетов)
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: { properties: { lockedAspect: true } }
+        });
     }
 
     destroy() {
