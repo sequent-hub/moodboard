@@ -36,6 +36,8 @@ export class PlacementTool extends BaseTool {
                         this.showEmojiGhost();
                     } else if (this.pending.type === 'frame') {
                         this.showFrameGhost();
+                    } else if (this.pending.type === 'frame-draw') {
+                        this.startFrameDrawMode();
                     } else if (this.pending.type === 'shape') {
                         this.showShapeGhost();
                     }
@@ -143,6 +145,23 @@ export class PlacementTool extends BaseTool {
         }
         
         if (!this.pending) return;
+        // Если включен режим рисования фрейма — инициируем рамку
+        if (this.pending.type === 'frame-draw') {
+            const start = this._toWorld(event.x, event.y);
+            this._frameDrawState = { startX: start.x, startY: start.y, graphics: null };
+            if (this.world) {
+                const g = new PIXI.Graphics();
+                g.zIndex = 3000;
+                this.world.addChild(g);
+                this._frameDrawState.graphics = g;
+            }
+            // Вешаем временные обработчики движения/отпускания
+            this._onFrameDrawMoveBound = (ev) => this._onFrameDrawMove(ev);
+            this._onFrameDrawUpBound = (ev) => this._onFrameDrawUp(ev);
+            this.app.view.addEventListener('mousemove', this._onFrameDrawMoveBound);
+            this.app.view.addEventListener('mouseup', this._onFrameDrawUpBound, { once: true });
+            return;
+        }
 
         const worldPoint = this._toWorld(event.x, event.y);
         // Базовая позиция (может быть переопределена для конкретных типов)
@@ -364,6 +383,57 @@ export class PlacementTool extends BaseTool {
         if (!isTextWithEditing && !(isFile && props.selectFileOnPlace)) {
             this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
         }
+    }
+
+    startFrameDrawMode() {
+        // Курсор при рисовании фрейма
+        if (this.app && this.app.view) this.app.view.style.cursor = 'crosshair';
+    }
+
+    _onFrameDrawMove(event) {
+        if (!this._frameDrawState || !this._frameDrawState.graphics) return;
+        const p = this._toWorld(event.offsetX, event.offsetY);
+        const x = Math.min(this._frameDrawState.startX, p.x);
+        const y = Math.min(this._frameDrawState.startY, p.y);
+        const w = Math.abs(p.x - this._frameDrawState.startX);
+        const h = Math.abs(p.y - this._frameDrawState.startY);
+        const g = this._frameDrawState.graphics;
+        g.clear();
+        g.lineStyle(1, 0x3B82F6, 1);
+        g.beginFill(0x3B82F6, 0.08);
+        g.drawRect(x, y, w, h);
+        g.endFill();
+    }
+
+    _onFrameDrawUp(event) {
+        const g = this._frameDrawState?.graphics;
+        if (!this._frameDrawState || !g) return;
+        const p = this._toWorld(event.offsetX, event.offsetY);
+        const x = Math.min(this._frameDrawState.startX, p.x);
+        const y = Math.min(this._frameDrawState.startY, p.y);
+        const w = Math.abs(p.x - this._frameDrawState.startX);
+        const h = Math.abs(p.y - this._frameDrawState.startY);
+        // Удаляем временную графику
+        if (g.parent) g.parent.removeChild(g);
+        g.destroy();
+        this._frameDrawState = null;
+        // Создаем фрейм, если размер достаточный
+        if (w >= 2 && h >= 2) {
+            this.eventBus.emit(Events.UI.ToolbarAction, {
+                type: 'frame',
+                id: 'frame',
+                position: { x, y },
+                properties: { width: Math.round(w), height: Math.round(h), title: 'Произвольный' }
+            });
+        }
+        // Сбрасываем pending и выходим из режима place → select
+        this.pending = null;
+        this.hideGhost();
+        if (this.app && this.app.view) {
+            this.app.view.removeEventListener('mousemove', this._onFrameDrawMoveBound);
+            this.app.view.style.cursor = '';
+        }
+        this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
     }
 
     _toWorld(x, y) {

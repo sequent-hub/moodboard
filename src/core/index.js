@@ -822,8 +822,12 @@ export class CoreMoodBoard {
             const object = objects.find(obj => obj.id === data.object);
             const objectType = object ? object.type : null;
 
-            // Сохраняем пропорции для фреймов
+            // Сохраняем пропорции для фреймов, кроме произвольных (lockedAspect=false)
             if (objectType === 'frame' && data.size) {
+                const lockedAspect = !!(object?.properties && (object.properties.lockedAspect === true));
+                if (!lockedAspect) {
+                    // произвольные фреймы — без ограничений
+                } else {
                 const start = this._activeResize?.startSize || { width: object.width, height: object.height };
                 const aspect = (start.width > 0 && start.height > 0) ? (start.width / start.height) : (object.width / Math.max(1, object.height));
                 let w = Math.max(1, data.size.width);
@@ -853,6 +857,7 @@ export class CoreMoodBoard {
                     if (hndl.includes('n')) { y = startPos.y + (sh - h); }
                     data.position = { x: Math.round(x), y: Math.round(y) };
                 }
+                }
             }
 
             // Если позиция не пришла из UI, вычислим её из контекста активной ручки
@@ -878,11 +883,11 @@ export class CoreMoodBoard {
         this.eventBus.on(Events.Tool.ResizeEnd, (data) => {
             // В конце создаем одну команду изменения размера
             if (this.resizeStartSize && data.oldSize && data.newSize) {
-                // Принудительно сохраняем пропорции для фреймов
+                // Принудительно сохраняем пропорции для фреймов (если lockedAspect=true)
                 const objects = this.state.getObjects();
                 const object = objects.find(obj => obj.id === data.object);
                 const objectType = object ? object.type : null;
-                if (objectType === 'frame') {
+                if (objectType === 'frame' && !!(object?.properties && object.properties.lockedAspect === true)) {
                     const start = this._activeResize?.startSize || { width: object.width, height: object.height };
                     const aspect = (start.width > 0 && start.height > 0) ? (start.width / start.height) : (object.width / Math.max(1, object.height));
                     let w = Math.max(1, data.newSize.width);

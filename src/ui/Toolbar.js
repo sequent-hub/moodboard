@@ -133,30 +133,36 @@ export class Toolbar {
                     this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
                     this.placeSelectedButtonId = 'frame';
                     this.setActiveToolbarButton('place');
-                    // Подбираем размеры по пресету
-                    let width = 210, height = 297, titleText = 'A4';
-                    if (id === '1x1') { width = 300; height = 300; titleText = '1:1'; }
-                    else if (id === '4x3') { width = 320; height = 240; titleText = '4:3'; }
-                    else if (id === '16x9') { width = 320; height = 180; titleText = '16:9'; }
-                    // Устанавливаем pending для размещения фрейма указанного размера
-                    this.eventBus.emit(Events.Place.Set, {
-                        type: 'frame',
-                        properties: {
-                            width,
-                            height,
-                            borderColor: 0x333333,
-                            fillColor: 0xFFFFFF,
-                            title: titleText
-                        }
-                    });
+                    if (id === 'custom') {
+                        // Рисовать фрейм вручную прямоугольником
+                        this.eventBus.emit(Events.Place.Set, { type: 'frame-draw', properties: {} });
+                    } else {
+                        // Подбираем размеры по пресету
+                        let width = 210, height = 297, titleText = 'A4';
+                        if (id === '1x1') { width = 300; height = 300; titleText = '1:1'; }
+                        else if (id === '4x3') { width = 320; height = 240; titleText = '4:3'; }
+                        else if (id === '16x9') { width = 320; height = 180; titleText = '16:9'; }
+                        // Устанавливаем pending для размещения фрейма указанного размера
+                        this.eventBus.emit(Events.Place.Set, {
+                            type: 'frame',
+                            properties: {
+                                width,
+                                height,
+                                borderColor: 0x333333,
+                                fillColor: 0xFFFFFF,
+                                title: titleText,
+                                lockedAspect: true
+                            }
+                        });
+                    }
                     this.closeFramePopup();
                 });
             }
             this.framePopupEl.appendChild(btn);
         };
 
-        // Верхний ряд: одна кнопка «Произвольный» (пока неактивна)
-        makeBtn('Произвольный', 'custom', false, 'none', { header: true });
+        // Верхний ряд: одна кнопка «Произвольный» (включаем рисование фрейма)
+        makeBtn('Произвольный', 'custom', true, 'none', { header: true });
 
         makeBtn('A4', 'a4', true, '210 / 297');
         makeBtn('1:1', '1x1', true, '1 / 1');
