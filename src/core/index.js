@@ -822,6 +822,39 @@ export class CoreMoodBoard {
             const object = objects.find(obj => obj.id === data.object);
             const objectType = object ? object.type : null;
 
+            // Сохраняем пропорции для фреймов
+            if (objectType === 'frame' && data.size) {
+                const start = this._activeResize?.startSize || { width: object.width, height: object.height };
+                const aspect = (start.width > 0 && start.height > 0) ? (start.width / start.height) : (object.width / Math.max(1, object.height));
+                let w = Math.max(1, data.size.width);
+                let h = Math.max(1, data.size.height);
+                // Приводим к ближайшему по изменяемой стороне
+                // Определим, какая сторона изменилась сильнее
+                const dw = Math.abs(w - start.width);
+                const dh = Math.abs(h - start.height);
+                if (dw >= dh) {
+                    h = Math.round(w / aspect);
+                } else {
+                    w = Math.round(h * aspect);
+                }
+                data.size = { width: w, height: h };
+
+                // Если позиция известна (фиксированная противоположная сторона) — откорректируем её
+                if (!data.position && this._activeResize && this._activeResize.objectId === data.object) {
+                    const hndl = (this._activeResize.handle || '').toLowerCase();
+                    const startPos = this._activeResize.startPosition;
+                    const sw = this._activeResize.startSize.width;
+                    const sh = this._activeResize.startSize.height;
+                    let x = startPos.x;
+                    let y = startPos.y;
+                    if (hndl.includes('e')) { /* фиксируем западную сторону */ }
+                    if (hndl.includes('s')) { /* фиксируем северную сторону */ }
+                    if (hndl.includes('w')) { x = startPos.x + (sw - w); }
+                    if (hndl.includes('n')) { y = startPos.y + (sh - h); }
+                    data.position = { x: Math.round(x), y: Math.round(y) };
+                }
+            }
+
             // Если позиция не пришла из UI, вычислим её из контекста активной ручки
             let position = data.position;
             if (!position && this._activeResize && this._activeResize.objectId === data.object) {
@@ -845,6 +878,31 @@ export class CoreMoodBoard {
         this.eventBus.on(Events.Tool.ResizeEnd, (data) => {
             // В конце создаем одну команду изменения размера
             if (this.resizeStartSize && data.oldSize && data.newSize) {
+                // Принудительно сохраняем пропорции для фреймов
+                const objects = this.state.getObjects();
+                const object = objects.find(obj => obj.id === data.object);
+                const objectType = object ? object.type : null;
+                if (objectType === 'frame') {
+                    const start = this._activeResize?.startSize || { width: object.width, height: object.height };
+                    const aspect = (start.width > 0 && start.height > 0) ? (start.width / start.height) : (object.width / Math.max(1, object.height));
+                    let w = Math.max(1, data.newSize.width);
+                    let h = Math.max(1, data.newSize.height);
+                    const dw = Math.abs(w - start.width);
+                    const dh = Math.abs(h - start.height);
+                    if (dw >= dh) { h = Math.round(w / aspect); } else { w = Math.round(h * aspect); }
+                    data.newSize = { width: w, height: h };
+                    if (!data.newPosition && this._activeResize && this._activeResize.objectId === data.object) {
+                        const hndl = (this._activeResize.handle || '').toLowerCase();
+                        const startPos = this._activeResize.startPosition;
+                        const sw = this._activeResize.startSize.width;
+                        const sh = this._activeResize.startSize.height;
+                        let x = startPos.x;
+                        let y = startPos.y;
+                        if (hndl.includes('w')) { x = startPos.x + (sw - w); }
+                        if (hndl.includes('n')) { y = startPos.y + (sh - h); }
+                        data.newPosition = { x: Math.round(x), y: Math.round(y) };
+                    }
+                }
                 // Создаем команду только если размер действительно изменился
                 if (data.oldSize.width !== data.newSize.width || 
                     data.oldSize.height !== data.newSize.height) {
