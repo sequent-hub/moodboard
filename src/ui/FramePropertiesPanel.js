@@ -228,6 +228,14 @@ export class FramePropertiesPanel {
             }
         });
 
+        // Блокируем Delete/Backspace от всплытия, чтобы не удалялся весь фрейм при фокусе в поле
+        titleInput.addEventListener('keydown', (e) => {
+            const key = e.key;
+            if (key === 'Backspace' || key === 'Delete') {
+                e.stopPropagation();
+            }
+        });
+
         // Обработчик Enter для подтверждения
         titleInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
