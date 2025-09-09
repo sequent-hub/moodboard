@@ -341,6 +341,20 @@ export class PixiEngine {
                 // Находим ID объекта
                 for (const [objectId, pixiObject] of this.objects.entries()) {
                     if (pixiObject === child) {
+                        // Особая обработка для фреймов: если у фрейма есть дети и клик внутри внутренней области (без 20px периметра),
+                        // то отдаём хит-тест как пустое место, чтобы позволить box-select.
+                        const mb = child._mb || {};
+                        if (mb.type === 'frame') {
+                            const props = mb.properties || {};
+                            const hasChildren = !!props && !!this._hasFrameChildren(objectId);
+                            if (hasChildren) {
+                                const b = child.getBounds();
+                                const inner = { x: b.x + 20, y: b.y + 20, w: Math.max(0, b.width - 40), h: Math.max(0, b.height - 40) };
+                                if (point.x >= inner.x && point.x <= inner.x + inner.w && point.y >= inner.y && point.y <= inner.y + inner.h) {
+                                    return { type: 'empty' };
+                                }
+                            }
+                        }
                         return {
                             type: 'object',
                             object: objectId,
@@ -389,6 +403,17 @@ export class PixiEngine {
         }
         
         return { type: 'empty' };
+    }
+
+    _hasFrameChildren(frameId) {
+        // Проверяем среди зарегистрированных PIXI объектов, у кого frameId совпадает
+        for (const [objectId, pixiObject] of this.objects.entries()) {
+            if (objectId === frameId) continue;
+            const mb = pixiObject && pixiObject._mb;
+            const props = mb && mb.properties;
+            if (props && props.frameId === frameId) return true;
+        }
+        return false;
     }
 
     // Геометрические помощники/хит-тесты вынести в отдельный сервис при следующем рефакторинге

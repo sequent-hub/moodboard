@@ -281,17 +281,77 @@ export class SelectTool extends BaseTool {
                 this.startBoxSelect(event);
             }
         } else if (hitResult.type === 'object') {
-            // Начинаем обычный drag исходника; Alt-режим включим на лету при движении
+            // Особая логика для фреймов: если у фрейма есть дети и клик внутри внутренней области (без 20px рамки),
+            // то не начинаем drag фрейма, а запускаем box-select для выбора объектов внутри
+            const req = { objectId: hitResult.object, pixiObject: null };
+            this.emit(Events.Tool.GetObjectPixi, req);
+            const mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
+            if (mbType === 'frame') {
+                // Получаем данные фрейма и его экранные границы
+                const objects = this.core?.state?.getObjects ? this.core.state.getObjects() : [];
+                const frameObj = objects.find(o => o.id === hitResult.object);
+                const hasChildren = !!(objects && objects.some(o => o.properties && o.properties.frameId === hitResult.object));
+                if (req.pixiObject && hasChildren && frameObj) {
+                    const bounds = req.pixiObject.getBounds(); // экранные координаты
+                    const inner = { x: bounds.x + 20, y: bounds.y + 20, width: Math.max(0, bounds.width - 40), height: Math.max(0, bounds.height - 40) };
+                    const insideInner = this.isPointInBounds({ x: event.x, y: event.y }, inner);
+                    // Если клик внутри внутренней области — запускаем box-select и выходим
+                    if (insideInner) {
+                        // Запускаем рамку выделения вместо drag фрейма
+                        this.startBoxSelect(event);
+                        return;
+                    }
+                    // Если клик на 20px рамке — позволяем перетягивать фрейм. Но запрещаем box-select от рамки.
+                    // Здесь ничего не делаем: ниже пойдёт обычная логика handleObjectSelect
+                }
+            }
+            // Обычная логика: начинаем drag выбранного объекта
             this.handleObjectSelect(hitResult.object, event);
         } else {
             // Клик по пустому месту — если есть одиночное выделение, разрешаем drag за пределами объекта в пределах рамки
             if (this.selection.size() === 1) {
                 const selId = this.selection.toArray()[0];
+                // Если выбран фрейм с детьми и клик внутри внутренней области — не начинаем drag, а box-select
+                const req = { objectId: selId, pixiObject: null };
+                this.emit(Events.Tool.GetObjectPixi, req);
+                const isFrame = !!(req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type === 'frame');
+                if (isFrame) {
+                    const objects = this.core?.state?.getObjects ? this.core.state.getObjects() : [];
+                    const frameObj = objects.find(o => o.id === selId);
+                    const hasChildren = !!(objects && objects.some(o => o.properties && o.properties.frameId === selId));
+                    if (frameObj && hasChildren) {
+                        const b = { x: frameObj.position.x, y: frameObj.position.y, width: frameObj.width || 0, height: frameObj.height || 0 };
+                        const inner = { x: b.x + 20, y: b.y + 20, width: Math.max(0, b.width - 40), height: Math.max(0, b.height - 40) };
+                        const insideInner = this.isPointInBounds({ x: event.x, y: event.y }, inner);
+                        if (insideInner) {
+                            this.startBoxSelect(event);
+                            return;
+                        }
+                    }
+                }
+                // Обычная логика: если клик внутри рамки выбранного — начинаем drag
                 const boundsReq = { objects: [] };
                 this.emit(Events.Tool.GetAllObjects, boundsReq);
                 const map = new Map(boundsReq.objects.map(o => [o.id, o.bounds]));
                 const b = map.get(selId);
                 if (b && this.isPointInBounds({ x: event.x, y: event.y }, b)) {
+                    // Для фрейма c детьми: отфильтруем клики внутри внутренней области (box-select)
+                    const req2 = { objectId: selId, pixiObject: null };
+                    this.emit(Events.Tool.GetObjectPixi, req2);
+                    const isFrame2 = !!(req2.pixiObject && req2.pixiObject._mb && req2.pixiObject._mb.type === 'frame');
+                    if (isFrame2) {
+                        const os = this.core?.state?.getObjects ? this.core.state.getObjects() : [];
+                        const fr = os.find(o => o.id === selId);
+                        const hasChildren2 = !!(os && os.some(o => o.properties && o.properties.frameId === selId));
+                        if (req2.pixiObject && fr && hasChildren2) {
+                            const bounds2 = req2.pixiObject.getBounds();
+                            const inner2 = { x: bounds2.x + 20, y: bounds2.y + 20, width: Math.max(0, bounds2.width - 40), height: Math.max(0, bounds2.height - 40) };
+                            if (this.isPointInBounds({ x: event.x, y: event.y }, inner2)) {
+                                this.startBoxSelect(event);
+                                return;
+                            }
+                        }
+                    }
                     // Старт перетаскивания как если бы кликнули по объекту
                     this.startDrag(selId, event);
                     return;
