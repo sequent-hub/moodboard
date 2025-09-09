@@ -841,6 +841,14 @@ export class CoreMoodBoard {
                 } else {
                     w = Math.round(h * aspect);
                 }
+                // Минимальная площадь фрейма ~1800px²
+                const minArea = 1800;
+                const area = Math.max(1, w * h);
+                if (area < minArea) {
+                    const scale = Math.sqrt(minArea / area);
+                    w = Math.round(w * scale);
+                    h = Math.round(h * scale);
+                }
                 data.size = { width: w, height: h };
 
                 // Если позиция известна (фиксированная противоположная сторона) — откорректируем её
@@ -887,6 +895,21 @@ export class CoreMoodBoard {
                 position = { x: nx, y: ny };
             }
 
+            // Для фреймов с произвольным аспектом также обеспечим минимальную площадь
+            if (objectType === 'frame' && data.size) {
+                const minArea = 1800;
+                const w0 = Math.max(1, data.size.width);
+                const h0 = Math.max(1, data.size.height);
+                const area0 = w0 * h0;
+                if (area0 < minArea) {
+                    const scale = Math.sqrt(minArea / Math.max(1, area0));
+                    const w = Math.round(w0 * scale);
+                    const h = Math.round(h0 * scale);
+                    data.size = { width: w, height: h };
+                    // позиция будет скорректирована ниже общей логикой (уже рассчитана выше при необходимости)
+                }
+            }
+
             this.updateObjectSizeAndPositionDirect(data.object, data.size, position, objectType);
         });
 
@@ -905,6 +928,14 @@ export class CoreMoodBoard {
                     const dw = Math.abs(w - start.width);
                     const dh = Math.abs(h - start.height);
                     if (dw >= dh) { h = Math.round(w / aspect); } else { w = Math.round(h * aspect); }
+                    // Минимальная площадь фрейма ~1800px²
+                    const minArea = 1800;
+                    const area = Math.max(1, w * h);
+                    if (area < minArea) {
+                        const scale = Math.sqrt(minArea / area);
+                        w = Math.round(w * scale);
+                        h = Math.round(h * scale);
+                    }
                     data.newSize = { width: w, height: h };
                     if (!data.newPosition && this._activeResize && this._activeResize.objectId === data.object) {
                         const hndl = (this._activeResize.handle || '').toLowerCase();
@@ -924,6 +955,30 @@ export class CoreMoodBoard {
                             }
                         }
                         data.newPosition = { x: Math.round(x), y: Math.round(y) };
+                    }
+                }
+                // Для произвольных фреймов также обеспечим минимальную площадь
+                if (objectType === 'frame' && data.newSize && !(object?.properties && object.properties.lockedAspect === true)) {
+                    const minArea = 1800;
+                    const w0 = Math.max(1, data.newSize.width);
+                    const h0 = Math.max(1, data.newSize.height);
+                    const area0 = w0 * h0;
+                    if (area0 < minArea) {
+                        const scale = Math.sqrt(minArea / Math.max(1, area0));
+                        const w = Math.round(w0 * scale);
+                        const h = Math.round(h0 * scale);
+                        data.newSize = { width: w, height: h };
+                        if (!data.newPosition && this._activeResize && this._activeResize.objectId === data.object) {
+                            const hndl2 = (this._activeResize.handle || '').toLowerCase();
+                            const startPos2 = this._activeResize.startPosition;
+                            const sw2 = this._activeResize.startSize.width;
+                            const sh2 = this._activeResize.startSize.height;
+                            let x2 = startPos2.x;
+                            let y2 = startPos2.y;
+                            if (hndl2.includes('w')) { x2 = startPos2.x + (sw2 - w); }
+                            if (hndl2.includes('n')) { y2 = startPos2.y + (sh2 - h); }
+                            data.newPosition = { x: Math.round(x2), y: Math.round(y2) };
+                        }
                     }
                 }
                 // Создаем команду только если размер действительно изменился
