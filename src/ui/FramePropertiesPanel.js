@@ -92,6 +92,7 @@ export class FramePropertiesPanel {
         
         // Обновляем контролы в соответствии с текущими свойствами объекта
         this._updateControlsFromObject();
+        this._syncTypeFromObject();
     }
 
     hide() {
@@ -278,8 +279,62 @@ export class FramePropertiesPanel {
         colorContainer.appendChild(colorLabel);
         colorContainer.appendChild(colorButton);
 
+        // Контейнер для типа фрейма
+        const typeContainer = document.createElement('div');
+        Object.assign(typeContainer.style, {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 12px'
+        });
+
+        const typeLabel = document.createElement('span');
+        typeLabel.textContent = 'Тип:';
+        typeLabel.style.fontSize = '12px';
+        typeLabel.style.color = '#666';
+        typeLabel.style.minWidth = '60px';
+
+        const typeSelect = document.createElement('select');
+        Object.assign(typeSelect.style, {
+            flex: '1',
+            padding: '4px 8px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            fontSize: '12px',
+            outline: 'none',
+            height: '28px'
+        });
+        const options = [
+            { value: 'custom', label: 'Произвольный' },
+            { value: 'a4', label: 'A4' },
+            { value: '1x1', label: '1:1' },
+            { value: '4x3', label: '4:3' },
+            { value: '16x9', label: '16:9' }
+        ];
+        options.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.label;
+            typeSelect.appendChild(o);
+        });
+        this.frameTypeSelect = typeSelect;
+
+        typeSelect.addEventListener('change', () => {
+            if (!this.currentId) return;
+            const v = typeSelect.value;
+            // Обновляем properties.type у фрейма
+            this.eventBus.emit(Events.Object.StateChanged, {
+                objectId: this.currentId,
+                updates: { properties: { type: v } }
+            });
+        });
+
+        typeContainer.appendChild(typeLabel);
+        typeContainer.appendChild(typeSelect);
+
         panel.appendChild(titleContainer);
         panel.appendChild(colorContainer);
+        panel.appendChild(typeContainer);
 
         // Создаем палитру цветов (скрытую)
         this._createColorPalette(panel);
@@ -448,6 +503,13 @@ export class FramePropertiesPanel {
         const hexColor = `#${pixiColor.toString(16).padStart(6, '0').toUpperCase()}`;
         this.colorButton.style.backgroundColor = hexColor;
         this.colorButton.title = `Цвет фона: ${hexColor}`;
+    }
+
+    _syncTypeFromObject() {
+        if (!this.frameTypeSelect || !this.currentId) return;
+        const objectData = this.core.getObjectData(this.currentId);
+        const t = (objectData && objectData.properties && objectData.properties.type) || 'custom';
+        this.frameTypeSelect.value = t;
     }
 
     destroy() {

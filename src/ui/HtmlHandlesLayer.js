@@ -1,4 +1,5 @@
 import { Events } from '../core/events/Events.js';
+import rotateIconSvg from '../assets/icons/rotate-icon.svg?raw';
 
 /**
  * HtmlHandlesLayer — HTML-ручки и рамка для выделенных объектов.
@@ -317,8 +318,7 @@ export class HtmlHandlesLayer {
             height: `${Math.max(0, height - 2 * cornerGap)}px` 
         }, 'ew-resize');
 
-        // Ручка вращения - зеленый круг с символом ↻ возле левого нижнего угла
-        // Ручка вращения: показываем для всех, кроме файла
+        // Ручка вращения: SVG-иконка, показываем для всех, кроме файла
         const rotateHandle = document.createElement('div');
         rotateHandle.dataset.handle = 'rotate'; 
         rotateHandle.dataset.id = id;
@@ -328,26 +328,28 @@ export class HtmlHandlesLayer {
             Object.assign(rotateHandle.style, {
                 position: 'absolute',
                 width: '20px', height: '20px',
-                background: '#28A745',
-                border: '2px solid #fff',
+                background: 'transparent',
+                border: 'none',
                 borderRadius: '50%',
-                boxSizing: 'border-box',
                 pointerEvents: 'auto',
                 cursor: 'grab',
                 zIndex: 15,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '12px', color: '#fff', fontWeight: 'bold', userSelect: 'none'
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
             });
-            rotateHandle.style.left = `${0 - 10}px`;
-            rotateHandle.style.top = `${height + 25 - 10}px`;
-            rotateHandle.innerHTML = '↻';
-            rotateHandle.addEventListener('mouseenter', () => {
-                rotateHandle.style.background = '#34CE57';
-                rotateHandle.style.cursor = 'grab';
-            });
-            rotateHandle.addEventListener('mouseleave', () => {
-                rotateHandle.style.background = '#28A745';
-            });
+            // Фиксированная дистанция 20px по диагонали (top-right → bottom-left) от угла (0, h)
+            const d = 38;
+            const L = Math.max(1, Math.hypot(width, height));
+            const centerX = -(width / L) * d; // влево от левого нижнего угла
+            const centerY = height + (height / L) * d; // ниже нижней грани
+            rotateHandle.style.left = `${Math.round(centerX - 0)}px`;
+            rotateHandle.style.top = `${Math.round(centerY - 10)}px`;
+            rotateHandle.innerHTML = rotateIconSvg;
+            const svgEl = rotateHandle.querySelector('svg');
+            if (svgEl) {
+                svgEl.style.width = '100%';
+                svgEl.style.height = '100%';
+                svgEl.style.display = 'block';
+            }
             rotateHandle.addEventListener('mousedown', (e) => this._onRotateHandleDown(e, box));
         }
         box.appendChild(rotateHandle);
@@ -802,8 +804,12 @@ export class HtmlHandlesLayer {
         // Позиционируем ручку вращения
         const rotateHandle = box.querySelector('[data-handle="rotate"]');
         if (rotateHandle) {
-            rotateHandle.style.left = `${0 - 10}px`; // центрируем относительно левого нижнего угла
-            rotateHandle.style.top = `${height + 25 - 10}px`; // отступ 25px от нижней грани
+            const d = 20;
+            const L = Math.max(1, Math.hypot(width, height));
+            const centerX = -(width / L) * d;
+            const centerY = height + (height / L) * d;
+            rotateHandle.style.left = `${Math.round(centerX - 10)}px`;
+            rotateHandle.style.top = `${Math.round(centerY - 10)}px`;
         }
     }
 }
