@@ -4,7 +4,7 @@ import { ResizeHandles } from '../ResizeHandles.js';
 import * as PIXI from 'pixi.js';
 import { Events } from '../../core/events/Events.js';
 import { SelectionModel } from './selection/SelectionModel.js';
-import { HandlesSync } from './selection/HandlesSync.js';
+// import { HandlesSync } from './selection/HandlesSync.js';
 import { SimpleDragController } from './selection/SimpleDragController.js';
 import { ResizeController } from './selection/ResizeController.js';
 import { RotateController } from './selection/RotateController.js';
@@ -149,12 +149,10 @@ export class SelectTool extends BaseTool {
         // Инициализируем систему ручек изменения размера
         if (!this.resizeHandles && app) {
             this.resizeHandles = new ResizeHandles(app);
-            this._handlesSync = new HandlesSync({
-                app,
-                resizeHandles: this.resizeHandles,
-                selection: this.selection,
-                emit: (event, payload) => this.emit(event, payload)
-            });
+            // Полностью отключаем синхронизацию старых PIXI-ручек
+            if (this.resizeHandles && typeof this.resizeHandles.hideHandles === 'function') {
+                this.resizeHandles.hideHandles();
+            }
             this._dragCtrl = new SimpleDragController({
                 emit: (event, payload) => this.emit(event, payload)
             });
@@ -614,6 +612,8 @@ export class SelectTool extends BaseTool {
     startDrag(objectId, event) {
         this.isDragging = true;
         this.dragTarget = objectId;
+        // Сообщаем HtmlHandlesLayer о начале перетаскивания одиночного объекта
+        this.emit(Events.Tool.DragStart, { object: objectId });
         
         // Получаем текущую позицию объекта
         const objectData = { objectId, position: null };
@@ -657,6 +657,10 @@ export class SelectTool extends BaseTool {
             const w = this._toWorld(event.x, event.y);
             this._dragCtrl.update({ ...event, x: w.x, y: w.y });
         }
+        // Сообщаем о процессе перетаскивания
+        if (this.isDragging && this.dragTarget) {
+            this.emit(Events.Tool.DragUpdate, { object: this.dragTarget });
+        }
         
         // Обновляем ручки во время перетаскивания
         if (this.resizeHandles && this.selection.has(this.dragTarget)) {
@@ -678,6 +682,8 @@ export class SelectTool extends BaseTool {
             this.groupCloneMap = null;
         } else if (this.dragTarget) {
             if (this._dragCtrl) this._dragCtrl.end();
+            // Сообщаем о завершении перетаскивания одиночного объекта
+            this.emit(Events.Tool.DragEnd, { object: this.dragTarget });
         }
         
         this.isDragging = false;
@@ -763,7 +769,8 @@ export class SelectTool extends BaseTool {
                 this.groupBoundsGraphics.position.set(gb.x, gb.y);
             }
             if (this.resizeHandles) {
-                this.resizeHandles.showHandles(this.groupBoundsGraphics, this.groupId);
+                // Отключаем старые PIXI-ручки
+                this.resizeHandles.hideHandles();
             }
             return;
         }
@@ -868,7 +875,7 @@ export class SelectTool extends BaseTool {
                 this.groupBoundsGraphics.pivot.set(0, 0);
                 this.groupBoundsGraphics.position.set(gb.x, gb.y);
             }
-            if (this.resizeHandles) this.resizeHandles.showHandles(this.groupBoundsGraphics, this.groupId);
+            if (this.resizeHandles) this.resizeHandles.hideHandles();
             return;
         }
         if (this._rotateCtrl) this._rotateCtrl.end();
@@ -1044,7 +1051,7 @@ export class SelectTool extends BaseTool {
         this.isDragging = false; // отключаем одиночный drag, если был
         this.ensureGroupBoundsGraphics(gb);
         if (this.groupBoundsGraphics && this.resizeHandles) {
-            this.resizeHandles.showHandles(this.groupBoundsGraphics, this.groupId);
+            this.resizeHandles.hideHandles();
         }
         if (this._groupDragCtrl) {
             const w = this._toWorld(event.x, event.y);

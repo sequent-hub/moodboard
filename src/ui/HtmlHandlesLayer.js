@@ -20,6 +20,7 @@ export class HtmlHandlesLayer {
         this.target = { type: 'none', id: null, bounds: null };
         this.handles = {};
         this._drag = null;
+        this._handlesSuppressed = false; // скрывать ручки во время перетаскивания/трансформаций
     }
 
     attach() {
@@ -35,11 +36,23 @@ export class HtmlHandlesLayer {
         this.eventBus.on(Events.Tool.SelectionRemove, () => this.update());
         this.eventBus.on(Events.Tool.SelectionClear, () => this.hide());
         this.eventBus.on(Events.Tool.DragUpdate, () => this.update());
+        this.eventBus.on(Events.Tool.DragStart, () => { this._handlesSuppressed = true; this._setHandlesVisibility(false); });
+        this.eventBus.on(Events.Tool.DragEnd, () => { this._handlesSuppressed = false; this._setHandlesVisibility(true); });
         this.eventBus.on(Events.Tool.ResizeUpdate, () => this.update());
+        this.eventBus.on(Events.Tool.ResizeStart, () => { this._handlesSuppressed = true; this._setHandlesVisibility(false); });
+        this.eventBus.on(Events.Tool.ResizeEnd, () => { this._handlesSuppressed = false; this._setHandlesVisibility(true); });
         this.eventBus.on(Events.Tool.RotateUpdate, () => this.update());
+        this.eventBus.on(Events.Tool.RotateStart, () => { this._handlesSuppressed = true; this._setHandlesVisibility(false); });
+        this.eventBus.on(Events.Tool.RotateEnd, () => { this._handlesSuppressed = false; this._setHandlesVisibility(true); });
         this.eventBus.on(Events.Tool.GroupDragUpdate, () => this.update());
+        this.eventBus.on(Events.Tool.GroupDragStart, () => { this._handlesSuppressed = true; this._setHandlesVisibility(false); });
+        this.eventBus.on(Events.Tool.GroupDragEnd, () => { this._handlesSuppressed = false; this._setHandlesVisibility(true); });
         this.eventBus.on(Events.Tool.GroupResizeUpdate, () => this.update());
+        this.eventBus.on(Events.Tool.GroupResizeStart, () => { this._handlesSuppressed = true; this._setHandlesVisibility(false); });
+        this.eventBus.on(Events.Tool.GroupResizeEnd, () => { this._handlesSuppressed = false; this._setHandlesVisibility(true); });
         this.eventBus.on(Events.Tool.GroupRotateUpdate, () => this.update());
+        this.eventBus.on(Events.Tool.GroupRotateStart, () => { this._handlesSuppressed = true; this._setHandlesVisibility(false); });
+        this.eventBus.on(Events.Tool.GroupRotateEnd, () => { this._handlesSuppressed = false; this._setHandlesVisibility(true); });
         this.eventBus.on(Events.UI.ZoomPercent, () => this.update());
         this.eventBus.on(Events.Tool.PanUpdate, () => this.update());
 
@@ -106,6 +119,27 @@ export class HtmlHandlesLayer {
         this.visible = false;
     }
 
+    _setHandlesVisibility(show) {
+        if (!this.layer) return;
+        const box = this.layer.querySelector('.mb-handles-box');
+        if (!box) return;
+        // Уголки
+        box.querySelectorAll('[data-dir]').forEach(el => {
+            el.style.display = show ? '' : 'none';
+        });
+        // Рёбра
+        box.querySelectorAll('[data-edge]').forEach(el => {
+            el.style.display = show ? '' : 'none';
+        });
+        // Ручка вращения
+        const rot = box.querySelector('[data-handle="rotate"]');
+        if (rot) rot.style.display = show ? '' : 'none';
+        // Если нужно показать, но ручек нет (мы их не создавали в suppressed-режиме) — перерисуем
+        if (show && !box.querySelector('[data-dir]')) {
+            this.update();
+        }
+    }
+
     _showBounds(worldBounds, id) {
         if (!this.layer) return;
         // Преобразуем world координаты в CSS-пиксели
@@ -161,6 +195,11 @@ export class HtmlHandlesLayer {
             transform: `rotate(${rotation}deg)` // Применяем поворот
         });
         this.layer.appendChild(box);
+        // Если сейчас подавление ручек активно — не создавать ручки вовсе, оставляем только рамку
+        if (this._handlesSuppressed) {
+            this.visible = true;
+            return;
+        }
 
         // Угловые ручки для ресайза - круглые с мятно-зелёным цветом и белой серединой
         const mkCorner = (dir, x, y, cursor) => {

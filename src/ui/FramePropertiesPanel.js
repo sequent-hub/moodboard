@@ -28,8 +28,12 @@ export class FramePropertiesPanel {
         });
 
         // Обновляем позицию при любых изменениях (как в TextPropertiesPanel)
+        this.eventBus.on(Events.Tool.DragStart, () => this.hide());
         this.eventBus.on(Events.Tool.DragUpdate, () => this.reposition());
+        this.eventBus.on(Events.Tool.DragEnd, () => this.updateFromSelection());
         this.eventBus.on(Events.Tool.GroupDragUpdate, () => this.reposition());
+        this.eventBus.on(Events.Tool.GroupDragStart, () => this.hide());
+        this.eventBus.on(Events.Tool.GroupDragEnd, () => this.updateFromSelection());
         this.eventBus.on(Events.Tool.ResizeUpdate, () => this.reposition());
         this.eventBus.on(Events.Tool.RotateUpdate, () => this.reposition());
 

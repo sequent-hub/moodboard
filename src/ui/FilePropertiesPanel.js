@@ -28,9 +28,13 @@ export class FilePropertiesPanel {
             if (this.currentId && objectId === this.currentId) this.hide();
         });
 
-        // Обновляем позицию при любых изменениях
+        // Обновляем позицию / скрываем во время перетаскивания
+        this.eventBus.on(Events.Tool.DragStart, () => this.hide());
         this.eventBus.on(Events.Tool.DragUpdate, () => this.reposition());
+        this.eventBus.on(Events.Tool.DragEnd, () => this.updateFromSelection());
         this.eventBus.on(Events.Tool.GroupDragUpdate, () => this.reposition());
+        this.eventBus.on(Events.Tool.GroupDragStart, () => this.hide());
+        this.eventBus.on(Events.Tool.GroupDragEnd, () => this.updateFromSelection());
         this.eventBus.on(Events.Tool.ResizeUpdate, () => this.reposition());
         this.eventBus.on(Events.Tool.RotateUpdate, () => this.reposition());
 
