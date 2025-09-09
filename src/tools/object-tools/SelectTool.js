@@ -680,6 +680,15 @@ export class SelectTool extends BaseTool {
         this.emit(Events.Tool.GetObjectPosition, objectData);
         // Нормализуем координаты в мировые (worldLayer), чтобы убрать влияние зума
         const w = this._toWorld(event.x, event.y);
+        // Запоминаем смещение точки захвата курсора относительно левого-верхнего угла объекта (в мировых координатах)
+        if (objectData.position) {
+            this._dragGrabOffset = {
+                x: w.x - objectData.position.x,
+                y: w.y - objectData.position.y
+            };
+        } else {
+            this._dragGrabOffset = null;
+        }
         const worldEvent = { ...event, x: w.x, y: w.y };
         if (this._dragCtrl) this._dragCtrl.start(objectId, worldEvent);
     }
@@ -699,13 +708,14 @@ export class SelectTool extends BaseTool {
             this.isAltCloneMode = true;
             this.cloneSourceId = this.dragTarget;
             this.clonePending = true;
-            // Запрашиваем текущую позицию исходного объекта
-            const positionData = { objectId: this.cloneSourceId, position: null };
-            this.emit(Events.Tool.GetObjectPosition, positionData);
-            // Сообщаем ядру о необходимости создать дубликат у позиции исходного объекта
+            // Создаём дубликат так, чтобы курсор захватывал ту же точку объекта
+            const wpos = this._toWorld(event.x, event.y);
+            const targetTopLeft = this._dragGrabOffset
+                ? { x: wpos.x - this._dragGrabOffset.x, y: wpos.y - this._dragGrabOffset.y }
+                : { x: wpos.x, y: wpos.y };
             this.emit(Events.Tool.DuplicateRequest, {
                 originalId: this.cloneSourceId,
-                position: positionData.position || { x: event.x, y: event.y }
+                position: targetTopLeft
             });
             // Не сбрасываем dragTarget, чтобы исходник продолжал двигаться до появления копии
             // Визуально это ок: копия появится и захватит drag в onDuplicateReady
@@ -2406,6 +2416,26 @@ export class SelectTool extends BaseTool {
         
         // Вызываем destroy родительского класса
         super.destroy();
+    }
+
+    onDuplicateReady(newObjectId) {
+        this.clonePending = false;
+        
+        // Переключаем выделение на новый объект
+        this.clearSelection();
+        this.addToSelection(newObjectId);
+
+        // Завершаем drag исходного объекта и переключаем контроллер на новый объект
+        if (this._dragCtrl) this._dragCtrl.end();
+        this.dragTarget = newObjectId;
+        this.isDragging = true;
+        // Стартуем drag нового объекта под текущим курсором (в мировых координатах)
+        const w = this._toWorld(this.currentX, this.currentY);
+        if (this._dragCtrl) this._dragCtrl.start(newObjectId, { x: w.x, y: w.y });
+        // Мгновенно обновляем позицию под курсор
+        this.updateDrag({ x: this.currentX, y: this.currentY });
+        // Обновляем ручки
+        this.updateResizeHandles();
     }
 
 }

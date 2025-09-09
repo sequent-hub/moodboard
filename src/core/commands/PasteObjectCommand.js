@@ -34,31 +34,42 @@ export class PasteObjectCommand extends BaseCommand {
         };
         this.newObjectId = generateObjectId(exists);
         this.newObjectData.id = this.newObjectId;
+
+        // Название для фрейма, если не проставлено заранее (например, из DuplicateRequest)
+        try {
+            if (this.newObjectData.type === 'frame') {
+                const t0 = this.newObjectData?.properties?.title || '';
+                if (!/^\s*Фрейм\s+\d+\s*$/i.test(t0)) {
+                    const objects = this.coreMoodboard.state?.state?.objects || [];
+                    let maxNum = 0;
+                    for (const o of objects) {
+                        if (!o || o.type !== 'frame') continue;
+                        const t = o?.properties?.title || '';
+                        const m = t.match(/^\s*Фрейм\s+(\d+)\s*$/i);
+                        if (m) {
+                            const n = parseInt(m[1], 10);
+                            if (Number.isFinite(n)) maxNum = Math.max(maxNum, n);
+                        }
+                    }
+                    const nextIndex = maxNum + 1;
+                    this.newObjectData.properties = this.newObjectData.properties || {};
+                    this.newObjectData.properties.title = `Фрейм ${nextIndex}`;
+                }
+            }
+        } catch (_) { /* no-op */ }
         
         // Сохраняем ID оригинального объекта для отслеживания копий
         this.newObjectData.originalId = originalData.id;
         
-        // Устанавливаем позицию вставки
+        // Устанавливаем позицию вставки: если пришла — строго под курсор; иначе fallback со смещением
         if (this.pastePosition) {
             this.newObjectData.position = { ...this.pastePosition };
         } else {
-            // Если позиция не указана, смещаем относительно оригинала
-            // Проверяем, сколько копий этого объекта уже создано
             const existingObjects = this.coreMoodboard.state.state.objects;
             const originalId = originalData.id;
-            
-            // Ищем все копии этого конкретного объекта
-            const copies = existingObjects.filter(obj => 
-                obj.originalId === originalId || // Копии оригинального объекта
-                (obj.id === originalId && obj.originalId) // Если оригинал сам является копией
-            );
-            
-            // Рассчитываем смещение на основе количества копий
+            const copies = existingObjects.filter(obj => obj.originalId === originalId || (obj.id === originalId && obj.originalId));
             const offsetMultiplier = copies.length + 1;
-            const offsetStep = 25; // Шаг смещения в пикселях
-            
-            console.log(`📋 Вставка копии объекта ${originalId}: найдено ${copies.length} существующих копий, смещение ${offsetStep * offsetMultiplier}px`);
-            
+            const offsetStep = 25;
             this.newObjectData.position = {
                 x: originalData.position.x + (offsetStep * offsetMultiplier),
                 y: originalData.position.y + (offsetStep * offsetMultiplier)

@@ -678,8 +678,35 @@ export class CoreMoodBoard {
                 type: 'object',
                 data: JSON.parse(JSON.stringify(original))
             };
+            // Запоминаем исходное название фрейма, чтобы не менять его
+            try {
+                if (original.type === 'frame') {
+                    this._dupTitleMap = this._dupTitleMap || new Map();
+                    const prevTitle = (original.properties && typeof original.properties.title !== 'undefined') ? original.properties.title : undefined;
+                    this._dupTitleMap.set(originalId, prevTitle);
+                }
+            } catch (_) { /* no-op */ }
+            // Если дублируем фрейм — проставим будущий заголовок сразу в буфер обмена
+            try {
+                if (this.clipboard.data && this.clipboard.data.type === 'frame') {
+                    const arr = this.state.state.objects || [];
+                    let maxNum = 0;
+                    for (const o of arr) {
+                        if (!o || o.type !== 'frame') continue;
+                        const t = o?.properties?.title || '';
+                        const m = t.match(/^\s*Фрейм\s+(\d+)\s*$/i);
+                        if (m) {
+                            const n = parseInt(m[1], 10);
+                            if (Number.isFinite(n)) maxNum = Math.max(maxNum, n);
+                        }
+                    }
+                    const next = maxNum + 1;
+                    this.clipboard.data.properties = this.clipboard.data.properties || {};
+                    this.clipboard.data.properties.title = `Фрейм ${next}`;
+                }
+            } catch (_) { /* no-op */ }
 
-            // Вызываем вставку с конкретной позицией (там рассчитается ID и пр.)
+            // Вызываем вставку по указанной позиции (под курсором)
             this.pasteObject(position);
         });
 
@@ -715,14 +742,77 @@ export class CoreMoodBoard {
                 this.eventBus.on(Events.Object.Pasted, handler);
                 // Кладем в clipboard объект, затем вызываем PasteObjectCommand с текущей позицией
                 this.clipboard = { type: 'object', data: JSON.parse(JSON.stringify(obj)) };
+                // Запомним оригинальные названия фреймов
+                try {
+                    if (obj.type === 'frame') {
+                        this._dupTitleMap = this._dupTitleMap || new Map();
+                        const prevTitle = (obj.properties && typeof obj.properties.title !== 'undefined') ? obj.properties.title : undefined;
+                        this._dupTitleMap.set(obj.id, prevTitle);
+                    }
+                } catch (_) { /* no-op */ }
+                // Если фрейм — сразу проставим новый заголовок в буфер
+                try {
+                    if (this.clipboard.data && this.clipboard.data.type === 'frame') {
+                        const arr = this.state.state.objects || [];
+                        let maxNum = 0;
+                        for (const o2 of arr) {
+                            if (!o2 || o2.type !== 'frame') continue;
+                            const t2 = o2?.properties?.title || '';
+                            const m2 = t2.match(/^\s*Фрейм\s+(\d+)\s*$/i);
+                            if (m2) {
+                                const n2 = parseInt(m2[1], 10);
+                                if (Number.isFinite(n2)) maxNum = Math.max(maxNum, n2);
+                            }
+                        }
+                        const next2 = maxNum + 1;
+                        this.clipboard.data.properties = this.clipboard.data.properties || {};
+                        this.clipboard.data.properties.title = `Фрейм ${next2}`;
+                    }
+                } catch (_) { /* no-op */ }
                 const cmd = new PasteObjectCommand(this, { x: obj.position.x, y: obj.position.y });
                 cmd.setEventBus(this.eventBus);
                 this.history.executeCommand(cmd);
             }
         });
 
-        // Когда объект вставлен (из PasteObjectCommand) — сообщаем SelectTool
+        // Когда объект вставлен (из PasteObjectCommand)
         this.eventBus.on(Events.Object.Pasted, ({ originalId, newId }) => {
+            try {
+                const arr = this.state.state.objects || [];
+                const newObj = arr.find(o => o.id === newId);
+                const origObj = arr.find(o => o.id === originalId);
+                if (newObj && newObj.type === 'frame') {
+                    // Рассчитываем следующий номер среди уже существующих (кроме только что вставленного)
+                    let maxNum = 0;
+                    for (const o of arr) {
+                        if (!o || o.id === newId || o.type !== 'frame') continue;
+                        const t = o?.properties?.title || '';
+                        const m = t.match(/^\s*Фрейм\s+(\d+)\s*$/i);
+                        if (m) {
+                            const n = parseInt(m[1], 10);
+                            if (Number.isFinite(n)) maxNum = Math.max(maxNum, n);
+                        }
+                    }
+                    const next = maxNum + 1;
+                    // Присваиваем новое имя только НОВОМУ
+                    newObj.properties = newObj.properties || {};
+                    newObj.properties.title = `Фрейм ${next}`;
+                    const pixNew = this.pixi.objects.get(newId);
+                    if (pixNew && pixNew._mb?.instance?.setTitle) pixNew._mb.instance.setTitle(newObj.properties.title);
+                    // Восстанавливаем исходное имя оригинала, если оно было записано
+                    if (this._dupTitleMap && this._dupTitleMap.has(originalId) && origObj && origObj.type === 'frame') {
+                        const prev = this._dupTitleMap.get(originalId);
+                        origObj.properties = origObj.properties || {};
+                        // Если prev undefined, очистим title
+                        origObj.properties.title = prev;
+                        const pixOrig = this.pixi.objects.get(originalId);
+                        if (pixOrig && pixOrig._mb?.instance?.setTitle) pixOrig._mb.instance.setTitle(prev);
+                        this._dupTitleMap.delete(originalId);
+                    }
+                    this.state.markDirty();
+                }
+            } catch (_) { /* no-op */ }
+            // Сообщаем SelectTool id нового объекта для переключения drag
             this.eventBus.emit(Events.Tool.DuplicateReady, { originalId, newId });
         });
 
