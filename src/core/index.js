@@ -1685,6 +1685,22 @@ export class CoreMoodBoard {
                 // fail-safe: не мешаем созданию при ошибке поиска
             }
         }
+
+        // Именование фреймов: "Фрейм N", где N = количество уже пронумерованных фреймов + 1
+        if (type === 'frame') {
+            try {
+                const objects = this.state?.state?.objects || [];
+                const numberedCount = objects.filter(o => o && o.type === 'frame').reduce((acc, o) => {
+                    const t = o?.properties?.title || '';
+                    // Считаем только пронумерованные: "Фрейм <число>"
+                    return (/^\s*Фрейм\s+\d+\s*$/i.test(t)) ? acc + 1 : acc;
+                }, 0);
+                const nextIndex = numberedCount + 1;
+                properties = { ...(properties || {}), title: `Фрейм ${nextIndex}` };
+            } catch (_) {
+                properties = { ...(properties || {}), title: 'Фрейм 1' };
+            }
+        }
         const objectData = {
             id: generateObjectId(exists),
             type,
