@@ -18,18 +18,29 @@ export class CopyObjectCommand extends BaseCommand {
         const object = objects.find(obj => obj.id === this.objectId);
         
         if (object) {
-            // Создаем глубокую копию данных объекта
-            this.objectData = JSON.parse(JSON.stringify(object));
-            
-            // Сохраняем в буфер обмена приложения
-            this.coreMoodboard.clipboard = {
-                type: 'object',
-                data: this.objectData
-            };
+            // Если копируем фрейм — кладём в буфер группу: сам фрейм + его дети
+            if (object.type === 'frame') {
+                const frame = JSON.parse(JSON.stringify(object));
+                const children = (objects || []).filter(o => o && o.properties && o.properties.frameId === object.id)
+                    .map(o => JSON.parse(JSON.stringify(o)));
+                const groupData = [frame, ...children];
+                this.coreMoodboard.clipboard = {
+                    type: 'group',
+                    data: groupData,
+                    meta: { pasteCount: 0, frameBundle: true }
+                };
+            } else {
+                // Обычный объект
+                this.objectData = JSON.parse(JSON.stringify(object));
+                this.coreMoodboard.clipboard = {
+                    type: 'object',
+                    data: this.objectData
+                };
+            }
             
             this.emit(Events.Object.Updated, {
                 objectId: this.objectId,
-                objectData: this.objectData
+                objectData: object
             });
         }
     }
