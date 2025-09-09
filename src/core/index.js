@@ -213,19 +213,115 @@ export class CoreMoodBoard {
             if (this.clipboard.type === 'object') {
                 this.pasteObject({ x, y });
             } else if (this.clipboard.type === 'group') {
-                // Вставляем группу с сохранением относительных позиций относительно клика
                 const group = this.clipboard;
                 const data = Array.isArray(group.data) ? group.data : [];
                 if (data.length === 0) return;
-                // Вычисляем топ-левт группы для относительного смещения клик-точки
-                let minX = Infinity, minY = Infinity;
-                data.forEach(o => {
-                    if (!o || !o.position) return;
-                    minX = Math.min(minX, o.position.x);
-                    minY = Math.min(minY, o.position.y);
-                });
-                if (!isFinite(minX) || !isFinite(minY)) return;
-                const baseX = minX, baseY = minY;
+
+                // Особая логика: если это бандл фрейма (фрейм + дети)
+                if (group.meta && group.meta.frameBundle) {
+                    // Вычисляем топ-левт группы для относительного смещения клик-точки
+                    let minX = Infinity, minY = Infinity;
+                    data.forEach(o => {
+                        if (!o || !o.position) return;
+                        minX = Math.min(minX, o.position.x);
+                        minY = Math.min(minY, o.position.y);
+                    });
+                    if (!isFinite(minX) || !isFinite(minY)) return;
+                    const baseX = minX, baseY = minY;
+
+                    // Ищем фрейм в бандле
+                    const frames = data.filter(o => o && o.type === 'frame');
+                    if (frames.length !== 1) {
+                        // fallback к обычной вставке группы
+                        const newIds = [];
+                        let pending = data.length;
+                        const onPasted = (payload) => {
+                            if (!payload || !payload.newId) return;
+                            newIds.push(payload.newId);
+                            pending -= 1;
+                            if (pending === 0) {
+                                this.eventBus.off(Events.Object.Pasted, onPasted);
+                                requestAnimationFrame(() => {
+                                    if (this.selectTool && newIds.length > 0) {
+                                        this.selectTool.setSelection(newIds);
+                                        this.selectTool.updateResizeHandles();
+                                    }
+                                });
+                            }
+                        };
+                        this.eventBus.on(Events.Object.Pasted, onPasted);
+                        data.forEach(orig => {
+                            const cloned = JSON.parse(JSON.stringify(orig));
+                            const targetPos = {
+                                x: x + (cloned.position.x - baseX),
+                                y: y + (cloned.position.y - baseY)
+                            };
+                            this.clipboard = { type: 'object', data: cloned };
+                            const cmd = new PasteObjectCommand(this, targetPos);
+                            cmd.setEventBus(this.eventBus);
+                            this.history.executeCommand(cmd);
+                        });
+                        this.clipboard = group;
+                        return;
+                    }
+
+                    const frameOriginal = frames[0];
+                    const children = data.filter(o => o && o.id !== frameOriginal.id);
+                    const totalToPaste = 1 + children.length;
+                    const newIds = [];
+                    let pastedCount = 0;
+                    let newFrameId = null;
+
+                    const onPasted = (payload) => {
+                        if (!payload || !payload.newId) return;
+                        newIds.push(payload.newId);
+                        pastedCount += 1;
+                        // Как только вставили фрейм — вставляем детей с новым frameId
+                        if (!newFrameId && payload.originalId === frameOriginal.id) {
+                            newFrameId = payload.newId;
+                            for (const child of children) {
+                                const clonedChild = JSON.parse(JSON.stringify(child));
+                                clonedChild.properties = clonedChild.properties || {};
+                                clonedChild.properties.frameId = newFrameId;
+                                const targetPos = {
+                                    x: x + (clonedChild.position.x - baseX),
+                                    y: y + (clonedChild.position.y - baseY)
+                                };
+                                this.clipboard = { type: 'object', data: clonedChild };
+                                const cmdChild = new PasteObjectCommand(this, targetPos);
+                                cmdChild.setEventBus(this.eventBus);
+                                this.history.executeCommand(cmdChild);
+                            }
+                        }
+                        if (pastedCount === totalToPaste) {
+                            this.eventBus.off(Events.Object.Pasted, onPasted);
+                            requestAnimationFrame(() => {
+                                if (this.selectTool && newIds.length > 0) {
+                                    this.selectTool.setSelection(newIds);
+                                    this.selectTool.updateResizeHandles();
+                                }
+                            });
+                        }
+                    };
+                    this.eventBus.on(Events.Object.Pasted, onPasted);
+
+                    // Вставляем фрейм первым
+                    const frameClone = JSON.parse(JSON.stringify(frameOriginal));
+                    this.clipboard = { type: 'object', data: frameClone };
+                    const targetPosFrame = {
+                        x: x + (frameClone.position.x - baseX),
+                        y: y + (frameClone.position.y - baseY)
+                    };
+                    const cmdFrame = new PasteObjectCommand(this, targetPosFrame);
+                    cmdFrame.setEventBus(this.eventBus);
+                    this.history.executeCommand(cmdFrame);
+
+                    // Возвращаем clipboard к группе для повторных вставок
+                    this.clipboard = group;
+                    return;
+                }
+
+                // Обычная вставка группы (не фрейм-бандл)
                 const newIds = [];
                 let pending = data.length;
                 const onPasted = (payload) => {
@@ -246,15 +342,14 @@ export class CoreMoodBoard {
                 data.forEach(orig => {
                     const cloned = JSON.parse(JSON.stringify(orig));
                     const targetPos = {
-                        x: x + (cloned.position.x - baseX),
-                        y: y + (cloned.position.y - baseY)
+                        x: x + (cloned.position.x - minX),
+                        y: y + (cloned.position.y - minY)
                     };
                     this.clipboard = { type: 'object', data: cloned };
                     const cmd = new PasteObjectCommand(this, targetPos);
                     cmd.setEventBus(this.eventBus);
                     this.history.executeCommand(cmd);
                 });
-                // Возвращаем clipboard к группе для повторных вставок
                 this.clipboard = group;
             }
         });
@@ -1612,7 +1707,61 @@ export class CoreMoodBoard {
                 group.meta.pasteCount = (group.meta.pasteCount || 0) + 1;
                 const dx = offsetStep * group.meta.pasteCount;
                 const dy = offsetStep * group.meta.pasteCount;
-                // Подготовим сбор новых id через единый временный слушатель
+
+                // Особая логика: фрейм-бандл (фрейм + дети)
+                if (group.meta && group.meta.frameBundle) {
+                    const frames = data.filter(o => o && o.type === 'frame');
+                    if (frames.length === 1) {
+                        const frameOriginal = frames[0];
+                        const children = data.filter(o => o && o.id !== frameOriginal.id);
+                        const totalToPaste = 1 + children.length;
+                        let pastedCount = 0;
+                        const newIds = [];
+                        let newFrameId = null;
+
+                        const onPasted = (payload) => {
+                            if (!payload || !payload.newId) return;
+                            newIds.push(payload.newId);
+                            pastedCount += 1;
+                            if (!newFrameId && payload.originalId === frameOriginal.id) {
+                                newFrameId = payload.newId;
+                                for (const child of children) {
+                                    const clonedChild = JSON.parse(JSON.stringify(child));
+                                    clonedChild.properties = clonedChild.properties || {};
+                                    clonedChild.properties.frameId = newFrameId;
+                                    const targetPos = {
+                                        x: (clonedChild.position?.x || 0) + dx,
+                                        y: (clonedChild.position?.y || 0) + dy
+                                    };
+                                    this.clipboard = { type: 'object', data: clonedChild };
+                                    const cmdChild = new PasteObjectCommand(this, targetPos);
+                                    cmdChild.setEventBus(this.eventBus);
+                                    this.history.executeCommand(cmdChild);
+                                }
+                            }
+                            if (pastedCount === totalToPaste) {
+                                this.eventBus.off(Events.Object.Pasted, onPasted);
+                                if (this.selectTool && newIds.length > 0) {
+                                    requestAnimationFrame(() => {
+                                        this.selectTool.setSelection(newIds);
+                                        this.selectTool.updateResizeHandles();
+                                    });
+                                }
+                            }
+                        };
+                        this.eventBus.on(Events.Object.Pasted, onPasted);
+
+                        const frameClone = JSON.parse(JSON.stringify(frameOriginal));
+                        this.clipboard = { type: 'object', data: frameClone };
+                        const cmdFrame = new PasteObjectCommand(this, { x: (frameClone.position?.x || 0) + dx, y: (frameClone.position?.y || 0) + dy });
+                        cmdFrame.setEventBus(this.eventBus);
+                        this.history.executeCommand(cmdFrame);
+                        this.clipboard = group;
+                        return;
+                    }
+                }
+
+                // Обычная вставка группы
                 let pending = data.length;
                 const newIds = [];
                 const onPasted = (payload) => {
@@ -1621,7 +1770,6 @@ export class CoreMoodBoard {
                     pending -= 1;
                     if (pending === 0) {
                         this.eventBus.off(Events.Object.Pasted, onPasted);
-                        // Выделяем новую группу и показываем рамку с ручками
                         if (this.selectTool && newIds.length > 0) {
                             requestAnimationFrame(() => {
                                 this.selectTool.setSelection(newIds);
@@ -1632,22 +1780,18 @@ export class CoreMoodBoard {
                 };
                 this.eventBus.on(Events.Object.Pasted, onPasted);
 
-                // Вставляем каждый объект группы, сохраняя относительное расположение + общее смещение
                 for (const original of data) {
                     const cloned = JSON.parse(JSON.stringify(original));
                     const targetPos = {
                         x: (cloned.position?.x || 0) + dx,
                         y: (cloned.position?.y || 0) + dy
                     };
-                    // Используем существующую логику PasteObjectCommand поверх clipboard типа object
                     this.clipboard = { type: 'object', data: cloned };
                     const cmd = new PasteObjectCommand(this, targetPos);
                     cmd.setEventBus(this.eventBus);
                     this.history.executeCommand(cmd);
                 }
-                // После вставки возвращаем clipboard к группе, чтобы можно было ещё раз вставлять с новым смещением
                 this.clipboard = group;
-                // Рамка появится по завершении обработки всех событий object:pasted
             }
         });
 

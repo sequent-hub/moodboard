@@ -51,10 +51,17 @@ export class FrameService {
 							continue;
 						}
 					}
-					// Применяем позицию = старт + текущий dx/dy
-					if (childPixi) { childPixi.x = startPos.x + dx; childPixi.y = startPos.y + dy; }
+					// Применяем позицию = старт + текущий dx/dy (в координатах центра PIXI)
+					const newCenterX = startPos.x + dx;
+					const newCenterY = startPos.y + dy;
+					if (childPixi) { childPixi.x = newCenterX; childPixi.y = newCenterY; }
 					const stObj = this.state.state.objects.find(o => o.id === childId);
-					if (stObj) { stObj.position.x = startPos.x + dx; stObj.position.y = startPos.y + dy; }
+					if (stObj) {
+						const halfW = childPixi ? (childPixi.width || 0) / 2 : 0;
+						const halfH = childPixi ? (childPixi.height || 0) / 2 : 0;
+						stObj.position.x = newCenterX - halfW;
+						stObj.position.y = newCenterY - halfH;
+					}
 				}
 			} else {
 				// Hover-эффект: подсветка фрейма, если центр объекта внутри
