@@ -15,11 +15,11 @@ export class BoardService {
 		const canvasSize = (this._getCanvasSize?.() || {});
 		this.grid = GridFactory.createGrid('line', {
 			enabled: true,
-			size: 20,
+			size: 32,
 			width: canvasSize.width || 800,
 			height: canvasSize.height || 600,
-			color: 0xE6E6E6,
-			opacity: 0.5
+			color: 0x6a6aff,
+			opacity: 0.4
 		});
 		this.grid.updateVisual();
 		this.pixi.setGrid(this.grid);
