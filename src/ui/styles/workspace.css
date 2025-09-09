@@ -321,6 +321,12 @@
 }
 
 /* Frame popup (grid 2x2 + header row) */
+.moodboard-root, :root {
+    /* CSS variables for frame style */
+    --frame-border-color: #EEEEEE;
+    --frame-border-width: 2; /* px */
+    --frame-corner-radius: 3; /* px */
+}
 .frame-popup {
     display: grid;
     box-sizing: border-box;

@@ -156,8 +156,8 @@ export class PlacementTool extends BaseTool {
         const isImage = this.pending.type === 'image';
         const isFile = this.pending.type === 'file';
         const presetSize = {
-            width: (this.pending.size && this.pending.size.width) ? this.pending.size.width : 200,
-            height: (this.pending.size && this.pending.size.height) ? this.pending.size.height : 150,
+            width: (this.pending.size && this.pending.size.width) ? this.pending.size.width : (props.width || 200),
+            height: (this.pending.size && this.pending.size.height) ? this.pending.size.height : (props.height || 150),
         };
 
         if (isTextWithEditing) {
@@ -212,6 +212,20 @@ export class PlacementTool extends BaseTool {
                     color: '#000000', // Дефолтный цвет (черный)
                     backgroundColor: 'transparent' // Дефолтный фон (прозрачный)
                 }
+            });
+        } else if (this.pending.type === 'frame') {
+            // Для фрейма центр привязываем к курсору так же, как у призрака
+            const width = props.width || presetSize.width || 200;
+            const height = props.height || presetSize.height || 300;
+            position = {
+                x: Math.round(worldPoint.x - width / 2),
+                y: Math.round(worldPoint.y - height / 2)
+            };
+            this.eventBus.emit(Events.UI.ToolbarAction, {
+                type: 'frame',
+                id: 'frame',
+                position,
+                properties: { ...props, width, height }
             });
         } else if (isImage && props.selectFileOnPlace) {
             const input = document.createElement('input');

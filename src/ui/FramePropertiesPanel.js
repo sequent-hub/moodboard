@@ -158,25 +158,25 @@ export class FramePropertiesPanel {
         const { x, y } = posData.position;
         const { width, height } = sizeData.size;
 
-        // Позиционируем панель НАД фреймом, но ниже ручек ресайза
-        const panelWidth = this.panel.offsetWidth || 200;
-        const panelHeight = this.panel.offsetHeight || 44;
-        
-        const panelX = x + panelWidth/2.5; // по центру фрейма
-        
-        // Пытаемся разместить панель над фреймом
-        let  panelY = y ;
-        
-        // Если панель уходит за верхнюю границу экрана, размещаем её ниже фрейма
-        // 10px ниже фрейма
+        // Позиционируем панель над фреймом, по центру
+        const panelRect = this.panel.getBoundingClientRect();
+        const panelW = Math.max(1, panelRect.width || 280);
+        const panelH = Math.max(1, panelRect.height || 60);
+        let panelX = x + (width / 2) - (panelW / 2);
+        let panelY = y - panelH - 8; // отступ 8px над фреймом
 
-        console.log('🖼️ FramePropertiesPanel: Positioning above frame:', { 
+        // Если панель уходит за верх, переносим ниже фрейма
+        if (panelY < 0) {
+            panelY = y + height + 8;
+        }
+
+        console.log('🖼️ FramePropertiesPanel: Positioning above frame:', {
             frameX: x, frameY: y, frameWidth: width, frameHeight: height,
             panelX, panelY
         });
 
-        this.panel.style.left = `${panelX}px`;
-        this.panel.style.top = `${panelY}px`;
+        this.panel.style.left = `${Math.round(panelX)}px`;
+        this.panel.style.top = `${Math.round(panelY)}px`;
         
         console.log('🖼️ FramePropertiesPanel: Panel CSS applied:', {
             left: this.panel.style.left,
