@@ -157,12 +157,15 @@ export class HtmlHandlesLayer {
         const worldX = world?.x || 0;
         const worldY = world?.y || 0;
         
-        // Узнаём тип объекта (нужно, чтобы для file отключить ручки/ресайз)
+        // Узнаём тип объекта (нужно, чтобы для file/frame отключать определённые элементы)
         let isFileTarget = false;
+        let isFrameTarget = false;
         if (id !== '__group__') {
             const req = { objectId: id, pixiObject: null };
             this.eventBus.emit(Events.Tool.GetObjectPixi, req);
-            isFileTarget = !!(req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type === 'file');
+            const mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
+            isFileTarget = mbType === 'file';
+            isFrameTarget = mbType === 'frame';
         }
 
         // Вычисляем позицию и размер в CSS координатах, округляем до целых px
@@ -322,7 +325,7 @@ export class HtmlHandlesLayer {
         const rotateHandle = document.createElement('div');
         rotateHandle.dataset.handle = 'rotate'; 
         rotateHandle.dataset.id = id;
-        if (isFileTarget) {
+        if (isFileTarget || isFrameTarget) {
             Object.assign(rotateHandle.style, { display: 'none', pointerEvents: 'none' });
         } else {
             Object.assign(rotateHandle.style, {
@@ -463,12 +466,20 @@ export class HtmlHandlesLayer {
                     newBounds: { x: worldX, y: worldY, width: worldW, height: worldH }
                 });
             } else {
-                // Для правой/нижней ручки — фиксируем стартовую позицию; для левой/верхней — новую
+                // Определяем тип объекта: для фреймов (locked aspect) позволяем ядру вычислить позицию (симметрия)
+                let isFrameTarget = false;
+                {
+                    const req = { objectId: id, pixiObject: null };
+                    this.eventBus.emit(Events.Tool.GetObjectPixi, req);
+                    const mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
+                    isFrameTarget = mbType === 'frame';
+                }
+                // Для правой/нижней ручки — фиксируем стартовую позицию; для левой/верхней — новую (не для frame)
                 const isLeftOrTop = dir.includes('w') || dir.includes('n');
                 const resizeData = {
                     object: id,
                     size: { width: worldW, height: worldH },
-                    position: isLeftOrTop ? { x: worldX, y: worldY } : { x: startWorld.x, y: startWorld.y }
+                    position: isFrameTarget ? null : (isLeftOrTop ? { x: worldX, y: worldY } : { x: startWorld.x, y: startWorld.y })
                 };
 
                 this.eventBus.emit(Events.Tool.ResizeUpdate, resizeData);
@@ -500,12 +511,19 @@ export class HtmlHandlesLayer {
                 const finalPositionChanged = (endCSS.left !== startCSS.left) || (endCSS.top !== startCSS.top);
                 
                 const isEdgeLeftOrTop = dir.includes('w') || dir.includes('n');
+                let isFrameTarget = false;
+                {
+                    const req = { objectId: id, pixiObject: null };
+                    this.eventBus.emit(Events.Tool.GetObjectPixi, req);
+                    const mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
+                    isFrameTarget = mbType === 'frame';
+                }
                 const resizeEndData = {
                     object: id,
                     oldSize: { width: startWorld.width, height: startWorld.height },
                     newSize: { width: worldW, height: worldH },
                     oldPosition: { x: startWorld.x, y: startWorld.y },
-                    newPosition: isEdgeLeftOrTop ? { x: worldX, y: worldY } : { x: startWorld.x, y: startWorld.y }
+                    newPosition: isFrameTarget ? null : (isEdgeLeftOrTop ? { x: worldX, y: worldY } : { x: startWorld.x, y: startWorld.y })
                 };
 
                 this.eventBus.emit(Events.Tool.ResizeEnd, resizeEndData);

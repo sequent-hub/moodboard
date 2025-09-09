@@ -851,10 +851,20 @@ export class CoreMoodBoard {
                     const sh = this._activeResize.startSize.height;
                     let x = startPos.x;
                     let y = startPos.y;
-                    if (hndl.includes('e')) { /* фиксируем западную сторону */ }
-                    if (hndl.includes('s')) { /* фиксируем северную сторону */ }
+                    // Базовая привязка противоположной стороны
                     if (hndl.includes('w')) { x = startPos.x + (sw - w); }
                     if (hndl.includes('n')) { y = startPos.y + (sh - h); }
+                    // Симметрическая компенсация по перпендикулярной оси для edge-хэндлов
+                    const isEdge = ['n','s','e','w'].includes(hndl);
+                    if (isEdge) {
+                        if (hndl === 'n' || hndl === 's') {
+                            // Вверх/вниз: верх или низ фиксируется, ширина меняется симметрично относительно центра
+                            x = startPos.x + Math.round((sw - w) / 2);
+                        } else if (hndl === 'e' || hndl === 'w') {
+                            // Вправо/влево: левая или правая фиксируется, высота меняется симметрично относительно центра
+                            y = startPos.y + Math.round((sh - h) / 2);
+                        }
+                    }
                     data.position = { x: Math.round(x), y: Math.round(y) };
                 }
                 }
@@ -905,6 +915,14 @@ export class CoreMoodBoard {
                         let y = startPos.y;
                         if (hndl.includes('w')) { x = startPos.x + (sw - w); }
                         if (hndl.includes('n')) { y = startPos.y + (sh - h); }
+                        const isEdge = ['n','s','e','w'].includes(hnl = hndl);
+                        if (isEdge) {
+                            if (hnl === 'n' || hnl === 's') {
+                                x = startPos.x + Math.round((sw - w) / 2);
+                            } else if (hnl === 'e' || hnl === 'w') {
+                                y = startPos.y + Math.round((sh - h) / 2);
+                            }
+                        }
                         data.newPosition = { x: Math.round(x), y: Math.round(y) };
                     }
                 }
