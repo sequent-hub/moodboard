@@ -673,7 +673,62 @@ export class CoreMoodBoard {
             const original = objects.find(obj => obj.id === originalId);
             if (!original) return;
 
-            // Сохраняем копию в буфер обмена, чтобы переиспользовать PasteObjectCommand
+            // Если дублируем фрейм — копируем вместе с его содержимым
+            if (original.type === 'frame') {
+                const frame = JSON.parse(JSON.stringify(original));
+                const dx = (position?.x ?? frame.position.x) - frame.position.x;
+                const dy = (position?.y ?? frame.position.y) - frame.position.y;
+
+                // Дети фрейма
+                const children = (this.state.state.objects || []).filter(o => o && o.properties && o.properties.frameId === originalId);
+
+                // После вставки фрейма вставим детей, перепривязав к новому frameId
+                const onFramePasted = (payload) => {
+                    if (!payload || payload.originalId !== originalId) return;
+                    const newFrameId = payload.newId;
+                    this.eventBus.off(Events.Object.Pasted, onFramePasted);
+                    for (const child of children) {
+                        const clonedChild = JSON.parse(JSON.stringify(child));
+                        clonedChild.properties = clonedChild.properties || {};
+                        clonedChild.properties.frameId = newFrameId;
+                        const targetPos = {
+                            x: (child.position?.x || 0) + dx,
+                            y: (child.position?.y || 0) + dy
+                        };
+                        this.clipboard = { type: 'object', data: clonedChild };
+                        const cmdChild = new PasteObjectCommand(this, targetPos);
+                        cmdChild.setEventBus(this.eventBus);
+                        this.history.executeCommand(cmdChild);
+                    }
+                };
+                this.eventBus.on(Events.Object.Pasted, onFramePasted);
+
+                // Подготовим буфер для фрейма (с новым названием)
+                const frameClone = JSON.parse(JSON.stringify(frame));
+                try {
+                    const arr = this.state.state.objects || [];
+                    let maxNum = 0;
+                    for (const o of arr) {
+                        if (!o || o.type !== 'frame') continue;
+                        const t = o?.properties?.title || '';
+                        const m = t.match(/^\s*Фрейм\s+(\d+)\s*$/i);
+                        if (m) {
+                            const n = parseInt(m[1], 10);
+                            if (Number.isFinite(n)) maxNum = Math.max(maxNum, n);
+                        }
+                    }
+                    const next = maxNum + 1;
+                    frameClone.properties = frameClone.properties || {};
+                    frameClone.properties.title = `Фрейм ${next}`;
+                } catch (_) {}
+                this.clipboard = { type: 'object', data: frameClone };
+                const cmdFrame = new PasteObjectCommand(this, { x: frame.position.x + dx, y: frame.position.y + dy });
+                cmdFrame.setEventBus(this.eventBus);
+                this.history.executeCommand(cmdFrame);
+                return;
+            }
+
+            // Обычная логика для остальных типов
             this.clipboard = {
                 type: 'object',
                 data: JSON.parse(JSON.stringify(original))
@@ -685,8 +740,8 @@ export class CoreMoodBoard {
                     const prevTitle = (original.properties && typeof original.properties.title !== 'undefined') ? original.properties.title : undefined;
                     this._dupTitleMap.set(originalId, prevTitle);
                 }
-            } catch (_) { /* no-op */ }
-            // Если дублируем фрейм — проставим будущий заголовок сразу в буфер обмена
+            } catch (_) {}
+            // Если фрейм — проставим будущий заголовок в буфер
             try {
                 if (this.clipboard.data && this.clipboard.data.type === 'frame') {
                     const arr = this.state.state.objects || [];
@@ -704,7 +759,7 @@ export class CoreMoodBoard {
                     this.clipboard.data.properties = this.clipboard.data.properties || {};
                     this.clipboard.data.properties.title = `Фрейм ${next}`;
                 }
-            } catch (_) { /* no-op */ }
+            } catch (_) {}
 
             // Вызываем вставку по указанной позиции (под курсором)
             this.pasteObject(position);

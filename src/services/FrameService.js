@@ -37,12 +37,24 @@ export class FrameService {
 				const dx = (p?.x || 0) - start.x;
 				const dy = (p?.y || 0) - start.y;
 				for (const childId of attachments) {
-					const start = this._frameDragChildStart?.get(childId);
-					if (!start) continue;
-					const p = this.pixi.objects.get(childId);
-					if (p) { p.x = start.x + dx; p.y = start.y + dy; }
+					let startPos = this._frameDragChildStart?.get(childId);
+					const childPixi = this.pixi.objects.get(childId);
+					if (!startPos) {
+						// Ребёнок мог появиться после начала drag (например, при копировании фрейма)
+						// Запомним его старт как (текущая позиция - уже пройденный сдвиг фрейма),
+						// чтобы не было скачка и далее двигался синхронно
+						if (childPixi) {
+							startPos = { x: childPixi.x - dx, y: childPixi.y - dy };
+							this._frameDragChildStart = this._frameDragChildStart || new Map();
+							this._frameDragChildStart.set(childId, startPos);
+						} else {
+							continue;
+						}
+					}
+					// Применяем позицию = старт + текущий dx/dy
+					if (childPixi) { childPixi.x = startPos.x + dx; childPixi.y = startPos.y + dy; }
 					const stObj = this.state.state.objects.find(o => o.id === childId);
-					if (stObj) { stObj.position.x = start.x + dx; stObj.position.y = start.y + dy; }
+					if (stObj) { stObj.position.x = startPos.x + dx; stObj.position.y = startPos.y + dy; }
 				}
 			} else {
 				// Hover-эффект: подсветка фрейма, если центр объекта внутри
