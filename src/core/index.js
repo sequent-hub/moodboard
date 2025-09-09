@@ -1613,6 +1613,23 @@ export class CoreMoodBoard {
         };
         const initialWidth = (properties && typeof properties.width === 'number') ? properties.width : 100;
         const initialHeight = (properties && typeof properties.height === 'number') ? properties.height : 100;
+
+        // Если создаём НЕ фрейм — проверим, попадает ли центр нового объекта внутрь какого-либо фрейма.
+        // Если да, сразу прикрепляем объект к этому фрейму (properties.frameId)
+        if (type !== 'frame' && position && this.pixi && typeof this.pixi.findObjectByPosition === 'function') {
+            const center = {
+                x: position.x + initialWidth / 2,
+                y: position.y + initialHeight / 2
+            };
+            try {
+                const hostFrame = this.pixi.findObjectByPosition(center, 'frame');
+                if (hostFrame && hostFrame.id) {
+                    properties = { ...(properties || {}), frameId: hostFrame.id };
+                }
+            } catch (e) {
+                // fail-safe: не мешаем созданию при ошибке поиска
+            }
+        }
         const objectData = {
             id: generateObjectId(exists),
             type,
