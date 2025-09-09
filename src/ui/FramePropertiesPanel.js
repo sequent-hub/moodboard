@@ -168,11 +168,11 @@ export class FramePropertiesPanel {
         const panelW = Math.max(1, panelRect.width || 280);
         const panelH = Math.max(1, panelRect.height || 60);
         let panelX = x + (width / 2) - (panelW / 2);
-        let panelY = y - panelH - 50; // отступ 50px над фреймом
+        let panelY = y - panelH - 40; // отступ 40px над фреймом
 
         // Если панель уходит за верх, переносим ниже фрейма
         if (panelY < 0) {
-            panelY = y + height + 50;
+            panelY = y + height + 40;
         }
 
         console.log('🖼️ FramePropertiesPanel: Positioning above frame:', {

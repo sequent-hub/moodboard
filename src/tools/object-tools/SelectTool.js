@@ -657,9 +657,12 @@ export class SelectTool extends BaseTool {
             const w = this._toWorld(event.x, event.y);
             this._dragCtrl.update({ ...event, x: w.x, y: w.y });
         }
-        // Сообщаем о процессе перетаскивания
+        // Сообщаем о процессе перетаскивания (с текущей позицией объекта)
         if (this.isDragging && this.dragTarget) {
-            this.emit(Events.Tool.DragUpdate, { object: this.dragTarget });
+            // Передаём текущий центр PIXI для точного расчёта dx/dy службами
+            const pix = this.getPixiObject(this.dragTarget);
+            const center = pix ? { x: pix.x, y: pix.y } : null;
+            this.emit(Events.Tool.DragUpdate, { object: this.dragTarget, pixiCenter: center });
         }
         
         // Обновляем ручки во время перетаскивания

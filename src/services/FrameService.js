@@ -14,8 +14,9 @@ export class FrameService {
 			if (moved && moved.type === 'frame') {
 				// Серый фон
 				this.pixi.setFrameFill(moved.id, moved.width, moved.height, 0xEEEEEE);
-				// Cнимок стартовых позиций
-				this._frameDragFrameStart = { x: this.pixi.objects.get(moved.id)?.x || 0, y: this.pixi.objects.get(moved.id)?.y || 0 };
+				// Cнимок стартовых позиций по центру PIXI
+				const fp = this.pixi.objects.get(moved.id);
+				this._frameDragFrameStart = { x: fp?.x || 0, y: fp?.y || 0 };
 				const attachments = this._getFrameChildren(moved.id);
 				this._frameDragChildStart = new Map();
 				for (const childId of attachments) {
@@ -30,9 +31,11 @@ export class FrameService {
 			if (!moved) return;
 			if (moved.type === 'frame') {
 				const attachments = this._getFrameChildren(moved.id);
-				const frameStart = this._frameDragFrameStart || { x: data.position.x, y: data.position.y };
-				const dx = data.position.x - frameStart.x;
-				const dy = data.position.y - frameStart.y;
+				// ВАЖНО: считаем сдвиг по центру PIXI, чтобы не смешивать центр и левый-верх
+				const p = this.pixi.objects.get(moved.id);
+				const start = this._frameDragFrameStart || { x: p?.x || 0, y: p?.y || 0 };
+				const dx = (p?.x || 0) - start.x;
+				const dy = (p?.y || 0) - start.y;
 				for (const childId of attachments) {
 					const start = this._frameDragChildStart?.get(childId);
 					if (!start) continue;

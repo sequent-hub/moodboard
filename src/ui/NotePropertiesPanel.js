@@ -167,7 +167,7 @@ export class NotePropertiesPanel {
         const panelW = Math.max(1, panelRect.width || 320);
         const panelH = Math.max(1, panelRect.height || 40);
         const panelX = x + (width / 2) - (panelW / 2);
-        const panelY = Math.max(0, y - panelH - 50); // отступ 50px над запиской
+        const panelY = Math.max(0, y - panelH - 40); // отступ 40px над запиской
         
         console.log('📝 NotePropertiesPanel: Positioning next to note:', { 
             noteX: x, noteY: y, noteWidth: width, noteHeight: height,
