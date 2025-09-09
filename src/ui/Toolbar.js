@@ -137,11 +137,14 @@ export class Toolbar {
                         // Рисовать фрейм вручную прямоугольником
                         this.eventBus.emit(Events.Place.Set, { type: 'frame-draw', properties: {} });
                     } else {
-                        // Подбираем размеры по пресету
+                        // Подбираем размеры по пресету и увеличиваем площадь в 2 раза (масштаб по корню из 2)
                         let width = 210, height = 297, titleText = 'A4';
                         if (id === '1x1') { width = 300; height = 300; titleText = '1:1'; }
                         else if (id === '4x3') { width = 320; height = 240; titleText = '4:3'; }
                         else if (id === '16x9') { width = 320; height = 180; titleText = '16:9'; }
+                        const scale = 2; // х2 по сторонам = х4 по площади
+                        width = Math.round(width * scale);
+                        height = Math.round(height * scale);
                         // Устанавливаем pending для размещения фрейма указанного размера
                         this.eventBus.emit(Events.Place.Set, {
                             type: 'frame',

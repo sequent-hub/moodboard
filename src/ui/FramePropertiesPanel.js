@@ -109,15 +109,15 @@ export class FramePropertiesPanel {
             position: 'absolute',
             display: 'none',
             alignItems: 'center',
-            gap: '6px',
-            padding: '6px 8px',
+            gap: '4px',
+            padding: '4px 6px',
             backgroundColor: 'white',
             border: '1px solid #e5e7eb',
             borderRadius: '6px',
             boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
             fontSize: '12px',
             fontFamily: 'Arial, sans-serif',
-            minWidth: '200px',
+            minWidth: '160px',
             height: 'auto',
             zIndex: '10000'
         });
@@ -195,7 +195,7 @@ export class FramePropertiesPanel {
         Object.assign(titleContainer.style, {
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: '4px',
             padding: '4px 6px'
         });
 
@@ -204,7 +204,8 @@ export class FramePropertiesPanel {
         titleLabel.textContent = 'Название:';
         titleLabel.style.fontSize = '11px';
         titleLabel.style.color = '#666';
-        titleLabel.style.minWidth = '48px';
+        titleLabel.style.width = '56px';
+        titleLabel.style.textAlign = 'right';
 
         // Поле ввода для названия
         const titleInput = document.createElement('input');
@@ -212,7 +213,7 @@ export class FramePropertiesPanel {
         titleInput.placeholder = 'Название фрейма';
         Object.assign(titleInput.style, {
             flex: '1',
-            padding: '2px 6px',
+            padding: '2px 4px',
             border: '1px solid #ddd',
             borderRadius: '4px',
             fontSize: '12px',
@@ -245,7 +246,7 @@ export class FramePropertiesPanel {
         Object.assign(colorContainer.style, {
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: '4px',
             padding: '4px 6px'
         });
 
@@ -254,12 +255,13 @@ export class FramePropertiesPanel {
         colorLabel.textContent = 'Фон:';
         colorLabel.style.fontSize = '11px';
         colorLabel.style.color = '#666';
-        colorLabel.style.minWidth = '48px';
+        colorLabel.style.width = '56px';
+        colorLabel.style.textAlign = 'right';
 
         // Кнопка выбора цвета
         const colorButton = document.createElement('button');
         Object.assign(colorButton.style, {
-            width: '24px',
+            width: '20px',
             height: '20px',
             border: '1px solid #ccc',
             borderRadius: '4px',
@@ -285,7 +287,7 @@ export class FramePropertiesPanel {
         Object.assign(typeContainer.style, {
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: '4px',
             padding: '4px 6px'
         });
 
@@ -293,17 +295,19 @@ export class FramePropertiesPanel {
         typeLabel.textContent = 'Тип:';
         typeLabel.style.fontSize = '11px';
         typeLabel.style.color = '#666';
-        typeLabel.style.minWidth = '48px';
+        typeLabel.style.width = '56px';
+        typeLabel.style.textAlign = 'right';
 
         const typeSelect = document.createElement('select');
         Object.assign(typeSelect.style, {
             flex: '1',
-            padding: '2px 6px',
+            padding: '2px 4px',
             border: '1px solid #ddd',
             borderRadius: '4px',
             fontSize: '12px',
             outline: 'none',
-            height: '24px'
+            height: '22px',
+            maxWidth: '100%'
         });
         const options = [
             { value: 'custom', label: 'Произвольный' },
