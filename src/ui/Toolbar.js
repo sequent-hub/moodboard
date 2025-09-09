@@ -98,81 +98,35 @@ export class Toolbar {
 
     createFramePopup() {
         this.framePopupEl = document.createElement('div');
-        Object.assign(this.framePopupEl.style, {
-            position: 'absolute',
-            display: 'none',
-            padding: '6px',
-            background: 'white',
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.08)',
-            zIndex: 1000,
-            boxSizing: 'border-box',
-            width: '160px',
-            height: '160px',
-            gap: '6px',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gridTemplateRows: 'repeat(2, 1fr)'
-        });
+        this.framePopupEl.className = 'moodboard-toolbar__popup frame-popup';
+        this.framePopupEl.style.display = 'none';
 
-        const makeBtn = (label, id, enabled, aspect) => {
+        const makeBtn = (label, id, enabled, aspect, options = {}) => {
             const btn = document.createElement('button');
-            Object.assign(btn.style, {
-                padding: '4px',
-                borderRadius: '6px',
-                border: 'none',
-                background: 'transparent',
-                color: enabled ? '#111827' : '#9ca3af',
-                cursor: enabled ? 'pointer' : 'not-allowed',
-                fontSize: '12px',
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxSizing: 'border-box',
-                overflow: 'hidden'
-            });
+            btn.className = 'frame-popup__btn' + (enabled ? '' : ' is-disabled') + (options.header ? ' frame-popup__btn--header' : '');
+            if (options.header) {
+                // handled by CSS class
+            }
             btn.dataset.id = id;
-            // Внутри кнопки — превью с нужными пропорциями и подпись
+            // Внутри кнопки — превью (слева) и подпись (справа/ниже)
             const holder = document.createElement('div');
-            Object.assign(holder.style, {
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '4px',
-                boxSizing: 'border-box'
-            });
-            const preview = document.createElement('div');
-            Object.assign(preview.style, {
-                background: '#e5e7eb',
-                border: 'none',
-                borderRadius: '4px',
-                aspectRatio: aspect || '1 / 1',
-                height: '60%',
-                maxWidth: '100%'
-            });
+            holder.className = 'frame-popup__holder';
+            let preview = document.createElement('div');
+            if (options.header) {
+                // Для «Произвольный» — горизонтальный пунктирный прямоугольник
+                preview.className = 'frame-popup__preview frame-popup__preview--custom';
+            } else {
+                // Для пресетов — мини-превью с нужными пропорциями, слева от текста
+                preview.className = 'frame-popup__preview';
+                preview.style.aspectRatio = aspect || '1 / 1';
+            }
             const caption = document.createElement('div');
             caption.textContent = label;
-            Object.assign(caption.style, {
-                fontSize: '12px',
-                lineHeight: '14px',
-                color: enabled ? '#111827' : '#9ca3af'
-            });
+            caption.className = 'frame-popup__caption';
             holder.appendChild(preview);
             holder.appendChild(caption);
             btn.appendChild(holder);
             if (enabled) {
-                // Hover background only for enabled buttons
-                btn.addEventListener('mouseenter', () => {
-                    btn.style.background = '#f3f4f6';
-                });
-                btn.addEventListener('mouseleave', () => {
-                    btn.style.background = 'transparent';
-                });
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     // Активируем place, устанавливаем pending для frame (А4)
@@ -195,6 +149,9 @@ export class Toolbar {
             }
             this.framePopupEl.appendChild(btn);
         };
+
+        // Верхний ряд: одна кнопка «Произвольный» (пока неактивна)
+        makeBtn('Произвольный', 'custom', false, 'none', { header: true });
 
         makeBtn('A4', 'a4', true, '210 / 297');
         makeBtn('1:1', '1x1', false, '1 / 1');
