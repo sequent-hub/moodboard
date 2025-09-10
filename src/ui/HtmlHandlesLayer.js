@@ -443,12 +443,67 @@ export class HtmlHandlesLayer {
                 newTop = startCSS.top + dy; 
             }
 
+            // Минимальная ширина = ширина трёх символов текущего шрифта
+            if (isTextTarget) {
+                try {
+                    const textLayer = (typeof window !== 'undefined') ? window.moodboardHtmlTextLayer : null;
+                    const el = textLayer && textLayer.idToEl ? textLayer.idToEl.get && textLayer.idToEl.get(id) : null;
+                    if (el && typeof window.getComputedStyle === 'function') {
+                        const cs = window.getComputedStyle(el);
+                        const meas = document.createElement('span');
+                        meas.style.position = 'absolute';
+                        meas.style.visibility = 'hidden';
+                        meas.style.whiteSpace = 'pre';
+                        meas.style.fontFamily = cs.fontFamily;
+                        meas.style.fontSize = cs.fontSize;
+                        meas.style.fontWeight = cs.fontWeight;
+                        meas.style.fontStyle = cs.fontStyle;
+                        meas.style.letterSpacing = cs.letterSpacing || 'normal';
+                        meas.textContent = 'WWW';
+                        document.body.appendChild(meas);
+                        const minWidthPx = Math.max(1, Math.ceil(meas.getBoundingClientRect().width));
+                        meas.remove();
+                        if (newW < minWidthPx) {
+                            if (dir.includes('w')) {
+                                newLeft = startCSS.left + (startCSS.width - minWidthPx);
+                            }
+                            newW = minWidthPx;
+                        }
+                    }
+                } catch (_) {}
+            }
+
             // Для текстовых объектов подгоняем высоту под контент при изменении ширины
             if (isTextTarget) {
                 try {
                     const textLayer = (typeof window !== 'undefined') ? window.moodboardHtmlTextLayer : null;
                     const el = textLayer && textLayer.idToEl ? textLayer.idToEl.get && textLayer.idToEl.get(id) : null;
                     if (el) {
+                        // Минимальная ширина в 3 символа
+                        let minWidthPx = 0;
+                        try {
+                            const cs = window.getComputedStyle(el);
+                            const meas = document.createElement('span');
+                            meas.style.position = 'absolute';
+                            meas.style.visibility = 'hidden';
+                            meas.style.whiteSpace = 'pre';
+                            meas.style.fontFamily = cs.fontFamily;
+                            meas.style.fontSize = cs.fontSize;
+                            meas.style.fontWeight = cs.fontWeight;
+                            meas.style.fontStyle = cs.fontStyle;
+                            meas.style.letterSpacing = cs.letterSpacing || 'normal';
+                            meas.textContent = 'WWW';
+                            document.body.appendChild(meas);
+                            minWidthPx = Math.max(1, Math.ceil(meas.getBoundingClientRect().width));
+                            meas.remove();
+                        } catch (_) {}
+
+                        if (minWidthPx > 0 && newW < minWidthPx) {
+                            if (dir.includes('w')) {
+                                newLeft = startCSS.left + (startCSS.width - minWidthPx);
+                            }
+                            newW = minWidthPx;
+                        }
                         el.style.width = `${Math.max(1, Math.round(newW))}px`;
                         el.style.height = 'auto';
                         const measured = Math.max(1, Math.round(el.scrollHeight));
@@ -646,6 +701,36 @@ export class HtmlHandlesLayer {
             if (edge === 'top') { 
                 newH = Math.max(1, startCSS.height - dyCSS); 
                 newTop = startCSS.top + dyCSS; 
+            }
+
+            // Минимальная ширина = ширина трёх символов текущего шрифта
+            if (isTextTarget) {
+                try {
+                    const textLayer = (typeof window !== 'undefined') ? window.moodboardHtmlTextLayer : null;
+                    const el = textLayer && textLayer.idToEl ? textLayer.idToEl.get && textLayer.idToEl.get(id) : null;
+                    if (el && typeof window.getComputedStyle === 'function') {
+                        const cs = window.getComputedStyle(el);
+                        const meas = document.createElement('span');
+                        meas.style.position = 'absolute';
+                        meas.style.visibility = 'hidden';
+                        meas.style.whiteSpace = 'pre';
+                        meas.style.fontFamily = cs.fontFamily;
+                        meas.style.fontSize = cs.fontSize;
+                        meas.style.fontWeight = cs.fontWeight;
+                        meas.style.fontStyle = cs.fontStyle;
+                        meas.style.letterSpacing = cs.letterSpacing || 'normal';
+                        meas.textContent = 'WWW';
+                        document.body.appendChild(meas);
+                        const minWidthPx = Math.max(1, Math.ceil(meas.getBoundingClientRect().width));
+                        meas.remove();
+                        if (newW < minWidthPx) {
+                            if (edge === 'left') {
+                                newLeft = startCSS.left + (startCSS.width - minWidthPx);
+                            }
+                            newW = minWidthPx;
+                        }
+                    }
+                } catch (_) {}
             }
 
             // Для текстовых объектов при изменении ширины вычисляем высоту по контенту
