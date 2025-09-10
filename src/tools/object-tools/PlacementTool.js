@@ -399,9 +399,14 @@ export class PlacementTool extends BaseTool {
         const h = Math.abs(p.y - this._frameDrawState.startY);
         const g = this._frameDrawState.graphics;
         g.clear();
-        g.lineStyle(1, 0x3B82F6, 1);
+        // Снапим к полупикселю и используем внутреннее выравнивание линии для чётких 1px краёв
+        const x0 = Math.floor(x) + 0.5;
+        const y0 = Math.floor(y) + 0.5;
+        const w0 = Math.max(1, Math.round(w));
+        const h0 = Math.max(1, Math.round(h));
+        g.lineStyle(1, 0x3B82F6, 1, 1 /* alignment: inner */);
         g.beginFill(0xFFFFFF, 0.6);
-        g.drawRect(x, y, w, h);
+        g.drawRect(x0, y0, w0, h0);
         g.endFill();
     }
 
@@ -911,15 +916,33 @@ export class PlacementTool extends BaseTool {
         // Получаем параметры фрейма из pending
         const width = this.pending.properties?.width || 200;
         const height = this.pending.properties?.height || 300;
-        const fillColor = this.pending.properties?.fillColor || 0xFFFFFF;
-        const borderColor = this.pending.properties?.borderColor || 0x333333;
+        const fillColor = (this.pending.properties?.backgroundColor ?? this.pending.properties?.fillColor) ?? 0xFFFFFF;
         const title = this.pending.properties?.title || 'Новый';
+
+        // Читаем стили рамки как у реального фрейма (FrameObject)
+        const rootStyles = (typeof window !== 'undefined') ? getComputedStyle(document.documentElement) : null;
+        const cssBorderWidth = rootStyles ? parseFloat(rootStyles.getPropertyValue('--frame-border-width') || '4') : 4;
+        const cssCornerRadius = rootStyles ? parseFloat(rootStyles.getPropertyValue('--frame-corner-radius') || '6') : 6;
+        const cssBorderColor = rootStyles ? rootStyles.getPropertyValue('--frame-border-color').trim() : '';
+        const borderWidth = Number.isFinite(cssBorderWidth) ? cssBorderWidth : 4;
+        const cornerRadius = Number.isFinite(cssCornerRadius) ? cssCornerRadius : 6;
+        let strokeColor;
+        if (cssBorderColor && cssBorderColor.startsWith('#')) {
+            strokeColor = parseInt(cssBorderColor.slice(1), 16);
+        } else {
+            strokeColor = (typeof this.pending.properties?.borderColor === 'number') ? this.pending.properties.borderColor : 0xE0E0E0;
+        }
         
-        // Создаем фон фрейма (как в FrameObject)
+        // Создаем фон фрейма (как в FrameObject) — повторяем стили рамки
         const frameGraphics = new PIXI.Graphics();
-        frameGraphics.beginFill(fillColor, 0.8); // Полупрозрачная заливка
-        frameGraphics.lineStyle(2, borderColor, 0.8); // Граница
-        frameGraphics.drawRect(0, 0, width, height);
+        try {
+            frameGraphics.lineStyle({ width: borderWidth, color: strokeColor, alpha: 1, alignment: 1 });
+        } catch (e) {
+            frameGraphics.lineStyle(borderWidth, strokeColor, 1);
+        }
+        // Заливка как у фрейма, прозрачность задаётся через контейнер (alpha)
+        frameGraphics.beginFill(fillColor, 1);
+        frameGraphics.drawRoundedRect(0, 0, width, height, cornerRadius);
         frameGraphics.endFill();
         
         // Создаем заголовок фрейма (как в FrameObject)
@@ -929,41 +952,13 @@ export class PlacementTool extends BaseTool {
             fill: 0x333333,
             fontWeight: 'bold'
         });
-        titleText.anchor.set(0, 1); // Левый нижний угол текста
-        titleText.y = -5; // Немного выше фрейма
-        
-        // Добавляем пунктирную рамку для лучшей видимости призрака
-        const dashedBorder = new PIXI.Graphics();
-        dashedBorder.lineStyle(1, 0x007BFF, 0.6);
-        // Создаем пунктирную линию вручную
-        for (let i = 0; i <= width; i += 10) {
-            if ((i / 10) % 2 === 0) {
-                dashedBorder.moveTo(i, -2);
-                dashedBorder.lineTo(Math.min(i + 5, width), -2);
-            }
-        }
-        for (let i = 0; i <= height; i += 10) {
-            if ((i / 10) % 2 === 0) {
-                dashedBorder.moveTo(-2, i);
-                dashedBorder.lineTo(-2, Math.min(i + 5, height));
-            }
-        }
-        for (let i = 0; i <= width; i += 10) {
-            if ((i / 10) % 2 === 0) {
-                dashedBorder.moveTo(i, height + 2);
-                dashedBorder.lineTo(Math.min(i + 5, width), height + 2);
-            }
-        }
-        for (let i = 0; i <= height; i += 10) {
-            if ((i / 10) % 2 === 0) {
-                dashedBorder.moveTo(width + 2, i);
-                dashedBorder.lineTo(width + 2, Math.min(i + 5, height));
-            }
-        }
+        // Размещаем заголовок внутри верхней части фрейма
+        titleText.anchor.set(0, 0);
+        titleText.x = 8;
+        titleText.y = 4;
         
         this.ghostContainer.addChild(frameGraphics);
         this.ghostContainer.addChild(titleText);
-        this.ghostContainer.addChild(dashedBorder);
         
         // Центрируем контейнер относительно курсора
         this.ghostContainer.pivot.x = width / 2;

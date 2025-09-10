@@ -12,6 +12,19 @@ import { GroupResizeController } from './selection/GroupResizeController.js';
 import { GroupRotateController } from './selection/GroupRotateController.js';
 import { GroupDragController } from './selection/GroupDragController.js';
 import { BoxSelectController } from './selection/BoxSelectController.js';
+import cursorDefaultSvg from '../../assets/icons/cursor-default.svg?raw';
+
+// Построение data URL для курсора по умолчанию (стрелка) — масштабируем в 2 раза меньше
+const _scaledCursorSvg = (() => {
+    try {
+        return cursorDefaultSvg
+            .replace(/width="[^"]+"/i, 'width="25px"')
+            .replace(/height="[^"]+"/i, 'height="25px"');
+    } catch (_) {
+        return cursorDefaultSvg;
+    }
+})();
+const DEFAULT_CURSOR = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(_scaledCursorSvg)}") 0 0, default`;
 
 /**
  * Инструмент выделения и работы с объектами
@@ -20,7 +33,7 @@ import { BoxSelectController } from './selection/BoxSelectController.js';
 export class SelectTool extends BaseTool {
     constructor(eventBus) {
         super('select', eventBus);
-        this.cursor = 'default';
+        this.cursor = DEFAULT_CURSOR;
         this.hotkey = 'v';
         
         // Флаг состояния объекта
@@ -143,7 +156,7 @@ export class SelectTool extends BaseTool {
         
         // Устанавливаем стандартный курсор для select инструмента
         if (this.app && this.app.view) {
-            this.app.view.style.cursor = 'default';
+            this.app.view.style.cursor = DEFAULT_CURSOR;
         }
         
         // Инициализируем систему ручек изменения размера
@@ -1179,7 +1192,7 @@ export class SelectTool extends BaseTool {
                 this.cursor = 'move';
                 break;
             default:
-                this.cursor = 'default';
+                this.cursor = DEFAULT_CURSOR;
         }
         
         this.setCursor();
@@ -1221,7 +1234,7 @@ export class SelectTool extends BaseTool {
         // Получаем ID выбранного объекта для определения его поворота
         const selectedObject = Array.from(this.selectedObjects)[0];
         if (!selectedObject) {
-            return 'default';
+            return DEFAULT_CURSOR;
         }
         
         // Получаем угол поворота объекта

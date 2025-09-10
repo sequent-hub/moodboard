@@ -1,4 +1,17 @@
 import { Events } from '../core/events/Events.js';
+import cursorDefaultSvg from '../assets/icons/cursor-default.svg?raw';
+
+// Масштабируем курсор в 2 раза меньше
+const _scaledCursorSvg = (() => {
+    try {
+        return cursorDefaultSvg
+            .replace(/width="[^"]+"/i, 'width="25px"')
+            .replace(/height="[^"]+"/i, 'height="25px"');
+    } catch (_) {
+        return cursorDefaultSvg;
+    }
+})();
+const DEFAULT_CURSOR = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(_scaledCursorSvg)}") 0 0, default`;
 
 /**
  * Менеджер инструментов - управляет активными инструментами и переключением между ними
@@ -22,6 +35,11 @@ export class ToolManager {
         this.lastMousePos = null;
         this.isMouseOverContainer = false;
         
+        // Устанавливаем курсор по умолчанию на контейнер, если инструмент ещё не активирован
+        if (this.container) {
+            this.container.style.cursor = DEFAULT_CURSOR;
+        }
+
         this.initEventListeners();
     }
     
@@ -126,7 +144,12 @@ export class ToolManager {
         this.container.addEventListener('mousedown', (e) => this.handleMouseDown(e));
         this.container.addEventListener('mousemove', (e) => this.handleMouseMove(e));
         this.container.addEventListener('mouseup', (e) => this.handleMouseUp(e));
-        this.container.addEventListener('mouseenter', () => { this.isMouseOverContainer = true; });
+        this.container.addEventListener('mouseenter', () => { 
+            this.isMouseOverContainer = true; 
+            if (!this.activeTool) {
+                this.container.style.cursor = DEFAULT_CURSOR;
+            }
+        });
         this.container.addEventListener('mouseleave', () => { this.isMouseOverContainer = false; });
         // Убираем отдельные слушатели aux-pan на контейнере, чтобы не дублировать mousedown/mouseup
 
