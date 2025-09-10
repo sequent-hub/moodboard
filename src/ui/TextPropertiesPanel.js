@@ -41,15 +41,10 @@ export class TextPropertiesPanel {
             if (this.currentId && objectId === this.currentId) this.hide();
         });
         
-        // Во время редактирования текста показываем панель для текущего объекта
-        this.eventBus.on(Events.UI.TextEditStart, ({ objectId }) => {
+        // Во время редактирования текста скрываем панель
+        this.eventBus.on(Events.UI.TextEditStart, () => {
             this.isTextEditing = true;
-            this.currentId = objectId || null;
-            if (this.currentId) {
-                this.showFor(this.currentId);
-            } else {
-                this.hide();
-            }
+            this.hide();
         });
         this.eventBus.on(Events.UI.TextEditEnd, () => {
             this.isTextEditing = false;
@@ -130,16 +125,16 @@ export class TextPropertiesPanel {
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'center',
-            gap: '12px',
-            padding: '8px 16px',
+            gap: '6px', 
+            padding: '6px 10px', 
             backgroundColor: 'white',
             border: '1px solid #e0e0e0',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-            fontSize: '14px',
+            borderRadius: '6px', 
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)', 
+            fontSize: '12px', 
             fontFamily: 'Arial, sans-serif',
-            minWidth: '550px',
-            height: '44px'
+            minWidth: '380px', 
+            height: '36px' 
         });
 
         // Создаем контролы
@@ -152,7 +147,7 @@ export class TextPropertiesPanel {
         // Лейбл для шрифта
         const fontLabel = document.createElement('span');
         fontLabel.textContent = 'Шрифт:';
-        fontLabel.style.fontSize = '12px';
+        fontLabel.style.fontSize = '11px';
         fontLabel.style.color = '#666';
         fontLabel.style.fontWeight = '500';
         panel.appendChild(fontLabel);
@@ -163,11 +158,11 @@ export class TextPropertiesPanel {
         Object.assign(this.fontSelect.style, {
             border: '1px solid #ddd',
             borderRadius: '4px',
-            padding: '4px 8px',
-            fontSize: '13px',
+            padding: '2px 6px', 
+            fontSize: '12px', 
             backgroundColor: 'white',
             cursor: 'pointer',
-            minWidth: '140px'
+            minWidth: '110px' 
         });
 
         // Список популярных шрифтов
@@ -202,10 +197,10 @@ export class TextPropertiesPanel {
         // Лейбл для размера
         const sizeLabel = document.createElement('span');
         sizeLabel.textContent = 'Размер:';
-        sizeLabel.style.fontSize = '12px';
+        sizeLabel.style.fontSize = '11px';
         sizeLabel.style.color = '#666';
         sizeLabel.style.fontWeight = '500';
-        sizeLabel.style.marginLeft = '8px';
+        sizeLabel.style.marginLeft = '6px';
         panel.appendChild(sizeLabel);
 
         // Выпадающий список размеров шрифта
@@ -214,11 +209,11 @@ export class TextPropertiesPanel {
         Object.assign(this.fontSizeSelect.style, {
             border: '1px solid #ddd',
             borderRadius: '4px',
-            padding: '4px 8px',
-            fontSize: '13px',
+            padding: '2px 6px',
+            fontSize: '12px',
             backgroundColor: 'white',
             cursor: 'pointer',
-            minWidth: '70px'
+            minWidth: '56px'
         });
 
         // Популярные размеры шрифта
@@ -241,10 +236,10 @@ export class TextPropertiesPanel {
         // Лейбл для цвета
         const colorLabel = document.createElement('span');
         colorLabel.textContent = 'Цвет:';
-        colorLabel.style.fontSize = '12px';
+        colorLabel.style.fontSize = '11px';
         colorLabel.style.color = '#666';
         colorLabel.style.fontWeight = '500';
-        colorLabel.style.marginLeft = '8px';
+        colorLabel.style.marginLeft = '6px';
         panel.appendChild(colorLabel);
 
         // Создаем компактный селектор цвета текста
@@ -277,9 +272,9 @@ export class TextPropertiesPanel {
         this.currentColorButton.type = 'button';
         this.currentColorButton.title = 'Выбрать цвет';
         this.currentColorButton.style.cssText = `
-            width: 32px;
-            height: 24px;
-            border: 2px solid #ddd;
+            width: 28px;
+            height: 20px;
+            border: 1px solid #ddd;
             border-radius: 4px;
             background-color: #000000;
             cursor: pointer;
@@ -468,9 +463,9 @@ export class TextPropertiesPanel {
         this.currentBgColorButton.type = 'button';
         this.currentBgColorButton.title = 'Выбрать цвет выделения';
         this.currentBgColorButton.style.cssText = `
-            width: 32px;
-            height: 24px;
-            border: 2px solid #ddd;
+            width: 28px;
+            height: 20px;
+            border: 1px solid #ddd;
             border-radius: 4px;
             background-color: transparent;
             cursor: pointer;

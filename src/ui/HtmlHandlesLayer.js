@@ -412,6 +412,15 @@ export class HtmlHandlesLayer {
         }
 
         const startMouse = { x: e.clientX, y: e.clientY };
+        // Определяем тип объекта (нужно, чтобы для текста автоподгонять высоту)
+        let isTextTarget = false;
+        {
+            const req = { objectId: id, pixiObject: null };
+            this.eventBus.emit(Events.Tool.GetObjectPixi, req);
+            const mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
+            isTextTarget = (mbType === 'text' || mbType === 'simple-text');
+        }
+
         const onMove = (ev) => {
             const dx = ev.clientX - startMouse.x;
             const dy = ev.clientY - startMouse.y;
@@ -432,6 +441,20 @@ export class HtmlHandlesLayer {
             if (dir.includes('n')) { 
                 newH = Math.max(1, startCSS.height - dy); 
                 newTop = startCSS.top + dy; 
+            }
+
+            // Для текстовых объектов подгоняем высоту под контент при изменении ширины
+            if (isTextTarget) {
+                try {
+                    const textLayer = (typeof window !== 'undefined') ? window.moodboardHtmlTextLayer : null;
+                    const el = textLayer && textLayer.idToEl ? textLayer.idToEl.get && textLayer.idToEl.get(id) : null;
+                    if (el) {
+                        el.style.width = `${Math.max(1, Math.round(newW))}px`;
+                        el.style.height = 'auto';
+                        const measured = Math.max(1, Math.round(el.scrollHeight));
+                        newH = measured;
+                    }
+                } catch (_) {}
             }
 
             // Обновим визуально (округление до целых для избежания дрожания)
@@ -523,6 +546,28 @@ export class HtmlHandlesLayer {
                 };
 
                 this.eventBus.emit(Events.Tool.ResizeEnd, resizeEndData);
+                // Для текстовых объектов также пробуем обновить размер по контенту ещё раз
+                try {
+                    const req2 = { objectId: id, pixiObject: null };
+                    this.eventBus.emit(Events.Tool.GetObjectPixi, req2);
+                    const mbType2 = req2.pixiObject && req2.pixiObject._mb && req2.pixiObject._mb.type;
+                    if (mbType2 === 'text' || mbType2 === 'simple-text') {
+                        const textLayer = (typeof window !== 'undefined') ? window.moodboardHtmlTextLayer : null;
+                        const el = textLayer && textLayer.idToEl ? textLayer.idToEl.get && textLayer.idToEl.get(id) : null;
+                        if (el) {
+                            el.style.width = `${Math.max(1, Math.round(endCSS.width))}px`;
+                            el.style.height = 'auto';
+                            const measured = Math.max(1, Math.round(el.scrollHeight));
+                            const worldH2 = (measured * res) / s;
+                            const fixData = {
+                                object: id,
+                                size: { width: worldW, height: worldH2 },
+                                position: isFrameTarget ? null : (isEdgeLeftOrTop ? { x: worldX, y: worldY } : { x: startWorld.x, y: startWorld.y })
+                            };
+                            this.eventBus.emit(Events.Tool.ResizeUpdate, fixData);
+                        }
+                    }
+                } catch (_) {}
             }
         };
         document.addEventListener('mousemove', onMove);

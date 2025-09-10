@@ -1622,6 +1622,20 @@ export class SelectTool extends BaseTool {
         this.textEditor.world = world || null;
         const view = app?.view;
         if (!view) return;
+        // Рассчитываем эффективный размер шрифта ДО вставки textarea в DOM, чтобы избежать скачка размера
+        const worldLayerEarly = world || (this.app?.stage);
+        const sEarly = worldLayerEarly?.scale?.x || 1;
+        const viewResEarly = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
+        const sCssEarly = sEarly / viewResEarly;
+        let effectiveFontPx = Math.max(1, Math.round((fontSize || 14) * sCssEarly));
+        if (objectId && typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
+            const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
+            if (el && typeof window.getComputedStyle === 'function') {
+                const cs = window.getComputedStyle(el);
+                const f = parseFloat(cs.fontSize);
+                if (isFinite(f) && f > 0) effectiveFontPx = Math.round(f);
+            }
+        }
         // Используем только HTML-ручки во время редактирования текста
         // Обертка для рамки + textarea + ручек
         const wrapper = document.createElement('div');
@@ -1651,17 +1665,19 @@ export class SelectTool extends BaseTool {
             border: 'none',
             paddingTop: '5px',
             paddingBottom: '5px',
-            fontSize: `${fontSize}px`,
+            paddingLeft: '0px',
+            paddingRight: '0px',
+            fontSize: `${effectiveFontPx}px`,
             fontFamily: 'Arial, sans-serif',
-            lineHeight: `${fontSize}px`,
+            lineHeight: `${effectiveFontPx}px`,
             color: '#111', // Для записок делаем текст черным для лучшей видимости
             background: isNote ? 'white' : 'transparent',
             outline: 'none',
             resize: 'none',
             minWidth: isNote ? '240px' : '0px',
-            minHeight: `${fontSize}px`,
+            minHeight: `${effectiveFontPx}px`,
             width: isNote ? '280px' : 'auto',
-            height: `${fontSize}px`,
+            height: `${effectiveFontPx}px`,
             boxSizing: 'content-box',
             overflow: 'hidden',
             // Повыше чёткость текста в CSS
@@ -1692,81 +1708,7 @@ export class SelectTool extends BaseTool {
         });
         wrapper.appendChild(outline);
         
-        // Угловые HTML-ручки (зелёные) вокруг input: nw, ne, se, sw
-        const cornerDirs = ['nw','ne','se','sw'];
-        const cornerHandles = cornerDirs.map(dir => {
-            const h = document.createElement('div');
-            h.dataset.dir = dir;
-            Object.assign(h.style, {
-                position: 'absolute',
-                width: '12px', height: '12px',
-                background: '#1DE9B6',
-                border: '2px solid #1DE9B6',
-                borderRadius: '50%',
-                boxSizing: 'border-box',
-                pointerEvents: 'auto',
-                zIndex: 10002,
-                cursor: (dir === 'nw' || dir === 'se') ? 'nwse-resize' : 'nesw-resize',
-            });
-            // Внутренний белый круг
-            const inner = document.createElement('div');
-            Object.assign(inner.style, {
-                position: 'absolute',
-                top: '1px', left: '1px',
-                width: '6px', height: '6px',
-                background: '#fff', borderRadius: '50%', pointerEvents: 'none'
-            });
-            h.appendChild(inner);
-            wrapper.appendChild(h);
-            return h;
-        });
-
-        const placeCornerHandles = () => {
-            const w = Math.max(1, wrapper.offsetWidth);
-            const h = Math.max(1, wrapper.offsetHeight);
-            cornerHandles.forEach(hd => {
-                const dir = hd.dataset.dir;
-                switch (dir) {
-                    case 'nw': hd.style.left = `${-6}px`; hd.style.top = `${-6}px`; break;
-                    case 'ne': hd.style.left = `${Math.max(-6, w - 6)}px`; hd.style.top = `${-6}px`; break;
-                    case 'se': hd.style.left = `${Math.max(-6, w - 6)}px`; hd.style.top = `${Math.max(-6, h - 6)}px`; break;
-                    case 'sw': hd.style.left = `${-6}px`; hd.style.top = `${Math.max(-6, h - 6)}px`; break;
-                }
-            });
-        };
-
-        const onCornerDown = (e) => {
-            e.preventDefault(); e.stopPropagation();
-            const dir = e.currentTarget.dataset.dir;
-            const start = {
-                x: e.clientX, y: e.clientY,
-                w: wrapper.offsetWidth, h: wrapper.offsetHeight,
-                left: parseFloat(wrapper.style.left || '0'), top: parseFloat(wrapper.style.top || '0'), dir
-            };
-            const onMove = (ev) => {
-                const dx = ev.clientX - start.x;
-                const dy = ev.clientY - start.y;
-                let newW = start.w; let newH = start.h; let newLeft = start.left; let newTop = start.top;
-                if (dir.includes('e')) newW = Math.max(minWBound, start.w + dx);
-                if (dir.includes('s')) newH = Math.max(minHBound, start.h + dy);
-                if (dir.includes('w')) { newW = Math.max(minWBound, start.w - dx); newLeft = start.left + dx; }
-                if (dir.includes('n')) { newH = Math.max(minHBound, start.h - dy); newTop = start.top + dy; }
-                wrapper.style.width = `${newW}px`;
-                wrapper.style.height = `${newH}px`;
-                wrapper.style.left = `${newLeft}px`;
-                wrapper.style.top = `${newTop}px`;
-                textarea.style.width = `${newW}px`;
-                textarea.style.height = `${newH}px`;
-                placeCornerHandles();
-            };
-            const onUp = () => {
-                document.removeEventListener('mousemove', onMove);
-                document.removeEventListener('mouseup', onUp);
-            };
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
-        };
-        cornerHandles.forEach(h => h.addEventListener('mousedown', onCornerDown));
+        // В режиме input не показываем локальные ручки
         
         // Не создаём локальные синие ручки: используем HtmlHandlesLayer (зелёные)
         
@@ -1846,9 +1788,6 @@ export class SelectTool extends BaseTool {
         wrapper.appendChild(textarea);
         view.parentElement.appendChild(wrapper);
         
-        // Автоматически устанавливаем фокус на textarea
-        textarea.focus();
-        
         // Позиция обертки по миру → экран
         const toScreen = (wx, wy) => {
             const worldLayer = this.textEditor.world || (this.app?.stage);
@@ -1911,16 +1850,34 @@ export class SelectTool extends BaseTool {
         const worldLayerRef = this.textEditor.world || (this.app?.stage);
         const s = worldLayerRef?.scale?.x || 1;
         const viewRes = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
+        const sCss = s / viewRes;
+        // Синхронизируем стартовый размер шрифта textarea с текущим зумом (как HtmlTextLayer)
+        // Используем ранее вычисленный effectiveFontPx (до вставки в DOM), если он есть в замыкании
+        textarea.style.fontSize = `${effectiveFontPx}px`;
+        // Адаптивный межстрочный интервал для ввода, синхронно с HtmlTextLayer
+        const computeLineHeightPx = (fs) => {
+            if (fs <= 12) return Math.round(fs * 1.40);
+            if (fs <= 18) return Math.round(fs * 1.34);
+            if (fs <= 36) return Math.round(fs * 1.26);
+            if (fs <= 48) return Math.round(fs * 1.24);
+            if (fs <= 72) return Math.round(fs * 1.22);
+            if (fs <= 96) return Math.round(fs * 1.20);
+            return Math.round(fs * 1.18);
+        };
+        const lhInitial = computeLineHeightPx(effectiveFontPx);
+        textarea.style.lineHeight = `${lhInitial}px`;
+        textarea.style.minHeight = `${effectiveFontPx}px`;
+        textarea.style.height = `${effectiveFontPx}px`;
         const initialWpx = initialSize ? Math.max(1, (initialSize.width || 0) * s / viewRes) : null;
         const initialHpx = initialSize ? Math.max(1, (initialSize.height || 0) * s / viewRes) : null;
         
         // Определяем минимальные границы для всех типов объектов
         let minWBound = initialWpx || 120; // базово близко к призраку
-        let minHBound = fontSize; // базовая высота
+        let minHBound = effectiveFontPx; // базовая высота
         // Уменьшаем визуальный нижний запас, который браузеры добавляют к textarea
         const BASELINE_FIX = 2; // px
         if (!isNote) {
-            minHBound = Math.max(1, fontSize - BASELINE_FIX);
+            minHBound = Math.max(1, effectiveFontPx - BASELINE_FIX);
         }
 
         // Если создаём новый текст — длина поля ровно как placeholder
@@ -1939,7 +1896,7 @@ export class SelectTool extends BaseTool {
                 return w;
             };
             const startWidth = Math.max(1, measureTextWidth('Напишите что-нибудь'));
-            const startHeight = Math.max(1, fontSize - BASELINE_FIX + 10); // +5px сверху и +5px снизу
+            const startHeight = Math.max(1, effectiveFontPx - BASELINE_FIX + 10); // +5px сверху и +5px снизу
             textarea.style.width = `${startWidth}px`;
             textarea.style.height = `${startHeight}px`;
             wrapper.style.width = `${startWidth}px`;
@@ -1985,7 +1942,7 @@ export class SelectTool extends BaseTool {
             // для нескольких строк используем scrollHeight с небольшим вычетом браузерного запаса
             const adjust = BASELINE_FIX;
             const computed = (typeof window !== 'undefined') ? window.getComputedStyle(textarea) : null;
-            const lineH = (computed ? parseFloat(computed.lineHeight) : (fontSize || 18)) + 10; // +5px сверху и +5px снизу
+            const lineH = (computed ? parseFloat(computed.lineHeight) : computeLineHeightPx(effectiveFontPx)) + 10; // +5px сверху и +5px снизу
             const rawH = textarea.scrollHeight;
             const lines = lineH > 0 ? Math.max(1, Math.round(rawH / lineH)) : 1;
             const targetH = lines <= 1
@@ -1993,8 +1950,7 @@ export class SelectTool extends BaseTool {
                 : Math.max(minHBound, Math.max(1, rawH - adjust));
             textarea.style.height = `${targetH}px`;
             wrapper.style.height = `${targetH}px`;
-            // Обновляем позицию угловых ручек после авторазмера
-            placeCornerHandles();
+            // Ручки скрыты в режиме input
         };
         
         // Вызываем autoSize только для обычного текста
@@ -2002,15 +1958,14 @@ export class SelectTool extends BaseTool {
             autoSize();
         }
         textarea.focus();
-        // Расставляем угловые ручки при первом рендере
-        placeCornerHandles();
+        // Ручки скрыты в режиме input
         // Локальная CSS-настройка placeholder (меньше базового шрифта)
         const uid = 'mbti-' + Math.random().toString(36).slice(2);
         textarea.classList.add(uid);
         const styleEl = document.createElement('style');
-        const phSize = fontSize;
+        const phSize = effectiveFontPx;
         const placeholderOpacity = isNote ? '0.4' : '0.6'; // Для записок делаем placeholder менее заметным
-        styleEl.textContent = `.${uid}::placeholder{font-size:${phSize}px;opacity:${placeholderOpacity};}`;
+        styleEl.textContent = `.${uid}::placeholder{font-size:${phSize}px;opacity:${placeholderOpacity};line-height:${computeLineHeightPx(phSize)}px;}`;
         document.head.appendChild(styleEl);
         this.textEditor = { active: true, objectId, textarea, wrapper, world: this.textEditor.world, position, properties: { fontSize }, objectType, _phStyle: styleEl };
 

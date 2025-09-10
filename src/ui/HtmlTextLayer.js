@@ -96,6 +96,18 @@ export class HtmlTextLayer {
                 }
                 if (updates.fontSize) {
                     el.style.fontSize = `${updates.fontSize}px`;
+                    // Также обновляем line-height согласно новой шкале
+                    const fs = updates.fontSize;
+                    const lh = (fs <= 12) ? Math.round(fs * 1.40)
+                        : (fs <= 18) ? Math.round(fs * 1.34)
+                        : (fs <= 36) ? Math.round(fs * 1.26)
+                        : (fs <= 48) ? Math.round(fs * 1.24)
+                        : (fs <= 72) ? Math.round(fs * 1.22)
+                        : (fs <= 96) ? Math.round(fs * 1.20)
+                        : Math.round(fs * 1.18);
+                    el.style.lineHeight = `${lh}px`;
+                    // Синхронизируем базовый размер шрифта для дальнейших пересчётов (zoom/resize)
+                    el.dataset.baseFontSize = String(fs);
                     console.log(`🔍 HtmlTextLayer: обновлен размер шрифта для ${objectId}:`, updates.fontSize);
                 }
                 if (updates.color) {
@@ -106,7 +118,9 @@ export class HtmlTextLayer {
                     el.style.backgroundColor = updates.backgroundColor === 'transparent' ? '' : updates.backgroundColor;
                     console.log(`🔍 HtmlTextLayer: обновлен фон для ${objectId}:`, updates.backgroundColor);
                 }
-                // Здесь можно добавить обработку других свойств текста
+                // После изменения свойств текста — автоподгон высоты рамки под контент и принудительное обновление
+                this._autoFitTextHeight(objectId);
+                this.updateOne(objectId);
             }
         });
 
@@ -175,6 +189,19 @@ export class HtmlTextLayer {
         const color = objectData.color || objectData.properties?.color || '#000000';
         const backgroundColor = objectData.backgroundColor || objectData.properties?.backgroundColor || 'transparent';
         
+        // Базовый line-height исходя из стартового размера шрифта
+        const baseFs = objectData.fontSize || objectData.properties?.fontSize || 16;
+        const baseLineHeight = (() => {
+            const fs = baseFs;
+            if (fs <= 12) return Math.round(fs * 1.40);
+            if (fs <= 18) return Math.round(fs * 1.34);
+            if (fs <= 36) return Math.round(fs * 1.26);
+            if (fs <= 48) return Math.round(fs * 1.24);
+            if (fs <= 72) return Math.round(fs * 1.22);
+            if (fs <= 96) return Math.round(fs * 1.20);
+            return Math.round(fs * 1.18);
+        })();
+
         Object.assign(el.style, {
             position: 'absolute',
             transformOrigin: 'top left',
@@ -185,7 +212,11 @@ export class HtmlTextLayer {
             pointerEvents: 'none', // всё взаимодействие остаётся на PIXI
             userSelect: 'none',
             fontFamily: fontFamily,
-            backgroundColor: backgroundColor === 'transparent' ? '' : backgroundColor
+            backgroundColor: backgroundColor === 'transparent' ? '' : backgroundColor,
+            paddingTop: '5px',
+            paddingBottom: '5px',
+            boxSizing: 'border-box',
+            lineHeight: `${baseLineHeight}px`
         });
         const content = objectData.content || objectData.properties?.content || '';
         el.textContent = content;
@@ -233,7 +264,7 @@ export class HtmlTextLayer {
         const angle = obj.rotation || obj.transform?.rotation || 0;
 
         // Чёткая отрисовка: меняем реальный font-size, учитывая зум и изменение размеров
-        const baseFS = parseFloat(el.dataset.baseFontSize || '16') || 16;
+        const baseFS = parseFloat(el.dataset.baseFontSize || `${obj.properties?.fontSize || obj.fontSize || 16}`) || 16;
         const baseW = parseFloat(el.dataset.baseW || '160') || 160;
         const baseH = parseFloat(el.dataset.baseH || '36') || 36;
         const scaleX = w && baseW ? (w / baseW) : 1;
@@ -246,8 +277,21 @@ export class HtmlTextLayer {
         const sCss = s / res;
         const fontSizePx = Math.max(1, baseFS * sObj * sCss);
         el.style.fontSize = `${fontSizePx}px`;
-        // Синхронизируем межстрочный интервал с режимом редактирования
-        el.style.lineHeight = `${fontSizePx}px`;
+        // Адаптивный межстрочный интервал по размеру шрифта
+        const computeLineHeightPx = (fs) => {
+            if (fs <= 12) return Math.round(fs * 1.40);
+            if (fs <= 18) return Math.round(fs * 1.34);
+            if (fs <= 36) return Math.round(fs * 1.26);
+            if (fs <= 48) return Math.round(fs * 1.24);
+            if (fs <= 72) return Math.round(fs * 1.22);
+            if (fs <= 96) return Math.round(fs * 1.20);
+            return Math.round(fs * 1.18);
+        };
+        // Применяем новый line-height только если он отличается от текущего, чтобы избежать конфликтов CSS
+        const newLH = `${computeLineHeightPx(fontSizePx)}px`;
+        if (el.style.lineHeight !== newLH) {
+            el.style.lineHeight = newLH;
+        }
 
         // Позиция и габариты в экранных координатах
         const left = (tx + s * x) / res;
@@ -270,6 +314,13 @@ export class HtmlTextLayer {
             el.textContent = content;
             console.log(`🔍 HtmlTextLayer: содержимое обновлено в updateOne для ${objectId}:`, content);
         }
+
+        // Гарантируем, что высота соответствует контенту (особенно после смены font-size)
+        try {
+            el.style.height = 'auto';
+            const h = Math.max(1, Math.round(el.scrollHeight));
+            el.style.height = `${h}px`;
+        } catch (_) {}
         
         console.log(`🔍 HtmlTextLayer: позиция обновлена для ${objectId}:`, {
             left: `${left}px`,
@@ -281,6 +332,33 @@ export class HtmlTextLayer {
             visibility: el.style.visibility,
             textContent: el.textContent
         });
+    }
+
+    _autoFitTextHeight(objectId) {
+        const el = this.idToEl.get(objectId);
+        if (!el || !this.core) return;
+        try {
+            // Измеряем фактическую высоту HTML-текста
+            el.style.height = 'auto';
+            const measured = Math.max(1, Math.round(el.scrollHeight));
+            el.style.height = `${measured}px`;
+            // Пересчитываем мировую высоту и отправляем обновление размера через события ResizeUpdate
+            const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
+            const s = world?.scale?.x || 1;
+            const res = (this.core?.pixi?.app?.renderer?.resolution) || 1;
+            const worldH = (measured * res) / s;
+            // Узнаём текущую ширину в мире
+            const obj = (this.core.state.state.objects || []).find(o => o.id === objectId);
+            const worldW = obj?.width || 0;
+            const position = obj?.position || null;
+            if (worldW > 0 && position) {
+                this.core.eventBus.emit(Events.Tool.ResizeUpdate, {
+                    object: objectId,
+                    size: { width: worldW, height: worldH },
+                    position
+                });
+            }
+        } catch (_) {}
     }
 }
 
