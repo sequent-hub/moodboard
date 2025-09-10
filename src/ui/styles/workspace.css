@@ -193,6 +193,7 @@
     pointer-events: auto; /* кликабельна */
     width: 30px;
     overflow: hidden;
+    cursor: default; /* курсор по умолчанию между кнопками */
 }
 
 
