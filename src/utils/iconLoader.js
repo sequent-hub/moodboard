@@ -26,7 +26,7 @@ export class IconLoader {
                 import('../assets/icons/attachments.svg?raw'),
                 import('../assets/icons/emoji.svg?raw'),
                 import('../assets/icons/frame.svg?raw'),
-                import('../assets/icons/clear.svg?raw'),
+                import('../assets/icons/trash.svg?raw'),
                 import('../assets/icons/undo.svg?raw'),
                 import('../assets/icons/redo.svg?raw')
             ]);

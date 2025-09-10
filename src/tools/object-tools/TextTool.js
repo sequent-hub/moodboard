@@ -1,4 +1,21 @@
 import { BaseTool } from '../BaseTool.js';
+import iCursorSvg from '../../assets/icons/i-cursor.svg?raw';
+
+// Масштабируем I-курсор в 2 раза меньше (примерно 16x32 с сохранением пропорций 1:2)
+const _scaledICursorSvg = (() => {
+    try {
+        if (!/\bwidth="/i.test(iCursorSvg)) {
+            return iCursorSvg.replace('<svg ', '<svg width="16px" height="32px" ');
+        }
+        return iCursorSvg
+            .replace(/width="[^"]+"/i, 'width="16px"')
+            .replace(/height="[^"]+"/i, 'height="32px"');
+    } catch (_) {
+        return iCursorSvg;
+    }
+})();
+
+const TEXT_CURSOR = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(_scaledICursorSvg)}") 0 0, text`;
 
 /**
  * Инструмент для создания и редактирования текстовых объектов
@@ -6,7 +23,7 @@ import { BaseTool } from '../BaseTool.js';
 export class TextTool extends BaseTool {
     constructor(eventBus) {
         super('text', eventBus);
-        this.cursor = 'text';
+        this.cursor = TEXT_CURSOR;
         this.hotkey = 't';
         this.container = null;
         
@@ -388,6 +405,10 @@ export class TextTool extends BaseTool {
         // Устанавливаем контейнер для размещения input
         if (pixiApp && pixiApp.view && pixiApp.view.parentElement) {
             this.setContainer(pixiApp.view.parentElement);
+        }
+        // Устанавливаем кастомный курсор на холст
+        if (pixiApp && pixiApp.view) {
+            pixiApp.view.style.cursor = this.cursor;
         }
     }
 

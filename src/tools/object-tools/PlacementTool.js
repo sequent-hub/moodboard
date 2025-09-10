@@ -1,4 +1,21 @@
 import { BaseTool } from '../BaseTool.js';
+import iCursorSvg from '../../assets/icons/i-cursor.svg?raw';
+
+// Масштабируем I-курсор в 2 раза меньше
+const _scaledICursorSvg = (() => {
+    try {
+        if (!/\bwidth="/i.test(iCursorSvg)) {
+            return iCursorSvg.replace('<svg ', '<svg width="16px" height="32px" ');
+        }
+        return iCursorSvg
+            .replace(/width="[^"]+"/i, 'width="16px"')
+            .replace(/height="[^"]+"/i, 'height="32px"');
+    } catch (_) {
+        return iCursorSvg;
+    }
+})();
+
+const TEXT_CURSOR = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(_scaledICursorSvg)}") 0 0, text`;
 import { Events } from '../../core/events/Events.js';
 import * as PIXI from 'pixi.js';
 
@@ -25,6 +42,10 @@ export class PlacementTool extends BaseTool {
         if (this.eventBus) {
             this.eventBus.on(Events.Place.Set, (cfg) => {
                 this.pending = cfg ? { ...cfg } : null;
+                // Обновляем курсор в зависимости от pending
+                if (this.app && this.app.view) {
+                    this.app.view.style.cursor = this._getPendingCursor();
+                }
                 
                 // Показываем призрак для текста, записки, эмоджи, фрейма или фигур, если они активны
                 if (this.pending && this.app && this.world) {
@@ -90,9 +111,9 @@ export class PlacementTool extends BaseTool {
         super.activate();
         this.app = app;
         this.world = this._getWorldLayer();
-        // Курсор указывает на размещение (прицел)
+        // Курсор в зависимости от типа размещаемого объекта
         if (this.app && this.app.view) {
-            this.app.view.style.cursor = 'crosshair';
+            this.app.view.style.cursor = this._getPendingCursor();
             // Добавляем обработчик движения мыши для "призрака"
             this.app.view.addEventListener('mousemove', this._onMouseMove.bind(this));
         }
@@ -1137,5 +1158,13 @@ export class PlacementTool extends BaseTool {
         this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
     }
 }
+
+// Возвращает подходящий курсор для текущего pending состояния
+PlacementTool.prototype._getPendingCursor = function() {
+    if (!this.pending) return 'crosshair';
+    if (this.pending.type === 'text') return TEXT_CURSOR;
+    if (this.pending.type === 'frame-draw') return 'crosshair';
+    return 'crosshair';
+};
 
 

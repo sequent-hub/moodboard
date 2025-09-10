@@ -182,7 +182,7 @@
 /* Toolbar Styles */
 .moodboard-toolbar {
     background: white;
-    border-radius: 12px;
+    border-radius: 999px;
     padding: 8px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
     border: 1px solid #e0e0e0;
@@ -192,6 +192,7 @@
     gap: 8px;
     pointer-events: auto; /* кликабельна */
     width: 30px;
+    overflow: hidden;
 }
 
 
@@ -204,7 +205,7 @@
     width: 30px;
     height: 30px;
     border: none;
-    border-radius: 8px;
+    border-radius: 50%;
     /* background: #E1F5FE; */
     /* color: #212121; */
     background: none;
@@ -220,6 +221,7 @@
 .moodboard-toolbar__button:hover {
     background: #BBDEFB;
     /* transform: translateY(-1px); */
+    border-radius: 50%;
 }
 
 .moodboard-toolbar__button:active {
@@ -229,8 +231,9 @@
 /* Активное состояние кнопок */
 .moodboard-toolbar__button--active {
     background: #00B0FF !important;
-    color: #FFFFFF !important;
+    color: inherit !important; /* не осветляем иконку при активной кнопке */
     /* box-shadow: inset 0 0 0 3px #42A5F5; */
+    border-radius: 50%;
 }
 
 /* Отключенное состояние */
@@ -248,8 +251,29 @@
     transition: transform 0.2s ease;
 }
 
+/* Базовый цвет всех SVG иконок тулбара */
+.moodboard-toolbar__button svg path,
+.moodboard-toolbar__button svg rect,
+.moodboard-toolbar__button svg circle,
+.moodboard-toolbar__button svg ellipse,
+.moodboard-toolbar__button svg polygon,
+.moodboard-toolbar__button svg line,
+.moodboard-toolbar__button svg polyline {
+    fill: #212121 !important;
+    stroke: #212121 !important;
+}
+
+/* Избегаем субпиксельного масштабирования для иконки текста (чёткие края) */
+.moodboard-toolbar__button--text-add svg {
+    height: 16px; /* 512 -> 16px: коэффициент 1/32; ширина станет 14px (448 * 1/32) */
+    width: auto;
+}
+.moodboard-toolbar__button--text-add:hover svg {
+    transform: none; /* не масштабируем при hover, чтобы не размывать */
+}
+
 .moodboard-toolbar__button:hover svg {
-    transform: scale(1.1);
+    transform: none;
 }
 
 .moodboard-toolbar__button--disabled svg {
