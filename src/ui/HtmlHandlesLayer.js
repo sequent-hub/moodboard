@@ -621,6 +621,14 @@ export class HtmlHandlesLayer {
         }
 
         const startMouse = { x: e.clientX, y: e.clientY };
+        // Определяем тип объекта: для текста будем автоподгонять высоту при изменении ширины
+        let isTextTarget = false;
+        {
+            const req = { objectId: id, pixiObject: null };
+            this.eventBus.emit(Events.Tool.GetObjectPixi, req);
+            const mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
+            isTextTarget = (mbType === 'text' || mbType === 'simple-text');
+        }
         const onMove = (ev) => {
             const dxCSS = ev.clientX - startMouse.x;
             const dyCSS = ev.clientY - startMouse.y;
@@ -638,6 +646,21 @@ export class HtmlHandlesLayer {
             if (edge === 'top') { 
                 newH = Math.max(1, startCSS.height - dyCSS); 
                 newTop = startCSS.top + dyCSS; 
+            }
+
+            // Для текстовых объектов при изменении ширины вычисляем высоту по контенту
+            const widthChanged = (edge === 'left' || edge === 'right');
+            if (isTextTarget && widthChanged) {
+                try {
+                    const textLayer = (typeof window !== 'undefined') ? window.moodboardHtmlTextLayer : null;
+                    const el = textLayer && textLayer.idToEl ? textLayer.idToEl.get && textLayer.idToEl.get(id) : null;
+                    if (el) {
+                        el.style.width = `${Math.max(1, Math.round(newW))}px`;
+                        el.style.height = 'auto';
+                        const measured = Math.max(1, Math.round(el.scrollHeight));
+                        newH = measured;
+                    }
+                } catch (_) {}
             }
 
             // Обновим визуально
@@ -701,10 +724,25 @@ export class HtmlHandlesLayer {
                 // Определяем, изменилась ли позиция для краевого ресайза
                 const edgeFinalPositionChanged = (endCSS.left !== startCSS.left) || (endCSS.top !== startCSS.top);
                 
+                // Финальная коррекция высоты для текстовых объектов
+                let finalWorldH = worldH;
+                if (isTextTarget && (edge === 'left' || edge === 'right')) {
+                    try {
+                        const textLayer = (typeof window !== 'undefined') ? window.moodboardHtmlTextLayer : null;
+                        const el = textLayer && textLayer.idToEl ? textLayer.idToEl.get && textLayer.idToEl.get(id) : null;
+                        if (el) {
+                            el.style.width = `${Math.max(1, Math.round(endCSS.width))}px`;
+                            el.style.height = 'auto';
+                            const measured = Math.max(1, Math.round(el.scrollHeight));
+                            finalWorldH = (measured * res) / s;
+                        }
+                    } catch (_) {}
+                }
+
                 const edgeResizeEndData = {
                     object: id,
                     oldSize: { width: startWorld.width, height: startWorld.height },
-                    newSize: { width: worldW, height: worldH },
+                    newSize: { width: worldW, height: finalWorldH },
                     oldPosition: { x: startWorld.x, y: startWorld.y },
                     newPosition: edgeFinalPositionChanged ? { x: worldX, y: worldY } : { x: startWorld.x, y: startWorld.y }
                 };
