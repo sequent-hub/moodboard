@@ -1692,6 +1692,82 @@ export class SelectTool extends BaseTool {
         });
         wrapper.appendChild(outline);
         
+        // Угловые HTML-ручки (зелёные) вокруг input: nw, ne, se, sw
+        const cornerDirs = ['nw','ne','se','sw'];
+        const cornerHandles = cornerDirs.map(dir => {
+            const h = document.createElement('div');
+            h.dataset.dir = dir;
+            Object.assign(h.style, {
+                position: 'absolute',
+                width: '12px', height: '12px',
+                background: '#1DE9B6',
+                border: '2px solid #1DE9B6',
+                borderRadius: '50%',
+                boxSizing: 'border-box',
+                pointerEvents: 'auto',
+                zIndex: 10002,
+                cursor: (dir === 'nw' || dir === 'se') ? 'nwse-resize' : 'nesw-resize',
+            });
+            // Внутренний белый круг
+            const inner = document.createElement('div');
+            Object.assign(inner.style, {
+                position: 'absolute',
+                top: '1px', left: '1px',
+                width: '6px', height: '6px',
+                background: '#fff', borderRadius: '50%', pointerEvents: 'none'
+            });
+            h.appendChild(inner);
+            wrapper.appendChild(h);
+            return h;
+        });
+
+        const placeCornerHandles = () => {
+            const w = Math.max(1, wrapper.offsetWidth);
+            const h = Math.max(1, wrapper.offsetHeight);
+            cornerHandles.forEach(hd => {
+                const dir = hd.dataset.dir;
+                switch (dir) {
+                    case 'nw': hd.style.left = `${-6}px`; hd.style.top = `${-6}px`; break;
+                    case 'ne': hd.style.left = `${Math.max(-6, w - 6)}px`; hd.style.top = `${-6}px`; break;
+                    case 'se': hd.style.left = `${Math.max(-6, w - 6)}px`; hd.style.top = `${Math.max(-6, h - 6)}px`; break;
+                    case 'sw': hd.style.left = `${-6}px`; hd.style.top = `${Math.max(-6, h - 6)}px`; break;
+                }
+            });
+        };
+
+        const onCornerDown = (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const dir = e.currentTarget.dataset.dir;
+            const start = {
+                x: e.clientX, y: e.clientY,
+                w: wrapper.offsetWidth, h: wrapper.offsetHeight,
+                left: parseFloat(wrapper.style.left || '0'), top: parseFloat(wrapper.style.top || '0'), dir
+            };
+            const onMove = (ev) => {
+                const dx = ev.clientX - start.x;
+                const dy = ev.clientY - start.y;
+                let newW = start.w; let newH = start.h; let newLeft = start.left; let newTop = start.top;
+                if (dir.includes('e')) newW = Math.max(minWBound, start.w + dx);
+                if (dir.includes('s')) newH = Math.max(minHBound, start.h + dy);
+                if (dir.includes('w')) { newW = Math.max(minWBound, start.w - dx); newLeft = start.left + dx; }
+                if (dir.includes('n')) { newH = Math.max(minHBound, start.h - dy); newTop = start.top + dy; }
+                wrapper.style.width = `${newW}px`;
+                wrapper.style.height = `${newH}px`;
+                wrapper.style.left = `${newLeft}px`;
+                wrapper.style.top = `${newTop}px`;
+                textarea.style.width = `${newW}px`;
+                textarea.style.height = `${newH}px`;
+                placeCornerHandles();
+            };
+            const onUp = () => {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        };
+        cornerHandles.forEach(h => h.addEventListener('mousedown', onCornerDown));
+        
         // Не создаём локальные синие ручки: используем HtmlHandlesLayer (зелёные)
         
         // Убираем ручки ресайза для всех типов объектов
@@ -1917,6 +1993,8 @@ export class SelectTool extends BaseTool {
                 : Math.max(minHBound, Math.max(1, rawH - adjust));
             textarea.style.height = `${targetH}px`;
             wrapper.style.height = `${targetH}px`;
+            // Обновляем позицию угловых ручек после авторазмера
+            placeCornerHandles();
         };
         
         // Вызываем autoSize только для обычного текста
@@ -1924,6 +2002,8 @@ export class SelectTool extends BaseTool {
             autoSize();
         }
         textarea.focus();
+        // Расставляем угловые ручки при первом рендере
+        placeCornerHandles();
         // Локальная CSS-настройка placeholder (меньше базового шрифта)
         const uid = 'mbti-' + Math.random().toString(36).slice(2);
         textarea.classList.add(uid);

@@ -41,10 +41,15 @@ export class TextPropertiesPanel {
             if (this.currentId && objectId === this.currentId) this.hide();
         });
         
-        // Скрываем панель во время редактирования текста
-        this.eventBus.on(Events.UI.TextEditStart, () => {
+        // Во время редактирования текста показываем панель для текущего объекта
+        this.eventBus.on(Events.UI.TextEditStart, ({ objectId }) => {
             this.isTextEditing = true;
-            this.hide();
+            this.currentId = objectId || null;
+            if (this.currentId) {
+                this.showFor(this.currentId);
+            } else {
+                this.hide();
+            }
         });
         this.eventBus.on(Events.UI.TextEditEnd, () => {
             this.isTextEditing = false;
