@@ -1641,53 +1641,32 @@ export class SelectTool extends BaseTool {
         const wrapper = document.createElement('div');
         wrapper.className = 'moodboard-text-editor';
         
-        // Убираем локальную рамку: рамка и зелёные HTML-ручки рисуются HtmlHandlesLayer
-        Object.assign(wrapper.style, {
-            position: 'absolute',
-            left: '0px',
-            top: '0px',
-            transformOrigin: '0 0',
-            boxSizing: 'border-box',
-            border: 'none',
-            background: 'transparent',
-            zIndex: 10000,
-        });
+        // Базовые стили вынесены в CSS (.moodboard-text-editor)
         
         const textarea = document.createElement('textarea');
         textarea.className = 'moodboard-text-input';
         textarea.value = content || '';
         textarea.placeholder = 'Напишите что-нибудь';
         
-        Object.assign(textarea.style, {
-            position: 'relative',
-            left: '0px',
-            top: '0px',
-            border: 'none',
-            paddingTop: '5px',
-            paddingBottom: '5px',
-            paddingLeft: '0px',
-            paddingRight: '0px',
-            fontSize: `${effectiveFontPx}px`,
-            fontFamily: 'Arial, sans-serif',
-            lineHeight: `${effectiveFontPx}px`,
-            color: '#111', // Для записок делаем текст черным для лучшей видимости
-            background: isNote ? 'white' : 'transparent',
-            outline: 'none',
-            resize: 'none',
-            minWidth: isNote ? '240px' : '0px',
-            minHeight: `${effectiveFontPx}px`,
-            width: isNote ? '280px' : 'auto',
-            height: `${effectiveFontPx}px`,
-            boxSizing: 'content-box',
-            overflow: 'hidden',
-            // Повыше чёткость текста в CSS
-            WebkitFontSmoothing: 'antialiased',
-            MozOsxFontSmoothing: 'grayscale',
-            // Улучшенное перенесение слов, как в Miro
-            overflowWrap: 'anywhere',
-            wordBreak: 'break-word',
-            margin: '0',
-        });
+        // Адаптивный межстрочный интервал для ввода, синхронно с HtmlTextLayer
+        const computeLineHeightPx = (fs) => {
+            if (fs <= 12) return Math.round(fs * 1.40);
+            if (fs <= 18) return Math.round(fs * 1.34);
+            if (fs <= 36) return Math.round(fs * 1.26);
+            if (fs <= 48) return Math.round(fs * 1.24);
+            if (fs <= 72) return Math.round(fs * 1.22);
+            if (fs <= 96) return Math.round(fs * 1.20);
+            return Math.round(fs * 1.18);
+        };
+        const lhInitial = computeLineHeightPx(effectiveFontPx);
+        
+        // Базовые стили вынесены в CSS (.moodboard-text-input); здесь — только динамика
+        textarea.style.fontSize = `${effectiveFontPx}px`;
+        textarea.style.lineHeight = `${lhInitial}px`;
+        const BASELINE_FIX_INIT = 2; // выравниваем визуальный нижний запас
+        const initialH = Math.max(1, lhInitial - BASELINE_FIX_INIT + 10); // +5px сверху/снизу
+        textarea.style.minHeight = `${initialH}px`;
+        textarea.style.height = `${initialH}px`;
         textarea.setAttribute('rows', '1');
         textarea.style.overflowY = 'hidden';
         
@@ -1854,20 +1833,6 @@ export class SelectTool extends BaseTool {
         // Синхронизируем стартовый размер шрифта textarea с текущим зумом (как HtmlTextLayer)
         // Используем ранее вычисленный effectiveFontPx (до вставки в DOM), если он есть в замыкании
         textarea.style.fontSize = `${effectiveFontPx}px`;
-        // Адаптивный межстрочный интервал для ввода, синхронно с HtmlTextLayer
-        const computeLineHeightPx = (fs) => {
-            if (fs <= 12) return Math.round(fs * 1.40);
-            if (fs <= 18) return Math.round(fs * 1.34);
-            if (fs <= 36) return Math.round(fs * 1.26);
-            if (fs <= 48) return Math.round(fs * 1.24);
-            if (fs <= 72) return Math.round(fs * 1.22);
-            if (fs <= 96) return Math.round(fs * 1.20);
-            return Math.round(fs * 1.18);
-        };
-        const lhInitial = computeLineHeightPx(effectiveFontPx);
-        textarea.style.lineHeight = `${lhInitial}px`;
-        textarea.style.minHeight = `${effectiveFontPx}px`;
-        textarea.style.height = `${effectiveFontPx}px`;
         const initialWpx = initialSize ? Math.max(1, (initialSize.width || 0) * s / viewRes) : null;
         const initialHpx = initialSize ? Math.max(1, (initialSize.height || 0) * s / viewRes) : null;
         
@@ -1896,7 +1861,7 @@ export class SelectTool extends BaseTool {
                 return w;
             };
             const startWidth = Math.max(1, measureTextWidth('Напишите что-нибудь'));
-            const startHeight = Math.max(1, effectiveFontPx - BASELINE_FIX + 10); // +5px сверху и +5px снизу
+            const startHeight = Math.max(1, lhInitial - BASELINE_FIX + 10); // +5px сверху и +5px снизу
             textarea.style.width = `${startWidth}px`;
             textarea.style.height = `${startHeight}px`;
             wrapper.style.width = `${startWidth}px`;
@@ -1965,7 +1930,7 @@ export class SelectTool extends BaseTool {
         const styleEl = document.createElement('style');
         const phSize = effectiveFontPx;
         const placeholderOpacity = isNote ? '0.4' : '0.6'; // Для записок делаем placeholder менее заметным
-        styleEl.textContent = `.${uid}::placeholder{font-size:${phSize}px;opacity:${placeholderOpacity};line-height:${computeLineHeightPx(phSize)}px;}`;
+        styleEl.textContent = `.${uid}::placeholder{font-size:${phSize}px;opacity:${placeholderOpacity};line-height:${computeLineHeightPx(phSize)}px;white-space:nowrap;}`;
         document.head.appendChild(styleEl);
         this.textEditor = { active: true, objectId, textarea, wrapper, world: this.textEditor.world, position, properties: { fontSize }, objectType, _phStyle: styleEl };
 

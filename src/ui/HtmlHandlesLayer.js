@@ -27,9 +27,6 @@ export class HtmlHandlesLayer {
     attach() {
         this.layer = document.createElement('div');
         this.layer.className = 'moodboard-html-handles';
-        Object.assign(this.layer.style, {
-            position: 'absolute', inset: '0', pointerEvents: 'none', zIndex: 12,
-        });
         this.container.appendChild(this.layer);
 
         // Подписки: обновлять при изменениях выбора и трансформациях
@@ -182,7 +179,7 @@ export class HtmlHandlesLayer {
         this.layer.innerHTML = '';
         const box = document.createElement('div');
         box.className = 'mb-handles-box';
-        
+
         // Получаем угол поворота объекта для поворота рамки
         let rotation = 0;
         if (id !== '__group__') {
@@ -209,16 +206,9 @@ export class HtmlHandlesLayer {
         const mkCorner = (dir, x, y, cursor) => {
             const h = document.createElement('div');
             h.dataset.dir = dir; h.dataset.id = id;
-            Object.assign(h.style, {
-                position: 'absolute', width: '12px', height: '12px',
-                background: '#1DE9B6', 
-                border: '2px solid #1DE9B6', 
-                borderRadius: '50%', // Делаем круглыми
-                boxSizing: 'border-box',
-                pointerEvents: isFileTarget ? 'none' : 'auto', 
-                zIndex: 10, // Увеличиваем z-index
-                cursor: cursor
-            });
+            h.className = 'mb-handle';
+            h.style.pointerEvents = isFileTarget ? 'none' : 'auto';
+            h.style.cursor = cursor;
             h.style.left = `${x - 6}px`;
             h.style.top = `${y - 6}px`;
             // Для файла скрываем ручки, для остальных показываем
@@ -226,15 +216,7 @@ export class HtmlHandlesLayer {
             
             // Создаем внутренний белый круг
             const inner = document.createElement('div');
-            Object.assign(inner.style, {
-                position: 'absolute',
-                top: '1px', left: '1px',
-                width: '6px', height: '6px',
-                background: '#fff',
-                borderRadius: '50%',
-                pointerEvents: 'none', // Важно: не блокируем события
-                zIndex: 1
-            });
+            inner.className = 'mb-handle-inner';
             h.appendChild(inner);
             
             // Эффект при наведении
@@ -269,12 +251,10 @@ export class HtmlHandlesLayer {
         const makeEdge = (name, style, cursor) => {
             const e = document.createElement('div');
             e.dataset.edge = name; e.dataset.id = id;
+            e.className = 'mb-edge';
             Object.assign(e.style, style, {
-                position: 'absolute', pointerEvents: isFileTarget ? 'none' : 'auto', cursor, 
-                zIndex: 5, // Меньше чем у ручек (10)
-                background: 'transparent', // невидимые области
+                pointerEvents: isFileTarget ? 'none' : 'auto', cursor, 
                 display: isFileTarget ? 'none' : 'block'
-                
             });
             if (!isFileTarget) {
                 e.addEventListener('mousedown', (evt) => this._onEdgeResizeDown(evt));
@@ -324,17 +304,7 @@ export class HtmlHandlesLayer {
         if (isFileTarget || isFrameTarget) {
             Object.assign(rotateHandle.style, { display: 'none', pointerEvents: 'none' });
         } else {
-            Object.assign(rotateHandle.style, {
-                position: 'absolute',
-                width: '20px', height: '20px',
-                background: 'transparent',
-                border: 'none',
-                borderRadius: '50%',
-                pointerEvents: 'auto',
-                cursor: 'grab',
-                zIndex: 15,
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-            });
+            rotateHandle.className = 'mb-rotate-handle';
             // Фиксированная дистанция 20px по диагонали (top-right → bottom-left) от угла (0, h)
             const d = 38;
             const L = Math.max(1, Math.hypot(width, height));

@@ -119,23 +119,7 @@ export class TextPropertiesPanel {
     _createPanel() {
         const panel = document.createElement('div');
         panel.className = 'text-properties-panel';
-        Object.assign(panel.style, {
-            position: 'absolute',
-            pointerEvents: 'auto',
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: '6px', 
-            padding: '6px 10px', 
-            backgroundColor: 'white',
-            border: '1px solid #e0e0e0',
-            borderRadius: '6px', 
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)', 
-            fontSize: '12px', 
-            fontFamily: 'Arial, sans-serif',
-            minWidth: '380px', 
-            height: '36px' 
-        });
+        // Основные стили панели вынесены в CSS (.text-properties-panel)
 
         // Создаем контролы
         this._createFontControls(panel);
@@ -147,23 +131,13 @@ export class TextPropertiesPanel {
         // Лейбл для шрифта
         const fontLabel = document.createElement('span');
         fontLabel.textContent = 'Шрифт:';
-        fontLabel.style.fontSize = '11px';
-        fontLabel.style.color = '#666';
-        fontLabel.style.fontWeight = '500';
+        fontLabel.className = 'tpp-label';
         panel.appendChild(fontLabel);
 
         // Выпадающий список шрифтов
         this.fontSelect = document.createElement('select');
         this.fontSelect.className = 'font-select';
-        Object.assign(this.fontSelect.style, {
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            padding: '2px 6px', 
-            fontSize: '12px', 
-            backgroundColor: 'white',
-            cursor: 'pointer',
-            minWidth: '110px' 
-        });
+        this.fontSelect.className = 'font-select';
 
         // Список популярных шрифтов
         const fonts = [
@@ -197,24 +171,13 @@ export class TextPropertiesPanel {
         // Лейбл для размера
         const sizeLabel = document.createElement('span');
         sizeLabel.textContent = 'Размер:';
-        sizeLabel.style.fontSize = '11px';
-        sizeLabel.style.color = '#666';
-        sizeLabel.style.fontWeight = '500';
-        sizeLabel.style.marginLeft = '6px';
+        sizeLabel.className = 'tpp-label tpp-label--spaced';
         panel.appendChild(sizeLabel);
 
         // Выпадающий список размеров шрифта
         this.fontSizeSelect = document.createElement('select');
         this.fontSizeSelect.className = 'font-size-select';
-        Object.assign(this.fontSizeSelect.style, {
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            padding: '2px 6px',
-            fontSize: '12px',
-            backgroundColor: 'white',
-            cursor: 'pointer',
-            minWidth: '56px'
-        });
+        this.fontSizeSelect.className = 'font-size-select';
 
         // Популярные размеры шрифта
         const fontSizes = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 60, 72];
@@ -236,22 +199,16 @@ export class TextPropertiesPanel {
         // Лейбл для цвета
         const colorLabel = document.createElement('span');
         colorLabel.textContent = 'Цвет:';
-        colorLabel.style.fontSize = '11px';
-        colorLabel.style.color = '#666';
-        colorLabel.style.fontWeight = '500';
-        colorLabel.style.marginLeft = '6px';
+        colorLabel.className = 'tpp-label tpp-label--spaced';
         panel.appendChild(colorLabel);
 
         // Создаем компактный селектор цвета текста
         this._createCompactColorSelector(panel);
 
-        // Лейбл для выделения
+        // Лейбл для фона
         const bgColorLabel = document.createElement('span');
-        bgColorLabel.textContent = 'Выделение:';
-        bgColorLabel.style.fontSize = '12px';
-        bgColorLabel.style.color = '#666';
-        bgColorLabel.style.fontWeight = '500';
-        bgColorLabel.style.marginLeft = '8px';
+        bgColorLabel.textContent = 'Фон:';
+        bgColorLabel.className = 'tpp-label tpp-label--spaced';
         panel.appendChild(bgColorLabel);
 
         // Создаем компактный селектор цвета фона
@@ -271,19 +228,7 @@ export class TextPropertiesPanel {
         this.currentColorButton = document.createElement('button');
         this.currentColorButton.type = 'button';
         this.currentColorButton.title = 'Выбрать цвет';
-        this.currentColorButton.style.cssText = `
-            width: 28px;
-            height: 20px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: #000000;
-            cursor: pointer;
-            margin: 0;
-            padding: 0;
-            display: block;
-            box-sizing: border-box;
-            position: relative;
-        `;
+        this.currentColorButton.className = 'current-color-button';
 
         // Создаем выпадающую панель с цветами
         this.colorDropdown = document.createElement('div');
@@ -462,19 +407,7 @@ export class TextPropertiesPanel {
         this.currentBgColorButton = document.createElement('button');
         this.currentBgColorButton.type = 'button';
         this.currentBgColorButton.title = 'Выбрать цвет выделения';
-        this.currentBgColorButton.style.cssText = `
-            width: 28px;
-            height: 20px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: transparent;
-            cursor: pointer;
-            margin: 0;
-            padding: 0;
-            display: block;
-            box-sizing: border-box;
-            position: relative;
-        `;
+        this.currentBgColorButton.className = 'current-bgcolor-button';
 
         // Создаем выпадающую панель с цветами фона
         this.bgColorDropdown = document.createElement('div');

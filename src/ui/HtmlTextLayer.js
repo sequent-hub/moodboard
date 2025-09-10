@@ -202,22 +202,11 @@ export class HtmlTextLayer {
             return Math.round(fs * 1.18);
         })();
 
-        Object.assign(el.style, {
-            position: 'absolute',
-            transformOrigin: 'top left',
-            color: color,
-            whiteSpace: 'pre-wrap',
-            overflowWrap: 'anywhere',
-            wordBreak: 'break-word',
-            pointerEvents: 'none', // всё взаимодействие остаётся на PIXI
-            userSelect: 'none',
-            fontFamily: fontFamily,
-            backgroundColor: backgroundColor === 'transparent' ? '' : backgroundColor,
-            paddingTop: '5px',
-            paddingBottom: '5px',
-            boxSizing: 'border-box',
-            lineHeight: `${baseLineHeight}px`
-        });
+        el.classList.add('mb-text');
+        el.style.color = color;
+        el.style.fontFamily = fontFamily;
+        el.style.backgroundColor = backgroundColor === 'transparent' ? '' : backgroundColor;
+        el.style.lineHeight = `${baseLineHeight}px`;
         const content = objectData.content || objectData.properties?.content || '';
         el.textContent = content;
         // Базовые размеры сохраняем в dataset

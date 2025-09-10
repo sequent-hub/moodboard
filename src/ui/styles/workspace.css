@@ -1,3 +1,174 @@
+/* Text Properties Panel */
+.text-properties-panel {
+    position: absolute;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 9999px; /* полностью круглые концы */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    font-size: 12px;
+    font-family: Arial, sans-serif;
+    min-width: 380px;
+    height: 36px;
+}
+
+.text-properties-panel .tpp-label {
+    font-size: 11px;
+    color: #666;
+    font-weight: 500;
+}
+
+.text-properties-panel .tpp-label--spaced {
+    margin-left: 6px;
+}
+
+/* Text objects (HTML overlay) */
+.mb-text {
+    position: absolute;
+    transform-origin: top left;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    pointer-events: none;
+    user-select: none;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    letter-spacing: normal;
+}
+
+/* HTML handles layer */
+.moodboard-html-handles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 12;
+}
+
+.mb-handles-box {
+    position: absolute;
+    border: 1px solid #1DE9B6;
+    border-radius: 3px;
+    box-sizing: content-box;
+    pointer-events: none;
+    transform-origin: center center;
+}
+
+.mb-handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #1DE9B6;
+    border: 2px solid #1DE9B6;
+    border-radius: 50%;
+    box-sizing: border-box;
+    pointer-events: auto;
+    z-index: 10;
+}
+
+.mb-handle-inner {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 6px;
+    height: 6px;
+    background: #fff;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.mb-edge {
+    position: absolute;
+    pointer-events: auto;
+    z-index: 5;
+    background: transparent;
+}
+
+.mb-rotate-handle {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    pointer-events: auto;
+    cursor: grab;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Text editor overlay */
+.moodboard-text-editor {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    box-sizing: border-box;
+    border: none;
+    background: transparent;
+    z-index: 10000;
+}
+
+.moodboard-text-input {
+    position: relative;
+    left: 0;
+    top: 0;
+    border: none;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 0;
+    padding-right: 0;
+    font-family: Arial, sans-serif;
+    color: #111;
+    background: transparent;
+    outline: none;
+    resize: none;
+    box-sizing: content-box;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    margin: 0;
+}
+
+.text-properties-panel .font-select,
+.text-properties-panel .font-size-select {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 12px;
+    background-color: #fff;
+    cursor: pointer;
+}
+
+.text-properties-panel .font-select { min-width: 110px; }
+.text-properties-panel .font-size-select { min-width: 56px; }
+
+.text-properties-panel .current-color-button,
+.text-properties-panel .current-bgcolor-button {
+    width: 28px;
+    height: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #000;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+    display: block;
+    box-sizing: border-box;
+    position: relative;
+}
 /* MoodBoard Workspace Styles */
 
 /* Основные контейнеры */
@@ -952,14 +1123,18 @@
 .moodboard-text-input {
     border-radius: 2px;
     transition: all 0.2s ease;
-    outline: 2px solid #007ACC;
-    outline-offset: 1px;
+    outline: none;
+    outline-offset: 0;
+    padding-top: 5px;
+    padding-bottom: 5px;
 }
 
 .moodboard-text-input:focus {
-    /* Убираем дополнительную тень при фокусе */
-    outline: 2px solid #007ACC;
-    outline-offset: 1px;
+    outline: none;
+}
+
+.moodboard-text-input::placeholder {
+    line-height: inherit;
 }
 
 
