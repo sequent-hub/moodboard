@@ -242,9 +242,7 @@ export class SelectTool extends BaseTool {
         
         // Очищаем выделение и ручки
         this.clearSelection();
-        if (this.resizeHandles) {
-            this.resizeHandles.hideHandles();
-        }
+        // Скрываем любые старые PIXI-ручки: используем только HTML-ручки
         
         // Сбрасываем курсор на стандартный
         if (this.app && this.app.view) {
@@ -830,9 +828,7 @@ export class SelectTool extends BaseTool {
         }
         
         // Обновляем ручки в реальном времени во время resize
-        if (this.resizeHandles) {
-            this.resizeHandles.updateHandles();
-        }
+        // HTML-ручки обновляются слоем HtmlHandlesLayer
     }
     
     /**
@@ -863,9 +859,7 @@ export class SelectTool extends BaseTool {
         if (this._resizeCtrl) this._resizeCtrl.end();
         
         // Обновляем позицию ручек после resize
-        if (this.resizeHandles) {
-            this.resizeHandles.updateHandles(); // Обновляем позицию ручек
-        }
+        // HTML-ручки обновляются слоем HtmlHandlesLayer
         
         this.isResizing = false;
         this.resizeHandle = null;
@@ -941,9 +935,7 @@ export class SelectTool extends BaseTool {
         }
         
         // Обновляем ручки в реальном времени во время поворота
-        if (this.resizeHandles) {
-            this.resizeHandles.updateHandles();
-        }
+        // HTML-ручки обновляются слоем HtmlHandlesLayer
     }
     
     /**
@@ -1104,9 +1096,7 @@ export class SelectTool extends BaseTool {
         // Размещаем графику в левом-верхнем углу группы
         this.groupBoundsGraphics.position.set(bounds.x, bounds.y);
         // Обновляем ручки, если показаны
-        if (this.resizeHandles) {
-            this.resizeHandles.updateHandles();
-        }
+        // HTML-ручки обновляются слоем HtmlHandlesLayer
     }
 
     updateGroupBoundsGraphicsByTopLeft(topLeft) {
@@ -1586,7 +1576,7 @@ export class SelectTool extends BaseTool {
         }
 
         
-        let { fontSize = 18, content = '', initialSize } = properties;
+        let { fontSize = 14, content = '', initialSize } = properties;
         
         // Определяем тип объекта
         const isNote = objectType === 'note';
@@ -1620,27 +1610,31 @@ export class SelectTool extends BaseTool {
         
         // Уведомляем о начале редактирования
         this.eventBus.emit(Events.UI.TextEditStart, { objectId: objectId || null });
+        // Прячем глобальные HTML-ручки на время редактирования, чтобы не было второй рамки
+        try {
+            if (typeof window !== 'undefined' && window.moodboardHtmlHandlesLayer) {
+                window.moodboardHtmlHandlesLayer.hide();
+            }
+        } catch (_) {}
         
         const app = this.app;
         const world = app?.stage?.getChildByName && app.stage.getChildByName('worldLayer');
         this.textEditor.world = world || null;
         const view = app?.view;
         if (!view) return;
-        if (this.resizeHandles && typeof this.resizeHandles.hideHandles === 'function') {
-            this.resizeHandles.hideHandles();
-        }
+        // Используем только HTML-ручки во время редактирования текста
         // Обертка для рамки + textarea + ручек
         const wrapper = document.createElement('div');
         wrapper.className = 'moodboard-text-editor';
         
-        // Убираем рамки и ручки для всех типов объектов в режиме редактирования
+        // Убираем локальную рамку: рамка и зелёные HTML-ручки рисуются HtmlHandlesLayer
         Object.assign(wrapper.style, {
             position: 'absolute',
             left: '0px',
             top: '0px',
             transformOrigin: '0 0',
             boxSizing: 'border-box',
-            border: 'none', // Убираем рамку для всех типов
+            border: 'none',
             background: 'transparent',
             zIndex: 10000,
         });
@@ -1648,24 +1642,25 @@ export class SelectTool extends BaseTool {
         const textarea = document.createElement('textarea');
         textarea.className = 'moodboard-text-input';
         textarea.value = content || '';
-        textarea.placeholder = 'напишите что-нибудь';
+        textarea.placeholder = 'Напишите что-нибудь';
         
         Object.assign(textarea.style, {
             position: 'relative',
             left: '0px',
             top: '0px',
             border: 'none',
-            padding: '0',
+            paddingTop: '5px',
+            paddingBottom: '5px',
             fontSize: `${fontSize}px`,
             fontFamily: 'Arial, sans-serif',
             lineHeight: `${fontSize}px`,
             color: '#111', // Для записок делаем текст черным для лучшей видимости
-            background: 'white',
+            background: isNote ? 'white' : 'transparent',
             outline: 'none',
             resize: 'none',
-            minWidth: '240px', // Для заметок уменьшаем минимальную ширину
+            minWidth: isNote ? '240px' : '0px',
             minHeight: `${fontSize}px`,
-            width: '280px', // Для заметок уменьшаем начальную ширину
+            width: isNote ? '280px' : 'auto',
             height: `${fontSize}px`,
             boxSizing: 'content-box',
             overflow: 'hidden',
@@ -1677,8 +1672,27 @@ export class SelectTool extends BaseTool {
             wordBreak: 'break-word',
             margin: '0',
         });
+        textarea.setAttribute('rows', '1');
+        textarea.style.overflowY = 'hidden';
         
         wrapper.appendChild(textarea);
+        // HTML-рамка строго по контуру input (зелёная, как у HtmlHandlesLayer)
+        const outline = document.createElement('div');
+        Object.assign(outline.style, {
+            position: 'absolute',
+            left: '0px',
+            top: '0px',
+            width: '100%',
+            height: '100%',
+            border: '1px solid #1DE9B6',
+            borderRadius: '3px',
+            boxSizing: 'content-box',
+            pointerEvents: 'none',
+            zIndex: 10001
+        });
+        wrapper.appendChild(outline);
+        
+        // Не создаём локальные синие ручки: используем HtmlHandlesLayer (зелёные)
         
         // Убираем ручки ресайза для всех типов объектов
         // let handles = [];
@@ -1826,13 +1840,30 @@ export class SelectTool extends BaseTool {
         
         // Определяем минимальные границы для всех типов объектов
         let minWBound = initialWpx || 120; // базово близко к призраку
-        let minHBound = fontSize; // высота по шрифту, чтобы не было пустого пространства
+        let minHBound = fontSize; // базовая высота
+        // Уменьшаем визуальный нижний запас, который браузеры добавляют к textarea
+        const BASELINE_FIX = 2; // px
+        if (!isNote) {
+            minHBound = Math.max(1, fontSize - BASELINE_FIX);
+        }
 
-        // Если создаём новый текст — выставляем стартовый размер, как у призрака, но чуть шире
+        // Если создаём новый текст — длина поля ровно как placeholder
         if (create && !isNote) {
-            const ghostWidth = 120;
-            const startWidth = Math.round(ghostWidth * 1.33); // чуть длиннее призрака (~160px)
-            const startHeight = fontSize; // высота равна высоте шрифта
+            const measureTextWidth = (text) => {
+                const sEl = document.createElement('span');
+                sEl.style.position = 'absolute';
+                sEl.style.visibility = 'hidden';
+                sEl.style.whiteSpace = 'pre';
+                sEl.style.fontFamily = textarea.style.fontFamily;
+                sEl.style.fontSize = textarea.style.fontSize;
+                sEl.textContent = 'Напишите что-нибудь';
+                document.body.appendChild(sEl);
+                const w = Math.ceil(sEl.getBoundingClientRect().width);
+                sEl.remove();
+                return w;
+            };
+            const startWidth = Math.max(1, measureTextWidth('Напишите что-нибудь'));
+            const startHeight = Math.max(1, fontSize - BASELINE_FIX + 10); // +5px сверху и +5px снизу
             textarea.style.width = `${startWidth}px`;
             textarea.style.height = `${startHeight}px`;
             wrapper.style.width = `${startWidth}px`;
@@ -1876,13 +1907,13 @@ export class SelectTool extends BaseTool {
             textarea.style.height = 'auto';
             // Коррекция высоты: для одной строки принудительно равна line-height,
             // для нескольких строк используем scrollHeight с небольшим вычетом браузерного запаса
-            const adjust = 2;
+            const adjust = BASELINE_FIX;
             const computed = (typeof window !== 'undefined') ? window.getComputedStyle(textarea) : null;
-            const lineH = computed ? parseFloat(computed.lineHeight) : (fontSize || 18);
+            const lineH = (computed ? parseFloat(computed.lineHeight) : (fontSize || 18)) + 10; // +5px сверху и +5px снизу
             const rawH = textarea.scrollHeight;
             const lines = lineH > 0 ? Math.max(1, Math.round(rawH / lineH)) : 1;
             const targetH = lines <= 1
-                ? lineH
+                ? Math.max(minHBound, Math.max(1, lineH - BASELINE_FIX))
                 : Math.max(minHBound, Math.max(1, rawH - adjust));
             textarea.style.height = `${targetH}px`;
             wrapper.style.height = `${targetH}px`;
@@ -1897,7 +1928,7 @@ export class SelectTool extends BaseTool {
         const uid = 'mbti-' + Math.random().toString(36).slice(2);
         textarea.classList.add(uid);
         const styleEl = document.createElement('style');
-        const phSize = Math.max(12, Math.round(fontSize * 0.8));
+        const phSize = fontSize;
         const placeholderOpacity = isNote ? '0.4' : '0.6'; // Для записок делаем placeholder менее заметным
         styleEl.textContent = `.${uid}::placeholder{font-size:${phSize}px;opacity:${placeholderOpacity};}`;
         document.head.appendChild(styleEl);
@@ -1918,41 +1949,7 @@ export class SelectTool extends BaseTool {
             }
         }
         // Ресайз мышью только для обычного текста
-        if (!isNote) {
-            const onHandleDown = (e) => {
-                e.preventDefault(); e.stopPropagation();
-                const dir = e.target.dataset.dir;
-                if (!dir) return;
-                const start = {
-                    x: e.clientX, y: e.clientY,
-                    w: wrapper.offsetWidth, h: wrapper.offsetHeight,
-                    left: parseFloat(wrapper.style.left), top: parseFloat(wrapper.style.top), dir
-                };
-                const onMove = (ev) => {
-                    const dx = ev.clientX - start.x;
-                    const dy = ev.clientY - start.y;
-                    let newW = start.w, newH = start.h, newLeft = start.left, newTop = start.top;
-                    if (dir.includes('e')) newW = Math.max(80, start.w + dx);
-                    if (dir.includes('s')) newH = Math.max(24, start.h + dy);
-                    if (dir.includes('w')) { newW = Math.max(80, start.w - dx); newLeft = start.left + dx; }
-                    if (dir.includes('n')) { newH = Math.max(24, start.h - dy); newTop = start.top + dy; }
-                    wrapper.style.width = `${newW}px`;
-                    wrapper.style.height = `${newH}px`;
-                    wrapper.style.left = `${newLeft}px`;
-                    wrapper.style.top = `${newTop}px`;
-                    textarea.style.width = `${Math.max(minWBound, newW)}px`;
-                    textarea.style.height = `${Math.max(minHBound, newH)}px`;
-                    // placeHandles();
-                };
-                const onUp = () => {
-                    document.removeEventListener('mousemove', onMove);
-                    document.removeEventListener('mouseup', onUp);
-                };
-                document.addEventListener('mousemove', onMove);
-                document.addEventListener('mouseup', onUp);
-            };
-            // handles.forEach(h => h.addEventListener('mousedown', onHandleDown));
-        }
+        // Не используем локальные ручки: ресайз обрабатывает HtmlHandlesLayer
         // Завершение
         const isNewCreation = !!create;
         const finalize = (commit) => {
@@ -2007,9 +2004,16 @@ export class SelectTool extends BaseTool {
                 }
             }
 
+            // Убираем редактор
             wrapper.remove();
             this.textEditor = { active: false, objectId: null, textarea: null, wrapper: null, world: null, position: null, properties: null, objectType: 'text' };
             this.eventBus.emit(Events.UI.TextEditEnd, { objectId: objectId || null });
+            // Возвращаем глобальные HTML-ручки (обновляем слой)
+            try {
+                if (typeof window !== 'undefined' && window.moodboardHtmlHandlesLayer) {
+                    window.moodboardHtmlHandlesLayer.update();
+                }
+            } catch (_) {}
             if (!commitValue) {
                 // Если это было создание нового текста и оно отменено — удаляем пустой объект
                 if (isNewCreation && objectId) {
