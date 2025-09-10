@@ -400,7 +400,7 @@ export class PlacementTool extends BaseTool {
         const g = this._frameDrawState.graphics;
         g.clear();
         g.lineStyle(1, 0x3B82F6, 1);
-        g.beginFill(0x3B82F6, 0.08);
+        g.beginFill(0xFFFFFF, 0.6);
         g.drawRect(x, y, w, h);
         g.endFill();
     }
