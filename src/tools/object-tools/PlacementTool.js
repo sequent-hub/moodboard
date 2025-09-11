@@ -26,7 +26,7 @@ import * as PIXI from 'pixi.js';
 export class PlacementTool extends BaseTool {
     constructor(eventBus, core = null) {
         super('place', eventBus);
-        this.cursor = 'crosshair';
+        this.cursor = 'default';
         this.hotkey = null;
         this.app = null;
         this.world = null;
@@ -63,6 +63,29 @@ export class PlacementTool extends BaseTool {
                         this.startFrameDrawMode();
                     } else if (this.pending.type === 'shape') {
                         this.showShapeGhost();
+                    }
+                    // Поддержка сценария перетаскивания из панели: отпускание без предварительного mousedown на канвасе
+                    if (this.pending.placeOnMouseUp && this.app && this.app.view) {
+                        const onUp = (ev) => {
+                            this.app.view.removeEventListener('mouseup', onUp);
+                            if (!this.pending) return;
+                            const worldPoint = this._toWorld(ev.x, ev.y);
+                            const position = {
+                                x: Math.round(worldPoint.x - (this.pending.size?.width ?? 100) / 2),
+                                y: Math.round(worldPoint.y - (this.pending.size?.height ?? 100) / 2)
+                            };
+                            const props = { ...(this.pending.properties || {}) };
+                            this.eventBus.emit(Events.UI.ToolbarAction, {
+                                type: this.pending.type,
+                                id: this.pending.type,
+                                position,
+                                properties: props
+                            });
+                            this.pending = null;
+                            this.hideGhost();
+                            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+                        };
+                        this.app.view.addEventListener('mouseup', onUp, { once: true });
                     }
                 }
             });
@@ -168,6 +191,31 @@ export class PlacementTool extends BaseTool {
         }
         
         if (!this.pending) return;
+        // Если включен режим "перетянуть и отпустить" из панели (placeOnMouseUp),
+        // то размещение выполняем на mouseup, а здесь только показываем призрак и запоминаем старт
+        if (this.pending.placeOnMouseUp) {
+            const onUp = (ev) => {
+                this.app.view.removeEventListener('mouseup', onUp);
+                // Имитация обычного place по текущему положению курсора
+                const worldPoint = this._toWorld(ev.x, ev.y);
+                const position = {
+                    x: Math.round(worldPoint.x - (this.pending.size?.width ?? 100) / 2),
+                    y: Math.round(worldPoint.y - (this.pending.size?.height ?? 100) / 2)
+                };
+                const props = { ...(this.pending.properties || {}) };
+                this.eventBus.emit(Events.UI.ToolbarAction, {
+                    type: this.pending.type,
+                    id: this.pending.type,
+                    position,
+                    properties: props
+                });
+                this.pending = null;
+                this.hideGhost();
+                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+            };
+            this.app.view.addEventListener('mouseup', onUp, { once: true });
+            return;
+        }
         // Если включен режим рисования фрейма — инициируем рамку
         if (this.pending.type === 'frame-draw') {
             const start = this._toWorld(event.x, event.y);
@@ -785,6 +833,16 @@ export class PlacementTool extends BaseTool {
         }
 
         this.world.addChild(this.ghostContainer);
+
+        // Кастомный курсор: мини-превью иконки рядом с курсором
+        try {
+            if (this.app && this.app.view && src) {
+                const cursorSize = 24;
+                const url = encodeURI(src);
+                // Используем CSS cursor с изображением, если поддерживается
+                this.app.view.style.cursor = `url(${url}) ${Math.floor(cursorSize/2)} ${Math.floor(cursorSize/2)}, default`;
+            }
+        } catch (_) {}
     }
 
     /**

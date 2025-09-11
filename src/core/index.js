@@ -1073,26 +1073,44 @@ export class CoreMoodBoard {
                 const aspect = isEmoji ? 1 : ((start.width > 0 && start.height > 0) ? (start.width / start.height) : (object.width / Math.max(1, object.height)));
                 let w = Math.max(1, data.size.width);
                 let h = Math.max(1, data.size.height);
-                // Приводим к ближайшему по изменяемой стороне
-                // Определим, какая сторона изменилась сильнее
-                const dw = Math.abs(w - start.width);
-                const dh = Math.abs(h - start.height);
-                if (dw >= dh) {
-                    h = Math.round(w / aspect);
-                } else {
-                    w = Math.round(h * aspect);
-                }
-                // Минимальная площадь — только для фреймов
-                if (!isEmoji) {
-                    const minArea = 1800;
-                    const area = Math.max(1, w * h);
-                    if (area < minArea) {
-                        const scale = Math.sqrt(minArea / area);
-                        w = Math.round(w * scale);
-                        h = Math.round(h * scale);
+                const hndl = (this._activeResize?.handle || '').toLowerCase();
+                if (isEmoji) {
+                    // Делаем квадрат, фиксируя противоположную сторону к старту
+                    const s = Math.max(w, h);
+                    // Вычислим позицию сразу, чтобы не было дрейфа правой/нижней границы
+                    if (!data.position && this._activeResize && this._activeResize.objectId === data.object) {
+                        const startPos = this._activeResize.startPosition;
+                        const sw = this._activeResize.startSize.width;
+                        const sh = this._activeResize.startSize.height;
+                        let x = startPos.x;
+                        let y = startPos.y;
+                        if (hndl.includes('w')) { x = startPos.x + (sw - s); }
+                        if (hndl.includes('n')) { y = startPos.y + (sh - s); }
+                        const isEdge = ['n','s','e','w'].includes(hndl);
+                        if (isEdge) {
+                            if (hndl === 'n' || hndl === 's') x = startPos.x + Math.round((sw - s) / 2);
+                            if (hndl === 'e' || hndl === 'w') y = startPos.y + Math.round((sh - s) / 2);
+                        }
+                        data.position = { x: Math.round(x), y: Math.round(y) };
                     }
+                    w = s; h = s;
+                } else {
+                    // Обычная поддержка аспекта для фреймов
+                    const dw = Math.abs(w - start.width);
+                    const dh = Math.abs(h - start.height);
+                    if (dw >= dh) { h = Math.round(w / aspect); } else { w = Math.round(h * aspect); }
                 }
-                data.size = { width: w, height: h };
+                 // Минимальная площадь — только для фреймов
+                 if (!isEmoji) {
+                     const minArea = 1800;
+                     const area = Math.max(1, w * h);
+                     if (area < minArea) {
+                         const scale = Math.sqrt(minArea / area);
+                         w = Math.round(w * scale);
+                         h = Math.round(h * scale);
+                     }
+                 }
+                 data.size = { width: w, height: h };
 
                 // Если позиция известна (фиксированная противоположная сторона) — откорректируем её
                 if (!data.position && this._activeResize && this._activeResize.objectId === data.object) {

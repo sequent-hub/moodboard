@@ -947,7 +947,49 @@ export class Toolbar {
                 img.alt = '';
                 btn.appendChild(img);
 
+                // Перетаскивание: начинаем только если был реальный drag (движение > 4px)
+                btn.addEventListener('mousedown', (e) => {
+                    const startX = e.clientX;
+                    const startY = e.clientY;
+                    let startedDrag = false;
+                    const onMove = (ev) => {
+                        if (startedDrag) return;
+                        const dx = Math.abs(ev.clientX - startX);
+                        const dy = Math.abs(ev.clientY - startY);
+                        if (dx > 4 || dy > 4) {
+                            startedDrag = true;
+                            btn.__dragActive = true;
+                            const target = 64;
+                            const targetW = target;
+                            const targetH = target;
+                            // Активируем инструмент размещения и включаем режим placeOnMouseUp
+                            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                            this.eventBus.emit(Events.Place.Set, {
+                                type: 'image',
+                                properties: { src: url, width: targetW, height: targetH, isEmojiIcon: true },
+                                size: { width: targetW, height: targetH },
+                                placeOnMouseUp: true
+                            });
+                            // Закрываем поповер, чтобы не мешал курсору над холстом
+                            this.closeEmojiPopup();
+                            cleanup();
+                        }
+                    };
+                    const onUp = () => {
+                        cleanup();
+                        // Снимем флаг сразу после клика, чтобы click мог отфильтроваться
+                        setTimeout(() => { btn.__dragActive = false; }, 0);
+                    };
+                    const cleanup = () => {
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                    };
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp, { once: true });
+                });
+
                 btn.addEventListener('click', () => {
+                    if (btn.__dragActive) return; // не обрабатываем клик после drag
                     this.animateButton(btn);
                     const target = 64; // кратно 128 для лучшей четкости при даунскейле
                     const targetW = target;
