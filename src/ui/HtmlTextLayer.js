@@ -42,12 +42,22 @@ export class HtmlTextLayer {
             this.updateOne(objectId);
         });
 
-        // Прятать HTML-текст во время редактирования (textarea)
+        // Прятать HTML-текст во время редактирования (textarea) — общий текст
         this.eventBus.on(Events.UI.TextEditStart, ({ objectId }) => {
             const el = this.idToEl.get(objectId);
             if (el) el.style.visibility = 'hidden';
         });
         this.eventBus.on(Events.UI.TextEditEnd, ({ objectId }) => {
+            const el = this.idToEl.get(objectId);
+            if (el) el.style.visibility = '';
+        });
+
+        // Независимое скрытие/показ для записок
+        this.eventBus.on(Events.UI.NoteEditStart, ({ objectId }) => {
+            const el = this.idToEl.get(objectId);
+            if (el) el.style.visibility = 'hidden';
+        });
+        this.eventBus.on(Events.UI.NoteEditEnd, ({ objectId }) => {
             const el = this.idToEl.get(objectId);
             if (el) el.style.visibility = '';
         });
@@ -187,12 +197,12 @@ export class HtmlTextLayer {
         el.className = 'mb-text';
         el.dataset.id = objectId;
         // Получаем свойства из properties объекта
-        const fontFamily = objectData.properties?.fontFamily || objectData.fontFamily || 'Roboto, Arial, sans-serif';
+        const fontFamily = objectData.properties?.fontFamily || objectData.fontFamily || 'Caveat, Arial, cursive';
         const color = objectData.color || objectData.properties?.color || '#000000';
         const backgroundColor = objectData.backgroundColor || objectData.properties?.backgroundColor || 'transparent';
         
         // Базовый line-height исходя из стартового размера шрифта
-        const baseFs = objectData.fontSize || objectData.properties?.fontSize || 16;
+        const baseFs = objectData.fontSize || objectData.properties?.fontSize || 32;
         const baseLineHeight = (() => {
             const fs = baseFs;
             if (fs <= 12) return Math.round(fs * 1.40);
@@ -209,10 +219,18 @@ export class HtmlTextLayer {
         el.style.fontFamily = fontFamily;
         el.style.backgroundColor = backgroundColor === 'transparent' ? '' : backgroundColor;
         el.style.lineHeight = `${baseLineHeight}px`;
+        // Выравнивание рендеринга с textarea
+        el.style.whiteSpace = 'pre-wrap';
+        el.style.wordBreak = 'break-word';
+        el.style.overflow = 'visible';
+        el.style.letterSpacing = '0px';
+        el.style.fontKerning = 'normal';
+        el.style.textRendering = 'optimizeLegibility';
+        el.style.padding = '0'; // без внутренних отступов
         const content = objectData.content || objectData.properties?.content || '';
         el.textContent = content;
         // Базовые размеры сохраняем в dataset
-        const fs = objectData.fontSize || objectData.properties?.fontSize || 16;
+        const fs = objectData.fontSize || objectData.properties?.fontSize || 32;
         const bw = Math.max(1, objectData.width || objectData.properties?.baseW || 160);
         const bh = Math.max(1, objectData.height || objectData.properties?.baseH || 36);
         el.dataset.baseFontSize = String(fs);
@@ -255,14 +273,13 @@ export class HtmlTextLayer {
         const angle = obj.rotation || obj.transform?.rotation || 0;
 
         // Чёткая отрисовка: меняем реальный font-size, учитывая зум и изменение размеров
-        const baseFS = parseFloat(el.dataset.baseFontSize || `${obj.properties?.fontSize || obj.fontSize || 16}`) || 16;
+        const baseFS = parseFloat(el.dataset.baseFontSize || `${obj.properties?.fontSize || obj.fontSize || 32}`) || 32;
         const baseW = parseFloat(el.dataset.baseW || '160') || 160;
         const baseH = parseFloat(el.dataset.baseH || '36') || 36;
         const scaleX = w && baseW ? (w / baseW) : 1;
         const scaleY = h && baseH ? (h / baseH) : 1;
-        // Для текстовых объектов не масштабируем шрифт от изменения размеров блока,
-        // чтобы сохранять вид как при редактировании (как в Miro)
-        const sObj = (obj?.type === 'text' || obj?.type === 'simple-text')
+        // Для записок также не масштабируем шрифт от размера блока — редактор совпадает точно
+        const sObj = (obj?.type === 'text' || obj?.type === 'simple-text' || obj?.type === 'note')
             ? 1
             : Math.min(scaleX, scaleY);
         const sCss = s / res;
@@ -309,7 +326,8 @@ export class HtmlTextLayer {
         // Гарантируем, что высота соответствует контенту (особенно после смены font-size)
         try {
             el.style.height = 'auto';
-            const h = Math.max(1, Math.round(el.scrollHeight));
+            // Добавим небольшой нижний отступ для хвостов букв, чтобы не отсекались (например, у «з»)
+            const h = Math.max(1, Math.round(el.scrollHeight + 2));
             el.style.height = `${h}px`;
         } catch (_) {}
         

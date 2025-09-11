@@ -1554,6 +1554,9 @@ export class CoreMoodBoard {
                                 if (updates.properties.fontSize !== undefined) {
                                     styleUpdates.fontSize = updates.properties.fontSize;
                                 }
+                                if (updates.properties.fontFamily !== undefined) {
+                                    styleUpdates.fontFamily = updates.properties.fontFamily;
+                                }
                                 
                                 if (Object.keys(styleUpdates).length > 0) {
                                     instance.setStyle(styleUpdates);

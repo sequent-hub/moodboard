@@ -1576,7 +1576,7 @@ export class SelectTool extends BaseTool {
         }
 
         
-        let { fontSize = 14, content = '', initialSize } = properties;
+        let { fontSize = 32, content = '', initialSize } = properties;
         
         // Определяем тип объекта
         const isNote = objectType === 'note';
@@ -1608,8 +1608,12 @@ export class SelectTool extends BaseTool {
             if (meta.fontSize) properties.fontSize = meta.fontSize;
         }
         
-        // Уведомляем о начале редактирования
-        this.eventBus.emit(Events.UI.TextEditStart, { objectId: objectId || null });
+        // Уведомляем о начале редактирования (для разных типов отдельно)
+        if (objectType === 'note') {
+            this.eventBus.emit(Events.UI.NoteEditStart, { objectId: objectId || null });
+        } else {
+            this.eventBus.emit(Events.UI.TextEditStart, { objectId: objectId || null });
+        }
         // Прячем глобальные HTML-ручки на время редактирования, чтобы не было второй рамки
         try {
             if (typeof window !== 'undefined' && window.moodboardHtmlHandlesLayer) {
@@ -1628,12 +1632,27 @@ export class SelectTool extends BaseTool {
         const viewResEarly = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
         const sCssEarly = sEarly / viewResEarly;
         let effectiveFontPx = Math.max(1, Math.round((fontSize || 14) * sCssEarly));
-        if (objectId && typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
-            const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
-            if (el && typeof window.getComputedStyle === 'function') {
-                const cs = window.getComputedStyle(el);
-                const f = parseFloat(cs.fontSize);
-                if (isFinite(f) && f > 0) effectiveFontPx = Math.round(f);
+        // Точное выравнивание размеров:
+        if (objectId) {
+            if (objectType === 'note') {
+                try {
+                    const pixiReq = { objectId, pixiObject: null };
+                    this.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
+                    const inst = pixiReq.pixiObject && pixiReq.pixiObject._mb && pixiReq.pixiObject._mb.instance;
+                    if (inst && inst.textField) {
+                        const wt = inst.textField.worldTransform;
+                        const scaleY = Math.max(0.0001, Math.hypot(wt.c || 0, wt.d || 0));
+                        const baseFS = parseFloat(inst.textField.style?.fontSize || fontSize || 14) || (fontSize || 14);
+                        effectiveFontPx = Math.max(1, Math.round(baseFS * (scaleY / viewResEarly)));
+                    }
+                } catch (_) {}
+            } else if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
+                const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
+                if (el && typeof window.getComputedStyle === 'function') {
+                    const cs = window.getComputedStyle(el);
+                    const f = parseFloat(cs.fontSize);
+                    if (isFinite(f) && f > 0) effectiveFontPx = Math.round(f);
+                }
             }
         }
         // Используем только HTML-ручки во время редактирования текста
@@ -1658,34 +1677,70 @@ export class SelectTool extends BaseTool {
             if (fs <= 96) return Math.round(fs * 1.20);
             return Math.round(fs * 1.18);
         };
-        const lhInitial = computeLineHeightPx(effectiveFontPx);
+        // Вычисляем межстрочный интервал; подгоняем к реальным значениям HTML-отображения
+        let lhInitial = computeLineHeightPx(effectiveFontPx);
+        try {
+            if (objectId) {
+                if (objectType === 'note') {
+                    const pixiReq = { objectId, pixiObject: null };
+                    this.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
+                    const inst = pixiReq.pixiObject && pixiReq.pixiObject._mb && pixiReq.pixiObject._mb.instance;
+                    if (inst && inst.textField) {
+                        const wt = inst.textField.worldTransform;
+                        const scaleY = Math.max(0.0001, Math.hypot(wt.c || 0, wt.d || 0));
+                        const baseLH = parseFloat(inst.textField.style?.lineHeight || (fontSize * 1.2)) || (fontSize * 1.2);
+                        lhInitial = Math.max(1, Math.round(baseLH * (scaleY / viewResEarly)));
+                    }
+                } else if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
+                    const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
+                    if (el) {
+                        const cs = window.getComputedStyle(el);
+                        const lh = parseFloat(cs.lineHeight);
+                        if (isFinite(lh) && lh > 0) lhInitial = Math.round(lh);
+                    }
+                }
+            }
+        } catch (_) {}
         
         // Базовые стили вынесены в CSS (.moodboard-text-input); здесь — только динамика
+        // Подбираем актуальный font-family из объекта
+        try {
+            if (objectId) {
+                if (objectType === 'note') {
+                    // Для записки читаем из PIXI-инстанса NoteObject
+                    const pixiReq = { objectId, pixiObject: null };
+                    this.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
+                    const inst = pixiReq.pixiObject && pixiReq.pixiObject._mb && pixiReq.pixiObject._mb.instance;
+                    const ff = (inst && inst.textField && inst.textField.style && inst.textField.style.fontFamily)
+                        || (pixiReq.pixiObject && pixiReq.pixiObject._mb && pixiReq.pixiObject._mb.properties && pixiReq.pixiObject._mb.properties.fontFamily)
+                        || null;
+                    if (ff) textarea.style.fontFamily = ff;
+                } else if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
+                    // Для обычного текста читаем из HTML-элемента
+                    const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
+                    if (el) {
+                        const cs = window.getComputedStyle(el);
+                        const ff = cs && cs.fontFamily ? cs.fontFamily : null;
+                        if (ff) textarea.style.fontFamily = ff;
+                    }
+                }
+            }
+        } catch (_) {}
         textarea.style.fontSize = `${effectiveFontPx}px`;
         textarea.style.lineHeight = `${lhInitial}px`;
-        const BASELINE_FIX_INIT = 2; // выравниваем визуальный нижний запас
-        const initialH = Math.max(1, lhInitial - BASELINE_FIX_INIT + 10); // +5px сверху/снизу
+        const BASELINE_FIX_INIT = 0; // без внутренних отступов — высота = line-height
+        const initialH = Math.max(1, lhInitial);
         textarea.style.minHeight = `${initialH}px`;
         textarea.style.height = `${initialH}px`;
         textarea.setAttribute('rows', '1');
         textarea.style.overflowY = 'hidden';
+        textarea.style.whiteSpace = 'pre-wrap';
+        textarea.style.wordBreak = 'break-word';
+        textarea.style.letterSpacing = '0px';
+        textarea.style.fontKerning = 'normal';
         
         wrapper.appendChild(textarea);
-        // HTML-рамка строго по контуру input (зелёная, как у HtmlHandlesLayer)
-        const outline = document.createElement('div');
-        Object.assign(outline.style, {
-            position: 'absolute',
-            left: '0px',
-            top: '0px',
-            width: '100%',
-            height: '100%',
-            border: '1px solid #1DE9B6',
-            borderRadius: '3px',
-            boxSizing: 'content-box',
-            pointerEvents: 'none',
-            zIndex: 10001
-        });
-        wrapper.appendChild(outline);
+        // Убрана зелёная рамка вокруг поля ввода по требованию
         
         // В режиме input не показываем локальные ручки
         
@@ -1796,30 +1851,62 @@ export class SelectTool extends BaseTool {
                 }
             }
             
-            // Позиционируем редактор точно там, где находится текст на заметке
-            // В NoteObject текст позиционируется с topMargin = 20 и центрируется по горизонтали
-            const topMargin = 20; // Отступ от верха (ниже полоски)
-            const horizontalPadding = 8; // Отступы по горизонтали
-            const editorWidth = Math.min(280, noteWidth - (horizontalPadding * 2));
-            const editorHeight = Math.min(36, noteHeight - topMargin - horizontalPadding);
+            // Текст у записки центрирован по обеим осям; textarea тоже центрируем
+            const horizontalPadding = 16; // немного больше, чем раньше
+            const editorWidth = Math.min(360, noteWidth - (horizontalPadding * 2));
+            const editorHeight = Math.min(180, noteHeight - (horizontalPadding * 2));
             
-            // Позиционируем редактор точно там, где находится текст
-            // Текст центрирован по горизонтали и имеет отступ topMargin от верха
-            const textCenterX = noteWidth / 2; // центр текста по горизонтали
-            const textTopY = topMargin; // позиция текста по вертикали
+            const textCenterX = noteWidth / 2;
+            const textCenterY = noteHeight / 2;
             
-            // Позиционируем редактор так, чтобы его центр совпадал с центром текста
             const editorLeft = textCenterX - (editorWidth / 2);
-            const editorTop = textTopY;
+            const editorTop = textCenterY - (editorHeight / 2);
             
             wrapper.style.left = `${screenPos.x + editorLeft}px`;
             wrapper.style.top = `${screenPos.y + editorTop}px`;
             
-            // Устанавливаем размеры редактора
+            // Устанавливаем размеры редактора (центрируем по контенту)
             textarea.style.width = `${editorWidth}px`;
             textarea.style.height = `${editorHeight}px`;
             wrapper.style.width = `${editorWidth}px`;
             wrapper.style.height = `${editorHeight}px`;
+
+            // Для записок: авто-ресайз редактора под содержимое с сохранением центрирования
+            textarea.style.textAlign = 'center';
+            const maxEditorWidth = Math.max(1, noteWidth - (horizontalPadding * 2));
+            const maxEditorHeight = Math.max(1, noteHeight - (horizontalPadding * 2));
+            const MIN_NOTE_EDITOR_W = 20;
+            const MIN_NOTE_EDITOR_H = Math.max(1, computeLineHeightPx(effectiveFontPx));
+
+            const autoSizeNote = () => {
+                // Сначала сбрасываем размеры, чтобы измерить естественные
+                const prevW = textarea.style.width;
+                const prevH = textarea.style.height;
+                textarea.style.width = 'auto';
+                textarea.style.height = 'auto';
+
+                // Ширина по содержимому, но не шире границ записки
+                const naturalW = Math.ceil(textarea.scrollWidth + 1);
+                const targetW = Math.min(maxEditorWidth, Math.max(MIN_NOTE_EDITOR_W, naturalW));
+                textarea.style.width = `${targetW}px`;
+                wrapper.style.width = `${targetW}px`;
+
+                // Высота по содержимому, c нижним пределом = одна строка
+                const computed = (typeof window !== 'undefined') ? window.getComputedStyle(textarea) : null;
+                const lineH = (computed ? parseFloat(computed.lineHeight) : computeLineHeightPx(effectiveFontPx));
+                const naturalH = Math.ceil(textarea.scrollHeight);
+                const targetH = Math.min(maxEditorHeight, Math.max(MIN_NOTE_EDITOR_H, naturalH));
+                textarea.style.height = `${targetH}px`;
+                wrapper.style.height = `${targetH}px`;
+
+                // Центрируем wrapper внутри записки после смены размеров
+                const left = screenPos.x + (noteWidth / 2) - (targetW / 2);
+                const top = screenPos.y + (noteHeight / 2) - (targetH / 2);
+                wrapper.style.left = `${left}px`;
+                wrapper.style.top = `${top}px`;
+            };
+            // Первый вызов — синхронизировать с текущим содержимым
+            autoSizeNote();
         } else {
             // Для обычного текста используем стандартное позиционирование
             wrapper.style.left = `${screenPos.x}px`;
@@ -1934,6 +2021,18 @@ export class SelectTool extends BaseTool {
         document.head.appendChild(styleEl);
         this.textEditor = { active: true, objectId, textarea, wrapper, world: this.textEditor.world, position, properties: { fontSize }, objectType, _phStyle: styleEl };
 
+        // Если редактируем записку — скрываем PIXI-текст записки (чтобы не было дублирования)
+        if (objectType === 'note' && objectId) {
+            try {
+                const pixiReq = { objectId, pixiObject: null };
+                this.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
+                const inst = pixiReq.pixiObject && pixiReq.pixiObject._mb && pixiReq.pixiObject._mb.instance;
+                if (inst && typeof inst.hideText === 'function') {
+                    inst.hideText();
+                }
+            } catch (_) {}
+        }
+
         // Скрываем статичный текст во время редактирования для всех типов объектов
         if (objectId) {
             // Проверяем, что HTML-элемент существует перед попыткой скрыть текст
@@ -2007,7 +2106,20 @@ export class SelectTool extends BaseTool {
             // Убираем редактор
             wrapper.remove();
             this.textEditor = { active: false, objectId: null, textarea: null, wrapper: null, world: null, position: null, properties: null, objectType: 'text' };
-            this.eventBus.emit(Events.UI.TextEditEnd, { objectId: objectId || null });
+            if (currentObjectType === 'note') {
+                this.eventBus.emit(Events.UI.NoteEditEnd, { objectId: objectId || null });
+                // Вернём PIXI-текст записки
+                try {
+                    const pixiReq = { objectId, pixiObject: null };
+                    this.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
+                    const inst = pixiReq.pixiObject && pixiReq.pixiObject._mb && pixiReq.pixiObject._mb.instance;
+                    if (inst && typeof inst.showText === 'function') {
+                        inst.showText();
+                    }
+                } catch (_) {}
+            } else {
+                this.eventBus.emit(Events.UI.TextEditEnd, { objectId: objectId || null });
+            }
             // Возвращаем глобальные HTML-ручки (обновляем слой)
             try {
                 if (typeof window !== 'undefined' && window.moodboardHtmlHandlesLayer) {
@@ -2092,9 +2204,55 @@ export class SelectTool extends BaseTool {
                 finalize(false);
             }
         });
-        // Автоподгон при вводе только для обычного текста
+        // Автоподгон при вводе
         if (!isNote) {
             textarea.addEventListener('input', autoSize);
+        } else {
+            // Для заметок растягиваем редактор по содержимому и центрируем
+            textarea.addEventListener('input', () => {
+                try {
+                    // Найдём локальную функцию, если она объявлена выше (в замыкании)
+                    // В некоторых движках можно хранить ссылку на функцию в data-атрибуте
+                    // но здесь просто повторим алгоритм: сброс -> измерение -> ограничение -> центрирование
+                    const view = this.app?.view || document.querySelector('canvas');
+                    // Безопасно получим текущие размеры записки
+                    let noteWidth = 300, noteHeight = 300;
+                    if (objectId) {
+                        const sizeData = { objectId, size: null };
+                        this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+                        if (sizeData.size) { noteWidth = sizeData.size.width; noteHeight = sizeData.size.height; }
+                    }
+                    const horizontalPadding = 16;
+                    const maxEditorWidth = Math.max(1, noteWidth - (horizontalPadding * 2));
+                    const maxEditorHeight = Math.max(1, noteHeight - (horizontalPadding * 2));
+                    const MIN_NOTE_EDITOR_W = 20;
+                    const MIN_NOTE_EDITOR_H = Math.max(1, computeLineHeightPx(effectiveFontPx));
+
+                    textarea.style.width = 'auto';
+                    textarea.style.height = 'auto';
+                    const naturalW = Math.ceil(textarea.scrollWidth + 1);
+                    const targetW = Math.min(maxEditorWidth, Math.max(MIN_NOTE_EDITOR_W, naturalW));
+                    textarea.style.width = `${targetW}px`;
+                    const computed = (typeof window !== 'undefined') ? window.getComputedStyle(textarea) : null;
+                    const lineH = (computed ? parseFloat(computed.lineHeight) : computeLineHeightPx(effectiveFontPx));
+                    const naturalH = Math.ceil(textarea.scrollHeight);
+                    const targetH = Math.min(maxEditorHeight, Math.max(MIN_NOTE_EDITOR_H, naturalH));
+                    textarea.style.height = `${targetH}px`;
+                    wrapper.style.width = `${targetW}px`;
+                    wrapper.style.height = `${targetH}px`;
+
+                    const toScreen = (wx, wy) => {
+                        const worldLayer = this.textEditor.world || (this.app?.stage);
+                        if (!worldLayer) return { x: wx, y: wy };
+                        const global = worldLayer.toGlobal(new PIXI.Point(wx, wy));
+                        const viewRes = (this.app?.renderer?.resolution) || (view && view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
+                        return { x: global.x / viewRes, y: global.y / viewRes };
+                    };
+                    const screenPos = toScreen(position.x, position.y);
+                    wrapper.style.left = `${screenPos.x + (noteWidth / 2) - (targetW / 2)}px`;
+                    wrapper.style.top = `${screenPos.y + (noteHeight / 2) - (targetH / 2)}px`;
+                } catch (_) {}
+            });
         }
     }
 

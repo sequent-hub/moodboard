@@ -418,9 +418,10 @@ export class Toolbar {
                     type: 'note', 
                     properties: { 
                         content: 'Новая записка',
-                        fontSize: 16,
-                        width: 300,
-                        height: 300
+                        fontFamily: 'Caveat, Arial, cursive',
+                        fontSize: 32,
+                        width: 250,
+                        height: 250
                     }
                 });
                 return;

@@ -68,6 +68,8 @@ export const Events = {
 		MinimapCenterOn: 'ui:minimap:center-on',
 		TextEditStart: 'ui:text:edit:start',
 		TextEditEnd: 'ui:text:edit:end',
+		NoteEditStart: 'ui:note:edit:start',
+		NoteEditEnd: 'ui:note:edit:end',
 		LayerBringToFront: 'ui:layer:bring-to-front',
 		LayerBringForward: 'ui:layer:bring-forward',
 		LayerSendBackward: 'ui:layer:send-backward',

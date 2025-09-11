@@ -431,7 +431,7 @@ export class PlacementTool extends BaseTool {
         } else {
             // Для записки: выставляем фактические габариты и центрируем по курсору
             if (this.pending.type === 'note') {
-                const base = 300; // квадрат 300x300
+                const base = 250; // квадрат 250x250
                 const noteW = (typeof props.width === 'number') ? props.width : base;
                 const noteH = (typeof props.height === 'number') ? props.height : base;
                 const side = Math.max(noteW, noteH);
@@ -532,6 +532,11 @@ export class PlacementTool extends BaseTool {
      */
     _onMouseMove(event) {
         if ((this.selectedFile || this.selectedImage || this.pending) && this.ghostContainer) {
+            // Сохраним последние координаты мыши (в экранных координатах) — пригодится для первичной позиции призрака
+            if (this.app && this.app.view) {
+                this.app.view._lastMouseX = event.x;
+                this.app.view._lastMouseY = event.y;
+            }
             const worldPoint = this._toWorld(event.offsetX, event.offsetY);
             this.updateGhostPosition(worldPoint.x, worldPoint.y);
         }
@@ -548,6 +553,17 @@ export class PlacementTool extends BaseTool {
         // Создаем контейнер для призрака
         this.ghostContainer = new PIXI.Container();
         this.ghostContainer.alpha = 0.6; // Полупрозрачность
+        // Сразу ставим контейнер в позицию курсора, чтобы он не мигал в левом верхнем углу
+        if (this.app && this.app.view) {
+            const rect = this.app.view.getBoundingClientRect();
+            const cursorX = (typeof this.app.view._lastMouseX === 'number') ? this.app.view._lastMouseX : (rect.left + rect.width / 2);
+            const cursorY = (typeof this.app.view._lastMouseY === 'number') ? this.app.view._lastMouseY : (rect.top + rect.height / 2);
+            const worldPoint = this._toWorld(cursorX, cursorY);
+            this.updateGhostPosition(worldPoint.x, worldPoint.y);
+        }
+        // Попробуем дождаться загрузки веб-шрифта Caveat до отрисовки
+        const pendingFont = (this.pending.properties?.fontFamily) || 'Caveat, Arial, cursive';
+        const primaryFont = String(pendingFont).split(',')[0].trim().replace(/^['"]|['"]$/g, '') || 'Caveat';
         
         // Размеры
         const width = this.selectedFile.properties.width || 120;
@@ -911,11 +927,9 @@ export class PlacementTool extends BaseTool {
         this.ghostContainer = new PIXI.Container();
         this.ghostContainer.alpha = 0.6; // Полупрозрачность
         
-        // Размеры и стили, синхронизированные с новой квадратной заметкой
-        const width = this.pending.properties?.width || 300;
-        const height = this.pending.properties?.height || 300;
-        const fontSize = this.pending.properties?.fontSize || 16;
-        const content = this.pending.properties?.content || 'Новая записка';
+        // Размеры и стили (без текста у призрака)
+        const width = this.pending.properties?.width || 250;
+        const height = this.pending.properties?.height || 250;
         const backgroundColor = (typeof this.pending.properties?.backgroundColor === 'number')
             ? this.pending.properties.backgroundColor
             : 0xFFF9C4; // желтый как у записки
@@ -931,30 +945,18 @@ export class PlacementTool extends BaseTool {
         background.drawRoundedRect(0, 0, width, height, 2);
         background.endFill();
 
-        // Текст записки, выровнен как в NoteObject (центр по X, отступ сверху)
-        const noteText = new PIXI.Text(content, {
-            fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
-            fontSize: fontSize,
-            fill: textColor,
-            align: 'center',
-            wordWrap: true,
-            wordWrapWidth: width - 16,
-            lineHeight: fontSize * 1.2
-        });
-        noteText.anchor.set(0.5, 0);
-        noteText.x = Math.round(width / 2);
-        noteText.y = 20; // как в NoteObject topMargin
+        // У призрака текста нет — только фон записки
 
         // Порядок добавления: тень → фон → шапка → текст
         // Без тени
         this.ghostContainer.addChild(background);
-        this.ghostContainer.addChild(noteText);
         
         // Центрируем контейнер относительно курсора
         this.ghostContainer.pivot.x = width / 2;
         this.ghostContainer.pivot.y = height / 2;
         
         this.world.addChild(this.ghostContainer);
+        // Текст убран — дополнительная загрузка шрифтов для призрака не требуется
     }
 
     /**

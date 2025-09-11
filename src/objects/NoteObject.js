@@ -14,14 +14,15 @@ export class NoteObject {
         this.objectData = objectData;
         
         // Размеры записки
-        const defaultSide = 300; // квадрат 300x300
+        const defaultSide = 250; // квадрат 250x250
         this.width = objectData.width || objectData.properties?.width || defaultSide;
         this.height = objectData.height || objectData.properties?.height || defaultSide;
         
         // Свойства записки
         const props = objectData.properties || {};
         this.content = props.content || '';
-        this.fontSize = props.fontSize || 16;
+        this.fontSize = props.fontSize || 32;
+        const fontFamily = props.fontFamily || 'Caveat, Arial, cursive';
         this.backgroundColor = (typeof props.backgroundColor === 'number') ? props.backgroundColor : 0xFFF9C4; // Светло-желтый
         this.borderColor = (typeof props.borderColor === 'number') ? props.borderColor : 0xF9A825; // Золотистый
         this.textColor = (typeof props.textColor === 'number') ? props.textColor : 0x1A1A1A; // Почти черный для лучшей контрастности
@@ -49,21 +50,38 @@ export class NoteObject {
         this.graphics = new PIXI.Graphics();
         this.container.addChild(this.graphics);
         
+        // Функция согласованной высоты строки (как в HtmlTextLayer)
+        const computeLineHeightPx = (fs) => {
+            if (fs <= 12) return Math.round(fs * 1.40);
+            if (fs <= 18) return Math.round(fs * 1.34);
+            if (fs <= 36) return Math.round(fs * 1.26);
+            if (fs <= 48) return Math.round(fs * 1.24);
+            if (fs <= 72) return Math.round(fs * 1.22);
+            if (fs <= 96) return Math.round(fs * 1.20);
+            return Math.round(fs * 1.18);
+        };
+
         // Текст записки
         this.textField = new PIXI.Text(this.content, {
-            fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
+            fontFamily: fontFamily,
             fontSize: this.fontSize,
             fill: this.textColor,
             align: 'center',
+            letterSpacing: 0,
             wordWrap: true,
             wordWrapWidth: this.width - 16, // Отступы по 8px с каждой стороны
-            lineHeight: this.fontSize * 1.2,
+            lineHeight: computeLineHeightPx(this.fontSize),
+            padding: 3,
+            trim: false,
             resolution: (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1
         });
         
         this._redraw(); // Сначала рисуем фон
         this.container.addChild(this.textField); // Затем добавляем текст поверх
         this._updateTextPosition();
+
+        // Гарантируем применение web-font (например, Caveat) при первом создании
+        this._ensureWebFontApplied(fontFamily, this.fontSize);
         
         // Отладочная информация
         console.log('NoteObject created with content:', this.content);
@@ -76,6 +94,7 @@ export class NoteObject {
             properties: { 
                 content: this.content,
                 fontSize: this.fontSize,
+                fontFamily: fontFamily,
                 backgroundColor: this.backgroundColor,
                 borderColor: this.borderColor,
                 textColor: this.textColor,
@@ -156,7 +175,31 @@ export class NoteObject {
         if (typeof fontSize === 'number') {
             this.fontSize = fontSize;
             this.textField.style.fontSize = fontSize;
-            this.textField.style.lineHeight = fontSize * 1.2;
+            // Согласуем с HTML-слоем
+            const computeLineHeightPx = (fs) => {
+                if (fs <= 12) return Math.round(fs * 1.40);
+                if (fs <= 18) return Math.round(fs * 1.34);
+                if (fs <= 36) return Math.round(fs * 1.26);
+                if (fs <= 48) return Math.round(fs * 1.24);
+                if (fs <= 72) return Math.round(fs * 1.22);
+                if (fs <= 96) return Math.round(fs * 1.20);
+                return Math.round(fs * 1.18);
+            };
+            this.textField.style.lineHeight = computeLineHeightPx(fontSize);
+            this.textField.style.padding = 3;
+            this.textField.style.trim = false;
+            this.textField.style.letterSpacing = 0;
+        }
+        if (typeof arguments[0]?.fontFamily === 'string') {
+            const ff = arguments[0].fontFamily;
+            this.textField.style.fontFamily = ff;
+            if (this.container && this.container._mb) {
+                this.container._mb.properties = {
+                    ...(this.container._mb.properties || {}),
+                    fontFamily: ff
+                };
+            }
+            this._ensureWebFontApplied(ff, this.fontSize);
         }
         if (typeof backgroundColor === 'number') this.backgroundColor = backgroundColor;
         if (typeof borderColor === 'number') this.borderColor = borderColor;
@@ -177,6 +220,26 @@ export class NoteObject {
         
         this._redraw();
         this._updateTextPosition();
+    }
+
+    /**
+     * Дожидается загрузки веб-шрифта и обновляет PIXI.Text, чтобы применились корректные метрики
+     */
+    _ensureWebFontApplied(fontFamily, fontSizePx) {
+        try {
+            if (typeof document === 'undefined' || !document.fonts || !document.fonts.load) return;
+            const primary = String(fontFamily || '').split(',')[0].trim().replace(/^['"]|['"]$/g, '') || 'Caveat';
+            const size = Math.max(1, Number(fontSizePx) || 32);
+            const spec = `normal ${size}px ${primary}`;
+            document.fonts.load(spec).then(() => {
+                // Обновляем текст после загрузки шрифта
+                try {
+                    this.textField.style.fontFamily = fontFamily;
+                    this.textField.updateText();
+                    this._updateTextPosition();
+                } catch (_) {}
+            }).catch(() => {});
+        } catch (_) {}
     }
 
     _redraw() {
@@ -263,13 +326,11 @@ export class NoteObject {
         // Ждем, пока PIXI пересчитает размеры текста
         this.textField.updateText();
         
-        // Центрируем текст по горизонтали
+        // Центрируем текст по центру заметки
         const centerX = this.width / 2;
-        const topMargin = 20; // Отступ от верха (ниже полоски)
-        
-        // Используем anchor для центрирования
-        this.textField.anchor.set(0.5, 0);
+        const centerY = this.height / 2;
+        this.textField.anchor.set(0.5, 0.5);
         this.textField.x = centerX;
-        this.textField.y = topMargin;
+        this.textField.y = centerY;
     }
 }

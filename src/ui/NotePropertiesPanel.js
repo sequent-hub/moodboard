@@ -179,6 +179,63 @@ export class NotePropertiesPanel {
     }
 
     _createNoteControls(panel) {
+        // Контейнер для выбора шрифта (как в панели текста)
+        const fontContainer = document.createElement('div');
+        Object.assign(fontContainer.style, {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+        });
+
+        const fontLabel = document.createElement('span');
+        fontLabel.textContent = 'Шрифт:';
+        Object.assign(fontLabel.style, {
+            fontSize: '11px',
+            color: '#666',
+            minWidth: '40px'
+        });
+
+        const fontSelect = document.createElement('select');
+        Object.assign(fontSelect.style, {
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            padding: '3px 8px',
+            fontSize: '12px',
+            backgroundColor: '#fff',
+            cursor: 'pointer',
+            minWidth: '140px',
+        });
+        this.fontSelect = fontSelect;
+
+        const fonts = [
+            { value: 'Caveat, Arial, cursive', name: 'Caveat' },
+            { value: 'Roboto, Arial, sans-serif', name: 'Roboto' },
+            { value: 'Oswald, Arial, sans-serif', name: 'Oswald' },
+            { value: 'Playfair Display, Georgia, serif', name: 'Playfair Display' },
+            { value: 'Roboto Slab, Georgia, serif', name: 'Roboto Slab' },
+            { value: 'Noto Serif, Georgia, serif', name: 'Noto Serif' },
+            { value: 'Lobster, Arial, cursive', name: 'Lobster' },
+            { value: 'Rubik Mono One, Arial, sans-serif', name: 'Rubik Mono One' },
+            { value: 'Great Vibes, Arial, cursive', name: 'Great Vibes' },
+            { value: 'Amatic SC, Arial, cursive', name: 'Amatic SC' },
+            { value: 'Poiret One, Arial, cursive', name: 'Poiret One' },
+            { value: 'Pacifico, Arial, cursive', name: 'Pacifico' },
+        ];
+        fonts.forEach((font) => {
+            const option = document.createElement('option');
+            option.value = font.value;
+            option.textContent = font.name;
+            option.style.fontFamily = font.value;
+            fontSelect.appendChild(option);
+        });
+
+        fontSelect.addEventListener('change', (e) => {
+            this._changeFontFamily(e.target.value);
+        });
+
+        fontContainer.appendChild(fontLabel);
+        fontContainer.appendChild(fontSelect);
+
         // Контейнер для цвета фона
         const backgroundContainer = this._createColorControl(
             'Фон:',
@@ -270,6 +327,7 @@ export class NotePropertiesPanel {
         fontSizeContainer.appendChild(fontSizeLabel);
         fontSizeContainer.appendChild(fontSizeInput);
 
+        panel.appendChild(fontContainer);
         panel.appendChild(backgroundContainer);
         panel.appendChild(borderContainer);
         panel.appendChild(textContainer);
@@ -463,6 +521,17 @@ export class NotePropertiesPanel {
         });
     }
 
+    _changeFontFamily(fontFamily) {
+        if (!this.currentId) return;
+
+        console.log('📝 NotePropertiesPanel: Changing font family to:', fontFamily);
+
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: { properties: { fontFamily: fontFamily } }
+        });
+    }
+
     _updateControlsFromObject() {
         if (!this.currentId) return;
 
@@ -484,6 +553,11 @@ export class NotePropertiesPanel {
             // Обновляем размер шрифта
             if (this.fontSizeInput && props.fontSize !== undefined) {
                 this.fontSizeInput.value = props.fontSize.toString();
+            }
+
+            // Обновляем выбранный шрифт
+            if (this.fontSelect) {
+                this.fontSelect.value = props.fontFamily || 'Pacifico, Arial, sans-serif';
             }
         }
     }
