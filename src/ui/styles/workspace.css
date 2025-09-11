@@ -1,14 +1,14 @@
 /* Fonts */
 @font-face {
     font-family: 'Roboto';
-    src: url('../../assets/fonts/roboto/roboto-regular.woff2') format('woff2'), url('../../assets/fonts/roboto/roboto-regular.ttf') format('truetype');
+    src: url('../../assets/fonts/roboto/Roboto-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Roboto';
-    src: url('../../assets/fonts/roboto/roboto-medium.woff2') format('woff2'), url('../../assets/fonts/roboto/roboto-medium.ttf') format('truetype');
+    src: url('../../assets/fonts/roboto/Roboto-Medium.ttf') format('truetype');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
@@ -16,28 +16,28 @@
 
 @font-face {
     font-family: 'Oswald';
-    src: url('../../assets/fonts/oswald/oswald-regular.woff2') format('woff2'), url('../../assets/fonts/oswald/oswald-regular.ttf') format('truetype');
+    src: url('../../assets/fonts/oswald/Oswald-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Oswald';
-    src: url('../../assets/fonts/oswald/oswald-medium.woff2') format('woff2'), url('../../assets/fonts/oswald/oswald-medium.ttf') format('truetype');
+    src: url('../../assets/fonts/oswald/Oswald-Medium.ttf') format('truetype');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Oswald';
-    src: url('../../assets/fonts/oswald/oswald-bold.woff2') format('woff2'), url('../../assets/fonts/oswald/oswald-bold.ttf') format('truetype');
+    src: url('../../assets/fonts/oswald/Oswald-Bold.ttf') format('truetype');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Roboto';
-    src: url('../../assets/fonts/roboto/roboto-bold.woff2') format('woff2'), url('../../assets/fonts/roboto/roboto-bold.ttf') format('truetype');
+    src: url('../../assets/fonts/roboto/Roboto-Bold.ttf') format('truetype');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -45,21 +45,21 @@
 
 @font-face {
     font-family: 'Playfair Display';
-    src: url('../../assets/fonts/playfair/playfair-regular.woff2') format('woff2'), url('../../assets/fonts/playfair/playfair-regular.ttf') format('truetype');
+    src: url('../../assets/fonts/playfair/PlayfairDisplay-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Playfair Display';
-    src: url('../../assets/fonts/playfair/playfair-medium.woff2') format('woff2'), url('../../assets/fonts/playfair/playfair-medium.ttf') format('truetype');
+    src: url('../../assets/fonts/playfair/PlayfairDisplay-Medium.ttf') format('truetype');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Playfair Display';
-    src: url('../../assets/fonts/playfair/playfair-bold.woff2') format('woff2'), url('../../assets/fonts/playfair/playfair-bold.ttf') format('truetype');
+    src: url('../../assets/fonts/playfair/PlayfairDisplay-Bold.ttf') format('truetype');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -67,21 +67,21 @@
 
 @font-face {
     font-family: 'Roboto Slab';
-    src: url('../../assets/fonts/roboto-slab/roboto-slab-regular.woff2') format('woff2'), url('../../assets/fonts/roboto-slab/roboto-slab-regular.ttf') format('truetype');
+    src: url('../../assets/fonts/roboto-slab/RobotoSlab-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Roboto Slab';
-    src: url('../../assets/fonts/roboto-slab/roboto-slab-medium.woff2') format('woff2'), url('../../assets/fonts/roboto-slab/roboto-slab-medium.ttf') format('truetype');
+    src: url('../../assets/fonts/roboto-slab/RobotoSlab-Medium.ttf') format('truetype');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Roboto Slab';
-    src: url('../../assets/fonts/roboto-slab/roboto-slab-bold.woff2') format('woff2'), url('../../assets/fonts/roboto-slab/roboto-slab-bold.ttf') format('truetype');
+    src: url('../../assets/fonts/roboto-slab/RobotoSlab-Bold.ttf') format('truetype');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -111,7 +111,7 @@
 
 @font-face {
     font-family: 'Lobster';
-    src: url('../../assets/fonts/lobster/lobster-regular.woff2') format('woff2'), url('../../assets/fonts/lobster/lobster-regular.ttf') format('truetype');
+    src: url('../../assets/fonts/lobster/Lobster-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -119,14 +119,14 @@
 
 @font-face {
     font-family: 'Caveat';
-    src: url('../../assets/fonts/caveat/caveat-regular.woff2') format('woff2'), url('../../assets/fonts/caveat/caveat-regular.ttf') format('truetype');
+    src: url('../../assets/fonts/caveat/Caveat-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Caveat';
-    src: url('../../assets/fonts/caveat/caveat-bold.woff2') format('woff2'), url('../../assets/fonts/caveat/caveat-bold.ttf') format('truetype');
+    src: url('../../assets/fonts/caveat/Caveat-Bold.ttf') format('truetype');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -134,7 +134,7 @@
 
 @font-face {
     font-family: 'Rubik Mono One';
-    src: url('../../assets/fonts/rubik-mono-one/rubik-mono-one-regular.woff2') format('woff2'), url('../../assets/fonts/rubik-mono-one/rubik-mono-one-regular.ttf') format('truetype');
+    src: url('../../assets/fonts/rubik-mono-one/RubikMonoOne-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -142,7 +142,7 @@
 
 @font-face {
     font-family: 'Great Vibes';
-    src: url('../../assets/fonts/great-vibes/great-vibes-regular.woff2') format('woff2'), url('../../assets/fonts/great-vibes/great-vibes-regular.ttf') format('truetype');
+    src: url('../../assets/fonts/great-vibes/GreatVibes-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -150,14 +150,14 @@
 
 @font-face {
     font-family: 'Amatic SC';
-    src: url('../../assets/fonts/amatic-sc/amatic-sc-regular.woff2') format('woff2'), url('../../assets/fonts/amatic-sc/amatic-sc-regular.ttf') format('truetype');
+    src: url('../../assets/fonts/amatic-sc/AmaticSC-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'Amatic SC';
-    src: url('../../assets/fonts/amatic-sc/amatic-sc-bold.woff2') format('woff2'), url('../../assets/fonts/amatic-sc/amatic-sc-bold.ttf') format('truetype');
+    src: url('../../assets/fonts/amatic-sc/AmaticSC-Bold.ttf') format('truetype');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -165,7 +165,7 @@
 
 @font-face {
     font-family: 'Poiret One';
-    src: url('../../assets/fonts/poiret-one/poiret-one-regular.woff2') format('woff2'), url('../../assets/fonts/poiret-one/poiret-one-regular.ttf') format('truetype');
+    src: url('../../assets/fonts/poiret-one/PoiretOne-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -173,7 +173,7 @@
 
 @font-face {
     font-family: 'Pacifico';
-    src: url('../../assets/fonts/pacifico/pacifico-regular.woff2') format('woff2'), url('../../assets/fonts/pacifico/Pacifico-Regular.ttf') format('truetype');
+    src: url('../../assets/fonts/pacifico/Pacifico-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
