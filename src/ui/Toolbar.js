@@ -898,70 +898,73 @@ export class Toolbar {
         this.emojiPopupEl = document.createElement('div');
         this.emojiPopupEl.className = 'moodboard-toolbar__popup moodboard-toolbar__popup--emoji';
         this.emojiPopupEl.style.display = 'none';
+        // Загружаем все изображения из папки src/assets/emodji (png/svg) через Vite import.meta.glob
+        const modules = import.meta.glob('../assets/emodji/**/*.{png,PNG,svg,SVG}', { eager: true, as: 'url' });
 
-        const categories = [
-            { title: 'Смайлики', items: ['😀','😁','😂','🤣','🙂','😊','😍','😘','😎','🤔','😴','😡','😭','😇','🤩','🤨','😐','😅','😏','🤗','🤫','😤','🤯','🤪'] },
-            { title: 'Жесты', items: ['👍','👎','👌','✌️','🤘','🤙','👏','🙌','🙏','💪','☝️','👋','🖐️','✋'] },
-            { title: 'Предметы', items: ['💡','📌','📎','📝','🖌️','🖼️','🗂️','📁','📷','🎥','🎯','🧩','🔒','🔑'] },
-            { title: 'Символы', items: ['⭐','🌟','✨','🔥','💥','⚡','❗','❓','✅','❌','💯','🔔','🌀'] },
-            { title: 'Животные', items: ['🐶','🐱','🦊','🐼','🐨','🐵','🐸','🐧','🐤','🦄','🐙'] }
-        ];
+        // Группируем по подпапкам внутри emodji (категории)
+        const entries = Object.entries(modules).sort(([a], [b]) => a.localeCompare(b));
+        const groups = new Map();
+        entries.forEach(([path, url]) => {
+            const marker = '/emodji/';
+            const idx = path.indexOf(marker);
+            let category = 'Разное';
+            if (idx >= 0) {
+                const after = path.slice(idx + marker.length);
+                const parts = after.split('/');
+                category = parts.length > 1 ? parts[0] : 'Разное';
+            }
+            if (!groups.has(category)) groups.set(category, []);
+            groups.get(category).push({ path, url });
+        });
 
-        categories.forEach(cat => {
+        // Задаем желаемый порядок категорий
+        const ORDER = ['Смайлики', 'Жесты', 'Женские эмоции', 'Котики', 'Разное'];
+        const present = [...groups.keys()];
+        const orderedFirst = ORDER.filter(name => groups.has(name));
+        const theRest = present.filter(name => !ORDER.includes(name)).sort((a, b) => a.localeCompare(b));
+        const orderedCategories = [...orderedFirst, ...theRest];
+
+        // Рендерим секции по категориям в нужном порядке
+        orderedCategories.forEach((cat) => {
             const section = document.createElement('div');
             section.className = 'moodboard-emoji__section';
+
             const title = document.createElement('div');
             title.className = 'moodboard-emoji__title';
-            title.textContent = cat.title;
+            title.textContent = cat;
+            section.appendChild(title);
+
             const grid = document.createElement('div');
             grid.className = 'moodboard-emoji__grid';
-            cat.items.forEach(ch => {
+
+            groups.get(cat).forEach(({ url }) => {
                 const btn = document.createElement('button');
                 btn.className = 'moodboard-emoji__btn';
-                btn.title = ch;
-                btn.textContent = ch;
+                btn.title = 'Добавить изображение';
+                const img = document.createElement('img');
+                img.className = 'moodboard-emoji__img';
+                img.src = url;
+                img.alt = '';
+                btn.appendChild(img);
+
                 btn.addEventListener('click', () => {
                     this.animateButton(btn);
-                    // Устанавливаем pending для размещения emoji кликом по холсту
-                    const size = 48; // базовый размер
+                    const targetW = 300;
+                    const targetH = 200;
                     this.eventBus.emit(Events.Place.Set, {
-                        type: 'emoji',
-                        properties: { content: ch, fontSize: size, width: size, height: size },
-                        size: { width: size, height: size },
-                        // anchorCentered не используем, позиция ставится как топ-левт со смещением на половину размера
+                        type: 'image',
+                        properties: { src: url, width: targetW, height: targetH },
+                        size: { width: targetW, height: targetH }
                     });
                     this.closeEmojiPopup();
                 });
+
                 grid.appendChild(btn);
             });
-            section.appendChild(title);
+
             section.appendChild(grid);
             this.emojiPopupEl.appendChild(section);
         });
-
-        // Разделительная линия
-        const divider = document.createElement('div');
-        divider.className = 'moodboard-emoji__divider';
-        this.emojiPopupEl.appendChild(divider);
-
-        // Стикеры (простые крупные эмодзи или пиктограммы)
-        const stickersTitle = document.createElement('div');
-        stickersTitle.className = 'moodboard-stickers__title';
-        stickersTitle.textContent = 'Стикеры';
-        const stickersGrid = document.createElement('div');
-        stickersGrid.className = 'moodboard-stickers__grid';
-
-        const stickers = ['📌','📎','🗂️','📁','🧩','🎯','💡','⭐','🔥','🚀','🎉','🧠'];
-        stickers.forEach(s => {
-            const btn = document.createElement('button');
-            btn.className = 'moodboard-sticker__btn';
-            btn.title = s;
-            btn.textContent = s;
-            btn.addEventListener('click', () => this.animateButton(btn));
-            stickersGrid.appendChild(btn);
-        });
-        this.emojiPopupEl.appendChild(stickersTitle);
-        this.emojiPopupEl.appendChild(stickersGrid);
         this.container.appendChild(this.emojiPopupEl);
     }
 
