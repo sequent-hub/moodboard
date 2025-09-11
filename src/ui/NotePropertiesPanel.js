@@ -101,7 +101,6 @@ export class NotePropertiesPanel {
         }
         // Скрываем все палитры цветов
         if (this.backgroundColorPalette) this.backgroundColorPalette.style.display = 'none';
-        if (this.borderColorPalette) this.borderColorPalette.style.display = 'none';
         if (this.textColorPalette) this.textColorPalette.style.display = 'none';
     }
 
@@ -114,16 +113,17 @@ export class NotePropertiesPanel {
             flexDirection: 'row',
             alignItems: 'center',
             gap: '8px',
-            padding: '8px 12px',
+            padding: '8px 40px',
             backgroundColor: 'white',
             border: '1px solid #e0e0e0',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+            borderRadius: '9999px',
+            boxShadow: '0 6px 24px rgba(0, 0, 0, 0.16)',
             fontSize: '12px',
             fontFamily: 'Arial, sans-serif',
             minWidth: '320px',
             height: '40px',
-            zIndex: '10000'
+            zIndex: '10000',
+            backdropFilter: 'blur(4px)'
         });
 
         // Создаем контролы для записки
@@ -252,21 +252,7 @@ export class NotePropertiesPanel {
             'backgroundColor'
         );
 
-        // Контейнер для цвета границы
-        const borderContainer = this._createColorControl(
-            'Граница:',
-            'borderColorButton',
-            'borderColorPalette',
-            [
-                { name: 'Золотой', hex: '#F9A825', pixi: 0xF9A825 },
-                { name: 'Розовый', hex: '#E91E63', pixi: 0xE91E63 },
-                { name: 'Синий', hex: '#2196F3', pixi: 0x2196F3 },
-                { name: 'Зеленый', hex: '#4CAF50', pixi: 0x4CAF50 },
-                { name: 'Оранжевый', hex: '#FF9800', pixi: 0xFF9800 },
-                { name: 'Фиолетовый', hex: '#9C27B0', pixi: 0x9C27B0 }
-            ],
-            'borderColor'
-        );
+        // Раздел "Граница" удалён по требованиям дизайна
 
         // Контейнер для цвета текста
         const textContainer = this._createColorControl(
@@ -329,7 +315,6 @@ export class NotePropertiesPanel {
 
         panel.appendChild(fontContainer);
         panel.appendChild(backgroundContainer);
-        panel.appendChild(borderContainer);
         panel.appendChild(textContainer);
         panel.appendChild(fontSizeContainer);
     }
@@ -353,12 +338,13 @@ export class NotePropertiesPanel {
 
         const button = document.createElement('button');
         Object.assign(button.style, {
-            width: '32px',
-            height: '20px',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
+            width: '24px',
+            height: '24px',
+            border: `1px solid ${this._darkenHex(colors[0].hex, 0.28)}`,
+            borderRadius: '50%',
             cursor: 'pointer',
-            backgroundColor: colors[0].hex
+            backgroundColor: colors[0].hex,
+            padding: '0'
         });
 
         button.addEventListener('click', (e) => {
@@ -400,11 +386,11 @@ export class NotePropertiesPanel {
         colors.forEach(color => {
             const colorSwatch = document.createElement('div');
             Object.assign(colorSwatch.style, {
-                width: '20px',
-                height: '20px',
+                width: '22px',
+                height: '22px',
                 backgroundColor: color.hex,
-                border: '1px solid #ccc',
-                borderRadius: '4px',
+                border: `1px solid ${this._darkenHex(color.hex, 0.28)}`,
+                borderRadius: '50%',
                 cursor: 'pointer',
                 transition: 'transform 0.1s'
             });
@@ -458,8 +444,8 @@ export class NotePropertiesPanel {
     }
 
     _documentClickHandler(e) {
-        const palettes = [this.backgroundColorPalette, this.borderColorPalette, this.textColorPalette];
-        const buttons = [this.backgroundColorButton, this.borderColorButton, this.textColorButton];
+        const palettes = [this.backgroundColorPalette, this.textColorPalette];
+        const buttons = [this.backgroundColorButton, this.textColorButton];
         
         let shouldClose = true;
         
@@ -490,12 +476,11 @@ export class NotePropertiesPanel {
         // Обновляем соответствующую кнопку
         if (propertyName === 'backgroundColor' && this.backgroundColorButton) {
             this.backgroundColorButton.style.backgroundColor = color.hex;
+            this.backgroundColorButton.style.borderColor = this._darkenHex(color.hex, 0.28);
             this.backgroundColorButton.title = `Цвет фона: ${color.name}`;
-        } else if (propertyName === 'borderColor' && this.borderColorButton) {
-            this.borderColorButton.style.backgroundColor = color.hex;
-            this.borderColorButton.title = `Цвет границы: ${color.name}`;
         } else if (propertyName === 'textColor' && this.textColorButton) {
             this.textColorButton.style.backgroundColor = color.hex;
+            this.textColorButton.style.borderColor = this._darkenHex(color.hex, 0.28);
             this.textColorButton.title = `Цвет текста: ${color.name}`;
         }
 
@@ -543,9 +528,7 @@ export class NotePropertiesPanel {
             if (this.backgroundColorButton && props.backgroundColor !== undefined) {
                 this._updateColorButton(this.backgroundColorButton, props.backgroundColor);
             }
-            if (this.borderColorButton && props.borderColor !== undefined) {
-                this._updateColorButton(this.borderColorButton, props.borderColor);
-            }
+            // Раздел "Граница" удалён — пропускаем обновление кнопки границы
             if (this.textColorButton && props.textColor !== undefined) {
                 this._updateColorButton(this.textColorButton, props.textColor);
             }
@@ -568,6 +551,26 @@ export class NotePropertiesPanel {
         // Конвертируем PIXI цвет в hex строку
         const hexColor = `#${pixiColor.toString(16).padStart(6, '0').toUpperCase()}`;
         button.style.backgroundColor = hexColor;
+        button.style.borderColor = this._darkenHex(hexColor, 0.28);
+    }
+
+    /**
+     * Затемняет hex-цвет на заданную долю (0..1)
+     */
+    _darkenHex(hex, amount = 0.2) {
+        try {
+            const norm = (hex || '').trim();
+            const m = /^#?([a-fA-F0-9]{6})$/.exec(norm.startsWith('#') ? norm : `#${norm}`);
+            if (!m) return '#777777';
+            const num = parseInt(m[1], 16);
+            const r = Math.max(0, Math.min(255, Math.floor(((num >> 16) & 0xFF) * (1 - amount))));
+            const g = Math.max(0, Math.min(255, Math.floor(((num >> 8) & 0xFF) * (1 - amount))));
+            const b = Math.max(0, Math.min(255, Math.floor((num & 0xFF) * (1 - amount))));
+            const toHex = (v) => v.toString(16).padStart(2, '0').toUpperCase();
+            return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+        } catch (_) {
+            return '#777777';
+        }
     }
 
     destroy() {
