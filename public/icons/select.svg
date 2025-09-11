@@ -2,6 +2,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
   <!-- Symmetrical outline cursor arrow -->
   <path d="M4 2 L4 18 L8 14 L12 22 L14 21 L10 13 L18 13 Z"
-        fill="none" stroke="#000000" stroke-width="2"
+        fill="none" stroke="currentColor" stroke-width="2"
         stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

@@ -743,9 +743,9 @@ export class Toolbar {
 
         // Первый ряд: карандаш, маркер, ластик (иконки SVG)
         const tools = [
-            { id: 'pencil-tool', tool: 'pencil', title: 'Карандаш', svg: '<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M2 14 L14 2 L18 6 L6 18 L2 18 Z" fill="#1f2937"/><path d="M12 4 L16 8" stroke="#e5e7eb" stroke-width="2"/></svg>' },
-            { id: 'marker-tool', tool: 'marker', title: 'Маркер', svg: '<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="3" y="3" width="10" height="6" rx="2" fill="#1f2937"/><path d="M13 4 L17 8 L12 13 L8 9 Z" fill="#374151"/></svg>' },
-            { id: 'eraser-tool', tool: 'eraser', title: 'Ластик', svg: '<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="4" y="10" width="10" height="6" rx="2" transform="rotate(-45 4 10)" fill="#9ca3af"/><rect x="9" y="5" width="6" height="4" rx="1" transform="rotate(-45 9 5)" fill="#d1d5db"/></svg>' }
+            { id: 'pencil-tool', tool: 'pencil', title: 'Карандаш', svg: '<svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M14.492 3.414 8.921 8.985a4.312 4.312 0 0 0 6.105 6.09l5.564-5.562 1.414 1.414-5.664 5.664a6.002 6.002 0 0 1-2.182 1.392L3.344 21.94 2.06 20.656 6.02 9.845c.3-.82.774-1.563 1.391-2.18l.093-.092.01-.01L13.077 2l1.415 1.414ZM4.68 19.32l4.486-1.64a6.305 6.305 0 0 1-1.651-1.19 6.306 6.306 0 0 1-1.192-1.655L4.68 19.32Z" clip-rule="evenodd"/></svg>' },
+            { id: 'marker-tool', tool: 'marker', title: 'Маркер', svg: '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" width="20" height="20" class="c-bxOhME c-bxOhME-dvzWZT-size-medium"><path fill="currentColor" fill-rule="evenodd" d="M12.737 2.676 8.531 7.264a1 1 0 0 0 .03 1.382l7.674 7.675a1 1 0 0 0 1.442-.029l4.589-4.97 1.468 1.357-4.588 4.97a3 3 0 0 1-3.46.689l-1.917 2.303-1.454.087-.63-.593-.828 1.38L10 22v-1l-.001-.001L10 22H1v-3l.18-.573 3.452-4.93-.817-.77.045-1.496 2.621-2.184a2.999 2.999 0 0 1 .577-3.134l4.205-4.589 1.474 1.352ZM3 19.315v.684h6.434l.76-1.268-4.09-3.85L3 19.314Zm3.007-7.27 6.904 6.498 1.217-1.46-6.667-6.25-1.454 1.212Z" clip-rule="evenodd"></path></svg>' },
+            { id: 'eraser-tool', tool: 'eraser', title: 'Ластик', svg: '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" width="20" height="20" class="c-bxOhME c-bxOhME-dvzWZT-size-medium"><path fill="currentColor" fill-rule="evenodd" d="M12.63 3.957 4.319 12.27a3 3 0 0 0 0 4.242L7.905 20.1 8.612 20.394H21v-2h-5.6l6.629-6.63a3 3 0 0 0 0-4.242L17.858 3.42a3 3 0 0 0-4.242 0ZM5.12 14.293a1 1 0 0 0 0 1.414L8.414 19h3.172l3-3L9 10.414l-3.879 3.88Zm10.336-8.922a1 1 0 0 0-1.414 0l-3.629 3.63L16 14.585l3.63-3.629a1 1 0 0 0 0-1.414L15.457 5.37Z" clip-rule="evenodd"></path></svg>' }
         ];
         const row1 = document.createElement('div');
         row1.className = 'moodboard-draw__row';
@@ -781,7 +781,7 @@ export class Toolbar {
             if (this.currentDrawTool === 'pencil') {
                 const sizes = [
                     { id: 'size-thin-black', title: 'Тонкий черный', color: '#111827', dot: 4, width: 2 },
-                    { id: 'size-medium-red', title: 'Средний красный', color: '#ef4444', dot: 7, width: 4 },
+                    { id: 'size-medium-red', title: 'Средний красный', color: '#ef4444', dot: 8, width: 4 },
                     { id: 'size-thick-green', title: 'Толстый зеленый', color: '#16a34a', dot: 10, width: 6 }
                 ];
                 sizes.forEach(s => {

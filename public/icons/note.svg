@@ -1,6 +1,1 @@
-<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
-  <rect x="2" y="2" width="16" height="16" rx="2" fill="#fbbf24" stroke="#f59e0b" stroke-width="1"/>
-  <path d="M6 6H14V8H6V6Z"/>
-  <path d="M6 10H12V12H6V10Z"/>
-  <path d="M6 14H10V16H6V14Z"/>
-</svg>
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" class="c-bxOhME c-bxOhME-dvzWZT-size-medium c-bxOhME-iPJLV-css"><path fill="currentColor" fill-rule="evenodd" d="M5 2a3 3 0 0 0-3 3v14a3 3 0 0 0 3 3h7c5.523 0 10-4.477 10-10V5a3 3 0 0 0-3-3H5Zm15 7V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1v-.004h4a3 3 0 0 0 3-3V13l1-1h4a3 3 0 0 0 3-3Zm-6.952 10.932A4.977 4.977 0 0 0 14 16.996V14h3a4.977 4.977 0 0 0 2.932-.95 8.004 8.004 0 0 1-6.884 6.882Z" clip-rule="evenodd"></path></svg>
