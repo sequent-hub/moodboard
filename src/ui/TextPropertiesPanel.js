@@ -272,18 +272,16 @@ export class TextPropertiesPanel {
     _createColorGrid(container) {
         // Популярные цвета для текста
         const presetColors = [
-            { color: '#000000', name: 'Черный' },
-            { color: '#333333', name: 'Темно-серый' },
-            { color: '#666666', name: 'Серый' },
-            { color: '#999999', name: 'Светло-серый' },
-            { color: '#ffffff', name: 'Белый' },
-            { color: '#ff0000', name: 'Красный' },
-            { color: '#00ff00', name: 'Зеленый' },
-            { color: '#0000ff', name: 'Синий' },
-            { color: '#ffff00', name: 'Желтый' },
-            { color: '#ff00ff', name: 'Фиолетовый' },
-            { color: '#00ffff', name: 'Голубой' },
-            { color: '#ffa500', name: 'Оранжевый' }
+            { color: '#000000', name: '#000000' },
+            { color: '#404040', name: '#404040' },
+            { color: '#999999', name: '#999999' },
+            { color: '#FF2D55', name: '#FF2D55' },
+            { color: '#CB30E0', name: '#CB30E0' },
+            { color: '#6155F5', name: '#6155F5' },
+            { color: '#00C0E8', name: '#00C0E8' },
+            { color: '#34C759', name: '#34C759' },
+            { color: '#FF8D28', name: '#FF8D28' },
+            { color: '#FFCC00', name: '#FFCC00' }
         ];
 
         // Сетка заготовленных цветов
