@@ -431,12 +431,14 @@ export class PlacementTool extends BaseTool {
         } else {
             // Для записки: выставляем фактические габариты и центрируем по курсору
             if (this.pending.type === 'note') {
-                const noteW = (typeof props.width === 'number') ? props.width : 160;
-                const noteH = (typeof props.height === 'number') ? props.height : 100;
-                props = { ...props, width: noteW, height: noteH };
+                const base = 300; // квадрат 300x300
+                const noteW = (typeof props.width === 'number') ? props.width : base;
+                const noteH = (typeof props.height === 'number') ? props.height : base;
+                const side = Math.max(noteW, noteH);
+                props = { ...props, width: side, height: side };
                 position = {
-                    x: Math.round(worldPoint.x - noteW / 2),
-                    y: Math.round(worldPoint.y - noteH / 2)
+                    x: Math.round(worldPoint.x - side / 2),
+                    y: Math.round(worldPoint.y - side / 2)
                 };
             }
             // Обычное размещение через общий канал
@@ -909,44 +911,25 @@ export class PlacementTool extends BaseTool {
         this.ghostContainer = new PIXI.Container();
         this.ghostContainer.alpha = 0.6; // Полупрозрачность
         
-        // Размеры и стили, синхронизированные с NoteObject
-        const width = this.pending.properties?.width || 160;
-        const height = this.pending.properties?.height || 100;
+        // Размеры и стили, синхронизированные с новой квадратной заметкой
+        const width = this.pending.properties?.width || 300;
+        const height = this.pending.properties?.height || 300;
         const fontSize = this.pending.properties?.fontSize || 16;
         const content = this.pending.properties?.content || 'Новая записка';
         const backgroundColor = (typeof this.pending.properties?.backgroundColor === 'number')
             ? this.pending.properties.backgroundColor
-            : 0xFFF9C4;
-        const borderColor = (typeof this.pending.properties?.borderColor === 'number')
-            ? this.pending.properties.borderColor
-            : 0xF9A825;
+            : 0xFFF9C4; // желтый как у записки
         const textColor = (typeof this.pending.properties?.textColor === 'number')
             ? this.pending.properties.textColor
             : 0x1A1A1A;
 
-        // Тень (размытая) под запиской
-        const shadow = new PIXI.Graphics();
-        try {
-            shadow.filters = [new PIXI.filters.BlurFilter(6)];
-        } catch (e) {}
-        shadow.beginFill(0x000000, 1);
-        shadow.drawRect(0, 0, width, height);
-        shadow.endFill();
-        shadow.x = 2;
-        shadow.y = 3;
-        shadow.alpha = 0.18;
+        // Тени для призрака отключены по требованию (без тени)
 
-        // Основной фон записки (прямоугольник без рамки)
+        // Основной фон записки (желтый как у оригинала)
         const background = new PIXI.Graphics();
         background.beginFill(backgroundColor, 1);
-        background.drawRect(0, 0, width, height);
+        background.drawRoundedRect(0, 0, width, height, 2);
         background.endFill();
-
-        // Прямоугольная шапка сверху, цвет рамки
-        const header = new PIXI.Graphics();
-        header.beginFill(borderColor, 1);
-        header.drawRect(0, 0, width, 8);
-        header.endFill();
 
         // Текст записки, выровнен как в NoteObject (центр по X, отступ сверху)
         const noteText = new PIXI.Text(content, {
@@ -963,9 +946,8 @@ export class PlacementTool extends BaseTool {
         noteText.y = 20; // как в NoteObject topMargin
 
         // Порядок добавления: тень → фон → шапка → текст
-        this.ghostContainer.addChild(shadow);
+        // Без тени
         this.ghostContainer.addChild(background);
-        this.ghostContainer.addChild(header);
         this.ghostContainer.addChild(noteText);
         
         // Центрируем контейнер относительно курсора

@@ -14,8 +14,9 @@ export class NoteObject {
         this.objectData = objectData;
         
         // Размеры записки
-        this.width = objectData.width || objectData.properties?.width || 160;
-        this.height = objectData.height || objectData.properties?.height || 100;
+        const defaultSide = 300; // квадрат 300x300
+        this.width = objectData.width || objectData.properties?.width || defaultSide;
+        this.height = objectData.height || objectData.properties?.height || defaultSide;
         
         // Свойства записки
         const props = objectData.properties || {};
@@ -32,15 +33,17 @@ export class NoteObject {
         this.container.eventMode = 'static';
         this.container.interactiveChildren = true;
         
-        // Размытая тень (отдельный слой под фоном)
-        this.shadow = new PIXI.Graphics();
-        // Применяем блёр к тени (мягкая тень)
+        // Тени по бокам (как у .box::before / .box::after)
+        this.shadowLayer = new PIXI.Container();
+        this.shadowLeft = new PIXI.Graphics();
+        this.shadowRight = new PIXI.Graphics();
+        this.shadowLayer.addChild(this.shadowLeft);
+        this.shadowLayer.addChild(this.shadowRight);
         try {
-            this.shadow.filters = [new PIXI.filters.BlurFilter(6)];
-        } catch (e) {
-            // Если фильтры недоступны, тень останется без размытия
-        }
-        this.container.addChild(this.shadow);
+            // Мягкая тень (чуть сильнее)
+            this.shadowLayer.filters = [new PIXI.filters.BlurFilter(12)];
+        } catch (_) {}
+        this.container.addChild(this.shadowLayer);
 
         // Графика фона
         this.graphics = new PIXI.Graphics();
@@ -89,8 +92,12 @@ export class NoteObject {
 
     updateSize(size) {
         if (!size) return;
-        this.width = Math.max(80, size.width || this.width);
-        this.height = Math.max(60, size.height || this.height);
+        let w = Math.max(80, size.width || this.width);
+        let h = Math.max(60, size.height || this.height);
+        // Держим квадрат
+        const side = Math.max(w, h);
+        this.width = side;
+        this.height = side;
         
         this._redraw();
         this._updateTextPosition();
@@ -179,28 +186,37 @@ export class NoteObject {
         
         g.clear();
         
-        // Прорисовка размытой тени отдельным слоем
-        if (this.shadow) {
-            const s = this.shadow;
-            s.clear();
-            s.beginFill(0x000000, 1);
-            s.drawRect(0, 0, w, h);
-            s.endFill();
-            // Лёгкое смещение тени вниз/вправо
-            s.x = 2;
-            s.y = 3;
-            s.alpha = 0.18; // прозрачность тени
-            // Если есть фильтр Blur, он уже применён в конструкторе
-        }
+        // Левая и правая тень (узкие полосы снизу)
+        const shH = Math.max(8, Math.round(h * 0.05)); // толще тень (~5% высоты)
+        const shW = Math.max(24, Math.round(w * 0.45)); // шире тень (~45% ширины)
+        const bottom = Math.max(8, Math.round(h * 0.03)) + 10; // отступ снизу ~10
+
+        const drawShadow = (g) => {
+            g.clear();
+            g.beginFill(0x000000, 1);
+            g.drawRoundedRect(0, 0, shW, shH, shH / 2);
+            g.endFill();
+        };
+        drawShadow(this.shadowLeft);
+        drawShadow(this.shadowRight);
+
+        // Базовые позиции как в CSS: left:15px и right:15px; bottom:10px
+        this.shadowLeft.x = 15;
+        this.shadowLeft.y = h - shH - 10;
+        this.shadowLeft.skew = new PIXI.ObservablePoint(() => {}, null, -5 * Math.PI / 180, 0);
+        this.shadowLeft.rotation = -5 * Math.PI / 180;
+
+        this.shadowRight.x = w - shW - 15;
+        this.shadowRight.y = h - shH - 10;
+        this.shadowRight.skew = new PIXI.ObservablePoint(() => {}, null, 5 * Math.PI / 180, 0);
+        this.shadowRight.rotation = 5 * Math.PI / 180;
+
+        this.shadowLayer.alpha = 0.7; // темнее
         
-        // Основной фон записки (прямоугольный без скруглений, без рамки)
-        g.beginFill(this.backgroundColor, 1);
-        g.drawRect(0, 0, w, h);
-        g.endFill();
-        
-        // Прямоугольная шапка сверху, тем же цветом что и рамка
-        g.beginFill(this.borderColor, 1);
-        g.drawRect(0, 0, w, 8);
+        // Основной фон записки — как .box: белый с небольшим радиусом
+        const boxBg = (typeof this.backgroundColor === 'number') ? this.backgroundColor : 0xFFFFFF;
+        g.beginFill(boxBg, 1);
+        g.drawRoundedRect(0, 0, w, h, 2);
         g.endFill();
         
         // Линии внутри записки убраны по требованию дизайна
@@ -219,6 +235,23 @@ export class NoteObject {
                    point.y >= bounds.y && 
                    point.y <= bounds.y + bounds.height;
         };
+
+        // Hover-эффект: ослабляем короб тени и сдвигаем ближе к центру (как в CSS)
+        this.container.eventMode = 'static';
+        this.container.on('pointerover', () => {
+            this.shadowLayer.alpha = 0.55;
+            this.shadowLeft.x = 5;
+            this.shadowRight.x = w - shW - 5;
+            this.shadowLeft.rotation = 0;
+            this.shadowRight.rotation = 0;
+        });
+        this.container.on('pointerout', () => {
+            this.shadowLayer.alpha = 0.7;
+            this.shadowLeft.x = 15;
+            this.shadowRight.x = w - shW - 15;
+            this.shadowLeft.rotation = -5 * Math.PI / 180;
+            this.shadowRight.rotation = 5 * Math.PI / 180;
+        });
     }
 
     _updateTextPosition() {

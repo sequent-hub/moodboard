@@ -419,8 +419,8 @@ export class Toolbar {
                     properties: { 
                         content: 'Новая записка',
                         fontSize: 16,
-                        width: 160,
-                        height: 100
+                        width: 300,
+                        height: 300
                     }
                 });
                 return;
