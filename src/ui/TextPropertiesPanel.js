@@ -141,16 +141,18 @@ export class TextPropertiesPanel {
 
         // Список популярных шрифтов
         const fonts = [
-            { value: 'Arial, sans-serif', name: 'Arial' },
-            { value: 'Helvetica, sans-serif', name: 'Helvetica' },
-            { value: 'Georgia, serif', name: 'Georgia' },
-            { value: 'Times New Roman, serif', name: 'Times New Roman' },
-            { value: 'Courier New, monospace', name: 'Courier New' },
-            { value: 'Verdana, sans-serif', name: 'Verdana' },
-            { value: 'Tahoma, sans-serif', name: 'Tahoma' },
-            { value: 'Impact, sans-serif', name: 'Impact' },
-            { value: 'Comic Sans MS, cursive', name: 'Comic Sans MS' },
-            { value: 'Trebuchet MS, sans-serif', name: 'Trebuchet MS' }
+            { value: 'Roboto, Arial, sans-serif', name: 'Roboto' },
+            { value: 'Oswald, Arial, sans-serif', name: 'Oswald' },
+            { value: '"Playfair Display", Georgia, serif', name: 'Playfair Display' },
+            { value: '"Roboto Slab", Georgia, serif', name: 'Roboto Slab' },
+            { value: '"Noto Serif", Georgia, serif', name: 'Noto Serif' },
+            { value: 'Lobster, "Comic Sans MS", cursive', name: 'Lobster' },
+            { value: 'Caveat, "Comic Sans MS", cursive', name: 'Caveat' },
+            { value: '"Rubik Mono One", "Courier New", monospace', name: 'Rubik Mono One' },
+            { value: '"Great Vibes", "Comic Sans MS", cursive', name: 'Great Vibes' },
+            { value: '"Amatic SC", "Comic Sans MS", cursive', name: 'Amatic SC' },
+            { value: '"Poiret One", Arial, sans-serif', name: 'Poiret One' },
+            { value: 'Pacifico, "Comic Sans MS", cursive', name: 'Pacifico' }
         ];
 
         fonts.forEach(font => {
@@ -634,11 +636,11 @@ export class TextPropertiesPanel {
 
         console.log('🔧 TextPropertiesPanel: Changing font family to:', fontFamily);
 
-        // Обновляем свойства объекта через StateManager
+        // Обновляем свойства объекта через StateManager (в properties)
         this.eventBus.emit(Events.Object.StateChanged, {
             objectId: this.currentId,
             updates: {
-                fontFamily: fontFamily
+                properties: { fontFamily }
             }
         });
 
@@ -755,7 +757,7 @@ export class TextPropertiesPanel {
                 this.fontSelect.value = properties.fontFamily;
             } else {
                 // Устанавливаем дефолтный шрифт
-                this.fontSelect.value = 'Arial, sans-serif';
+                this.fontSelect.value = 'Roboto, Arial, sans-serif';
             }
 
             // Устанавливаем размер шрифта в селекте

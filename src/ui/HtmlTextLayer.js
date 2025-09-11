@@ -90,9 +90,11 @@ export class HtmlTextLayer {
         this.eventBus.on(Events.Object.StateChanged, ({ objectId, updates }) => {
             const el = this.idToEl.get(objectId);
             if (el && updates) {
-                if (updates.fontFamily) {
-                    el.style.fontFamily = updates.fontFamily;
-                    console.log(`🔍 HtmlTextLayer: обновлен шрифт для ${objectId}:`, updates.fontFamily);
+                // Поддерживаем верхний уровень и updates.properties.fontFamily
+                const nextFont = updates.fontFamily || (updates.properties && updates.properties.fontFamily);
+                if (nextFont) {
+                    el.style.fontFamily = nextFont;
+                    console.log(`🔍 HtmlTextLayer: обновлен шрифт для ${objectId}:`, nextFont);
                 }
                 if (updates.fontSize) {
                     el.style.fontSize = `${updates.fontSize}px`;
@@ -185,7 +187,7 @@ export class HtmlTextLayer {
         el.className = 'mb-text';
         el.dataset.id = objectId;
         // Получаем свойства из properties объекта
-        const fontFamily = objectData.fontFamily || objectData.properties?.fontFamily || 'Arial, sans-serif';
+        const fontFamily = objectData.properties?.fontFamily || objectData.fontFamily || 'Roboto, Arial, sans-serif';
         const color = objectData.color || objectData.properties?.color || '#000000';
         const backgroundColor = objectData.backgroundColor || objectData.properties?.backgroundColor || 'transparent';
         

@@ -8,8 +8,8 @@ export default defineConfig({
     // Настройки для плагинов
     plugins: [],
 
-    // Настройки для загрузки SVG
-    assetsInclude: ['**/*.svg'],
+    // Настройки для загрузки SVG и шрифтов
+    assetsInclude: ['**/*.svg', '**/*.woff2', '**/*.woff', '**/*.ttf'],
 
     build: {
         lib: {

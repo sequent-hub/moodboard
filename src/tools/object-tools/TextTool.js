@@ -35,7 +35,7 @@ export class TextTool extends BaseTool {
         // Настройки текста по умолчанию
         this.defaultTextSettings = {
             fontSize: 16,
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Roboto, Arial, sans-serif',
             color: '#000000',
             textAlign: 'left',
             fontWeight: 'normal',
