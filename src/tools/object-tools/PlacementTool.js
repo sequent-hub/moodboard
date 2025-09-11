@@ -55,6 +55,8 @@ export class PlacementTool extends BaseTool {
                         this.showNoteGhost();
                     } else if (this.pending.type === 'emoji') {
                         this.showEmojiGhost();
+                    } else if (this.pending.type === 'image') {
+                        this.showImageUrlGhost();
                     } else if (this.pending.type === 'frame') {
                         this.showFrameGhost();
                     } else if (this.pending.type === 'frame-draw') {
@@ -731,6 +733,57 @@ export class PlacementTool extends BaseTool {
             this.ghostContainer.pivot.y = maxHeight / 2;
         }
         
+        this.world.addChild(this.ghostContainer);
+    }
+
+    /**
+     * Показать "призрак" изображения по URL (для выбора из панели эмоджи)
+     */
+    async showImageUrlGhost() {
+        if (!this.pending || this.pending.type !== 'image' || !this.world) return;
+        const src = this.pending.properties?.src;
+        if (!src) return;
+
+        this.hideGhost();
+
+        this.ghostContainer = new PIXI.Container();
+        this.ghostContainer.alpha = 0.6;
+
+        const maxWidth = this.pending.size?.width || this.pending.properties?.width || 56;
+        const maxHeight = this.pending.size?.height || this.pending.properties?.height || 56;
+
+        try {
+            const texture = await PIXI.Texture.fromURL(src);
+            const imageAspect = (texture.width || 1) / (texture.height || 1);
+            let width = maxWidth;
+            let height = maxWidth / imageAspect;
+            if (height > maxHeight) {
+                height = maxHeight;
+                width = maxHeight * imageAspect;
+            }
+
+            const sprite = new PIXI.Sprite(texture);
+            sprite.width = Math.max(1, Math.round(width));
+            sprite.height = Math.max(1, Math.round(height));
+
+            const border = new PIXI.Graphics();
+            try { border.lineStyle({ width: 2, color: 0xDEE2E6, alpha: 0.8 }); }
+            catch (_) { border.lineStyle(2, 0xDEE2E6, 0.8); }
+            border.drawRoundedRect(-2, -2, sprite.width + 4, sprite.height + 4, 4);
+
+            this.ghostContainer.addChild(border);
+            this.ghostContainer.addChild(sprite);
+            this.ghostContainer.pivot.set(sprite.width / 2, sprite.height / 2);
+        } catch (e) {
+            const g = new PIXI.Graphics();
+            g.beginFill(0xF0F0F0, 0.8);
+            g.lineStyle(2, 0xDEE2E6, 0.8);
+            g.drawRoundedRect(0, 0, maxWidth, maxHeight, 8);
+            g.endFill();
+            this.ghostContainer.addChild(g);
+            this.ghostContainer.pivot.set(maxWidth / 2, maxHeight / 2);
+        }
+
         this.world.addChild(this.ghostContainer);
     }
 

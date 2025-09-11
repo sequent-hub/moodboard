@@ -594,13 +594,13 @@
 }
 .moodboard-emoji__grid {
     display: grid;
-    grid-template-columns: repeat(5, 56px);
+    grid-template-columns: repeat(5, 64px);
     gap: 6px;
 }
 
 .moodboard-emoji__btn {
-    width: 56px;
-    height: 56px;
+    width: 64px;
+    height: 64px;
     border: none;
     border-radius: 8px;
     background: #f5f5f5;
@@ -615,8 +615,8 @@
 
 /* Изображения превью в кнопке */
 .moodboard-emoji__img {
-    max-width: 90%;
-    max-height: 90%;
+    max-width: 88%;
+    max-height: 88%;
     object-fit: contain;
     pointer-events: none;
 }

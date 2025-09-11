@@ -1063,13 +1063,14 @@ export class CoreMoodBoard {
             const objectType = object ? object.type : null;
 
             // Сохраняем пропорции для фреймов, кроме произвольных (lockedAspect=false)
-            if (objectType === 'frame' && data.size) {
+            if ((objectType === 'frame' || (objectType === 'image' && object?.properties?.isEmojiIcon)) && data.size) {
                 const lockedAspect = !!(object?.properties && (object.properties.lockedAspect === true));
-                if (!lockedAspect) {
+                const isEmoji = (objectType === 'image' && object?.properties?.isEmojiIcon);
+                if (!lockedAspect && !isEmoji) {
                     // произвольные фреймы — без ограничений
                 } else {
                 const start = this._activeResize?.startSize || { width: object.width, height: object.height };
-                const aspect = (start.width > 0 && start.height > 0) ? (start.width / start.height) : (object.width / Math.max(1, object.height));
+                const aspect = isEmoji ? 1 : ((start.width > 0 && start.height > 0) ? (start.width / start.height) : (object.width / Math.max(1, object.height)));
                 let w = Math.max(1, data.size.width);
                 let h = Math.max(1, data.size.height);
                 // Приводим к ближайшему по изменяемой стороне
@@ -1081,13 +1082,15 @@ export class CoreMoodBoard {
                 } else {
                     w = Math.round(h * aspect);
                 }
-                // Минимальная площадь фрейма ~1800px²
-                const minArea = 1800;
-                const area = Math.max(1, w * h);
-                if (area < minArea) {
-                    const scale = Math.sqrt(minArea / area);
-                    w = Math.round(w * scale);
-                    h = Math.round(h * scale);
+                // Минимальная площадь — только для фреймов
+                if (!isEmoji) {
+                    const minArea = 1800;
+                    const area = Math.max(1, w * h);
+                    if (area < minArea) {
+                        const scale = Math.sqrt(minArea / area);
+                        w = Math.round(w * scale);
+                        h = Math.round(h * scale);
+                    }
                 }
                 data.size = { width: w, height: h };
 
@@ -1957,6 +1960,14 @@ export class CoreMoodBoard {
         };
         const initialWidth = (properties && typeof properties.width === 'number') ? properties.width : 100;
         const initialHeight = (properties && typeof properties.height === 'number') ? properties.height : 100;
+        // Зафиксировать пропорции для эмоджи-иконок (квадрат)
+        if (type === 'image' && properties && properties.isEmojiIcon) {
+            const s = Math.max(1, Math.round((initialWidth + initialHeight) / 2));
+            properties.lockedAspect = true;
+            properties.aspect = 1; // квадрат
+            properties.width = s;
+            properties.height = s;
+        }
 
         // Если создаём НЕ фрейм — проверим, попадает ли центр нового объекта внутрь какого-либо фрейма.
         // Если да, сразу прикрепляем объект к этому фрейму (properties.frameId)

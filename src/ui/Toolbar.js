@@ -949,11 +949,12 @@ export class Toolbar {
 
                 btn.addEventListener('click', () => {
                     this.animateButton(btn);
-                    const targetW = 300;
-                    const targetH = 200;
+                    const target = 64; // кратно 128 для лучшей четкости при даунскейле
+                    const targetW = target;
+                    const targetH = target;
                     this.eventBus.emit(Events.Place.Set, {
                         type: 'image',
-                        properties: { src: url, width: targetW, height: targetH },
+                        properties: { src: url, width: targetW, height: targetH, isEmojiIcon: true },
                         size: { width: targetW, height: targetH }
                     });
                     this.closeEmojiPopup();
