@@ -814,7 +814,7 @@ export class TextPropertiesPanel {
 
         // Позиционируем панель над объектом
         const panelX = screenX + (objectWidth / 2) - (this.panel.offsetWidth / 2);
-        const panelY = screenY - this.panel.offsetHeight - 10; // 10px отступ от объекта
+        const panelY = screenY - this.panel.offsetHeight - 20; // поднимем выше ещё
 
         // Проверяем границы контейнера
         const containerRect = this.container.getBoundingClientRect();
