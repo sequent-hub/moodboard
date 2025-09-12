@@ -906,24 +906,33 @@ export class Toolbar {
         this.emojiPopupEl = document.createElement('div');
         this.emojiPopupEl.className = 'moodboard-toolbar__popup moodboard-toolbar__popup--emoji';
         this.emojiPopupEl.style.display = 'none';
-        // Загружаем все изображения из папки src/assets/emodji (png/svg) через Vite import.meta.glob
-        const modules = import.meta.glob('../assets/emodji/**/*.{png,PNG,svg,SVG}', { eager: true, as: 'url' });
 
-        // Группируем по подпапкам внутри emodji (категории)
-        const entries = Object.entries(modules).sort(([a], [b]) => a.localeCompare(b));
-        const groups = new Map();
-        entries.forEach(([path, url]) => {
-            const marker = '/emodji/';
-            const idx = path.indexOf(marker);
-            let category = 'Разное';
-            if (idx >= 0) {
-                const after = path.slice(idx + marker.length);
-                const parts = after.split('/');
-                category = parts.length > 1 ? parts[0] : 'Разное';
-            }
-            if (!groups.has(category)) groups.set(category, []);
-            groups.get(category).push({ path, url });
-        });
+        // Определяем способ загрузки эмоджи
+        let groups = new Map();
+        
+        if (typeof import.meta !== 'undefined' && import.meta.glob) {
+            // Режим с bundler (Vite) - используем import.meta.glob
+            const modules = import.meta.glob('../assets/emodji/**/*.{png,PNG,svg,SVG}', { eager: true, as: 'url' });
+            
+            // Группируем по подпапкам внутри emodji (категории)
+            const entries = Object.entries(modules).sort(([a], [b]) => a.localeCompare(b));
+            entries.forEach(([path, url]) => {
+                const marker = '/emodji/';
+                const idx = path.indexOf(marker);
+                let category = 'Разное';
+                if (idx >= 0) {
+                    const after = path.slice(idx + marker.length);
+                    const parts = after.split('/');
+                    category = parts.length > 1 ? parts[0] : 'Разное';
+                }
+                if (!groups.has(category)) groups.set(category, []);
+                groups.get(category).push({ path, url });
+            });
+        } else {
+            // Режим без bundler - используем статичный список
+            console.log('🎭 Toolbar: Режим без bundler, используем статичные эмоджи');
+            groups = this.getFallbackEmojiGroups();
+        }
 
         // Задаем желаемый порядок категорий
         const ORDER = ['Смайлики', 'Жесты', 'Женские эмоции', 'Котики', 'Разное'];
@@ -1017,6 +1026,75 @@ export class Toolbar {
             this.emojiPopupEl.appendChild(section);
         });
         this.container.appendChild(this.emojiPopupEl);
+    }
+
+    /**
+     * Возвращает fallback группы эмоджи для работы без bundler
+     */
+    getFallbackEmojiGroups() {
+        const groups = new Map();
+        
+        // Определяем базовый путь для эмоджи
+        const basePath = this.getEmojiBasePath();
+        
+        // Статичный список эмоджи с реальными именами файлов
+        const fallbackEmojis = {
+            'Смайлики': [
+                '1f600.png', '1f601.png', '1f602.png', '1f603.png', '1f604.png',
+                '1f605.png', '1f606.png', '1f607.png', '1f609.png', '1f60a.png',
+                '1f60b.png', '1f60c.png', '1f60d.png', '1f60e.png', '1f60f.png',
+                '1f610.png', '1f611.png', '1f612.png', '1f613.png', '1f614.png',
+                '1f615.png', '1f616.png', '1f617.png', '1f618.png', '1f619.png'
+            ],
+            'Жесты': [
+                '1f446.png', '1f447.png', '1f448.png', '1f449.png', '1f44a.png',
+                '1f44b.png', '1f44c.png', '1f450.png', '1f4aa.png', '1f590.png',
+                '1f596.png', '1f64c.png', '1f64f.png', '270c.png', '270d.png'
+            ],
+            'Женские эмоции': [
+                '1f645.png', '1f646.png', '1f64b.png', '1f64d.png', '1f64e.png'
+            ],
+            'Котики': [
+                '1f638.png', '1f639.png', '1f63a.png', '1f63b.png', '1f63c.png',
+                '1f63d.png', '1f63e.png', '1f63f.png', '1f640.png'
+            ],
+            'Разное': [
+                '1f440.png', '1f441.png', '1f499.png', '1f4a1.png', '1f4a3.png',
+                '1f4a9.png', '1f4ac.png', '1f4af.png', '2764.png', '203c.png', '26d4.png'
+            ]
+        };
+
+        Object.entries(fallbackEmojis).forEach(([category, emojis]) => {
+            const emojiList = emojis.map(file => ({
+                path: `${basePath}${category}/${file}`,
+                url: `${basePath}${category}/${file}`
+            }));
+            groups.set(category, emojiList);
+        });
+
+        return groups;
+    }
+
+    /**
+     * Определяет базовый путь для эмоджи в зависимости от режима
+     */
+    getEmojiBasePath() {
+        // Проверяем, есть ли глобальная настройка базового пути
+        if (window.MOODBOARD_BASE_PATH) {
+            return `${window.MOODBOARD_BASE_PATH}src/assets/emodji/`;
+        }
+        
+        // Попытка определить автоматически
+        const scripts = document.querySelectorAll('script[src]');
+        for (const script of scripts) {
+            if (script.src.includes('moodboard') || script.src.includes('node_modules')) {
+                const baseUrl = new URL(script.src).origin;
+                return `${baseUrl}/node_modules/moodboard-futurello/src/assets/emodji/`;
+            }
+        }
+        
+        // Fallback: относительный путь
+        return './src/assets/emodji/';
     }
 
     toggleEmojiPopup(anchorButton) {

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoodBoard в Laravel - Тест без bundler</title>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: Arial, sans-serif; 
+            background: #f0f0f0;
+        }
+        #moodboard-container { 
+            width: 100vw; 
+            height: 100vh; 
+            position: relative;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="moodboard-container">
+        <div class="loading">Загрузка MoodBoard...</div>
+    </div>
+
+    <script type="module">
+        try {
+            // Устанавливаем базовый путь для ресурсов
+            window.MOODBOARD_BASE_PATH = './';
+            
+            console.log('🚀 Начинаем инициализацию MoodBoard без bundler...');
+            
+            // Импортируем функции для работы без bundler
+            import { 
+                quickInitMoodBoard, 
+                injectCriticalStyles 
+            } from './src/index.js';
+            
+            // Критичные стили для мгновенного отображения
+            injectCriticalStyles();
+            
+            // Быстрая инициализация MoodBoard
+            const moodboard = quickInitMoodBoard('#moodboard-container', {
+                theme: 'light',
+                autoSave: false // Отключаем автосохранение для тестирования
+            }, './');
+            
+            // Убираем индикатор загрузки
+            setTimeout(() => {
+                const loading = document.querySelector('.loading');
+                if (loading) loading.remove();
+            }, 1000);
+            
+            console.log('✅ MoodBoard успешно инициализирован!');
+            console.log('🎨 Можно использовать панель инструментов и создавать объекты');
+            
+            // Тестовый объект (опционально)
+            setTimeout(() => {
+                try {
+                    // Добавляем тестовую записку
+                    window.moodboard = moodboard; // Для отладки
+                    console.log('🧪 MoodBoard доступен в window.moodboard для тестирования');
+                } catch (e) {
+                    console.log('ℹ️ Объект для тестирования не создан:', e.message);
+                }
+            }, 2000);
+            
+        } catch (error) {
+            console.error('❌ Критическая ошибка инициализации:', error);
+            document.querySelector('.loading').textContent = 'Ошибка загрузки MoodBoard. Проверьте консоль.';
+        }
+    </script>
+</body>
+</html>
