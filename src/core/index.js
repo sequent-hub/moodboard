@@ -689,7 +689,8 @@ export class CoreMoodBoard {
                 }
             }
             if (moves.length > 0) {
-                const cmd = new GroupMoveCommand(this, moves);
+                // Обычное групповое перемещение - координаты центров PIXI
+                const cmd = new GroupMoveCommand(this, moves, false);
                 cmd.setEventBus(this.eventBus);
                 this.history.executeCommand(cmd);
             }
@@ -740,7 +741,8 @@ export class CoreMoodBoard {
                                 const to = { x: child.position.x, y: child.position.y };
                                 moves.push({ id: childId, from, to });
                             }
-                            const cmd = new GroupMoveCommand(this, moves);
+                            // Frame перемещение - координаты уже левый-верх
+                            const cmd = new GroupMoveCommand(this, moves, true);
                             cmd.setEventBus(this.eventBus);
                             this.history.executeCommand(cmd);
                         } else {
