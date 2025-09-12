@@ -82,14 +82,44 @@
     bottom: 16px;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     padding: 8px 10px;
     background: #fff;
     border: 1px solid #e0e0e0;
-    border-radius: 10px;
+    border-radius: 9999px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.12);
     z-index: 3000;
 }
+
+.moodboard-mapbar__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.moodboard-mapbar__button:hover { background: #e6e6e6; }
+
+.moodboard-mapbar__popup {
+    position: absolute;
+    right: 0;
+    bottom: 40px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    padding: 10px;
+}
+
+.moodboard-minimap-canvas { display: block; width: 280px; height: 180px; border-radius: 8px; }
 
 .text-properties-panel {
     position: absolute;
