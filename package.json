@@ -7,7 +7,7 @@
   "module": "./src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./style.css": "./src/ui/styles/workspace.css"
+    "./style.css": "./src/ui/styles/index.css"
   },
   "files": [
     "src",

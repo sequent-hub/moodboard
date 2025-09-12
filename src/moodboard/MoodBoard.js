@@ -186,6 +186,17 @@ export class MoodBoard {
             this.options.theme
         );
 
+        // Инициализация цвета кнопки "краска" по текущему фону канваса
+        try {
+            const app = this.coreMoodboard?.pixi?.app;
+            const colorInt = (app?.renderer?.background && app.renderer.background.color) || app?.renderer?.backgroundColor;
+            if (typeof colorInt === 'number') {
+                const boardHex = `#${colorInt.toString(16).padStart(6, '0')}`;
+                const btnHex = this.topbar.mapBoardToBtnHex(boardHex);
+                this.topbar.setPaintButtonHex(btnHex || '#B3E5FC');
+            }
+        } catch (_) {}
+
         // Смена фона доски по выбору цвета в топбаре
         this.coreMoodboard.eventBus.on(Events.UI.PaintPick, ({ color }) => {
             if (!color) return;

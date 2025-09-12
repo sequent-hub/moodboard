@@ -1,0 +1,113 @@
+/* Topbar (split from workspace.css) */
+.moodboard-topbar {
+    position: absolute;
+    top: 12px;
+    left: 16px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px; /* горизонтальные отступы по 30px */
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 9999px; /* полностью круглые края */
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    z-index: 3000;
+    pointer-events: auto;
+}
+
+.moodboard-topbar__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%; /* круглые кнопки */
+    background: none;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.moodboard-topbar__button svg {
+    width: 16px;
+    height: 16px;
+    transition: all 0.2s ease;
+}
+
+.moodboard-topbar__button:hover svg { transform: none; }
+.moodboard-topbar__button:hover { background: #e6e6e6; }
+
+.moodboard-topbar__divider {
+    width: 1px;
+    height: 28px;
+    background: #e5e7eb;
+    margin: 0 6px 0 2px;
+}
+
+.moodboard-topbar__button--active {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.moodboard-topbar__button--paint { background: var(--paint-btn-color, #f0f0f0); }
+.moodboard-topbar__button--paint:hover { background: var(--paint-btn-color, #f0f0f0); }
+
+.moodboard-topbar__paint-popover {
+    position: absolute;
+    top: 38px;
+    left: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0px 10px; /* как у topbar, круглые торцы */
+    min-height: 44px; /* визуально согласовано с topbar */
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 9999px; /* полностью круглые края слева/справа */
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    z-index: 3100;
+}
+
+.moodboard-topbar__paint-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 32px); /* как размеры кнопок topbar */
+    gap: 6px; /* как gap у topbar */
+    margin: 0; /* убираем дополнительный зазор */
+}
+
+.moodboard-topbar__paint-btn {
+    width: 30px; /* как у кнопок topbar */
+    height: 30px; /* как у кнопок topbar */
+    border: 1px solid transparent; /* тонкая обводка; цвет задаём из JS (тёмнее фона) */
+    border-radius: 50%; /* круглые кнопки */
+    box-sizing: border-box;
+    cursor: pointer;
+    position: relative;
+    z-index: 0;
+}
+
+.moodboard-topbar__paint-tick {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 8px;
+    height: 5px;
+    transform: translate(-50%, -50%) rotate(315deg) scaleX(-1);
+    border-right: 2px solid currentColor; /* цвет задаётся через style.color в JS */
+    border-bottom: 2px solid currentColor;
+    display: none;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.moodboard-topbar__paint-btn.is-active .moodboard-topbar__paint-tick {
+    display: block;
+}
+.moodboard-topbar__paint-btn:hover { filter: brightness(0.97); }
+
+.moodboard-topbar__zoom { display: inline-flex; align-items: center; gap: 8px; margin-left: 8px; }
+.moodboard-topbar__button--zoom { width: 32px; height: 32px; font-size: 16px; }
+.moodboard-topbar__zoom-label { min-width: 48px; text-align: center; font-size: 14px; }
+
