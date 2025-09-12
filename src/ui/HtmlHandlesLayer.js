@@ -1,4 +1,5 @@
 import { Events } from '../core/events/Events.js';
+import * as PIXI from 'pixi.js';
 import rotateIconSvg from '../assets/icons/rotate-icon.svg?raw';
 
 /**
@@ -90,24 +91,39 @@ export class HtmlHandlesLayer {
                     height: sizeData.size.height
                 }, id);
             } else {
-                // Fallback к getBounds() если события не сработали
+                // Fallback к getBounds() если события не сработали — конвертируем в мировые координаты (без зума)
+                const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
                 const b = pixi.getBounds();
-                this._showBounds({ x: b.x, y: b.y, width: b.width, height: b.height }, id);
+                const tl = world.toLocal(new PIXI.Point(b.x, b.y));
+                const br = world.toLocal(new PIXI.Point(b.x + b.width, b.y + b.height));
+                const wx = Math.min(tl.x, br.x);
+                const wy = Math.min(tl.y, br.y);
+                const ww = Math.max(1, Math.abs(br.x - tl.x));
+                const wh = Math.max(1, Math.abs(br.y - tl.y));
+                this._showBounds({ x: wx, y: wy, width: ww, height: wh }, id);
             }
         } else {
-            // Группа: вычислим общий bbox по PIXI
+            // Группа: считаем bbox в МИРОВЫХ координатах (независимо от текущего зума)
+            const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
             ids.forEach(id => {
                 const p = this.core.pixi.objects.get(id);
                 if (!p) return;
                 const b = p.getBounds();
-                minX = Math.min(minX, b.x);
-                minY = Math.min(minY, b.y);
-                maxX = Math.max(maxX, b.x + b.width);
-                maxY = Math.max(maxY, b.y + b.height);
+                // Конвертируем углы прямоугольника из экранных в мировые координаты
+                const tl = world.toLocal(new PIXI.Point(b.x, b.y));
+                const br = world.toLocal(new PIXI.Point(b.x + b.width, b.y + b.height));
+                const x0 = Math.min(tl.x, br.x);
+                const y0 = Math.min(tl.y, br.y);
+                const x1 = Math.max(tl.x, br.x);
+                const y1 = Math.max(tl.y, br.y);
+                minX = Math.min(minX, x0);
+                minY = Math.min(minY, y0);
+                maxX = Math.max(maxX, x1);
+                maxY = Math.max(maxY, y1);
             });
             if (!isFinite(minX)) { this.hide(); return; }
-            this._showBounds({ x: minX, y: minY, width: maxX - minX, height: maxY - minY }, '__group__');
+            this._showBounds({ x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) }, '__group__');
         }
     }
 
