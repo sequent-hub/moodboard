@@ -81,11 +81,11 @@ export class DrawingObject {
         // Перерисовываем геометрию
         this._draw(points, this.color, this.strokeWidth, this.mode);
 
-        // После перерисовки выставляем pivot по центру новой геометрии,
-        // чтобы ядро корректно сопоставляло левый-верх и центр при ресайзе
-        const b = g.getBounds();
-        const pX = Math.max(0, b.width / 2);
-        const pY = Math.max(0, b.height / 2);
+        // После перерисовки выставляем pivot по ЦЕНТРУ ЛОКАЛЬНЫХ границ,
+        // чтобы поворот происходил вокруг геометрического центра без диагонального смещения
+        const lb = g.getLocalBounds();
+        const pX = (lb.x || 0) + Math.max(0, lb.width / 2);
+        const pY = (lb.y || 0) + Math.max(0, lb.height / 2);
         g.pivot.set(pX, pY);
 
         // Восстанавливаем центр и поворот

@@ -270,7 +270,11 @@ export class HtmlTextLayer {
         const y = obj.position?.y || 0;
         const w = obj.width || 0;
         const h = obj.height || 0;
-        const angle = obj.rotation || obj.transform?.rotation || 0;
+        // Угол: во время поворота state ещё не обновлён, поэтому берем актуальный из PIXI
+        const pixiObj = this.core?.pixi?.objects?.get ? this.core.pixi.objects.get(objectId) : null;
+        const angle = (pixiObj && typeof pixiObj.rotation === 'number')
+            ? (pixiObj.rotation * 180 / Math.PI)
+            : (obj.rotation || obj.transform?.rotation || 0);
 
         // Чёткая отрисовка: меняем реальный font-size, учитывая зум и изменение размеров
         const baseFS = parseFloat(el.dataset.baseFontSize || `${obj.properties?.fontSize || obj.fontSize || 32}`) || 32;
@@ -310,12 +314,9 @@ export class HtmlTextLayer {
             el.style.width = `${Math.max(1, (w * s) / res)}px`;
             el.style.height = `${Math.max(1, (h * s) / res)}px`;
         }
-        // Поворот вокруг top-left
-        if (angle) {
-            el.style.transform = `rotate(${angle}deg)`;
-        } else {
-            el.style.transform = '';
-        }
+        // Поворот вокруг центра (как у PIXI и HTML-ручек)
+        el.style.transformOrigin = 'center center';
+        el.style.transform = angle ? `rotate(${angle}deg)` : '';
         // Текст
         const content = obj.content || obj.properties?.content;
         if (typeof content === 'string') {
