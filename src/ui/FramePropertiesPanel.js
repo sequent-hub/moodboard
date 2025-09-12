@@ -108,17 +108,6 @@ export class FramePropertiesPanel {
         Object.assign(panel.style, {
             position: 'absolute',
             display: 'none',
-            alignItems: 'center',
-            gap: '4px',
-            padding: '4px 6px',
-            backgroundColor: 'white',
-            border: '1px solid #e5e7eb',
-            borderRadius: '6px',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
-            fontSize: '12px',
-            fontFamily: 'Arial, sans-serif',
-            minWidth: '160px',
-            height: 'auto',
             zIndex: '10000'
         });
 
@@ -192,33 +181,22 @@ export class FramePropertiesPanel {
     _createFrameControls(panel) {
         // Контейнер для названия
         const titleContainer = document.createElement('div');
-        Object.assign(titleContainer.style, {
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            padding: '4px 6px'
-        });
+        titleContainer.className = 'fpp-section';
 
         // Лейбл
         const titleLabel = document.createElement('span');
         titleLabel.textContent = 'Название:';
-        titleLabel.style.fontSize = '11px';
-        titleLabel.style.color = '#666';
-        titleLabel.style.width = '56px';
-        titleLabel.style.textAlign = 'right';
+        titleLabel.className = 'fpp-label';
 
         // Поле ввода для названия
         const titleInput = document.createElement('input');
         titleInput.type = 'text';
         titleInput.placeholder = 'Название фрейма';
+        titleInput.className = 'fpp-input';
         Object.assign(titleInput.style, {
+            height: '22px',
             flex: '1',
-            padding: '2px 4px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            fontSize: '12px',
-            outline: 'none',
-            height: '22px'
+            outline: 'none'
         });
 
         // Обработчик изменения названия
@@ -251,32 +229,16 @@ export class FramePropertiesPanel {
 
         // Контейнер для цвета фона
         const colorContainer = document.createElement('div');
-        Object.assign(colorContainer.style, {
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            padding: '4px 6px'
-        });
+        colorContainer.className = 'fpp-section';
 
         // Лейбл для цвета
         const colorLabel = document.createElement('span');
         colorLabel.textContent = 'Фон:';
-        colorLabel.style.fontSize = '11px';
-        colorLabel.style.color = '#666';
-        colorLabel.style.width = '56px';
-        colorLabel.style.textAlign = 'right';
+        colorLabel.className = 'fpp-label';
 
         // Кнопка выбора цвета
         const colorButton = document.createElement('button');
-        Object.assign(colorButton.style, {
-            width: '20px',
-            height: '20px',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            backgroundColor: '#ffffff',
-            position: 'relative'
-        });
+        colorButton.className = 'fpp-color-button';
 
         // Обработчик клика по кнопке цвета
         colorButton.addEventListener('click', (e) => {
@@ -292,29 +254,18 @@ export class FramePropertiesPanel {
 
         // Контейнер для типа фрейма
         const typeContainer = document.createElement('div');
-        Object.assign(typeContainer.style, {
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            padding: '4px 6px'
-        });
+        typeContainer.className = 'fpp-section';
 
         const typeLabel = document.createElement('span');
         typeLabel.textContent = 'Тип:';
-        typeLabel.style.fontSize = '11px';
-        typeLabel.style.color = '#666';
-        typeLabel.style.width = '56px';
-        typeLabel.style.textAlign = 'right';
+        typeLabel.className = 'fpp-label';
 
         const typeSelect = document.createElement('select');
+        typeSelect.className = 'fpp-select';
         Object.assign(typeSelect.style, {
             flex: '1',
-            padding: '2px 4px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            fontSize: '12px',
-            outline: 'none',
             height: '22px',
+            outline: 'none',
             maxWidth: '100%'
         });
         const options = [

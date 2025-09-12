@@ -49,6 +49,55 @@
     height: 36px;
 }
 
+/* Frame properties panel — mirror text panel look */
+.frame-properties-panel {
+    position: absolute;
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 22px;
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 9999px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    font-size: 13px;
+    font-family: 'Roboto', Arial, sans-serif;
+    min-width: 320px;
+    height: 36px;
+}
+
+.frame-properties-panel .fpp-label {
+    font-family: 'Roboto', Arial, sans-serif;
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+}
+
+.frame-properties-panel .fpp-select,
+.frame-properties-panel .fpp-input {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 13px;
+    background-color: #fff;
+}
+
+.frame-properties-panel .fpp-color-button {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #ddd;
+    border-radius: 50%;
+    background-color: #ffffff;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+    display: block;
+    box-sizing: border-box;
+}
+
+.frame-properties-panel .fpp-section { display: inline-flex; align-items: center; gap: 6px; }
+
 .text-properties-panel .tpp-label {
     font-family: 'Roboto', Arial, sans-serif;
     font-size: 12px;
