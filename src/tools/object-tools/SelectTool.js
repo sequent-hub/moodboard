@@ -24,7 +24,7 @@ const _scaledCursorSvg = (() => {
         return cursorDefaultSvg;
     }
 })();
-const DEFAULT_CURSOR = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(_scaledCursorSvg)}") 0 0, default`;
+const DEFAULT_CURSOR = '';
 
 /**
  * Инструмент выделения и работы с объектами
@@ -156,7 +156,7 @@ export class SelectTool extends BaseTool {
         
         // Устанавливаем стандартный курсор для select инструмента
         if (this.app && this.app.view) {
-            this.app.view.style.cursor = DEFAULT_CURSOR;
+            this.app.view.style.cursor = DEFAULT_CURSOR; // пусто → наследует глобальный CSS
         }
         
         // Инициализируем систему ручек изменения размера

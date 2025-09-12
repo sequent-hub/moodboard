@@ -408,7 +408,7 @@ export class TextTool extends BaseTool {
         }
         // Устанавливаем кастомный курсор на холст
         if (pixiApp && pixiApp.view) {
-            pixiApp.view.style.cursor = this.cursor;
+            pixiApp.view.style.cursor = (this.cursor && this.cursor !== 'default') ? this.cursor : '';
         }
     }
 

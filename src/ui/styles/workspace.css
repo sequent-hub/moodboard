@@ -14,6 +14,11 @@
     font-display: swap;
 }
 
+/* Global default cursor */
+html, body, .moodboard-workspace, .moodboard-container, .moodboard-canvas {
+    cursor: url('../../assets/icons/cursor-default-custom.svg') 0 0, default;
+}
+
 @font-face {
     font-family: 'Oswald';
     src: url('../../assets/fonts/oswald/Oswald-Regular.ttf') format('truetype');

@@ -11,7 +11,7 @@ const _scaledCursorSvg = (() => {
         return cursorDefaultSvg;
     }
 })();
-const DEFAULT_CURSOR = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(_scaledCursorSvg)}") 0 0, default`;
+const DEFAULT_CURSOR = '';
 
 /**
  * Менеджер инструментов - управляет активными инструментами и переключением между ними
@@ -37,7 +37,7 @@ export class ToolManager {
         
         // Устанавливаем курсор по умолчанию на контейнер, если инструмент ещё не активирован
         if (this.container) {
-            this.container.style.cursor = DEFAULT_CURSOR;
+            this.container.style.cursor = DEFAULT_CURSOR; // пусто → берётся глобальный CSS-курсор
         }
 
         this.initEventListeners();

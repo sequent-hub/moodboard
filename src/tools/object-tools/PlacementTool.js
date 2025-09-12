@@ -44,7 +44,8 @@ export class PlacementTool extends BaseTool {
                 this.pending = cfg ? { ...cfg } : null;
                 // Обновляем курсор в зависимости от pending
                 if (this.app && this.app.view) {
-                    this.app.view.style.cursor = this._getPendingCursor();
+                    const cur = this._getPendingCursor();
+                    this.app.view.style.cursor = (cur === 'default') ? '' : cur;
                 }
                 
                 // Показываем призрак для текста, записки, эмоджи, фрейма или фигур, если они активны

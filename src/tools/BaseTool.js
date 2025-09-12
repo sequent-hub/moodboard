@@ -44,7 +44,12 @@ export class BaseTool {
      */
     setCursor() {
         if (typeof document !== 'undefined' && document.body) {
-            document.body.style.cursor = this.cursor;
+            // Для 'default' не ставим инлайн-стиль, чтобы сработал глобальный CSS-курсор
+            if (!this.cursor || this.cursor === 'default') {
+                document.body.style.cursor = '';
+            } else {
+                document.body.style.cursor = this.cursor;
+            }
         }
     }
     
