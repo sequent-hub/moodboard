@@ -67,9 +67,9 @@ export class GridFactory {
         const defaults = {
             line: {
                 enabled: true,
-                size: 20,
-                color: 0xE0E0E0,
-                opacity: 0.5,
+                size: 32,
+                color: 0x6a6aff,
+                opacity: 0.4,
                 lineWidth: 1,
                 showSubGrid: false,
                 subGridDivisions: 4
