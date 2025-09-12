@@ -1401,7 +1401,8 @@ export class CoreMoodBoard {
         // Обновляем ручки когда объект изменяется через команды (Undo/Redo)
         this.eventBus.on(Events.Object.TransformUpdated, (data) => {
             // Обновляем ручки если объект выделен
-            if (this.selectTool && this.selectTool.selectedObjects.has(data.objectId)) {
+            if (this.selectTool && this.selectTool.selection && this.selectTool.selection.has(data.objectId)) {
+                console.log(`🔄 Core: Объект ${data.objectId} изменен через команду, обновляем ручки SelectTool`);
                 this.selectTool.updateResizeHandles();
             }
         });

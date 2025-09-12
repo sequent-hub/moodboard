@@ -54,6 +54,18 @@ export class HtmlHandlesLayer {
         this.eventBus.on(Events.Tool.GroupRotateEnd, () => { this._handlesSuppressed = false; this._setHandlesVisibility(true); });
         this.eventBus.on(Events.UI.ZoomPercent, () => this.update());
         this.eventBus.on(Events.Tool.PanUpdate, () => this.update());
+        
+        // Обновление рамки при undo/redo команд трансформации (перемещение, ресайз, поворот)
+        this.eventBus.on(Events.Object.TransformUpdated, (data) => {
+            // Проверяем, что обновленный объект выделен, и обновляем ручки
+            if (this.core?.selectTool && data.objectId) {
+                const isSelected = this.core.selectTool.selectedObjects.has(data.objectId);
+                if (isSelected) {
+                    console.log(`🔄 HtmlHandlesLayer: Объект ${data.objectId} изменен через команду, обновляем рамку`);
+                    this.update();
+                }
+            }
+        });
 
         this.update();
     }

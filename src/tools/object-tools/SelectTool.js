@@ -131,6 +131,20 @@ export class SelectTool extends BaseTool {
                     }
                 }
             });
+
+            // Обработка удаления объектов (undo создания, delete команды и т.д.)
+            this.eventBus.on(Events.Object.Deleted, (data) => {
+                const objectId = data?.objectId || data;
+                if (objectId && this.selection.has(objectId)) {
+                    console.log(`🗑️ SelectTool: Объект ${objectId} удален, убираем из выделения`);
+                    this.removeFromSelection(objectId);
+                    
+                    // Если выделение стало пустым, скрываем ручки
+                    if (this.selection.size() === 0) {
+                        this.updateResizeHandles();
+                    }
+                }
+            });
 		}
         this.textEditor = {
             active: false,
