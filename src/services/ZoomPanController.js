@@ -9,11 +9,22 @@ export class ZoomPanController {
 	attach() {
 		// Масштабирование колесом — глобально отрабатываем Ctrl+Wheel
 		this.eventBus.on(Events.Tool.WheelZoom, ({ x, y, delta }) => {
-			const factor = 1 + (-delta) * 0.0015;
+			// Дискретный шаг зума 10%
 			const world = this.pixi.worldLayer || this.pixi.app.stage;
 			const oldScale = world.scale.x || 1;
-			const newScale = Math.max(0.1, Math.min(5, oldScale * factor));
-			if (newScale === oldScale) return;
+			const oldPercent = Math.round(oldScale * 100);
+			let targetPercent;
+			if (delta < 0) {
+				// Zoom in: к ближайшему следующему кратному 10 плюс шаг
+				targetPercent = Math.min(500, Math.floor(oldPercent / 10) * 10 + 10);
+			} else if (delta > 0) {
+				// Zoom out: к ближайшему предыдущему кратному 10 минус шаг
+				targetPercent = Math.max(10, Math.ceil(oldPercent / 10) * 10 - 10);
+			} else {
+				return;
+			}
+			const newScale = Math.max(0.1, Math.min(5, targetPercent / 100));
+			if (Math.abs(newScale - oldScale) < 0.0001) return;
 			// Вычисляем мировые координаты точки под курсором до изменения скейла
 			const worldX = (x - world.x) / oldScale;
 			const worldY = (y - world.y) / oldScale;
