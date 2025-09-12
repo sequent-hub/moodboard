@@ -264,7 +264,6 @@ export class FramePropertiesPanel {
         typeSelect.className = 'fpp-select';
         Object.assign(typeSelect.style, {
             flex: '1',
-            height: '22px',
             outline: 'none',
             maxWidth: '100%'
         });
@@ -313,14 +312,14 @@ export class FramePropertiesPanel {
     }
 
     _createColorPalette(panel) {
-        // Палитра из 6 популярных цветов
-        const colors = [
-            { name: 'Белый', hex: '#FFFFFF', pixi: 0xFFFFFF },
+        // Палитра из 6 популярных цветов (как у текстовой панели — круглые кнопки, галочка)
+        this._frameColors = [
+            { name: 'Белый',   hex: '#FFFFFF', pixi: 0xFFFFFF },
             { name: 'Голубой', hex: '#E3F2FD', pixi: 0xE3F2FD },
             { name: 'Зеленый', hex: '#E8F5E8', pixi: 0xE8F5E8 },
-            { name: 'Желтый', hex: '#FFF8E1', pixi: 0xFFF8E1 },
+            { name: 'Желтый',  hex: '#FFF8E1', pixi: 0xFFF8E1 },
             { name: 'Розовый', hex: '#FCE4EC', pixi: 0xFCE4EC },
-            { name: 'Серый', hex: '#F5F5F5', pixi: 0xF5F5F5 }
+            { name: 'Серый',   hex: '#F5F5F5', pixi: 0xF5F5F5 }
         ];
 
         const palette = document.createElement('div');
@@ -330,47 +329,79 @@ export class FramePropertiesPanel {
             top: '100%',
             left: '0',
             display: 'none',
-            flexWrap: 'wrap',
-            gap: '4px',
-            padding: '8px',
             backgroundColor: 'white',
-            border: '1px solid #e0e0e0',
-            borderRadius: '8px',
+            border: '1px solid #ddd',
+            borderRadius: '6px',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+            padding: '8px',
             zIndex: '10001',
-            width: '120px'
+            minWidth: '200px'
         });
 
-        colors.forEach(color => {
-            const colorSwatch = document.createElement('div');
-            Object.assign(colorSwatch.style, {
-                width: '24px',
-                height: '24px',
-                backgroundColor: color.hex,
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                transition: 'transform 0.1s'
-            });
+        // Сетка цветов, как в TextPropertiesPanel
+        const grid = document.createElement('div');
+        grid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(6, 28px);
+            gap: 6px;
+            margin: 0;
+            align-items: center;
+            justify-items: center;
+        `;
 
-            colorSwatch.title = color.name;
+        this._paletteButtons = [];
 
-            colorSwatch.addEventListener('click', () => {
+        this._frameColors.forEach(color => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.title = color.name;
+            btn.dataset.colorHex = color.hex.toUpperCase();
+            btn.style.cssText = `
+                width: 28px;
+                height: 28px;
+                border: 1px solid ${color.hex.toUpperCase() === '#FFFFFF' ? '#ccc' : '#ddd'};
+                border-radius: 50%;
+                background-color: ${color.hex};
+                cursor: pointer;
+                margin: 0;
+                padding: 0;
+                display: block;
+                box-sizing: border-box;
+                position: relative;
+            `;
+
+            // Галочка как в текстовой панели
+            const tick = document.createElement('i');
+            tick.style.cssText = `
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                width: 8px;
+                height: 5px;
+                transform: translate(-50%, -50%) rotate(315deg) scaleX(-1);
+                border-right: 2px solid #111;
+                border-bottom: 2px solid #111;
+                display: none;
+                pointer-events: none;
+            `;
+            btn.appendChild(tick);
+
+            btn.addEventListener('click', () => {
+                // Снимаем активность со всех
+                this._paletteButtons.forEach(b => {
+                    const i = b.querySelector('i');
+                    if (i) i.style.display = 'none';
+                });
+                tick.style.display = 'block';
                 this._selectColor(color);
                 this._hideColorPalette();
             });
 
-            colorSwatch.addEventListener('mouseenter', () => {
-                colorSwatch.style.transform = 'scale(1.1)';
-            });
-
-            colorSwatch.addEventListener('mouseleave', () => {
-                colorSwatch.style.transform = 'scale(1)';
-            });
-
-            palette.appendChild(colorSwatch);
+            grid.appendChild(btn);
+            this._paletteButtons.push(btn);
         });
 
+        palette.appendChild(grid);
         this.colorPalette = palette;
         panel.appendChild(palette);
     }
@@ -397,6 +428,9 @@ export class FramePropertiesPanel {
         this.colorPalette.style.left = `${buttonRect.left - panelRect.left}px`;
         this.colorPalette.style.top = `${buttonRect.bottom - panelRect.top + 4}px`;
         this.colorPalette.style.display = 'flex';
+
+        // Синхронизируем активный цвет (показываем галочку у текущего)
+        this._syncPaletteSelectionFromObject();
 
         // Добавляем обработчик клика по документу для закрытия палитры
         setTimeout(() => {
@@ -431,6 +465,26 @@ export class FramePropertiesPanel {
         this.eventBus.emit(Events.Object.StateChanged, {
             objectId: this.currentId,
             updates: { backgroundColor: color.pixi }
+        });
+    }
+
+    _syncPaletteSelectionFromObject() {
+        if (!this._paletteButtons || this._paletteButtons.length === 0) return;
+        const objectData = this.core.getObjectData(this.currentId);
+        let pixiColor = (objectData && (objectData.backgroundColor || (objectData.properties && objectData.properties.backgroundColor))) || 0xFFFFFF;
+        const hex = `#${pixiColor.toString(16).padStart(6, '0').toUpperCase()}`;
+        this._setActivePaletteColor(hex);
+    }
+
+    _setActivePaletteColor(hex) {
+        this._paletteButtons.forEach(btn => {
+            const i = btn.querySelector('i');
+            if (!i) return;
+            if ((btn.dataset.colorHex || '').toUpperCase() === hex.toUpperCase()) {
+                i.style.display = 'block';
+            } else {
+                i.style.display = 'none';
+            }
         });
     }
 
