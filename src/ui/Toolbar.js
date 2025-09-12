@@ -530,6 +530,13 @@ export class Toolbar {
                 this.setActiveToolbarButton('place'); // ← Исправление: подсвечиваем кнопку эмоджи
                 return;
             }
+
+            // Очистка холста - требует подтверждения
+            if (toolType === 'clear') {
+                this.animateButton(button);
+                this.showClearConfirmation();
+                return;
+            }
             
             // Эмитим событие для других инструментов
             this.eventBus.emit(Events.UI.ToolbarAction, {
@@ -1045,6 +1052,38 @@ export class Toolbar {
         if (this.emojiPopupEl) {
             this.emojiPopupEl.style.display = 'none';
         }
+    }
+
+    /**
+     * Показывает диалог подтверждения очистки холста
+     */
+    showClearConfirmation() {
+        // Проверяем, есть ли объекты на холсте для очистки
+        let hasObjects = false;
+        const checkData = { objects: [] };
+        this.eventBus.emit(Events.Tool.GetAllObjects, checkData);
+        hasObjects = checkData.objects && checkData.objects.length > 0;
+
+        if (!hasObjects) {
+            // Если холст уже пуст, показываем уведомление
+            alert('Холст уже пуст');
+            return;
+        }
+
+        // Показываем диалог подтверждения
+        const confirmed = confirm(
+            'Вы уверены, что хотите очистить холст?\n\n' +
+            'Это действие удалит все объекты с холста и не может быть отменено.'
+        );
+
+        if (confirmed) {
+            // Пользователь подтвердил - выполняем очистку
+            this.eventBus.emit(Events.UI.ToolbarAction, {
+                type: 'clear',
+                id: 'clear'
+            });
+        }
+        // Если не подтвердил - ничего не делаем
     }
     
     /**
