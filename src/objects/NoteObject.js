@@ -51,7 +51,7 @@ export class NoteObject {
         this.container.addChild(this.graphics);
         
         // Функция согласованной высоты строки (как в HtmlTextLayer)
-        const computeLineHeightPx = (fs) => {
+        this._computeLineHeightPx = (fs) => {
             if (fs <= 12) return Math.round(fs * 1.40);
             if (fs <= 18) return Math.round(fs * 1.34);
             if (fs <= 36) return Math.round(fs * 1.26);
@@ -71,15 +71,34 @@ export class NoteObject {
             wordWrap: true,
             breakWords: true,
             wordWrapWidth: Math.max(1, Math.min(360, (this.width - 32))),
-            lineHeight: computeLineHeightPx(this.fontSize),
+            lineHeight: this._computeLineHeightPx(this.fontSize),
             padding: 3,
             trim: false,
             resolution: (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1
         });
         
+        // Маска для обрезки текста по границам записки
+        this.textMask = new PIXI.Graphics();
+        this.container.addChild(this.textMask);
+        this.textField.mask = this.textMask;
+
         this._redraw(); // Сначала рисуем фон
+        // Прячем текст до загрузки шрифта Caveat, чтобы не показывать системный
+        this.textField.visible = false;
         this.container.addChild(this.textField); // Затем добавляем текст поверх
         this._updateTextPosition();
+        // Если шрифт уже загружен — показываем сразу, иначе подождём загрузки
+        if (this._isFontLoaded(fontFamily, this.fontSize)) {
+            this.textField.visible = true;
+        } else {
+            this._ensureWebFontApplied(fontFamily, this.fontSize);
+            // Фолбэк на случай отсутствия Font Loading API — короткая задержка
+            try {
+                if (!(typeof document !== 'undefined' && document.fonts && typeof document.fonts.load === 'function')) {
+                    setTimeout(() => { try { this.textField.visible = true; } catch (_) {} }, 300);
+                }
+            } catch (_) {}
+        }
 
         // Гарантируем применение web-font (например, Caveat) при первом создании
         this._ensureWebFontApplied(fontFamily, this.fontSize);
@@ -115,6 +134,50 @@ export class NoteObject {
         return Math.max(1, Math.min(360, contentWidth));
     }
 
+    /** Проверяет, загружен ли указанный web-шрифт */
+    _isFontLoaded(fontFamily, fontSizePx) {
+        try {
+            if (typeof document === 'undefined' || !document.fonts || typeof document.fonts.check !== 'function') return false;
+            const primary = String(fontFamily || '').split(',')[0].trim().replace(/^['"]|['"]$/g, '') || 'Caveat';
+            const size = Math.max(1, Number(fontSizePx) || 32);
+            const spec = `normal ${size}px ${primary}`;
+            return document.fonts.check(spec);
+        } catch (_) {
+            return false;
+        }
+    }
+
+    /**
+     * Подгоняет размер шрифта так, чтобы текст умещался внутри записки
+     */
+    _fitTextToBounds() {
+        if (!this.textField) return;
+        const maxWidth = this._getVisibleTextWidth();
+        const verticalPadding = 16;
+        const maxHeight = Math.max(1, this.height - (verticalPadding * 2));
+
+        // Базовые установки стиля перед измерением
+        this.textField.style.wordWrap = true;
+        this.textField.style.breakWords = true;
+        this.textField.style.wordWrapWidth = maxWidth;
+
+        // Начинаем с желаемого размера шрифта
+        let displayFontSize = Math.max(1, Number(this.fontSize) || 32);
+        const minFontSize = 8;
+        let safety = 0;
+        const maxIterations = 64;
+
+        while (safety < maxIterations) {
+            this.textField.style.fontSize = displayFontSize;
+            this.textField.style.lineHeight = this._computeLineHeightPx(displayFontSize);
+            this.textField.updateText();
+            const needsShrink = this.textField.height > maxHeight;
+            if (!needsShrink || displayFontSize <= minFontSize) break;
+            displayFontSize = Math.max(minFontSize, displayFontSize - 1);
+            safety++;
+        }
+    }
+
     getPixi() {
         return this.container;
     }
@@ -144,8 +207,10 @@ export class NoteObject {
 
     setContent(content) {
         this.content = content || '';
+        if (this.textField) this.textField.visible = false;
         this.textField.text = this.content;
         this._updateTextPosition();
+        if (this.textField) this.textField.visible = true;
         if (this.container && this.container._mb) {
             this.container._mb.properties = {
                 ...(this.container._mb.properties || {}),
@@ -186,16 +251,7 @@ export class NoteObject {
             this.fontSize = fontSize;
             this.textField.style.fontSize = fontSize;
             // Согласуем с HTML-слоем
-            const computeLineHeightPx = (fs) => {
-                if (fs <= 12) return Math.round(fs * 1.40);
-                if (fs <= 18) return Math.round(fs * 1.34);
-                if (fs <= 36) return Math.round(fs * 1.26);
-                if (fs <= 48) return Math.round(fs * 1.24);
-                if (fs <= 72) return Math.round(fs * 1.22);
-                if (fs <= 96) return Math.round(fs * 1.20);
-                return Math.round(fs * 1.18);
-            };
-            this.textField.style.lineHeight = computeLineHeightPx(fontSize);
+            this.textField.style.lineHeight = this._computeLineHeightPx(fontSize);
             this.textField.style.padding = 3;
             this.textField.style.trim = false;
             this.textField.style.letterSpacing = 0;
@@ -242,11 +298,12 @@ export class NoteObject {
             const size = Math.max(1, Number(fontSizePx) || 32);
             const spec = `normal ${size}px ${primary}`;
             document.fonts.load(spec).then(() => {
-                // Обновляем текст после загрузки шрифта
+                // Обновляем текст после загрузки шрифта и сразу подгоняем без мерцания
                 try {
+                    if (this.textField) this.textField.visible = false;
                     this.textField.style.fontFamily = fontFamily;
-                    this.textField.updateText();
                     this._updateTextPosition();
+                    if (this.textField) this.textField.visible = true;
                 } catch (_) {}
             }).catch(() => {});
         } catch (_) {}
@@ -272,6 +329,13 @@ export class NoteObject {
         };
         drawShadow(this.shadowLeft);
         drawShadow(this.shadowRight);
+
+        // Обновляем маску текста под новые размеры
+        const pad = 16;
+        this.textMask.clear();
+        this.textMask.beginFill(0x000000, 1);
+        this.textMask.drawRect(pad, pad, Math.max(1, w - pad * 2), Math.max(1, h - pad * 2));
+        this.textMask.endFill();
 
         // Базовые позиции как в CSS: left:15px и right:15px; bottom:10px
         this.shadowLeft.x = 15;
@@ -332,8 +396,13 @@ export class NoteObject {
         
         // Обновляем стиль текста согласно ограничениям редактора
         this.textField.style.wordWrapWidth = this._getVisibleTextWidth();
-        
-        // Ждем, пока PIXI пересчитает размеры текста
+        this.textField.style.wordWrap = true;
+        this.textField.style.breakWords = true;
+
+        // Подгоняем размер шрифта под доступные границы
+        this._fitTextToBounds();
+
+        // Обновляем текст после подгонки
         this.textField.updateText();
         
         // Центрируем текст по центру заметки
