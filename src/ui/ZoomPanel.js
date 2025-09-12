@@ -18,7 +18,10 @@ export class ZoomPanel {
         const zoomOutBtn = document.createElement('button');
         zoomOutBtn.className = 'moodboard-zoombar__button';
         zoomOutBtn.title = 'Уменьшить масштаб';
-        zoomOutBtn.textContent = '−';
+        const zoomOutIcon = document.createElement('span');
+        zoomOutIcon.className = 'moodboard-zoombar__icon';
+        zoomOutIcon.textContent = '−';
+        zoomOutBtn.appendChild(zoomOutIcon);
         zoomOutBtn.dataset.action = 'zoom-out';
 
         const label = document.createElement('span');
@@ -37,7 +40,10 @@ export class ZoomPanel {
         const zoomInBtn = document.createElement('button');
         zoomInBtn.className = 'moodboard-zoombar__button';
         zoomInBtn.title = 'Увеличить масштаб';
-        zoomInBtn.textContent = '+';
+        const zoomInIcon = document.createElement('span');
+        zoomInIcon.className = 'moodboard-zoombar__icon';
+        zoomInIcon.textContent = '+';
+        zoomInBtn.appendChild(zoomInIcon);
         zoomInBtn.dataset.action = 'zoom-in';
 
         this.element.appendChild(zoomOutBtn);
