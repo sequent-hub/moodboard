@@ -288,9 +288,11 @@ export class TextPropertiesPanel {
         const presetsGrid = document.createElement('div');
         presetsGrid.style.cssText = `
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 4px;
+            grid-template-columns: repeat(6, 28px);
+            gap: 6px;
             margin-bottom: 8px;
+            align-items: center;
+            justify-items: center;
         `;
 
         presetColors.forEach(preset => {
@@ -298,10 +300,10 @@ export class TextPropertiesPanel {
             colorButton.type = 'button';
             colorButton.title = preset.name;
             colorButton.style.cssText = `
-                width: 24px;
-                height: 24px;
+                width: 28px;
+                height: 28px;
                 border: 1px solid #ddd;
-                border-radius: 3px;
+                border-radius: 50%;
                 background-color: ${preset.color};
                 cursor: pointer;
                 margin: 0;
@@ -309,9 +311,31 @@ export class TextPropertiesPanel {
                 display: block;
                 box-sizing: border-box;
                 ${preset.color === '#ffffff' ? 'border-color: #ccc;' : ''}
+                position: relative;
             `;
+            // Галочка по центру активного пресета
+            const tick = document.createElement('i');
+            tick.style.cssText = `
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                width: 8px;
+                height: 5px;
+                transform: translate(-50%, -50%) rotate(315deg) scaleX(-1);
+                border-right: 2px solid #111;
+                border-bottom: 2px solid #111;
+                display: none;
+                pointer-events: none;
+            `;
+            colorButton.appendChild(tick);
 
             colorButton.addEventListener('click', () => {
+                // Снимаем активность с других и ставим на текущий
+                Array.from(presetsGrid.children).forEach((el) => {
+                    const i = el.querySelector('i');
+                    if (i) i.style.display = 'none';
+                });
+                tick.style.display = 'block';
                 this._selectColor(preset.color);
             });
 
@@ -467,9 +491,11 @@ export class TextPropertiesPanel {
         const presetsGrid = document.createElement('div');
         presetsGrid.style.cssText = `
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 4px;
+            grid-template-columns: repeat(6, 28px);
+            gap: 6px;
             margin-bottom: 8px;
+            align-items: center;
+            justify-items: center;
         `;
 
         bgColors.forEach(preset => {
@@ -480,10 +506,10 @@ export class TextPropertiesPanel {
             if (preset.color === 'transparent') {
                 // Специальная кнопка для "без выделения"
                 colorButton.style.cssText = `
-                    width: 24px;
-                    height: 24px;
+                    width: 28px;
+                    height: 28px;
                     border: 1px solid #ddd;
-                    border-radius: 3px;
+                    border-radius: 50%;
                     background: white;
                     cursor: pointer;
                     margin: 0;
@@ -506,10 +532,10 @@ export class TextPropertiesPanel {
                 colorButton.appendChild(line);
             } else {
                 colorButton.style.cssText = `
-                    width: 24px;
-                    height: 24px;
+                    width: 28px;
+                    height: 28px;
                     border: 1px solid #ddd;
-                    border-radius: 3px;
+                    border-radius: 50%;
                     background-color: ${preset.color};
                     cursor: pointer;
                     margin: 0;
@@ -517,10 +543,33 @@ export class TextPropertiesPanel {
                     display: block;
                     box-sizing: border-box;
                     ${preset.color === '#ffffff' ? 'border-color: #ccc;' : ''}
+                    position: relative;
                 `;
+                // Галочка по центру активного пресета
+                const tick = document.createElement('i');
+                tick.style.cssText = `
+                    position: absolute;
+                    left: 50%;
+                    top: 50%;
+                    width: 8px;
+                    height: 5px;
+                    transform: translate(-50%, -50%) rotate(315deg) scaleX(-1);
+                    border-right: 2px solid #111;
+                    border-bottom: 2px solid #111;
+                    display: none;
+                    pointer-events: none;
+                `;
+                colorButton.appendChild(tick);
             }
 
             colorButton.addEventListener('click', () => {
+                // Снимаем активность с других и ставим на текущий
+                Array.from(presetsGrid.children).forEach((el) => {
+                    const i = el.querySelector('i');
+                    if (i) i.style.display = 'none';
+                });
+                const selfTick = colorButton.querySelector('i');
+                if (selfTick) selfTick.style.display = 'block';
                 this._selectBgColor(preset.color);
             });
 
