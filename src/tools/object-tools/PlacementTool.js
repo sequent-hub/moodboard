@@ -103,9 +103,16 @@ export class PlacementTool extends BaseTool {
 
             // Обработка выбора файла
             this.eventBus.on(Events.Place.FileSelected, (fileData) => {
+                console.log('📁 PlacementTool: получен FileSelected:', fileData);
                 this.selectedFile = fileData;
                 this.selectedImage = null;
-                this.showFileGhost();
+                
+                // Если PlacementTool уже активен - показываем призрак сразу
+                if (this.world) {
+                    this.showFileGhost();
+                } else {
+                    console.log('📁 PlacementTool: world не готов, призрак будет показан при активации');
+                }
             });
 
             // Обработка отмены выбора файла
@@ -547,7 +554,16 @@ export class PlacementTool extends BaseTool {
      * Показать "призрак" файла
      */
     showFileGhost() {
-        if (!this.selectedFile || !this.world) return;
+        console.log('📁 PlacementTool.showFileGhost:', {
+            hasSelectedFile: !!this.selectedFile,
+            hasWorld: !!this.world,
+            selectedFileData: this.selectedFile
+        });
+        
+        if (!this.selectedFile || !this.world) {
+            console.warn('⚠️ Не можем показать призрак файла - нет selectedFile или world');
+            return;
+        }
         
         this.hideGhost(); // Сначала убираем старый призрак
         
@@ -562,9 +578,10 @@ export class PlacementTool extends BaseTool {
             const worldPoint = this._toWorld(cursorX, cursorY);
             this.updateGhostPosition(worldPoint.x, worldPoint.y);
         }
-        // Попробуем дождаться загрузки веб-шрифта Caveat до отрисовки
-        const pendingFont = (this.pending.properties?.fontFamily) || 'Caveat, Arial, cursive';
-        const primaryFont = String(pendingFont).split(',')[0].trim().replace(/^['"]|['"]$/g, '') || 'Caveat';
+        // Попробуем дождаться загрузки веб-шрифта Caveat до отрисовки  
+        // Для файлов используем selectedFile, а не pending
+        const fileFont = (this.selectedFile.properties?.fontFamily) || 'Caveat, Arial, cursive';
+        const primaryFont = String(fileFont).split(',')[0].trim().replace(/^['"]|['"]$/g, '') || 'Caveat';
         
         // Размеры
         const width = this.selectedFile.properties.width || 120;
@@ -622,6 +639,13 @@ export class PlacementTool extends BaseTool {
         this.ghostContainer.pivot.y = height / 2;
         
         this.world.addChild(this.ghostContainer);
+        
+        console.log('📁 Призрак файла создан и добавлен в world:', {
+            ghostContainerSize: { w: width, h: height },
+            ghostContainerAlpha: this.ghostContainer.alpha,
+            worldHasContainer: this.world.children.includes(this.ghostContainer),
+            ghostContainerChildren: this.ghostContainer.children.length
+        });
     }
 
     /**
@@ -722,9 +746,10 @@ export class PlacementTool extends BaseTool {
         this.ghostContainer = new PIXI.Container();
         this.ghostContainer.alpha = 0.6; // Полупрозрачность
         
-        // Размеры призрака
-        const maxWidth = this.selectedImage.properties.width || 300;
-        const maxHeight = this.selectedImage.properties.height || 200;
+        // Размеры призрака - используем размеры из pending/selected, если есть
+        const isEmojiIcon = this.selectedImage.properties?.isEmojiIcon;
+        const maxWidth = this.selectedImage.properties.width || (isEmojiIcon ? 64 : 300);
+        const maxHeight = this.selectedImage.properties.height || (isEmojiIcon ? 64 : 200);
         
         try {
             // Создаем превью изображения
@@ -816,8 +841,10 @@ export class PlacementTool extends BaseTool {
         this.ghostContainer = new PIXI.Container();
         this.ghostContainer.alpha = 0.6;
 
-        const maxWidth = this.pending.size?.width || this.pending.properties?.width || 56;
-        const maxHeight = this.pending.size?.height || this.pending.properties?.height || 56;
+        // Для эмоджи используем точные размеры из pending для согласованности
+        const isEmojiIcon = this.pending.properties?.isEmojiIcon;
+        const maxWidth = this.pending.size?.width || this.pending.properties?.width || (isEmojiIcon ? 64 : 56);
+        const maxHeight = this.pending.size?.height || this.pending.properties?.height || (isEmojiIcon ? 64 : 56);
 
         try {
             const texture = await PIXI.Texture.fromURL(src);
@@ -853,15 +880,23 @@ export class PlacementTool extends BaseTool {
 
         this.world.addChild(this.ghostContainer);
 
-        // Кастомный курсор: мини-превью иконки рядом с курсором
-        try {
-            if (this.app && this.app.view && src) {
-                const cursorSize = 24;
-                const url = encodeURI(src);
-                // Используем CSS cursor с изображением, если поддерживается
-                this.app.view.style.cursor = `url(${url}) ${Math.floor(cursorSize/2)} ${Math.floor(cursorSize/2)}, default`;
+        // Для эмоджи не используем кастомный курсор, чтобы избежать дублирования призраков
+        if (!isEmojiIcon) {
+            // Кастомный курсор только для обычных изображений
+            try {
+                if (this.app && this.app.view && src) {
+                    const cursorSize = 24;
+                    const url = encodeURI(src);
+                    // Используем CSS cursor с изображением, если поддерживается
+                    this.app.view.style.cursor = `url(${url}) ${Math.floor(cursorSize/2)} ${Math.floor(cursorSize/2)}, default`;
+                }
+            } catch (_) {}
+        } else {
+            // Для эмоджи используем стандартный курсор
+            if (this.app && this.app.view) {
+                this.app.view.style.cursor = 'crosshair';
             }
-        } catch (_) {}
+        }
     }
 
     /**

@@ -969,9 +969,13 @@ export class Toolbar {
 
                 // Перетаскивание: начинаем только если был реальный drag (движение > 4px)
                 btn.addEventListener('mousedown', (e) => {
+                    // Блокируем одновременную обработку
+                    if (btn.__clickProcessing || btn.__dragActive) return;
+                    
                     const startX = e.clientX;
                     const startY = e.clientY;
                     let startedDrag = false;
+                    
                     const onMove = (ev) => {
                         if (startedDrag) return;
                         const dx = Math.abs(ev.clientX - startX);
@@ -979,6 +983,10 @@ export class Toolbar {
                         if (dx > 4 || dy > 4) {
                             startedDrag = true;
                             btn.__dragActive = true;
+                            
+                            // Блокируем click handler
+                            btn.__clickProcessing = true;
+                            
                             const target = 64;
                             const targetW = target;
                             const targetH = target;
@@ -997,8 +1005,11 @@ export class Toolbar {
                     };
                     const onUp = () => {
                         cleanup();
-                        // Снимем флаг сразу после клика, чтобы click мог отфильтроваться
-                        setTimeout(() => { btn.__dragActive = false; }, 0);
+                        // Снимаем флаги с задержкой
+                        setTimeout(() => { 
+                            btn.__dragActive = false;
+                            btn.__clickProcessing = false;
+                        }, 50);
                     };
                     const cleanup = () => {
                         document.removeEventListener('mousemove', onMove);
@@ -1008,8 +1019,13 @@ export class Toolbar {
                     document.addEventListener('mouseup', onUp, { once: true });
                 });
 
-                btn.addEventListener('click', () => {
-                    if (btn.__dragActive) return; // не обрабатываем клик после drag
+                btn.addEventListener('click', (e) => {
+                    // Блокируем обработку клика если был drag или если уже обрабатывается
+                    if (btn.__dragActive || btn.__clickProcessing) return;
+                    
+                    btn.__clickProcessing = true;
+                    setTimeout(() => { btn.__clickProcessing = false; }, 100);
+                    
                     this.animateButton(btn);
                     const target = 64; // кратно 128 для лучшей четкости при даунскейле
                     const targetW = target;
@@ -1226,7 +1242,7 @@ export class Toolbar {
                 }
 
                 // Файл выбран - запускаем режим "призрака"
-                this.eventBus.emit(Events.Place.FileSelected, {
+                const fileSelectedData = {
                     file: file,
                     fileName: file.name,
                     fileSize: file.size,
@@ -1235,7 +1251,10 @@ export class Toolbar {
                         width: 120,
                         height: 140
                     }
-                });
+                };
+                
+                console.log('📁 Toolbar: эмитируем FileSelected:', fileSelectedData);
+                this.eventBus.emit(Events.Place.FileSelected, fileSelectedData);
 
                 // Активируем инструмент размещения
                 this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
