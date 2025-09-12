@@ -1409,13 +1409,23 @@ export class CoreMoodBoard {
         });
 
         // Получение позиции объекта (левый-верх логических координат)
+        // Используем размеры из state для согласованности с HtmlHandlesLayer
         this.eventBus.on(Events.Tool.GetObjectPosition, (data) => {
             const pixiObject = this.pixi.objects.get(data.objectId);
-            if (pixiObject) {
-                const halfW = (pixiObject.width || 0) / 2;
-                const halfH = (pixiObject.height || 0) / 2;
-                data.position = { x: pixiObject.x - halfW, y: pixiObject.y - halfH };
-            }
+            if (!pixiObject) return;
+            let widthFromState = 0;
+            let heightFromState = 0;
+            try {
+                const objects = this.state?.getObjects ? this.state.getObjects() : [];
+                const obj = Array.isArray(objects) ? objects.find(o => o.id === data.objectId) : null;
+                if (obj && typeof obj.width === 'number' && typeof obj.height === 'number') {
+                    widthFromState = obj.width;
+                    heightFromState = obj.height;
+                }
+            } catch (_) {}
+            const halfW = (widthFromState > 0 ? widthFromState : (pixiObject.width || 0)) / 2;
+            const halfH = (heightFromState > 0 ? heightFromState : (pixiObject.height || 0)) / 2;
+            data.position = { x: pixiObject.x - halfW, y: pixiObject.y - halfH };
         });
 
         // Получение PIXI объекта

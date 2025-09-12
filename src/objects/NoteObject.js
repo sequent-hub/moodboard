@@ -69,7 +69,8 @@ export class NoteObject {
             align: 'center',
             letterSpacing: 0,
             wordWrap: true,
-            wordWrapWidth: this.width - 16, // Отступы по 8px с каждой стороны
+            breakWords: true,
+            wordWrapWidth: Math.max(1, Math.min(360, (this.width - 32))),
             lineHeight: computeLineHeightPx(this.fontSize),
             padding: 3,
             trim: false,
@@ -103,6 +104,15 @@ export class NoteObject {
         };
 
         this._redraw();
+    }
+
+    /**
+     * Возвращает видимую ширину текстового блока, согласованную с режимом редактирования
+     */
+    _getVisibleTextWidth() {
+        const horizontalPadding = 16;
+        const contentWidth = Math.max(1, this.width - (horizontalPadding * 2));
+        return Math.max(1, Math.min(360, contentWidth));
     }
 
     getPixi() {
@@ -320,8 +330,8 @@ export class NoteObject {
     _updateTextPosition() {
         if (!this.textField) return;
         
-        // Обновляем стиль текста
-        this.textField.style.wordWrapWidth = this.width - 16;
+        // Обновляем стиль текста согласно ограничениям редактора
+        this.textField.style.wordWrapWidth = this._getVisibleTextWidth();
         
         // Ждем, пока PIXI пересчитает размеры текста
         this.textField.updateText();
