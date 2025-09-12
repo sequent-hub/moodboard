@@ -74,7 +74,6 @@ export class FilePropertiesPanel {
         const pixi = this.core?.pixi?.objects?.get ? this.core.pixi.objects.get(id) : null;
         const isFile = !!(pixi && pixi._mb && pixi._mb.type === 'file');
         
-        console.log('📎 FilePropertiesPanel: updateFromSelection - id=', id, 'isFile=', isFile);
         
         if (isFile) {
             this.showFor(id);
@@ -84,7 +83,6 @@ export class FilePropertiesPanel {
     }
 
     showFor(objectId) {
-        console.log('📎 FilePropertiesPanel: Showing panel for objectId:', objectId);
         this.currentId = objectId;
         if (this.panel) {
             this.panel.style.display = 'flex';
@@ -223,7 +221,6 @@ export class FilePropertiesPanel {
 
             // Скачиваем файл
             await this.core.fileUploadService.downloadFile(fileId, fileName);
-            console.log('✅ Файл скачан:', fileName);
 
             // Восстанавливаем кнопку
             setTimeout(() => {

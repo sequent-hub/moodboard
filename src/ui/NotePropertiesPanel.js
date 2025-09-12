@@ -73,7 +73,6 @@ export class NotePropertiesPanel {
         const pixi = this.core?.pixi?.objects?.get ? this.core.pixi.objects.get(id) : null;
         const isNote = !!(pixi && pixi._mb && pixi._mb.type === 'note');
         
-        console.log('📝 NotePropertiesPanel: updateFromSelection - id=', id, 'isNote=', isNote);
         
         if (isNote) {
             this.showFor(id);
@@ -83,7 +82,6 @@ export class NotePropertiesPanel {
     }
 
     showFor(objectId) {
-        console.log('📝 NotePropertiesPanel: Showing panel for objectId:', objectId);
         this.currentId = objectId;
         if (this.panel) {
             this.panel.style.display = 'flex';
@@ -471,7 +469,6 @@ export class NotePropertiesPanel {
     _selectColor(color, propertyName) {
         if (!this.currentId) return;
 
-        console.log(`📝 NotePropertiesPanel: Selecting ${propertyName}:`, color);
 
         // Обновляем соответствующую кнопку
         if (propertyName === 'backgroundColor' && this.backgroundColorButton) {
@@ -497,7 +494,6 @@ export class NotePropertiesPanel {
     _changeFontSize(fontSize) {
         if (!this.currentId) return;
 
-        console.log('📝 NotePropertiesPanel: Changing font size to:', fontSize);
 
         // Отправляем событие изменения размера шрифта
         this.eventBus.emit(Events.Object.StateChanged, {
@@ -509,7 +505,6 @@ export class NotePropertiesPanel {
     _changeFontFamily(fontFamily) {
         if (!this.currentId) return;
 
-        console.log('📝 NotePropertiesPanel: Changing font family to:', fontFamily);
 
         this.eventBus.emit(Events.Object.StateChanged, {
             objectId: this.currentId,

@@ -103,15 +103,12 @@ export class PlacementTool extends BaseTool {
 
             // Обработка выбора файла
             this.eventBus.on(Events.Place.FileSelected, (fileData) => {
-                console.log('📁 PlacementTool: получен FileSelected:', fileData);
                 this.selectedFile = fileData;
                 this.selectedImage = null;
                 
                 // Если PlacementTool уже активен - показываем призрак сразу
                 if (this.world) {
                     this.showFileGhost();
-                } else {
-                    console.log('📁 PlacementTool: world не готов, призрак будет показан при активации');
                 }
             });
 
@@ -554,16 +551,7 @@ export class PlacementTool extends BaseTool {
      * Показать "призрак" файла
      */
     showFileGhost() {
-        console.log('📁 PlacementTool.showFileGhost:', {
-            hasSelectedFile: !!this.selectedFile,
-            hasWorld: !!this.world,
-            selectedFileData: this.selectedFile
-        });
-        
-        if (!this.selectedFile || !this.world) {
-            console.warn('⚠️ Не можем показать призрак файла - нет selectedFile или world');
-            return;
-        }
+        if (!this.selectedFile || !this.world) return;
         
         this.hideGhost(); // Сначала убираем старый призрак
         
@@ -639,13 +627,6 @@ export class PlacementTool extends BaseTool {
         this.ghostContainer.pivot.y = height / 2;
         
         this.world.addChild(this.ghostContainer);
-        
-        console.log('📁 Призрак файла создан и добавлен в world:', {
-            ghostContainerSize: { w: width, h: height },
-            ghostContainerAlpha: this.ghostContainer.alpha,
-            worldHasContainer: this.world.children.includes(this.ghostContainer),
-            ghostContainerChildren: this.ghostContainer.children.length
-        });
     }
 
     /**

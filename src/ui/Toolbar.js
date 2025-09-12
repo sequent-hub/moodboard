@@ -578,11 +578,9 @@ export class Toolbar {
     setActiveToolbarButton(toolName) {
         if (!this.element) return;
         
-        console.log('🎯 Toolbar: Установка активной кнопки для инструмента:', toolName, 'placeSelectedButtonId:', this.placeSelectedButtonId);
         
         // Сбрасываем активные классы
         this.element.querySelectorAll('.moodboard-toolbar__button--active').forEach(el => {
-            console.log('🔄 Deactivating button:', el.dataset.toolId);
             el.classList.remove('moodboard-toolbar__button--active');
         });
         
@@ -614,16 +612,13 @@ export class Toolbar {
         }
         
         if (!btnId) {
-            console.warn('⚠️ Toolbar: Не найден btnId для инструмента:', toolName);
             return;
         }
         
         const btn = this.element.querySelector(`.moodboard-toolbar__button--${btnId}`);
         if (btn) {
             btn.classList.add('moodboard-toolbar__button--active');
-            console.log('✅ Toolbar: Активирована кнопка:', btnId);
         } else {
-            console.warn('⚠️ Toolbar: Не найдена кнопка с селектором:', `.moodboard-toolbar__button--${btnId}`);
         }
     }
     
@@ -933,7 +928,6 @@ export class Toolbar {
             });
         } else {
             // Режим без bundler - используем статичный список
-            console.log('🎭 Toolbar: Режим без bundler, используем статичные эмоджи');
             groups = this.getFallbackEmojiGroups();
         }
 
@@ -1242,7 +1236,7 @@ export class Toolbar {
                 }
 
                 // Файл выбран - запускаем режим "призрака"
-                const fileSelectedData = {
+                this.eventBus.emit(Events.Place.FileSelected, {
                     file: file,
                     fileName: file.name,
                     fileSize: file.size,
@@ -1251,10 +1245,7 @@ export class Toolbar {
                         width: 120,
                         height: 140
                     }
-                };
-                
-                console.log('📁 Toolbar: эмитируем FileSelected:', fileSelectedData);
-                this.eventBus.emit(Events.Place.FileSelected, fileSelectedData);
+                });
 
                 // Активируем инструмент размещения
                 this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
@@ -1400,7 +1391,6 @@ export class Toolbar {
      * @param {string} iconName - имя иконки
      */
     async reloadToolbarIcon(iconName) {
-        console.log(`🔄 Начинаем обновление иконки ${iconName} в тулбаре...`);
         try {
             // Перезагружаем иконку
             const newSvgContent = await this.iconLoader.reloadIcon(iconName);
@@ -1417,9 +1407,7 @@ export class Toolbar {
                 
                 // Добавляем новый SVG
                 this.createSvgIcon(button, iconName);
-                console.log(`✅ Иконка ${iconName} обновлена в интерфейсе!`);
             } else {
-                console.warn(`⚠️ Кнопка с иконкой ${iconName} не найдена`);
             }
         } catch (error) {
             console.error(`❌ Ошибка обновления иконки ${iconName}:`, error);

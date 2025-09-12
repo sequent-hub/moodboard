@@ -1402,7 +1402,6 @@ export class CoreMoodBoard {
         this.eventBus.on(Events.Object.TransformUpdated, (data) => {
             // Обновляем ручки если объект выделен
             if (this.selectTool && this.selectTool.selection && this.selectTool.selection.has(data.objectId)) {
-                console.log(`🔄 Core: Объект ${data.objectId} изменен через команду, обновляем ручки SelectTool`);
                 this.selectTool.updateResizeHandles();
             }
         });
@@ -1567,7 +1566,6 @@ export class CoreMoodBoard {
                     
                     // Сохраняем изменения
                     this.state.markDirty();
-                    console.log(`✅ Состояние объекта ${objectId} обновлено`);
                 } else {
                     console.warn(`❌ Объект ${objectId} не найден в состоянии`);
                 }
@@ -1590,7 +1588,6 @@ export class CoreMoodBoard {
         this.eventBus.on('file:metadata:updated', (data) => {
             const { objectId, fileId, metadata } = data;
             if (objectId && metadata) {
-                console.log(`🔄 Обновляем метаданные файла ${objectId} с сервера:`, metadata);
                 
                 // Обновляем объект в состоянии
                 const objects = this.state.getObjects();
@@ -1619,7 +1616,6 @@ export class CoreMoodBoard {
                         
                         // Обновляем состояние
                         this.state.markDirty();
-                        console.log(`✅ Метаданные файла ${objectId} синхронизированы с сервером`);
                     }
                 }
             }
@@ -1848,7 +1844,6 @@ export class CoreMoodBoard {
             try {
                 const result = await this.cleanupUnusedImages();
                 if (result.deletedCount > 0) {
-                    console.log(`✅ Автоматически очищено ${result.deletedCount} неиспользуемых изображений`);
                 }
             } catch (error) {
                 // Не прерываем выполнение при ошибке cleanup
@@ -1923,7 +1918,6 @@ export class CoreMoodBoard {
         if (object) {
             object.rotation = angle;
             this.state.markDirty();
-            console.log(`🔄 Угол объекта ${objectId} обновлен: ${angle}°`);
         }
     }
 

@@ -73,7 +73,6 @@ export class FramePropertiesPanel {
         const pixi = this.core?.pixi?.objects?.get ? this.core.pixi.objects.get(id) : null;
         const isFrame = !!(pixi && pixi._mb && pixi._mb.type === 'frame');
         
-        console.log('🖼️ FramePropertiesPanel: updateFromSelection - id=', id, 'isFrame=', isFrame);
         
         if (isFrame) {
             this.showFor(id);
@@ -83,7 +82,6 @@ export class FramePropertiesPanel {
     }
 
     showFor(objectId) {
-        console.log('🖼️ FramePropertiesPanel: Showing panel for objectId:', objectId);
         this.currentId = objectId;
         if (this.panel) {
             this.panel.style.display = 'flex';
@@ -164,18 +162,10 @@ export class FramePropertiesPanel {
             panelY = y + height + 40;
         }
 
-        console.log('🖼️ FramePropertiesPanel: Positioning above frame:', {
-            frameX: x, frameY: y, frameWidth: width, frameHeight: height,
-            panelX, panelY
-        });
 
         this.panel.style.left = `${Math.round(panelX)}px`;
         this.panel.style.top = `${Math.round(panelY)}px`;
         
-        console.log('🖼️ FramePropertiesPanel: Panel CSS applied:', {
-            left: this.panel.style.left,
-            top: this.panel.style.top
-        });
     }
 
     _createFrameControls(panel) {
@@ -302,7 +292,6 @@ export class FramePropertiesPanel {
     _changeFrameTitle(newTitle) {
         if (!this.currentId) return;
 
-        console.log('🖼️ FramePropertiesPanel: Changing frame title to:', newTitle);
 
         // Обновляем свойства объекта
         this.eventBus.emit(Events.Object.StateChanged, {
@@ -455,7 +444,6 @@ export class FramePropertiesPanel {
     _selectColor(color) {
         if (!this.currentId) return;
 
-        console.log('🖼️ FramePropertiesPanel: Selecting color:', color);
 
         // Обновляем визуальное отображение кнопки
         this.colorButton.style.backgroundColor = color.hex;

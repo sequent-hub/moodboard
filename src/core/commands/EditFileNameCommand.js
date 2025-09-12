@@ -68,7 +68,6 @@ export class EditFileNameCommand extends BaseCommand {
             // Синхронизируем с сервером, если есть fileId
             if (objectData.fileId && this.coreMoodboard.fileUploadService) {
                 try {
-                    console.log('🔄 Синхронизируем название файла с сервером:', { fileId: objectData.fileId, fileName });
                     await this.coreMoodboard.fileUploadService.updateFileMetadata(objectData.fileId, { 
                         fileName: fileName 
                     });

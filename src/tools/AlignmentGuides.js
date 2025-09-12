@@ -36,13 +36,11 @@ export class AlignmentGuides {
         
         this._attachEvents();
         
-        console.log('AlignmentGuides: Инициализированы направляющие линии выравнивания');
     }
 
     _attachEvents() {
         // Одиночное перетаскивание
         this.eventBus.on(Events.Tool.DragStart, (data) => {
-            console.log('AlignmentGuides: Начало перетаскивания объекта:', data.object);
             this.isDragging = true;
             this.currentDragObject = data.object;
             this.currentDragObjects = [];
@@ -122,7 +120,6 @@ export class AlignmentGuides {
         
         // Отображаем найденные направляющие
         if (guides.length > 0) {
-            console.log('AlignmentGuides: Найдено направляющих:', guides.length);
             this._showGuides(guides);
         }
     }

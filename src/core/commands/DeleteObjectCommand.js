@@ -23,14 +23,6 @@ export class DeleteObjectCommand extends BaseCommand {
         
         // Для изображений убедимся, что есть src URL для восстановления
         if (this.objectData.type === 'image') {
-            console.log('🔧 DEBUG DeleteObjectCommand: исходные данные изображения:', {
-                id: this.objectData.id,
-                imageId: this.objectData.imageId,
-                src: this.objectData.src,
-                propertiesSrc: this.objectData.properties?.src,
-                hasBase64Src: !!(this.objectData.src && this.objectData.src.startsWith('data:')),
-                hasBase64Props: !!(this.objectData.properties?.src && this.objectData.properties.src.startsWith('data:'))
-            });
             
             if (this.objectData.imageId) {
                 const imageUrl = `/api/images/${this.objectData.imageId}/file`;
@@ -44,29 +36,16 @@ export class DeleteObjectCommand extends BaseCommand {
                 }
                 this.objectData.properties.src = imageUrl;
                 
-                console.log('🔧 DEBUG DeleteObjectCommand: обновленные данные изображения:', {
-                    id: this.objectData.id,
-                    imageId: this.objectData.imageId,
-                    src: this.objectData.src,
-                    propertiesSrc: this.objectData.properties?.src
-                });
             } else {
-                console.warn('🔧 DEBUG DeleteObjectCommand: у изображения нет imageId, оставляем как есть');
             }
         }
         
         // Для файлов сохраняем информацию для возможной очистки с сервера
         if (this.objectData.type === 'file') {
-            console.log('🔧 DEBUG DeleteObjectCommand: исходные данные файла:', {
-                id: this.objectData.id,
-                fileId: this.objectData.fileId,
-                fileName: this.objectData.properties?.fileName
-            });
             
             if (this.objectData.fileId) {
                 // Сохраняем fileId для удаления с сервера
                 this.fileIdToDelete = this.objectData.fileId;
-                console.log('🔧 DEBUG DeleteObjectCommand: файл будет удален с сервера:', this.fileIdToDelete);
             }
         }
         
@@ -97,25 +76,9 @@ export class DeleteObjectCommand extends BaseCommand {
     }
 
     undo() {
-        // DEBUG: Логируем состояние объекта при Undo
-        if (this.objectData.type === 'image') {
-            console.log('🔄 DEBUG Undo изображения:', {
-                id: this.objectData.id,
-                imageId: this.objectData.imageId,
-                src: this.objectData.src,
-                propertiesSrc: this.objectData.properties?.src,
-                hasBase64Src: !!(this.objectData.src && this.objectData.src.startsWith('data:')),
-                hasBase64Props: !!(this.objectData.properties?.src && this.objectData.properties.src.startsWith('data:'))
-            });
-        }
         
         // Специальная обработка для файловых объектов
         if (this.objectData.type === 'file' && this.fileIdToDelete) {
-            console.log('🔄 DEBUG Undo файла:', {
-                id: this.objectData.id,
-                fileId: this.objectData.fileId,
-                fileName: this.objectData.properties?.fileName
-            });
             
             // Файл был удален с сервера, создаем объект с предупреждением
             const restoredObjectData = { ...this.objectData };

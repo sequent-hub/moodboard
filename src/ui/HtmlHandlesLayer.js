@@ -61,7 +61,6 @@ export class HtmlHandlesLayer {
             if (this.core?.selectTool && data.objectId) {
                 const isSelected = this.core.selectTool.selectedObjects.has(data.objectId);
                 if (isSelected) {
-                    console.log(`🔄 HtmlHandlesLayer: Объект ${data.objectId} изменен через команду, обновляем рамку`);
                     this.update();
                 }
             }

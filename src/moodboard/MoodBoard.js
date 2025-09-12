@@ -124,7 +124,6 @@ export class MoodBoard {
             // Загружаем данные (сначала пробуем загрузить с сервера, потом дефолтные)
             await this.loadExistingBoard();
             
-            console.log('MoodBoard initialized');
         } catch (error) {
             console.error('MoodBoard init failed:', error);
             throw error;
@@ -353,8 +352,6 @@ export class MoodBoard {
             
         } catch (error) {
             console.warn('⚠️ Ошибка загрузки доски, создаем новую:', error.message);
-            console.debug('ApiClient доступен:', !!this.coreMoodboard.apiClient);
-            console.debug('Метод restoreObjectUrls доступен:', !!(this.coreMoodboard.apiClient && typeof this.coreMoodboard.apiClient.restoreObjectUrls === 'function'));
             // Если загрузка не удалась, используем дефолтные данные
             this.dataManager.loadData(this.data);
         }
@@ -438,6 +435,5 @@ export class MoodBoard {
         // Очищаем ссылку на контейнер
         this.container = null;
         
-        console.log('MoodBoard успешно уничтожен');
     }
 }

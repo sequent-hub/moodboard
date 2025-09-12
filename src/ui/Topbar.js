@@ -64,9 +64,6 @@ export class Topbar {
         this.element = document.createElement('div');
         this.element.className = `moodboard-topbar moodboard-topbar--${this.theme}`;
         
-        console.log('🔍 Topbar: создаю верхнюю панель');
-        console.log('🔍 Topbar: this.icons содержит:', this.icons);
-        console.log('🔍 Topbar: количество иконок:', Object.keys(this.icons).length);
         
         // Кнопки выбора вида сетки (без функциональности)
         const buttons = [
@@ -80,14 +77,11 @@ export class Topbar {
             const btn = document.createElement('button');
             btn.className = 'moodboard-topbar__button';
             
-            console.log(`🔍 Topbar: создаю кнопку для иконки "${cfg.icon}"`);
             
             // Создаем SVG иконку
             if (this.icons[cfg.icon]) {
-                console.log(`✅ Topbar: иконка "${cfg.icon}" найдена, создаю SVG`);
                 this.createSvgIcon(btn, cfg.icon);
             } else {
-                console.warn(`⚠️ Topbar: иконка "${cfg.icon}" не найдена, создаю fallback`);
                 // Fallback: создаем простую текстовую иконку
                 const fallbackIcon = document.createElement('span');
                 fallbackIcon.textContent = cfg.icon.charAt(0).toUpperCase();
@@ -111,14 +105,11 @@ export class Topbar {
         paintBtn.className = 'moodboard-topbar__button moodboard-topbar__button--paint';
         paintBtn.title = 'Палитра фона';
         
-        console.log('🔍 Topbar: создаю кнопку краски');
         
         // Создаем SVG иконку
         if (this.icons['paint']) {
-            console.log('✅ Topbar: иконка paint найдена, создаю SVG');
             this.createSvgIcon(paintBtn, 'paint');
         } else {
-            console.warn('⚠️ Topbar: иконка paint не найдена, создаю fallback');
             // Fallback: создаем простую текстовую иконку
             const fallbackIcon = document.createElement('span');
             fallbackIcon.textContent = '🎨';
@@ -144,11 +135,8 @@ export class Topbar {
      * Создает SVG иконку для кнопки
      */
     createSvgIcon(button, iconName) {
-        console.log(`🔍 Topbar: создаю SVG иконку "${iconName}"`);
-        console.log(`🔍 Topbar: доступные иконки:`, Object.keys(this.icons));
         
         if (this.icons[iconName]) {
-            console.log(`✅ Topbar: иконка "${iconName}" найдена, создаю SVG элемент`);
             // Создаем SVG элемент из загруженного содержимого
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = this.icons[iconName];
@@ -162,12 +150,9 @@ export class Topbar {
                 
                 // Добавляем SVG в кнопку
                 button.appendChild(svg);
-                console.log(`✅ Topbar: SVG иконка "${iconName}" успешно добавлена в кнопку`);
             } else {
-                console.warn(`⚠️ Topbar: не удалось найти SVG элемент в содержимом иконки "${iconName}"`);
             }
         } else {
-            console.warn(`⚠️ Topbar: иконка "${iconName}" не найдена в this.icons`);
         }
     }
 

@@ -96,7 +96,6 @@ export class ResizeHandles {
             this.container.y = objectCenterY;
             this.container.pivot.set(objectPivotX, objectPivotY);
             
-            console.log(`🔄 Поворот ручек: ${(this.targetObject.rotation * 180 / Math.PI).toFixed(1)}°, центр: (${objectCenterX}, ${objectCenterY}), pivot: (${objectPivotX}, ${objectPivotY})`);
             
             // Используем локальные границы для создания ручек
             this.workingBounds = {

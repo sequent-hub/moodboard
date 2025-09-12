@@ -681,7 +681,6 @@ export class TextPropertiesPanel {
     _changeFontFamily(fontFamily) {
         if (!this.currentId) return;
 
-        console.log('🔧 TextPropertiesPanel: Changing font family to:', fontFamily);
 
         // Обновляем свойства объекта через StateManager (в properties)
         this.eventBus.emit(Events.Object.StateChanged, {
@@ -698,7 +697,6 @@ export class TextPropertiesPanel {
     _changeFontSize(fontSize) {
         if (!this.currentId) return;
 
-        console.log('🔧 TextPropertiesPanel: Changing font size to:', fontSize);
 
         // Обновляем свойства объекта через StateManager
         this.eventBus.emit(Events.Object.StateChanged, {
@@ -715,7 +713,6 @@ export class TextPropertiesPanel {
     _changeTextColor(color) {
         if (!this.currentId) return;
 
-        console.log('🔧 TextPropertiesPanel: Changing text color to:', color);
 
         // Обновляем свойства объекта через StateManager
         this.eventBus.emit(Events.Object.StateChanged, {
@@ -732,7 +729,6 @@ export class TextPropertiesPanel {
     _changeBackgroundColor(backgroundColor) {
         if (!this.currentId) return;
 
-        console.log('🔧 TextPropertiesPanel: Changing background color to:', backgroundColor);
 
         // Обновляем свойства объекта через StateManager
         this.eventBus.emit(Events.Object.StateChanged, {

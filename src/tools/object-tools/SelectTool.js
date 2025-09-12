@@ -136,7 +136,6 @@ export class SelectTool extends BaseTool {
             this.eventBus.on(Events.Object.Deleted, (data) => {
                 const objectId = data?.objectId || data;
                 if (objectId && this.selection.has(objectId)) {
-                    console.log(`🗑️ SelectTool: Объект ${objectId} удален, убираем из выделения`);
                     this.removeFromSelection(objectId);
                     
                     // Если выделение стало пустым, скрываем ручки
@@ -164,7 +163,6 @@ export class SelectTool extends BaseTool {
      */
     activate(app) {
         super.activate();
-        console.log('🔧 SelectTool активирован, app:', !!app);
 		// Сохраняем ссылку на PIXI app для оверлеев (рамка выделения)
 		this.app = app;
         
@@ -224,7 +222,6 @@ export class SelectTool extends BaseTool {
         } else if (!app) {
             console.log('❌ PIXI app не передан в activate');
         } else {
-            console.log('ℹ️ ResizeHandles уже созданы');
         }
     }
 
@@ -272,7 +269,6 @@ export class SelectTool extends BaseTool {
         
         // Если активен текстовый редактор, закрываем его при клике вне
         if (this.textEditor.active) {
-            console.log('🔧 SelectTool: closing text editor on mouse down, objectType:', this.textEditor.objectType, 'objectId:', this.textEditor.objectId);
             if (this.textEditor.objectType === 'file') {
                 this._closeFileNameEditor(true);
             } else {
@@ -529,7 +525,6 @@ export class SelectTool extends BaseTool {
     onKeyDown(event) {
         // Проверяем, не активен ли текстовый редактор (редактирование названия файла или текста)
         if (this.textEditor && this.textEditor.active) {
-            console.log('🔒 SelectTool: Текстовый редактор активен, пропускаем обработку клавиш');
             return; // Не обрабатываем клавиши во время редактирования
         }
         
@@ -793,7 +788,6 @@ export class SelectTool extends BaseTool {
      * Начало изменения размера
      */
     startResize(handle, objectId) {
-        console.log(`🔧 Начинаем resize: ручка ${handle}, объект ${objectId}`);
         // Групповой resize
         if (objectId === this.groupId && this.selection.size() > 1) {
             this.isGroupResizing = true;
@@ -1263,7 +1257,6 @@ export class SelectTool extends BaseTool {
      */
     
         addToSelection(object) {
-        console.log(`➕ Добавляем в выделение: ${object}`);
         this.selection.add(object);
         this.emit(Events.Tool.SelectionAdd, { object });
         this.updateResizeHandles();
@@ -2061,13 +2054,11 @@ export class SelectTool extends BaseTool {
         // Завершение
         const isNewCreation = !!create;
         const finalize = (commit) => {
-            console.log('🔧 SelectTool: finalize called with commit:', commit, 'objectId:', objectId, 'objectType:', this.textEditor.objectType);
             const value = textarea.value.trim();
             const commitValue = commit && value.length > 0;
             
             // Сохраняем objectType ДО сброса this.textEditor
             const currentObjectType = this.textEditor.objectType;
-            console.log('🔧 SelectTool: finalize - saved objectType:', currentObjectType);
             
             // Показываем статичный текст только если не отменяем создание нового пустого
             if (objectId && (commitValue || !isNewCreation)) {
@@ -2140,11 +2131,9 @@ export class SelectTool extends BaseTool {
                 if (isNewCreation && objectId) {
                     this.eventBus.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
                 }
-                console.log('🔧 SelectTool: finalize - no commit, returning');
                 return;
             }
             if (objectId == null) {
-                console.log('🔧 SelectTool: finalize - creating new object');
                 // Создаем объект с правильным типом
                 const objectType = currentObjectType || 'text';
                 // Конвертируем размеры редактора (px) в мировые единицы
@@ -2163,7 +2152,6 @@ export class SelectTool extends BaseTool {
             } else {
                 // Обновление существующего: используем команду обновления содержимого
                 if (currentObjectType === 'note') {
-                    console.log('🔧 SelectTool: updating note content via UpdateObjectContent');
                     // Для записок обновляем содержимое через PixiEngine
                     this.eventBus.emit(Events.Tool.UpdateObjectContent, { 
                         objectId: objectId, 
@@ -2179,7 +2167,6 @@ export class SelectTool extends BaseTool {
                     });
                 } else {
                     // Для обычного текста тоже используем обновление содержимого
-                    console.log('🔧 SelectTool: finalize - updating text content via UpdateObjectContent');
                     this.eventBus.emit(Events.Tool.UpdateObjectContent, { 
                         objectId: objectId, 
                         content: value 
@@ -2429,7 +2416,6 @@ export class SelectTool extends BaseTool {
      * Закрывает редактор названия файла
      */
     _closeFileNameEditor(commit) {
-        console.log('🔧 SelectTool: _closeFileNameEditor called with commit:', commit);
         
         // Проверяем, что редактор существует и не закрыт
         if (!this.textEditor || !this.textEditor.textarea || this.textEditor.closing) {
@@ -2444,7 +2430,6 @@ export class SelectTool extends BaseTool {
         const commitValue = commit && value.length > 0;
         const objectId = this.textEditor.objectId;
         
-        console.log('🔧 SelectTool: _closeFileNameEditor - objectId:', objectId, 'commitValue:', commitValue, 'newName:', value);
         
         // Убираем wrapper из DOM
         if (this.textEditor.wrapper && this.textEditor.wrapper.parentNode) {
@@ -2464,7 +2449,6 @@ export class SelectTool extends BaseTool {
                 
                 // Применяем изменения если нужно
                 if (commitValue && value !== this.textEditor.properties.fileName) {
-                    console.log('🔧 Применяем новое название файла:', value);
                     
                     // Создаем команду изменения названия файла
                     const oldName = this.textEditor.properties.fileName || 'Untitled';
@@ -2492,7 +2476,6 @@ export class SelectTool extends BaseTool {
     }
 
     _closeTextEditor(commit) {
-        console.log('🔧 SelectTool: _closeTextEditor called with commit:', commit);
         const textarea = this.textEditor.textarea;
         if (!textarea) return;
         const value = textarea.value.trim();
@@ -2502,7 +2485,6 @@ export class SelectTool extends BaseTool {
         const position = this.textEditor.position;
         const properties = this.textEditor.properties;
         
-        console.log('🔧 SelectTool: _closeTextEditor - objectType:', objectType, 'objectId:', objectId, 'commitValue:', commitValue);
         
         // Показываем статичный текст после завершения редактирования для всех типов объектов
         if (objectId) {
@@ -2524,7 +2506,6 @@ export class SelectTool extends BaseTool {
         if (!commitValue) return;
         if (objectId == null) {
             // Создаём новый объект через ToolbarAction
-            console.log('🔧 SelectTool: creating new object via ToolbarAction, type:', objectType);
             this.eventBus.emit(Events.UI.ToolbarAction, {
                 type: objectType,
                 id: objectType,

@@ -38,10 +38,6 @@ export class ResizeObjectCommand extends BaseCommand {
         
 
         
-        // Отладка ресайза
-        if (position && object) {
-            console.log(`🔧 Ресайз объекта ${this.objectId}: newSize(${size.width}, ${size.height}), newPosition(${position.x}, ${position.y})`);
-        }
         
         // Обновляем размер в PIXI с указанием типа
         this.coreMoodboard.pixi.updateObjectSize(this.objectId, size, objectType);
@@ -57,14 +53,7 @@ export class ResizeObjectCommand extends BaseCommand {
                 pixiObject.y = position.y + halfH;
                 object.position.x = position.x;
                 object.position.y = position.y;
-                console.log(`🎯 После ресайза: center(${pixiObject.x}, ${pixiObject.y}), leftTop(${position.x}, ${position.y})`);
                 
-                // Проверим, где находятся границы объекта
-                const leftEdge = pixiObject.x - size.width / 2;
-                const rightEdge = pixiObject.x + size.width / 2;
-                const topEdge = pixiObject.y - size.height / 2;
-                const bottomEdge = pixiObject.y + size.height / 2;
-                console.log(`📏 Границы объекта: left=${leftEdge}, right=${rightEdge}, top=${topEdge}, bottom=${bottomEdge}`);
 
             }
         }
@@ -103,7 +92,6 @@ export class ResizeObjectCommand extends BaseCommand {
         
         // Если этот объект выделен, обновляем ручки
         if (activeTool.selectedObjects && activeTool.selectedObjects.has(this.objectId)) {
-            console.log(`🔄 Обновляем ручки для объекта ${this.objectId} после Undo/Redo`);
             activeTool.updateResizeHandles();
         }
     }

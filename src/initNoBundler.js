@@ -13,7 +13,6 @@ import { EmojiLoaderNoBundler } from './utils/emojiLoaderNoBundler.js';
  * @returns {Promise<MoodBoard>} готовый экземпляр MoodBoard
  */
 export async function initMoodBoardNoBundler(container, options = {}, basePath = '') {
-    console.log('🚀 Инициализация MoodBoard без bundler...');
     
     // 1. Загружаем стили
     const styleLoader = new StyleLoader();
@@ -38,7 +37,6 @@ export async function initMoodBoardNoBundler(container, options = {}, basePath =
     // 5. Создаем MoodBoard
     const moodboard = new MoodBoard(container, enhancedOptions);
     
-    console.log('✅ MoodBoard инициализирован без bundler');
     
     return moodboard;
 }

@@ -74,7 +74,6 @@ const _localEmojiModules = (() => {
     try {
       return import.meta.glob('../assets/emodji/**/*.{svg,SVG,png,PNG}', { eager: true, query: '?url', import: 'default' });
     } catch (error) {
-      console.warn('⚠️ import.meta.glob failed, using fallback for emoji resolution');
       return {};
     }
   }
@@ -161,7 +160,6 @@ export function resolveEmojiAbsoluteUrl(emoji, basePath = null) {
         return `${resolvedBasePath}Смайлики/${base}.png`; // Большинство эмоджи в папке Смайлики
         
     } catch (error) {
-        console.warn('⚠️ Ошибка resolveEmojiAbsoluteUrl:', error);
         return null;
     }
 }

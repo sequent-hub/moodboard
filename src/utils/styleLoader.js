@@ -19,18 +19,15 @@ export class StyleLoader {
             'src/ui/styles/panels.css'
         ];
 
-        console.log('🎨 StyleLoader: Загружаем стили MoodBoard...');
 
         for (const stylePath of styles) {
             try {
                 await this.loadStyle(basePath + stylePath);
-                console.log(`✅ Стиль загружен: ${stylePath}`);
             } catch (error) {
                 console.warn(`⚠️ Ошибка загрузки стиля ${stylePath}:`, error);
             }
         }
 
-        console.log('🎨 StyleLoader: Все стили загружены');
     }
 
     /**
