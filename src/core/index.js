@@ -551,7 +551,8 @@ export class CoreMoodBoard {
 
         // События перетаскивания
         this.eventBus.on(Events.Tool.DragStart, (data) => {
-            // Сохраняем начальную позицию как левый-верх, переводя центр PIXI в state-координаты
+            // Сохраняем начальную позицию как левый-верх 
+            // Все объекты используют pivot по центру, поэтому логика одинакова
             const pixiObject = this.pixi.objects.get(data.object);
             if (pixiObject) {
                 const halfW = (pixiObject.width || 0) / 2;
@@ -713,7 +714,9 @@ export class CoreMoodBoard {
             if (this.dragStartPosition) {
                 const pixiObject = this.pixi.objects.get(data.object);
                 if (pixiObject) {
-                    const finalPosition = { x: pixiObject.x - (pixiObject.width||0)/2, y: pixiObject.y - (pixiObject.height||0)/2 };
+                    // Берем финальную позицию из state, который обновлялся во время drag:update
+                    const objState = this.state.state.objects.find(o => o.id === data.object);
+                    const finalPosition = objState && objState.position ? { x: objState.position.x, y: objState.position.y } : { x: 0, y: 0 };
                     
                     // Создаем команду только если позиция действительно изменилась
                     if (this.dragStartPosition.x !== finalPosition.x || 
@@ -1395,7 +1398,6 @@ export class CoreMoodBoard {
 
         // Обновляем ручки когда объект изменяется через команды (Undo/Redo)
         this.eventBus.on(Events.Object.TransformUpdated, (data) => {
-            console.log(`🔄 Объект ${data.objectId} был изменен через команду, обновляем ручки`);
             // Обновляем ручки если объект выделен
             if (this.selectTool && this.selectTool.selectedObjects.has(data.objectId)) {
                 this.selectTool.updateResizeHandles();
@@ -1409,37 +1411,21 @@ export class CoreMoodBoard {
         });
 
         // Получение позиции объекта (левый-верх логических координат)
-        // Используем размеры из state для согласованности с HtmlHandlesLayer
+        // Используем размеры PIXI для согласованности с updateObjectPositionDirect
         this.eventBus.on(Events.Tool.GetObjectPosition, (data) => {
             const pixiObject = this.pixi.objects.get(data.objectId);
             if (!pixiObject) return;
-            let widthFromState = 0;
-            let heightFromState = 0;
-            try {
-                const objects = this.state?.getObjects ? this.state.getObjects() : [];
-                const obj = Array.isArray(objects) ? objects.find(o => o.id === data.objectId) : null;
-                if (obj && typeof obj.width === 'number' && typeof obj.height === 'number') {
-                    widthFromState = obj.width;
-                    heightFromState = obj.height;
-                }
-            } catch (_) {}
-            const halfW = (widthFromState > 0 ? widthFromState : (pixiObject.width || 0)) / 2;
-            const halfH = (heightFromState > 0 ? heightFromState : (pixiObject.height || 0)) / 2;
+            
+            // Всегда используем размеры из PIXI для согласованности
+            const halfW = (pixiObject.width || 0) / 2;
+            const halfH = (pixiObject.height || 0) / 2;
             data.position = { x: pixiObject.x - halfW, y: pixiObject.y - halfH };
         });
 
         // Получение PIXI объекта
         this.eventBus.on(Events.Tool.GetObjectPixi, (data) => {
-            console.log(`🔍 Запрос PIXI объекта для ${data.objectId}`);
-            console.log('📋 Доступные PIXI объекты:', Array.from(this.pixi.objects.keys()));
-            
             const pixiObject = this.pixi.objects.get(data.objectId);
-            if (pixiObject) {
-                console.log(`✅ PIXI объект найден для ${data.objectId}`);
-                data.pixiObject = pixiObject;
-            } else {
-                console.log(`❌ PIXI объект НЕ найден для ${data.objectId}`);
-            }
+            data.pixiObject = pixiObject || null;
         });
 
         // Получение списка всех объектов (с их PIXI и логическими границами)
@@ -1906,7 +1892,8 @@ export class CoreMoodBoard {
      * Используется во время перетаскивания для плавного движения
      */
     updateObjectPositionDirect(objectId, position) {
-        // position — левый верх (state); приводим к центру в PIXI
+        // position — левый верх (state); приводим к центру в PIXI, используя размеры PIXI объекта
+        // Все объекты используют pivot по центру, поэтому логика одинакова для всех
         const pixiObject = this.pixi.objects.get(objectId);
         if (pixiObject) {
             const halfW = (pixiObject.width || 0) / 2;

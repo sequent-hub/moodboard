@@ -400,11 +400,13 @@ export class HtmlHandlesLayer {
         const startMouse = { x: e.clientX, y: e.clientY };
         // Определяем тип объекта (нужно, чтобы для текста автоподгонять высоту)
         let isTextTarget = false;
+        let isNoteTarget = false;
         {
             const req = { objectId: id, pixiObject: null };
             this.eventBus.emit(Events.Tool.GetObjectPixi, req);
             const mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
             isTextTarget = (mbType === 'text' || mbType === 'simple-text');
+            isNoteTarget = (mbType === 'note');
         }
 
         const onMove = (ev) => {
@@ -427,6 +429,16 @@ export class HtmlHandlesLayer {
             if (dir.includes('n')) { 
                 newH = Math.max(1, startCSS.height - dy); 
                 newTop = startCSS.top + dy; 
+            }
+
+            // Для записки удерживаем квадрат и компенсируем позицию в зависимости от ручки
+            if (isNoteTarget) {
+                const s = Math.max(newW, newH);
+                // базовая фиксация размера
+                newW = s; newH = s;
+                // корректируем привязку противоположной стороны
+                if (dir.includes('w')) { newLeft = startCSS.left + (startCSS.width - s); }
+                if (dir.includes('n')) { newTop = startCSS.top + (startCSS.height - s); }
             }
 
             // Минимальная ширина = ширина трёх символов текущего шрифта
@@ -664,11 +676,13 @@ export class HtmlHandlesLayer {
         const startMouse = { x: e.clientX, y: e.clientY };
         // Определяем тип объекта: для текста будем автоподгонять высоту при изменении ширины
         let isTextTarget = false;
+        let isNoteTarget = false;
         {
             const req = { objectId: id, pixiObject: null };
             this.eventBus.emit(Events.Tool.GetObjectPixi, req);
             const mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
             isTextTarget = (mbType === 'text' || mbType === 'simple-text');
+            isNoteTarget = (mbType === 'note');
         }
         const onMove = (ev) => {
             const dxCSS = ev.clientX - startMouse.x;
@@ -687,6 +701,31 @@ export class HtmlHandlesLayer {
             if (edge === 'top') { 
                 newH = Math.max(1, startCSS.height - dyCSS); 
                 newTop = startCSS.top + dyCSS; 
+            }
+
+            // Для записки удерживаем квадрат и компенсируем противоположные стороны
+            if (isNoteTarget) {
+                const s = Math.max(newW, newH);
+                switch (edge) {
+                    case 'right':
+                        newW = s; newH = s;
+                        newTop = startCSS.top + Math.round((startCSS.height - s) / 2);
+                        break;
+                    case 'left':
+                        newW = s; newH = s;
+                        newLeft = startCSS.left + (startCSS.width - s);
+                        newTop = startCSS.top + Math.round((startCSS.height - s) / 2);
+                        break;
+                    case 'bottom':
+                        newW = s; newH = s;
+                        newLeft = startCSS.left + Math.round((startCSS.width - s) / 2);
+                        break;
+                    case 'top':
+                        newW = s; newH = s;
+                        newTop = startCSS.top + (startCSS.height - s);
+                        newLeft = startCSS.left + Math.round((startCSS.width - s) / 2);
+                        break;
+                }
             }
 
             // Минимальная ширина = ширина трёх символов текущего шрифта

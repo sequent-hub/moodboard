@@ -29,29 +29,9 @@ export class MoveObjectCommand extends BaseCommand {
     }
 
     _setPosition(position) {
-        // Обновляем позицию в PIXI (x/y — центр), position — левый-верх
-        const pixiObject = this.coreMoodboard.pixi.objects.get(this.objectId);
-        if (pixiObject) {
-            const halfW = (pixiObject.width || 0) / 2;
-            const halfH = (pixiObject.height || 0) / 2;
-            pixiObject.x = position.x + halfW;
-            pixiObject.y = position.y + halfH;
-        }
-        
-        // Обновляем позицию в состоянии (левый-верх; без эмита события)
-        const objects = this.coreMoodboard.state.state.objects;
-        const object = objects.find(obj => obj.id === this.objectId);
-        if (object) {
-            object.position = { ...position };
-            
-            // Помечаем, что координаты уже скомпенсированы для pivot
-            if (!object.transform) {
-                object.transform = {};
-            }
-            object.transform.pivotCompensated = true;
-            
-            this.coreMoodboard.state.markDirty();
-        }
+        // Используем готовую функцию из ядра - она правильно обрабатывает все типы объектов
+        // position уже является координатами левого-верхнего угла
+        this.coreMoodboard.updateObjectPositionDirect(this.objectId, position);
         
         // Уведомляем о том, что объект был изменен (для обновления ручек)
         if (this.eventBus) {
@@ -81,7 +61,7 @@ export class MoveObjectCommand extends BaseCommand {
         
         // Обновляем конечную позицию
         this.newPosition = { ...otherCommand.newPosition };
-        this.description = `Переместить объект (${Math.round(this.oldPosition.x)}, ${Math.round(this.oldPosition.y)}) → (${Math.round(this.newPosition.x)}, ${Math.round(this.newPosition.y)})`;
+        this.description = `Переместить объект (${Math.round(this.oldPosition.x)}, ${Math.round(this.newPosition.y)}) → (${Math.round(this.newPosition.x)}, ${Math.round(this.newPosition.y)})`;
         this.timestamp = otherCommand.timestamp; // Обновляем время последнего изменения
         
 

@@ -51,6 +51,7 @@ export class FrameObject {
         
         this._draw(this.width, this.height, this.fillColor);
         // Центрируем pivot контейнера, чтобы совпадали рамка и ручки
+        // pivot по центру, чтобы позиция (x,y) контейнера соответствовала центру видимой области фрейма
         this.container.pivot.set(this.width / 2, this.height / 2);
     }
 
