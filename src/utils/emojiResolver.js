@@ -67,13 +67,19 @@ export function emojiToLocalUrl(emoji) {
     }
 }
 
-// Карта локальных изображений (SVG и PNG) из src/assets/emodji (собирается Vite'ом)
-// Ключи вида '../assets/emodji/1f600.svg' / '../assets/emodji/1f600.png' → URL
-const _localEmojiModules = import.meta && typeof import.meta.glob === 'function'
-  ? {
-      ...import.meta.glob('../assets/emodji/**/*.{svg,SVG,png,PNG}', { eager: true, query: '?url', import: 'default' })
+// Карта локальных изображений (SVG и PNG) из src/assets/emodji
+// В режиме с bundler используем import.meta.glob, иначе fallback
+const _localEmojiModules = (() => {
+  if (typeof import.meta !== 'undefined' && import.meta.glob) {
+    try {
+      return import.meta.glob('../assets/emodji/**/*.{svg,SVG,png,PNG}', { eager: true, query: '?url', import: 'default' });
+    } catch (error) {
+      console.warn('⚠️ import.meta.glob failed, using fallback for emoji resolution');
+      return {};
     }
-  : {};
+  }
+  return {};
+})();
 
 // Индекс по имени файла (без пути)
 const _localEmojiIndex = (() => {
@@ -116,6 +122,47 @@ export function buildLocalPaths(emoji) {
         ];
     } catch (_) {
         return [];
+    }
+}
+
+/**
+ * Возвращает абсолютный URL для эмоджи с учетом базового пути
+ * @param {string} emoji - эмоджи символ
+ * @param {string} basePath - базовый путь к ассетам
+ * @returns {string|null} абсолютный URL или null
+ */
+export function resolveEmojiAbsoluteUrl(emoji, basePath = null) {
+    try {
+        const base = emojiFilenameBase(emoji);
+        if (!base) return null;
+        
+        // Определяем базовый путь
+        let resolvedBasePath = basePath;
+        
+        if (!resolvedBasePath) {
+            // Пытаемся определить от import.meta.url
+            try {
+                resolvedBasePath = new URL('../assets/emodji/', import.meta.url).href;
+            } catch (error) {
+                // Fallback на глобальную настройку
+                if (window.MOODBOARD_BASE_PATH) {
+                    const globalPath = window.MOODBOARD_BASE_PATH.endsWith('/') ? window.MOODBOARD_BASE_PATH : window.MOODBOARD_BASE_PATH + '/';
+                    resolvedBasePath = `${globalPath}src/assets/emodji/`;
+                } else {
+                    resolvedBasePath = '/src/assets/emodji/';
+                }
+            }
+        }
+        
+        // Формируем URL (приоритет PNG, потом SVG)
+        if (!resolvedBasePath.endsWith('/')) resolvedBasePath += '/';
+        
+        // Возвращаем URL в формате готовом для использования
+        return `${resolvedBasePath}Смайлики/${base}.png`; // Большинство эмоджи в папке Смайлики
+        
+    } catch (error) {
+        console.warn('⚠️ Ошибка resolveEmojiAbsoluteUrl:', error);
+        return null;
     }
 }
 

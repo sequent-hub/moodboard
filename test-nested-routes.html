@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест MoodBoard на вложенных роутах</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        .test-info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 10000;
+            max-width: 300px;
+            font-size: 12px;
+        }
+        .path-info {
+            margin: 5px 0;
+            font-family: monospace;
+            background: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        #moodboard-container { 
+            width: 100vw; 
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-info">
+        <strong>Тест вложенных роутов</strong><br>
+        Текущий URL: <div class="path-info" id="current-url"></div>
+        Базовый путь эмоджи: <div class="path-info" id="emoji-base-path"></div>
+        Статус: <span id="status">Загрузка...</span>
+    </div>
+
+    <div id="moodboard-container"></div>
+
+    <script type="module">
+        // Отображаем текущий URL
+        document.getElementById('current-url').textContent = location.href;
+        
+        try {
+            import { 
+                quickInitMoodBoard, 
+                injectCriticalStyles 
+            } from './src/index.js';
+            
+            injectCriticalStyles();
+            
+            const moodboard = quickInitMoodBoard('#moodboard-container', {
+                theme: 'light',
+                autoSave: false
+            });
+            
+            // Показываем базовый путь эмоджи
+            setTimeout(() => {
+                try {
+                    const toolbar = moodboard.toolbar;
+                    if (toolbar && toolbar.getEmojiBasePath) {
+                        const basePath = toolbar.getEmojiBasePath();
+                        document.getElementById('emoji-base-path').textContent = basePath;
+                        
+                        // Тестируем загрузку одного эмоджи
+                        const testEmojiUrl = basePath + 'Смайлики/1f600.png';
+                        const img = new Image();
+                        img.onload = () => {
+                            document.getElementById('status').textContent = '✅ Работает! Эмоджи загружаются';
+                            document.getElementById('status').style.color = 'green';
+                        };
+                        img.onerror = () => {
+                            document.getElementById('status').textContent = '❌ Ошибка! Эмоджи не загружаются';
+                            document.getElementById('status').style.color = 'red';
+                            console.error('❌ Тестовый эмоджи не загрузился:', testEmojiUrl);
+                        };
+                        img.src = testEmojiUrl;
+                    }
+                } catch (e) {
+                    document.getElementById('status').textContent = '⚠️ Ошибка тестирования';
+                    console.error('Ошибка тестирования:', e);
+                }
+            }, 2000);
+            
+        } catch (error) {
+            console.error('❌ Критическая ошибка:', error);
+            document.getElementById('status').textContent = '❌ Ошибка инициализации';
+            document.getElementById('status').style.color = 'red';
+        }
+    </script>
+
+    <!-- Инструкция по тестированию -->
+    <script>
+        console.log('📝 ИНСТРУКЦИЯ ПО ТЕСТИРОВАНИЮ:');
+        console.log('1. Откройте этот файл прямо: http://localhost/test-nested-routes.html');
+        console.log('2. Затем на вложенном роуте: http://localhost/boards/123/test-nested-routes.html');
+        console.log('3. Проверьте, что эмоджи работают в обоих случаях');
+        console.log('4. В правом верхнем углу должен быть статус "✅ Работает!"');
+    </script>
+</body>
+</html>

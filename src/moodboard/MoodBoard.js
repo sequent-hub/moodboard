@@ -159,7 +159,10 @@ export class MoodBoard {
         this.toolbar = new Toolbar(
             this.toolbarContainer, 
             this.coreMoodboard.eventBus,
-            this.options.theme
+            this.options.theme,
+            {
+                emojiBasePath: this.options.emojiBasePath || null
+            }
         );
         
         // Добавляем функцию для отладки иконок в window

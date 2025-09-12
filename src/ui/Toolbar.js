@@ -5,10 +5,13 @@ import { Events } from '../core/events/Events.js';
 import { IconLoader } from '../utils/iconLoader.js';
 
 export class Toolbar {
-    constructor(container, eventBus, theme = 'light') {
+    constructor(container, eventBus, theme = 'light', options = {}) {
         this.container = container;
         this.eventBus = eventBus;
         this.theme = theme;
+        
+        // Базовый путь для ассетов (эмоджи и другие ресурсы)
+        this.emojiBasePath = options.emojiBasePath || null;
         
         // Инициализируем IconLoader
         this.iconLoader = new IconLoader();
@@ -1079,22 +1082,43 @@ export class Toolbar {
      * Определяет базовый путь для эмоджи в зависимости от режима
      */
     getEmojiBasePath() {
-        // Проверяем, есть ли глобальная настройка базового пути
+        // 1. Приоритет: опция basePath из конструктора
+        if (this.emojiBasePath) {
+            return this.emojiBasePath.endsWith('/') ? this.emojiBasePath : this.emojiBasePath + '/';
+        }
+
+        // 2. Глобальная настройка (абсолютный URL)
         if (window.MOODBOARD_BASE_PATH) {
-            return `${window.MOODBOARD_BASE_PATH}src/assets/emodji/`;
+            const basePath = window.MOODBOARD_BASE_PATH.endsWith('/') ? window.MOODBOARD_BASE_PATH : window.MOODBOARD_BASE_PATH + '/';
+            return `${basePath}src/assets/emodji/`;
         }
         
-        // Попытка определить автоматически
-        const scripts = document.querySelectorAll('script[src]');
-        for (const script of scripts) {
-            if (script.src.includes('moodboard') || script.src.includes('node_modules')) {
-                const baseUrl = new URL(script.src).origin;
-                return `${baseUrl}/node_modules/moodboard-futurello/src/assets/emodji/`;
+        // 3. Вычисление от URL текущего модуля (import.meta.url)
+        try {
+            // Используем import.meta.url для получения абсолютного пути к ассетам
+            const currentModuleUrl = import.meta.url;
+            // От текущего модуля (ui/Toolbar.js) поднимаемся к корню пакета и идем к assets
+            const emojiUrl = new URL('../assets/emodji/', currentModuleUrl).href;
+            return emojiUrl;
+        } catch (error) {
+            console.warn('⚠️ Не удалось определить путь через import.meta.url:', error);
+        }
+        
+        // 4. Fallback: поиск script тега для определения базового URL
+        try {
+            const currentScript = document.currentScript;
+            if (currentScript && currentScript.src) {
+                // Пытаемся определить от текущего скрипта
+                const scriptUrl = new URL(currentScript.src);
+                const baseUrl = new URL('../assets/emodji/', scriptUrl).href;
+                return baseUrl;
             }
+        } catch (error) {
+            console.warn('⚠️ Не удалось определить путь через currentScript:', error);
         }
         
-        // Fallback: относительный путь
-        return './src/assets/emodji/';
+        // 5. Последний fallback: абсолютный путь от корня домена
+        return '/src/assets/emodji/';
     }
 
     toggleEmojiPopup(anchorButton) {

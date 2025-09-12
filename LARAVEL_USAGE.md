@@ -56,13 +56,12 @@ npm install moodboard-futurello
 <script type="module">
     import { quickInitMoodBoard } from './node_modules/moodboard-futurello/src/index.js';
     
-    // Базовый путь (важно!)
-    window.MOODBOARD_BASE_PATH = './node_modules/moodboard-futurello/';
-    
-    // Быстрая инициализация с автозагрузкой стилей
+    // Быстрая инициализация - пути определяются автоматически через import.meta.url
     const moodboard = quickInitMoodBoard('#moodboard-container', {
-        theme: 'light'
-    }, './node_modules/moodboard-futurello/');
+        theme: 'light',
+        // Опциональный базовый путь для ассетов (если автоопределение не работает)
+        emojiBasePath: new URL('./node_modules/moodboard-futurello/src/assets/emodji/', location.href).href
+    });
     
     console.log('🚀 MoodBoard запущен!');
 </script>
@@ -93,16 +92,15 @@ const moodboard = new MoodBoard('#container', { noBundler: true });
 <div id="moodboard-app" style="width: 100%; height: calc(100vh - 100px);"></div>
 
 <script type="module">
-    // Устанавливаем базовый путь относительно Laravel public
-    window.MOODBOARD_BASE_PATH = '{{ asset('node_modules/moodboard-futurello') }}/';
-    
     import { quickInitMoodBoard } from '{{ asset('node_modules/moodboard-futurello/src/index.js') }}';
     
     const moodboard = quickInitMoodBoard('#moodboard-app', {
         theme: 'light',
         autoSave: true,
-        apiEndpoint: '{{ route('moodboard.api') }}' // Ваш API endpoint
-    }, '{{ asset('node_modules/moodboard-futurello') }}/');
+        apiEndpoint: '{{ route('moodboard.api') }}', // Ваш API endpoint
+        // Явно указываем путь к ассетам для Laravel
+        emojiBasePath: '{{ asset('node_modules/moodboard-futurello/src/assets/emodji') }}/'
+    });
 </script>
 @endsection
 ```

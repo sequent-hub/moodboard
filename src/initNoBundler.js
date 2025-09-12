@@ -31,6 +31,7 @@ export async function initMoodBoardNoBundler(container, options = {}, basePath =
         ...options,
         emojiLoader: emojiLoader,
         emojiGroups: emojiGroups,
+        emojiBasePath: basePath ? `${basePath}src/assets/emodji/` : null,
         noBundler: true
     };
     
@@ -138,7 +139,8 @@ export function quickInitMoodBoard(container, options = {}, basePath = '') {
     const moodboard = new MoodBoard(container, {
         ...options,
         noBundler: true,
-        skipEmojiLoader: true // Пропускаем автозагрузку эмоджи
+        skipEmojiLoader: true, // Пропускаем автозагрузку эмоджи
+        emojiBasePath: basePath ? `${basePath}src/assets/emodji/` : null
     });
     
     return moodboard;
