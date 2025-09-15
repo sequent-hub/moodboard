@@ -74,6 +74,8 @@ export class ZoomPanel {
 
         document.addEventListener('mousedown', (e) => {
             if (!this.menuEl) return;
+            // ИСПРАВЛЕНИЕ: Защита от null элементов
+            if (!this.element || !e.target) return;
             if (this.element.contains(e.target)) return;
             this.hideMenu();
         });

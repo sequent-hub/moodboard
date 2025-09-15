@@ -37,8 +37,9 @@ export class HtmlHandlesLayer {
         this.eventBus.on(Events.Tool.DragUpdate, () => this.update());
         
         // ИСПРАВЛЕНИЕ: Обработка удаления объектов
-        this.eventBus.on(Events.Object.Deleted, ({ objectId }) => {
-            console.log('🗑️ HtmlHandlesLayer: объект удален, принудительно очищаем ручки:', objectId);
+        this.eventBus.on(Events.Object.Deleted, (data) => {
+            const objectId = data?.objectId || data;
+            console.log('🗑️ HtmlHandlesLayer: получено событие удаления:', data, 'objectId:', objectId);
             
             // Принудительно скрываем и очищаем все ручки
             this.hide();

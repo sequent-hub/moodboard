@@ -448,14 +448,16 @@ export class NotePropertiesPanel {
         let shouldClose = true;
         
         for (let palette of palettes) {
-            if (palette && palette.contains(e.target)) {
+            // ИСПРАВЛЕНИЕ: Защита от null элементов
+            if (palette && e.target && palette.contains(e.target)) {
                 shouldClose = false;
                 break;
             }
         }
         
         for (let button of buttons) {
-            if (button && button.contains(e.target)) {
+            // ИСПРАВЛЕНИЕ: Защита от null элементов
+            if (button && e.target && button.contains(e.target)) {
                 shouldClose = false;
                 break;
             }

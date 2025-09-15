@@ -555,7 +555,10 @@ export class Toolbar {
 
         // Клик вне попапов — закрыть
         document.addEventListener('click', (e) => {
-            const isInsideToolbar = this.element.contains(e.target);
+            // ИСПРАВЛЕНИЕ: Защита от null элементов
+            if (!e.target) return;
+            
+            const isInsideToolbar = this.element && this.element.contains(e.target);
             const isInsideShapesPopup = this.shapesPopupEl && this.shapesPopupEl.contains(e.target);
             const isInsideDrawPopup = this.drawPopupEl && this.drawPopupEl.contains(e.target);
             const isInsideEmojiPopup = this.emojiPopupEl && this.emojiPopupEl.contains(e.target);

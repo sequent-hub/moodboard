@@ -135,9 +135,15 @@ export class SelectTool extends BaseTool {
             // Обработка удаления объектов (undo создания, delete команды и т.д.)
             this.eventBus.on(Events.Object.Deleted, (data) => {
                 const objectId = data?.objectId || data;
-                console.log('🗑️ SelectTool: получено событие удаления объекта:', objectId);
+                console.log('🗑️ SelectTool: получено событие удаления объекта:', objectId, 'данные:', data);
                 
-                if (objectId && this.selection.has(objectId)) {
+                // ЗАЩИТА: Проверяем что данные валидны
+                if (!objectId) {
+                    console.warn('⚠️ SelectTool: получено событие удаления с невалидным objectId');
+                    return;
+                }
+                
+                if (this.selection.has(objectId)) {
                     console.log('🗑️ SelectTool: удаляем объект из selection:', objectId);
                     this.removeFromSelection(objectId);
                     
@@ -147,10 +153,9 @@ export class SelectTool extends BaseTool {
                         this.emit(Events.Tool.SelectionClear);
                         this.updateResizeHandles();
                     }
-                } else if (objectId) {
-                    console.log('🗑️ SelectTool: объект не был в selection, но проверяем ручки');
-                    // Дополнительная проверка - возможно объект был удален не через selection
-                    // Принудительно обновляем ручки
+                } else {
+                    console.log('🗑️ SelectTool: объект не был в selection, обновляем ручки на всякий случай');
+                    // Принудительно обновляем ручки без излишних действий
                     this.updateResizeHandles();
                 }
             });

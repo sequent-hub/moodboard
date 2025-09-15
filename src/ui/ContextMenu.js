@@ -51,7 +51,8 @@ export class ContextMenu {
         // Скрывать при клике вне меню или по Esc
         document.addEventListener('mousedown', (e) => {
             if (!this.isVisible) return;
-            if (!this.element.contains(e.target)) {
+            // ИСПРАВЛЕНИЕ: Защита от null элементов
+            if (this.element && e.target && !this.element.contains(e.target)) {
                 this.hide();
             }
         });

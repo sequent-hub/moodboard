@@ -435,7 +435,8 @@ export class FramePropertiesPanel {
     }
 
     _documentClickHandler(e) {
-        if (this.colorPalette && !this.colorPalette.contains(e.target) && 
+        // ИСПРАВЛЕНИЕ: Защита от null элементов
+        if (this.colorPalette && e.target && !this.colorPalette.contains(e.target) && 
             this.colorButton && !this.colorButton.contains(e.target)) {
             this._hideColorPalette();
         }

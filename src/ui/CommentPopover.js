@@ -132,7 +132,8 @@ export class CommentPopover {
 
     _onDocMouseDown(e) {
         if (!this.popover || this.popover.style.display === 'none') return;
-        if (this.popover.contains(e.target)) return; // клик внутри окна — не закрываем
+        // ИСПРАВЛЕНИЕ: Защита от null элементов
+        if (this.popover && e.target && this.popover.contains(e.target)) return; // клик внутри окна — не закрываем
         this.hide();
     }
 

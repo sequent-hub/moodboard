@@ -38,6 +38,8 @@ export class MapPanel {
         // Закрытие по клику вне панели
         document.addEventListener('mousedown', (e) => {
             if (!this.popupEl) return;
+            // ИСПРАВЛЕНИЕ: Защита от null элементов
+            if (!this.element || !e.target) return;
             if (this.element.contains(e.target)) return;
             this.hidePopup();
         });
@@ -45,7 +47,8 @@ export class MapPanel {
         // Колесо для зума внутри миникарты
         this.element.addEventListener('wheel', (e) => {
             if (!this.popupEl) return;
-            if (!this.popupEl.contains(e.target)) return;
+            // ИСПРАВЛЕНИЕ: Защита от null элементов
+            if (!this.popupEl || !e.target || !this.popupEl.contains(e.target)) return;
             e.preventDefault();
             // Масштабируем вокруг точки под курсором в миникарте
             const rect = this.canvas.getBoundingClientRect();

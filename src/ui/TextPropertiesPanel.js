@@ -259,7 +259,8 @@ export class TextPropertiesPanel {
 
         // Закрываем панель при клике вне её
         document.addEventListener('click', (e) => {
-            if (!colorSelectorContainer.contains(e.target)) {
+            // ИСПРАВЛЕНИЕ: Защита от null элементов
+            if (!colorSelectorContainer || !e.target || !colorSelectorContainer.contains(e.target)) {
                 this._hideColorDropdown();
             }
         });
@@ -460,7 +461,8 @@ export class TextPropertiesPanel {
 
         // Закрываем панель при клике вне её
         document.addEventListener('click', (e) => {
-            if (!bgSelectorContainer.contains(e.target)) {
+            // ИСПРАВЛЕНИЕ: Защита от null элементов
+            if (!bgSelectorContainer || !e.target || !bgSelectorContainer.contains(e.target)) {
                 this._hideBgColorDropdown();
             }
         });
@@ -871,7 +873,7 @@ export class TextPropertiesPanel {
     }
 
     _onDocMouseDown(e) {
-        // Скрываем панель при клике вне неё и вне текстового объекта
+        // ИСПРАВЛЕНИЕ: Защита от null элементов + скрываем панель при клике вне неё
         if (!this.panel || !e.target) return;
         
         // Если клик внутри панели - не скрываем
