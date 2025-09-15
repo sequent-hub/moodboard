@@ -203,8 +203,20 @@ export function resolveEmojiAbsoluteUrl(emoji, basePath = null) {
         // Формируем URL (приоритет PNG, потом SVG)
         if (!resolvedBasePath.endsWith('/')) resolvedBasePath += '/';
         
-        // Возвращаем URL в формате готовом для использования
-        return `${resolvedBasePath}Смайлики/${base}.png`; // Большинство эмоджи в папке Смайлики
+        // ПРИОРИТЕТ 2: Файлы в папках (только если нет встроенных SVG)
+        // Сначала проверяем разные папки
+        const possiblePaths = [
+            `${resolvedBasePath}Смайлики/${base}.png`,
+            `${resolvedBasePath}Жесты/${base}.png`, 
+            `${resolvedBasePath}Женские эмоции/${base}.png`,
+            `${resolvedBasePath}Котики/${base}.png`,
+            `${resolvedBasePath}Разное/${base}.png`,
+            `${resolvedBasePath}Обезьянка/${base}.png`,
+            `${resolvedBasePath}${base}.png` // Прямо в корне папки эмоджи
+        ];
+        
+        // Возвращаем первый возможный путь (браузер сам проверит доступность)
+        return possiblePaths[0];
         
     } catch (error) {
         return null;

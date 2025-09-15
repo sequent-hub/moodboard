@@ -3,6 +3,7 @@
  */
 import { Events } from '../core/events/Events.js';
 import { IconLoader } from '../utils/iconLoader.js';
+import { getAvailableInlineEmojis, getInlineEmojiUrl } from '../utils/inlineSvgEmojis.js';
 
 export class Toolbar {
     constructor(container, eventBus, theme = 'light', options = {}) {
@@ -905,9 +906,24 @@ export class Toolbar {
         this.emojiPopupEl.className = 'moodboard-toolbar__popup moodboard-toolbar__popup--emoji';
         this.emojiPopupEl.style.display = 'none';
 
-        // Определяем способ загрузки эмоджи
+        // ПРИОРИТЕТ 1: Добавляем встроенные SVG эмоджи
         let groups = new Map();
         
+        console.log('🎯 Создание EmojiPopup: добавляем встроенные SVG эмоджи...');
+        const inlineEmojis = getAvailableInlineEmojis();
+        
+        if (inlineEmojis.length > 0) {
+            // Добавляем встроенные эмоджи в категорию "Встроенные"
+            groups.set('Встроенные', inlineEmojis.map(emoji => ({
+                path: `inline:${emoji}`,
+                url: getInlineEmojiUrl(emoji),
+                isInline: true,
+                emoji: emoji
+            })));
+            console.log(`✅ Добавлено ${inlineEmojis.length} встроенных SVG эмоджи`);
+        }
+        
+        // ПРИОРИТЕТ 2: Дополняем файловыми эмоджи (если нужны)
         if (typeof import.meta !== 'undefined' && import.meta.glob) {
             // Режим с bundler (Vite) - используем import.meta.glob
             const modules = import.meta.glob('../assets/emodji/**/*.{png,PNG,svg,SVG}', { eager: true, as: 'url' });
@@ -924,15 +940,19 @@ export class Toolbar {
                     category = parts.length > 1 ? parts[0] : 'Разное';
                 }
                 if (!groups.has(category)) groups.set(category, []);
-                groups.get(category).push({ path, url });
+                groups.get(category).push({ path, url, isInline: false });
             });
         } else {
             // Режим без bundler - используем статичный список
-            groups = this.getFallbackEmojiGroups();
+            const fallbackGroups = this.getFallbackEmojiGroups();
+            fallbackGroups.forEach((items, category) => {
+                if (!groups.has(category)) groups.set(category, []);
+                groups.get(category).push(...items.map(item => ({ ...item, isInline: false })));
+            });
         }
 
-        // Задаем желаемый порядок категорий
-        const ORDER = ['Смайлики', 'Жесты', 'Женские эмоции', 'Котики', 'Разное'];
+        // Задаем желаемый порядок категорий (встроенные SVG - первые!)
+        const ORDER = ['Встроенные', 'Смайлики', 'Жесты', 'Женские эмоции', 'Котики', 'Разное'];
         const present = [...groups.keys()];
         const orderedFirst = ORDER.filter(name => groups.has(name));
         const theRest = present.filter(name => !ORDER.includes(name)).sort((a, b) => a.localeCompare(b));
@@ -951,14 +971,14 @@ export class Toolbar {
             const grid = document.createElement('div');
             grid.className = 'moodboard-emoji__grid';
 
-            groups.get(cat).forEach(({ url }) => {
+            groups.get(cat).forEach(({ url, isInline, emoji }) => {
                 const btn = document.createElement('button');
                 btn.className = 'moodboard-emoji__btn';
-                btn.title = 'Добавить изображение';
+                btn.title = isInline ? `Встроенный эмоджи: ${emoji}` : 'Добавить изображение';
                 const img = document.createElement('img');
                 img.className = 'moodboard-emoji__img';
                 img.src = url;
-                img.alt = '';
+                img.alt = emoji || '';
                 btn.appendChild(img);
 
                 // Перетаскивание: начинаем только если был реальный drag (движение > 4px)
@@ -1024,9 +1044,19 @@ export class Toolbar {
                     const target = 64; // кратно 128 для лучшей четкости при даунскейле
                     const targetW = target;
                     const targetH = target;
+                    
+                    console.log(`🎯 Создаем эмоджи: ${isInline ? 'встроенный SVG' : 'файл'}, url: ${url.substring(0, 50)}...`);
+                    
                     this.eventBus.emit(Events.Place.Set, {
                         type: 'image',
-                        properties: { src: url, width: targetW, height: targetH, isEmojiIcon: true },
+                        properties: { 
+                            src: url, 
+                            width: targetW, 
+                            height: targetH, 
+                            isEmojiIcon: true,
+                            isInlineSvg: isInline || false,
+                            originalEmoji: emoji || null
+                        },
                         size: { width: targetW, height: targetH }
                     });
                     this.closeEmojiPopup();
