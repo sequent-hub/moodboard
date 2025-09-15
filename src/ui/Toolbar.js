@@ -3,7 +3,7 @@
  */
 import { Events } from '../core/events/Events.js';
 import { IconLoader } from '../utils/iconLoader.js';
-import { getAvailableInlineEmojis, getInlineEmojiUrl } from '../utils/inlineSvgEmojis.js';
+import { getInlinePngEmojiUrl, hasInlinePngEmoji } from '../utils/inlinePngEmojis.js';
 
 export class Toolbar {
     constructor(container, eventBus, theme = 'light', options = {}) {
@@ -906,24 +906,11 @@ export class Toolbar {
         this.emojiPopupEl.className = 'moodboard-toolbar__popup moodboard-toolbar__popup--emoji';
         this.emojiPopupEl.style.display = 'none';
 
-        // ПРИОРИТЕТ 1: Добавляем встроенные SVG эмоджи
+        // Загружаем файловые эмоджи и заменяем их на встроенные PNG data URL
         let groups = new Map();
+        let convertedCount = 0;
         
-        console.log('🎯 Создание EmojiPopup: добавляем встроенные SVG эмоджи...');
-        const inlineEmojis = getAvailableInlineEmojis();
-        
-        if (inlineEmojis.length > 0) {
-            // Добавляем встроенные эмоджи в категорию "Встроенные"
-            groups.set('Встроенные', inlineEmojis.map(emoji => ({
-                path: `inline:${emoji}`,
-                url: getInlineEmojiUrl(emoji),
-                isInline: true,
-                emoji: emoji
-            })));
-            console.log(`✅ Добавлено ${inlineEmojis.length} встроенных SVG эмоджи`);
-        }
-        
-        // ПРИОРИТЕТ 2: Дополняем файловыми эмоджи (если нужны)
+        console.log('🎯 Создание EmojiPopup: заменяем файловые эмоджи на встроенные PNG...');
         if (typeof import.meta !== 'undefined' && import.meta.glob) {
             // Режим с bundler (Vite) - используем import.meta.glob
             const modules = import.meta.glob('../assets/emodji/**/*.{png,PNG,svg,SVG}', { eager: true, as: 'url' });
@@ -939,20 +926,45 @@ export class Toolbar {
                     const parts = after.split('/');
                     category = parts.length > 1 ? parts[0] : 'Разное';
                 }
-                if (!groups.has(category)) groups.set(category, []);
-                groups.get(category).push({ path, url, isInline: false });
+                
+                // Извлекаем код эмоджи из имени файла (например, "1f600.png" -> "1f600")
+                const fileName = path.split('/').pop();
+                const emojiCode = fileName.split('.')[0];
+                
+                // Заменяем на встроенный PNG data URL
+                const inlineUrl = getInlinePngEmojiUrl(emojiCode);
+                
+                if (inlineUrl) {
+                    // Используем встроенный PNG
+                    if (!groups.has(category)) groups.set(category, []);
+                    groups.get(category).push({ 
+                        path: `inline:${emojiCode}`, 
+                        url: inlineUrl, 
+                        isInline: true,
+                        emojiCode: emojiCode
+                    });
+                    convertedCount++;
+                } else {
+                    // Fallback на файловый URL (если встроенного нет)
+                    if (!groups.has(category)) groups.set(category, []);
+                    groups.get(category).push({ path, url, isInline: false });
+                    console.warn(`⚠️ Нет встроенного PNG для ${emojiCode}, используем файл`);
+                }
             });
         } else {
             // Режим без bundler - используем статичный список
             const fallbackGroups = this.getFallbackEmojiGroups();
             fallbackGroups.forEach((items, category) => {
                 if (!groups.has(category)) groups.set(category, []);
-                groups.get(category).push(...items.map(item => ({ ...item, isInline: false })));
+                groups.get(category).push(...items); // items уже содержат правильные isInline флаги
+                convertedCount += items.filter(item => item.isInline).length;
             });
         }
 
-        // Задаем желаемый порядок категорий (встроенные SVG - первые!)
-        const ORDER = ['Встроенные', 'Смайлики', 'Жесты', 'Женские эмоции', 'Котики', 'Разное'];
+        // Задаем желаемый порядок категорий (используем ваши оригинальные разделы)
+        const ORDER = ['Смайлики', 'Жесты', 'Женские эмоции', 'Котики', 'Обезьянка', 'Разное'];
+        
+        console.log(`✅ Заменено ${convertedCount} файловых эмоджи на встроенные PNG`);
         const present = [...groups.keys()];
         const orderedFirst = ORDER.filter(name => groups.has(name));
         const theRest = present.filter(name => !ORDER.includes(name)).sort((a, b) => a.localeCompare(b));
@@ -971,14 +983,14 @@ export class Toolbar {
             const grid = document.createElement('div');
             grid.className = 'moodboard-emoji__grid';
 
-            groups.get(cat).forEach(({ url, isInline, emoji }) => {
+            groups.get(cat).forEach(({ url, isInline, emojiCode }) => {
                 const btn = document.createElement('button');
                 btn.className = 'moodboard-emoji__btn';
-                btn.title = isInline ? `Встроенный эмоджи: ${emoji}` : 'Добавить изображение';
+                btn.title = isInline ? `Встроенный PNG: ${emojiCode}` : 'Добавить изображение';
                 const img = document.createElement('img');
                 img.className = 'moodboard-emoji__img';
                 img.src = url;
-                img.alt = emoji || '';
+                img.alt = emojiCode || '';
                 btn.appendChild(img);
 
                 // Перетаскивание: начинаем только если был реальный drag (движение > 4px)
@@ -1045,7 +1057,7 @@ export class Toolbar {
                     const targetW = target;
                     const targetH = target;
                     
-                    console.log(`🎯 Создаем эмоджи: ${isInline ? 'встроенный SVG' : 'файл'}, url: ${url.substring(0, 50)}...`);
+                    console.log(`🎯 Создаем эмоджи: ${isInline ? 'встроенный PNG' : 'файл'} (${emojiCode})`);
                     
                     this.eventBus.emit(Events.Place.Set, {
                         type: 'image',
@@ -1054,8 +1066,8 @@ export class Toolbar {
                             width: targetW, 
                             height: targetH, 
                             isEmojiIcon: true,
-                            isInlineSvg: isInline || false,
-                            originalEmoji: emoji || null
+                            isInlinePng: isInline || false,
+                            emojiCode: emojiCode || null
                         },
                         size: { width: targetW, height: targetH }
                     });
@@ -1076,45 +1088,72 @@ export class Toolbar {
      */
     getFallbackEmojiGroups() {
         const groups = new Map();
+        let convertedCount = 0;
         
-        // Определяем базовый путь для эмоджи
-        const basePath = this.getEmojiBasePath();
+        console.log('🎯 Fallback режим: заменяем файловые эмоджи на встроенные PNG...');
         
         // Статичный список эмоджи с реальными именами файлов
         const fallbackEmojis = {
             'Смайлики': [
-                '1f600.png', '1f601.png', '1f602.png', '1f603.png', '1f604.png',
-                '1f605.png', '1f606.png', '1f607.png', '1f609.png', '1f60a.png',
-                '1f60b.png', '1f60c.png', '1f60d.png', '1f60e.png', '1f60f.png',
-                '1f610.png', '1f611.png', '1f612.png', '1f613.png', '1f614.png',
-                '1f615.png', '1f616.png', '1f617.png', '1f618.png', '1f619.png'
+                '1f600', '1f601', '1f602', '1f603', '1f604', '1f605', '1f606', '1f607', 
+                '1f609', '1f60a', '1f60b', '1f60c', '1f60d', '1f60e', '1f60f', '1f610', 
+                '1f611', '1f612', '1f613', '1f614', '1f615', '1f616', '1f617', '1f618', 
+                '1f619', '1f61a', '1f61b', '1f61c', '1f61d', '1f61e', '1f61f', '1f620',
+                '1f621', '1f622', '1f623', '1f624', '1f625', '1f626', '1f627', '1f628',
+                '1f629', '1f62a', '1f62b', '1f62c', '1f62d', '1f62e', '1f62f', '1f630',
+                '1f631', '1f632', '1f633', '1f635', '1f636', '1f641', '1f642', '2639', '263a'
             ],
             'Жесты': [
-                '1f446.png', '1f447.png', '1f448.png', '1f449.png', '1f44a.png',
-                '1f44b.png', '1f44c.png', '1f450.png', '1f4aa.png', '1f590.png',
-                '1f596.png', '1f64c.png', '1f64f.png', '270c.png', '270d.png'
+                '1f446', '1f447', '1f448', '1f449', '1f44a', '1f44b', '1f44c', '1f450', 
+                '1f4aa', '1f590', '1f596', '1f64c', '1f64f', '261d', '270a', '270b', '270c', '270d'
             ],
             'Женские эмоции': [
-                '1f645.png', '1f646.png', '1f64b.png', '1f64d.png', '1f64e.png'
+                '1f645', '1f646', '1f64b', '1f64d', '1f64e'
             ],
             'Котики': [
-                '1f638.png', '1f639.png', '1f63a.png', '1f63b.png', '1f63c.png',
-                '1f63d.png', '1f63e.png', '1f63f.png', '1f640.png'
+                '1f638', '1f639', '1f63a', '1f63b', '1f63c', '1f63d', '1f63e', '1f63f', '1f640'
+            ],
+            'Обезьянка': [
+                '1f435', '1f648', '1f649', '1f64a'
             ],
             'Разное': [
-                '1f440.png', '1f441.png', '1f499.png', '1f4a1.png', '1f4a3.png',
-                '1f4a9.png', '1f4ac.png', '1f4af.png', '2764.png', '203c.png', '26d4.png'
+                '1f440', '1f441', '1f499', '1f4a1', '1f4a3', '1f4a9', '1f4ac', '1f4af', '203c', '26d4', '2764'
             ]
         };
 
         Object.entries(fallbackEmojis).forEach(([category, emojis]) => {
-            const emojiList = emojis.map(file => ({
-                path: `${basePath}${category}/${file}`,
-                url: `${basePath}${category}/${file}`
-            }));
-            groups.set(category, emojiList);
+            const emojiList = [];
+            
+            emojis.forEach(emojiCode => {
+                // Заменяем на встроенный PNG data URL
+                const inlineUrl = getInlinePngEmojiUrl(emojiCode);
+                
+                if (inlineUrl) {
+                    emojiList.push({
+                        path: `inline:${emojiCode}`,
+                        url: inlineUrl,
+                        isInline: true,
+                        emojiCode: emojiCode
+                    });
+                    convertedCount++;
+                } else {
+                    // Fallback на файловый URL (если встроенного нет)
+                    const basePath = this.getEmojiBasePath();
+                    emojiList.push({
+                        path: `${basePath}${category}/${emojiCode}.png`,
+                        url: `${basePath}${category}/${emojiCode}.png`,
+                        isInline: false
+                    });
+                    console.warn(`⚠️ Нет встроенного PNG для ${emojiCode}, используем файл`);
+                }
+            });
+            
+            if (emojiList.length > 0) {
+                groups.set(category, emojiList);
+            }
         });
 
+        console.log(`✅ Fallback: заменено ${convertedCount} файловых эмоджи на встроенные PNG`);
         return groups;
     }
 

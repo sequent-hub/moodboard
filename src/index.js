@@ -174,12 +174,20 @@ export { initMoodBoardNoBundler, quickInitMoodBoard, injectCriticalStyles, force
 export { StyleLoader } from './utils/styleLoader.js';
 export { EmojiLoaderNoBundler } from './utils/emojiLoaderNoBundler.js';
 
-// Экспорт встроенных SVG эмоджи
+// Экспорт встроенных эмоджи (PNG data URL)
+export { 
+    getInlinePngEmojiUrl,
+    getAvailableInlinePngEmojis,
+    hasInlinePngEmoji
+} from './utils/inlinePngEmojis.js';
+
+// Экспорт встроенных SVG эмоджи (для пользователей, которые хотят добавить свои)
 export { 
     addInlineSvgEmoji, 
     bulkAddInlineSvgEmojis, 
     getAvailableInlineEmojis,
-    isInlineSvgEmoji 
+    isInlineSvgEmoji,
+    getInlineEmojiByCode
 } from './utils/inlineSvgEmojis.js';
 
 /**
