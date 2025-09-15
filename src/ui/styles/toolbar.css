@@ -19,7 +19,7 @@
     align-items: center;
     gap: 8px;
     pointer-events: auto;
-    width: 30px;
+    /* width: 30px; */
     overflow: hidden;
     cursor: default;
 }

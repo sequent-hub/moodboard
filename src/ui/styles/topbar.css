@@ -3,7 +3,7 @@
     position: absolute;
     top: 12px;
     left: 16px;
-    height: 30px;
+    /* height: 30px; */
     display: inline-flex;
     align-items: center;
     gap: 6px;
