@@ -268,28 +268,52 @@ export class FilePropertiesPanel {
     reposition() {
         if (!this.currentId || !this.panel || this.panel.style.display === 'none') return;
 
-        const pixiObject = this.core?.pixi?.objects?.get(this.currentId);
-        if (!pixiObject) return;
-
-        try {
-            // Получаем границы объекта в world координатах
-            const bounds = pixiObject.getBounds();
-            
-            // Преобразуем в screen координаты
-            const worldToScreen = this.core.pixi.app.stage.worldTransform;
-            const screenX = bounds.x * worldToScreen.a + worldToScreen.tx;
-            const screenY = bounds.y * worldToScreen.d + worldToScreen.ty;
-            
-            // Позиционируем панель сверху по центру объекта
-            const panelWidth = this.panel.offsetWidth || 120;
-            const centerX = screenX + (bounds.width * worldToScreen.a) / 2;
-            
-            this.panel.style.left = `${centerX - panelWidth / 2}px`;
-            this.panel.style.top = `${screenY - 65}px`; // 65px выше объекта (было 45px)
-            
-        } catch (error) {
-            console.warn('FilePropertiesPanel: ошибка позиционирования:', error);
+        // Проверяем, что наш объект все еще выделен
+        const ids = this.core?.selectTool ? Array.from(this.core.selectTool.selectedObjects || []) : [];
+        if (!ids.includes(this.currentId)) {
+            this.hide();
+            return;
         }
+
+        // Получаем позицию и размеры объекта
+        const posData = { objectId: this.currentId, position: null };
+        const sizeData = { objectId: this.currentId, size: null };
+        this.eventBus.emit(Events.Tool.GetObjectPosition, posData);
+        this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+
+        if (!posData.position || !sizeData.size) {
+            return;
+        }
+
+        // Получаем зум и позицию мира
+        const worldLayer = this.core?.pixi?.worldLayer;
+        const scale = worldLayer?.scale?.x || 1;
+        const worldX = worldLayer?.x || 0;
+        const worldY = worldLayer?.y || 0;
+
+        // Преобразуем координаты объекта в экранные координаты
+        const screenX = posData.position.x * scale + worldX;
+        const screenY = posData.position.y * scale + worldY;
+        const objectWidth = sizeData.size.width * scale;
+
+        // Позиционируем панель над объектом по центру
+        const panelWidth = this.panel.offsetWidth || 120;
+        const panelHeight = this.panel.offsetHeight || 40;
+        const panelX = screenX + (objectWidth / 2) - (panelWidth / 2);
+        let panelY = screenY - panelHeight - 40; // отступ 40px над файлом
+
+        // Если панель уходит за верх, переносим ниже объекта
+        if (panelY < 0) {
+            panelY = screenY + (sizeData.size.height * scale) + 40;
+        }
+
+        // Проверяем границы контейнера
+        const containerRect = this.container.getBoundingClientRect();
+        const finalX = Math.max(10, Math.min(panelX, containerRect.width - panelWidth - 10));
+        const finalY = Math.max(10, panelY);
+
+        this.panel.style.left = `${Math.round(finalX)}px`;
+        this.panel.style.top = `${Math.round(finalY)}px`;
     }
 
     destroy() {

@@ -147,25 +147,36 @@ export class FramePropertiesPanel {
             return;
         }
 
-        const { x, y } = posData.position;
-        const { width, height } = sizeData.size;
+        // Получаем зум и позицию мира
+        const worldLayer = this.core?.pixi?.worldLayer;
+        const scale = worldLayer?.scale?.x || 1;
+        const worldX = worldLayer?.x || 0;
+        const worldY = worldLayer?.y || 0;
+
+        // Преобразуем координаты объекта в экранные координаты
+        const screenX = posData.position.x * scale + worldX;
+        const screenY = posData.position.y * scale + worldY;
+        const objectWidth = sizeData.size.width * scale;
+        const objectHeight = sizeData.size.height * scale;
 
         // Позиционируем панель над фреймом, по центру
-        const panelRect = this.panel.getBoundingClientRect();
-        const panelW = Math.max(1, panelRect.width || 280);
-        const panelH = Math.max(1, panelRect.height || 60);
-        let panelX = x + (width / 2) - (panelW / 2);
-        let panelY = y - panelH - 40; // отступ 40px над фреймом
+        const panelW = this.panel.offsetWidth || 280;
+        const panelH = this.panel.offsetHeight || 60;
+        let panelX = screenX + (objectWidth / 2) - (panelW / 2);
+        let panelY = screenY - panelH - 40; // отступ 40px над фреймом
 
         // Если панель уходит за верх, переносим ниже фрейма
         if (panelY < 0) {
-            panelY = y + height + 40;
+            panelY = screenY + objectHeight + 40;
         }
 
+        // Проверяем границы контейнера
+        const containerRect = this.container.getBoundingClientRect();
+        const finalX = Math.max(10, Math.min(panelX, containerRect.width - panelW - 10));
+        const finalY = Math.max(10, panelY);
 
-        this.panel.style.left = `${Math.round(panelX)}px`;
-        this.panel.style.top = `${Math.round(panelY)}px`;
-        
+        this.panel.style.left = `${Math.round(finalX)}px`;
+        this.panel.style.top = `${Math.round(finalY)}px`;
     }
 
     _createFrameControls(panel) {
