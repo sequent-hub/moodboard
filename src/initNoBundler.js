@@ -81,8 +81,7 @@ export function injectCriticalStyles() {
             flex-direction: column;
             align-items: center;
             gap: 8px;
-            pointer-events: auto;
-            width: 30px;
+            pointer-events: auto;            
             overflow: hidden;
             cursor: default;
         }
@@ -90,8 +89,7 @@ export function injectCriticalStyles() {
         .moodboard-topbar {
             position: absolute;
             top: 12px;
-            left: 16px;
-            height: 30px;
+            left: 16px;            
             display: inline-flex;
             align-items: center;
             gap: 6px;

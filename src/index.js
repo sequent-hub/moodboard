@@ -1,6 +1,155 @@
 // Основной экспорт пакета - готовый MoodBoard с UI
 export { MoodBoard } from './moodboard/MoodBoard.js';
 
+/**
+ * Диагностика конфликтов CSS для панелей
+ * Находит что именно переопределяет ширину панелей
+ */
+export function diagnosePanelConflicts() {
+    console.log('🔍 ДИАГНОСТИКА: поиск конфликтов стилей панелей...');
+    
+    const panel = document.querySelector('.text-properties-panel, .frame-properties-panel');
+    if (!panel) {
+        console.log('❌ Панели не найдены. Создайте объект и выберите его.');
+        return;
+    }
+    
+    console.log('📋 Найдена панель:', panel.className);
+    
+    // Получаем все применяемые стили
+    const computedStyle = getComputedStyle(panel);
+    console.log('📏 Текущие размеры панели:');
+    console.log('  - width:', computedStyle.width);
+    console.log('  - min-width:', computedStyle.minWidth);
+    console.log('  - max-width:', computedStyle.maxWidth);
+    console.log('  - height:', computedStyle.height);
+    console.log('  - padding:', computedStyle.padding);
+    console.log('  - display:', computedStyle.display);
+    console.log('  - position:', computedStyle.position);
+    
+    // Проверяем inline стили
+    if (panel.style.cssText) {
+        console.log('⚠️ НАЙДЕНЫ inline стили на панели:', panel.style.cssText);
+    } else {
+        console.log('✅ Inline стилей нет');
+    }
+    
+    // Ищем все CSS правила, которые могут влиять на панель
+    console.log('🔍 Поиск CSS правил, влияющих на панель...');
+    
+    // Проверяем основные подозрительные свойства
+    const suspiciousProperties = ['width', 'min-width', 'max-width', 'height', 'padding', 'display'];
+    
+    suspiciousProperties.forEach(prop => {
+        const value = computedStyle.getPropertyValue(prop);
+        console.log(`📌 ${prop}: ${value}`);
+        
+        // Проверяем приоритет
+        const priority = computedStyle.getPropertyPriority(prop);
+        if (priority) {
+            console.log(`   ⚡ Приоритет: ${priority}`);
+        }
+    });
+    
+    // Проверяем классы родительских элементов
+    let parent = panel.parentElement;
+    let level = 1;
+    console.log('🔗 Родительские элементы:');
+    while (parent && level <= 5) {
+        const parentStyles = getComputedStyle(parent);
+        console.log(`  ${level}. ${parent.tagName}${parent.className ? '.' + parent.className : ''}`);
+        console.log(`     width: ${parentStyles.width}, display: ${parentStyles.display}`);
+        parent = parent.parentElement;
+        level++;
+    }
+    
+    // Ищем потенциальные конфликтующие CSS классы
+    console.log('⚠️ Поиск потенциальных конфликтов:');
+    
+    const possibleConflicts = [
+        'bootstrap', 'tailwind', 'flex', 'grid', 'container', 'row', 'col',
+        'w-', 'width', 'min-w', 'max-w', 'panel', 'modal', 'popup'
+    ];
+    
+    const allClasses = panel.className.split(' ');
+    const parentClasses = panel.parentElement?.className?.split(' ') || [];
+    
+    [...allClasses, ...parentClasses].forEach(cls => {
+        possibleConflicts.forEach(conflict => {
+            if (cls.includes(conflict)) {
+                console.log(`🚨 Подозрительный класс: "${cls}" (содержит "${conflict}")`);
+            }
+        });
+    });
+    
+    return {
+        element: panel,
+        computedStyle: computedStyle,
+        currentWidth: computedStyle.width,
+        currentMinWidth: computedStyle.minWidth,
+        hasInlineStyles: !!panel.style.cssText
+    };
+}
+
+/**
+ * Хирургическое исправление конкретных свойств панелей
+ * Исправляет только width и min-width, не трогая остальное
+ */
+export function surgicalPanelFix() {
+    console.log('🔧 ХИРУРГИЧЕСКОЕ исправление размеров панелей...');
+    
+    const targetPanels = document.querySelectorAll(`
+        .text-properties-panel, 
+        .frame-properties-panel, 
+        .note-properties-panel,
+        .file-properties-panel,
+        .moodboard-file-properties-panel
+    `);
+    
+    if (targetPanels.length === 0) {
+        console.log('❌ Панели не найдены');
+        return;
+    }
+    
+    targetPanels.forEach((panel, index) => {
+        console.log(`🔧 Исправляем панель ${index + 1}: ${panel.className}`);
+        
+        // Запоминаем текущие значения для диагностики
+        const beforeWidth = getComputedStyle(panel).width;
+        const beforeMinWidth = getComputedStyle(panel).minWidth;
+        
+        // Применяем ТОЛЬКО минимально необходимые исправления
+        if (panel.classList.contains('text-properties-panel') || 
+            panel.classList.contains('frame-properties-panel')) {
+            panel.style.setProperty('min-width', '320px', 'important');
+            panel.style.setProperty('width', 'auto', 'important');
+        } else if (panel.classList.contains('note-properties-panel')) {
+            panel.style.setProperty('min-width', '280px', 'important');
+            panel.style.setProperty('width', 'auto', 'important');
+        } else if (panel.classList.contains('file-properties-panel') || 
+                   panel.classList.contains('moodboard-file-properties-panel')) {
+            panel.style.setProperty('min-width', '250px', 'important');
+            panel.style.setProperty('width', 'auto', 'important');
+        }
+        
+        // Проверяем результат
+        setTimeout(() => {
+            const afterWidth = getComputedStyle(panel).width;
+            const afterMinWidth = getComputedStyle(panel).minWidth;
+            
+            console.log(`📏 Панель ${index + 1} результат:`);
+            console.log(`   До:  width: ${beforeWidth}, min-width: ${beforeMinWidth}`);
+            console.log(`   После: width: ${afterWidth}, min-width: ${afterMinWidth}`);
+            
+            if (parseInt(afterMinWidth) >= 250) {
+                console.log(`✅ Панель ${index + 1} исправлена успешно!`);
+            } else {
+                console.log(`❌ Панель ${index + 1} все еще имеет проблемы`);
+            }
+        }, 50);
+    });
+}
+
 // Дополнительные экспорты для работы без bundler
 export { initMoodBoardNoBundler, quickInitMoodBoard, injectCriticalStyles, forceInjectPanelStyles } from './initNoBundler.js';
 export { StyleLoader } from './utils/styleLoader.js';
