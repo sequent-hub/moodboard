@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест исправления стилей панелей</title>
+    <style>
+        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+        .fix-panel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 10000;
+        }
+        .fix-button {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .fix-button:hover { background: #45a049; }
+        #moodboard-container { width: 100vw; height: 100vh; }
+    </style>
+</head>
+<body>
+    <div class="fix-panel">
+        <h4 style="margin: 0 0 10px 0;">Исправление панелей MoodBoard</h4>
+        <button class="fix-button" onclick="applyPanelFix()">
+            🔧 Исправить стили панелей
+        </button>
+        <div id="status" style="margin-top: 10px; font-size: 12px; color: #666;">
+            Создайте объект для появления панели свойств
+        </div>
+    </div>
+
+    <div id="moodboard-container"></div>
+
+    <script type="module">
+        let moodboard = null;
+        
+        try {
+            // Импортируем MoodBoard и функцию исправления
+            const { MoodBoard, fixPanelStyles } = await import('./src/index.js');
+            
+            // Создаем MoodBoard
+            moodboard = new MoodBoard('#moodboard-container', {
+                theme: 'light',
+                autoSave: false
+            });
+            
+            // Функция для исправления панелей
+            window.applyPanelFix = () => {
+                fixPanelStyles();
+                document.getElementById('status').innerHTML = 
+                    '<span style="color: green;">✅ Стили исправлены! Проверьте панели.</span>';
+                
+                // Проверяем панель через секунду
+                setTimeout(() => {
+                    const panel = document.querySelector('.text-properties-panel, .frame-properties-panel');
+                    if (panel) {
+                        const computedStyle = getComputedStyle(panel);
+                        const width = parseInt(computedStyle.minWidth);
+                        document.getElementById('status').innerHTML += 
+                            `<br><small>Текущая ширина панели: ${width}px</small>`;
+                    }
+                }, 1000);
+            };
+            
+            console.log('✅ MoodBoard инициализирован');
+            window.moodboard = moodboard;
+            
+        } catch (error) {
+            console.error('❌ Ошибка инициализации:', error);
+            document.getElementById('status').innerHTML = 
+                '<span style="color: red;">❌ Ошибка загрузки MoodBoard</span>';
+        }
+    </script>
+    
+    <script>
+        console.log('📝 ИНСТРУКЦИИ:');
+        console.log('1. Создайте текстовый объект и выберите его');
+        console.log('2. Если панель узкая - нажмите кнопку "Исправить стили"');
+        console.log('3. Панель должна стать широкой (320px+)');
+        console.log('4. Проверьте консоль на сообщения о исправлении');
+    </script>
+</body>
+</html>
