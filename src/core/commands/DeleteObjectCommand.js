@@ -54,9 +54,13 @@ export class DeleteObjectCommand extends BaseCommand {
     }
 
     async execute() {
+        console.log('🗑️ DeleteObjectCommand: начинаем удаление объекта:', this.objectId);
+        
         // Удаляем объект из состояния и PIXI
         this.coreMoodboard.state.removeObject(this.objectId);
         this.coreMoodboard.pixi.removeObject(this.objectId);
+        
+        console.log('🗑️ DeleteObjectCommand: объект удален из state и PIXI');
         
         // Если это файловый объект с fileId, удаляем файл с сервера
         if (this.fileIdToDelete && this.coreMoodboard.fileUploadService) {
@@ -70,9 +74,12 @@ export class DeleteObjectCommand extends BaseCommand {
             }
         }
         
+        // Эмитим событие удаления для обновления всех UI компонентов
         this.coreMoodboard.eventBus.emit(Events.Object.Deleted, { 
             objectId: this.objectId 
         });
+        
+        console.log('✅ DeleteObjectCommand: событие Events.Object.Deleted отправлено');
     }
 
     undo() {

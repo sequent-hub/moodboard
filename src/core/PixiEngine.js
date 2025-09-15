@@ -170,12 +170,51 @@ export class PixiEngine {
     removeObject(objectId) {
         const pixiObject = this.objects.get(objectId);
         if (pixiObject) {
+            console.log('🗑️ PixiEngine: удаляем объект из сцены:', objectId);
+            
+            // Удаляем из родительского контейнера
             if (this.worldLayer) {
                 this.worldLayer.removeChild(pixiObject);
             } else {
                 this.app.stage.removeChild(pixiObject);
             }
+            
+            // ИСПРАВЛЕНИЕ: Полная очистка для изображений/эмоджи
+            if (pixiObject instanceof PIXI.Sprite) {
+                console.log('🗑️ PixiEngine: очищаем ресурсы изображения/эмоджи');
+                
+                // Очищаем текстуру (особенно важно для data URL)
+                if (pixiObject.texture && pixiObject.texture !== PIXI.Texture.WHITE) {
+                    // Не уничтожаем базовые текстуры PIXI
+                    const textureSource = pixiObject.texture.baseTexture?.resource?.src;
+                    if (textureSource && (textureSource.startsWith('data:') || textureSource.includes('emodji'))) {
+                        pixiObject.texture.destroy(false); // Уничтожаем только созданную текстуру
+                    }
+                }
+                
+                // Очищаем все события
+                pixiObject.removeAllListeners();
+                
+                // Принудительно уничтожаем спрайт
+                pixiObject.destroy({ children: true, texture: false, baseTexture: false });
+            } else {
+                // Для других типов объектов - стандартная очистка
+                if (pixiObject.destroy) {
+                    pixiObject.destroy({ children: true });
+                }
+            }
+            
+            // Удаляем из карты объектов
             this.objects.delete(objectId);
+            
+            // ПРИНУДИТЕЛЬНЫЙ РЕНДЕР после удаления
+            if (this.app && this.app.renderer) {
+                this.app.renderer.render(this.app.stage);
+            }
+            
+            console.log(`✅ PixiEngine: объект ${objectId} полностью удален и рендер обновлен`);
+        } else {
+            console.warn(`⚠️ PixiEngine: объект ${objectId} не найден для удаления`);
         }
     }
 

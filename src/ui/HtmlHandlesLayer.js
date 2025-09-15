@@ -35,6 +35,22 @@ export class HtmlHandlesLayer {
         this.eventBus.on(Events.Tool.SelectionRemove, () => this.update());
         this.eventBus.on(Events.Tool.SelectionClear, () => this.hide());
         this.eventBus.on(Events.Tool.DragUpdate, () => this.update());
+        
+        // ИСПРАВЛЕНИЕ: Обработка удаления объектов
+        this.eventBus.on(Events.Object.Deleted, ({ objectId }) => {
+            console.log('🗑️ HtmlHandlesLayer: объект удален, принудительно очищаем ручки:', objectId);
+            
+            // Принудительно скрываем и очищаем все ручки
+            this.hide();
+            
+            // Очищаем DOM от старых ручек 
+            this.layer.innerHTML = '';
+            
+            // Обновляем для актуального состояния
+            setTimeout(() => {
+                this.update();
+            }, 10); // Небольшая задержка для полной очистки
+        });
         this.eventBus.on(Events.Tool.DragStart, () => { this._handlesSuppressed = true; this._setHandlesVisibility(false); });
         this.eventBus.on(Events.Tool.DragEnd, () => { this._handlesSuppressed = false; this._setHandlesVisibility(true); });
         this.eventBus.on(Events.Tool.ResizeUpdate, () => this.update());
