@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import { Events } from '../core/events/Events.js';
 
 /**
  * Класс объекта «Фрейм» (контейнерная прямоугольная область)
@@ -7,9 +8,11 @@ import * as PIXI from 'pixi.js';
 export class FrameObject {
     /**
      * @param {Object} objectData Полные данные объекта из состояния
+     * @param {Object} eventBus EventBus для подписки на события зума
      */
-    constructor(objectData) {
+    constructor(objectData, eventBus = null) {
         this.objectData = objectData || {};
+        this.eventBus = eventBus;
         this.width = this.objectData.width || 100;
         this.height = this.objectData.height || 100;
         // Берем стили рамки из CSS-переменных, с дефолтом
@@ -37,9 +40,11 @@ export class FrameObject {
         this.container.addChild(this.graphics);
         
         // Текст заголовка
+        this.baseFontSize = 14; // Сохраняем оригинальный размер шрифта
+        this.currentWorldScale = 1.0; // Текущий масштаб мира
         this.titleText = new PIXI.Text(this.title, {
             fontFamily: 'Arial, sans-serif',
-            fontSize: 14,
+            fontSize: this.baseFontSize,
             fill: 0x333333,
             fontWeight: 'bold'
         });
@@ -48,6 +53,11 @@ export class FrameObject {
         this.titleText.x = 8;
         this.titleText.y = 4;
         this.container.addChild(this.titleText);
+        
+        // Подписываемся на события зума для компенсации масштабирования заголовка
+        if (this.eventBus) {
+            this.eventBus.on(Events.UI.ZoomPercent, this._onZoomChange.bind(this));
+        }
         
         this._draw(this.width, this.height, this.fillColor);
         // Центрируем pivot контейнера, чтобы совпадали рамка и ручки
@@ -106,6 +116,8 @@ export class FrameObject {
         this.width = w;
         this.height = h;
         this._redrawPreserveTransform(w, h, this.fillColor);
+        // Обновляем масштаб заголовка после изменения размера
+        this._updateTitleScale();
     }
 
     /**
@@ -125,6 +137,9 @@ export class FrameObject {
         container.x = x;
         container.y = y;
         container.rotation = rot;
+        
+        // Обновляем масштаб заголовка после перерисовки
+        this._updateTitleScale();
     }
 
     /**
@@ -151,6 +166,48 @@ export class FrameObject {
                    point.y >= bounds.y && 
                    point.y <= bounds.y + bounds.height;
         };
+    }
+
+    /**
+     * Обработчик изменения зума
+     * @param {Object} data Данные события с процентом зума
+     */
+    _onZoomChange(data) {
+        if (!data || typeof data.percentage !== 'number') return;
+        
+        const worldScale = data.percentage / 100;
+        this.currentWorldScale = worldScale;
+        this._updateTitleScale();
+    }
+
+    /**
+     * Обновить масштаб заголовка для компенсации зума
+     */
+    _updateTitleScale() {
+        if (!this.titleText) return;
+        
+        // Компенсируем зум мира обратным масштабированием заголовка
+        const compensationScale = 1 / this.currentWorldScale;
+        
+        // Обновляем размер шрифта
+        const newFontSize = this.baseFontSize * compensationScale;
+        this.titleText.style.fontSize = newFontSize;
+        
+        // Корректируем позицию заголовка с учетом изменения размера
+        this.titleText.x = 8 * compensationScale;
+        this.titleText.y = 4 * compensationScale;
+    }
+
+    /**
+     * Метод для отписки от событий при уничтожении объекта
+     */
+    destroy() {
+        if (this.eventBus) {
+            this.eventBus.off(Events.UI.ZoomPercent, this._onZoomChange.bind(this));
+        }
+        if (this.container) {
+            this.container.destroy({ children: true });
+        }
     }
 }
 

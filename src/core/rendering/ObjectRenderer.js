@@ -7,8 +7,9 @@ import { GeometryUtils } from './GeometryUtils.js';
  * Отвечает за создание, обновление и удаление PIXI объектов
  */
 export class ObjectRenderer {
-    constructor(objectsMap) {
+    constructor(objectsMap, eventBus = null) {
         this.objects = objectsMap; // Map<id, pixiObject> из PixiEngine
+        this.eventBus = eventBus;
     }
 
     /**
@@ -20,7 +21,7 @@ export class ObjectRenderer {
         let pixiObject;
 
         // Создаем объект через фабрику
-        const instance = ObjectFactory.create(objectData.type, objectData);
+        const instance = ObjectFactory.create(objectData.type, objectData, this.eventBus);
         if (instance) {
             pixiObject = instance.getPixi();
             this._setupObjectMetadata(pixiObject, objectData, instance);

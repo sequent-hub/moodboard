@@ -38,13 +38,13 @@ export class PixiEngine {
         this.app.stage.addChild(this.worldLayer);
 
         // Инициализируем ObjectRenderer
-        this.renderer = new ObjectRenderer(this.objects);
+        this.renderer = new ObjectRenderer(this.objects, this.eventBus);
     }
 
     createObject(objectData) {
         let pixiObject;
 
-        const instance = ObjectFactory.create(objectData.type, objectData);
+        const instance = ObjectFactory.create(objectData.type, objectData, this.eventBus);
         if (instance) {
             pixiObject = instance.getPixi();
             const prevMb = pixiObject._mb || {};

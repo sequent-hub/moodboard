@@ -40,12 +40,17 @@ export class ObjectFactory {
      * Создать инстанс объекта по типу
      * @param {string} type
      * @param {Object} objectData
+     * @param {Object} eventBus EventBus для объектов, которым он нужен
      * @returns {any|null}
      */
-    static create(type, objectData = {}) {
+    static create(type, objectData = {}, eventBus = null) {
         const Ctor = this.registry.get(type);
         if (!Ctor) return null;
         try {
+            // Если тип объекта - фрейм, передаем eventBus
+            if (type === 'frame' && eventBus) {
+                return new Ctor(objectData, eventBus);
+            }
             return new Ctor(objectData);
         } catch (e) {
             console.error(`ObjectFactory: failed to create instance for type "${type}"`, e);
