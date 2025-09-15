@@ -45,6 +45,13 @@ export async function initMoodBoardNoBundler(container, options = {}, basePath =
  * Инжектирует критичные стили inline для мгновенного отображения
  */
 export function injectCriticalStyles() {
+    // Проверяем, не добавлены ли уже критичные стили
+    if (document.getElementById('moodboard-critical-styles')) {
+        console.log('⚠️ Критичные стили уже добавлены');
+        return;
+    }
+    
+    console.log('🎨 Добавляем критичные стили MoodBoard...');
     const criticalCSS = `
         /* Критичные стили для мгновенного отображения */
         .moodboard-workspace {
@@ -225,6 +232,153 @@ export function injectCriticalStyles() {
     style.id = 'moodboard-critical-styles';
     style.textContent = criticalCSS;
     document.head.appendChild(style);
+    
+    console.log('✅ Критичные стили добавлены в DOM');
+    
+    // Проверяем, применились ли стили панелей
+    setTimeout(() => {
+        const testPanel = document.querySelector('.text-properties-panel');
+        if (testPanel) {
+            const computedStyle = getComputedStyle(testPanel);
+            console.log('📋 Стили панели применены:', {
+                minWidth: computedStyle.minWidth,
+                height: computedStyle.height,
+                display: computedStyle.display,
+                padding: computedStyle.padding
+            });
+        } else {
+            console.log('📋 Панели пока не созданы, стили ожидают применения');
+        }
+    }, 100);
+}
+
+/**
+ * Принудительно инжектирует стили панелей с !important
+ * Используйте если панели отображаются узкими
+ */
+export function forceInjectPanelStyles() {
+    console.log('🔧 Принудительно добавляем стили панелей...');
+    
+    const forcedPanelCSS = `
+        /* ПРИНУДИТЕЛЬНЫЕ стили панелей - с !important */
+        .text-properties-panel {
+            position: absolute !important;
+            pointer-events: auto !important;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            gap: 8px !important;
+            padding: 12px 22px !important;
+            background-color: #ffffff !important;
+            border: 1px solid #e0e0e0 !important;
+            border-radius: 9999px !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+            font-size: 13px !important;
+            font-family: 'Roboto', Arial, sans-serif !important;
+            min-width: 320px !important;
+            width: auto !important;
+            height: 36px !important;
+            z-index: 1001 !important;
+        }
+        
+        .frame-properties-panel {
+            position: absolute !important;
+            pointer-events: auto !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            padding: 12px 32px !important;
+            background-color: #ffffff !important;
+            border: 1px solid #e0e0e0 !important;
+            border-radius: 9999px !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+            font-size: 13px !important;
+            font-family: 'Roboto', Arial, sans-serif !important;
+            min-width: 320px !important;
+            width: auto !important;
+            height: 36px !important;
+            z-index: 1001 !important;
+        }
+        
+        .note-properties-panel {
+            position: absolute !important;
+            pointer-events: auto !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            padding: 12px 22px !important;
+            background-color: #ffffff !important;
+            border: 1px solid #e0e0e0 !important;
+            border-radius: 9999px !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+            font-size: 13px !important;
+            font-family: 'Roboto', Arial, sans-serif !important;
+            min-width: 280px !important;
+            width: auto !important;
+            height: 36px !important;
+            z-index: 1001 !important;
+        }
+        
+        .file-properties-panel {
+            position: absolute !important;
+            pointer-events: auto !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            padding: 12px 22px !important;
+            background-color: #ffffff !important;
+            border: 1px solid #e0e0e0 !important;
+            border-radius: 9999px !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+            font-size: 13px !important;
+            font-family: 'Roboto', Arial, sans-serif !important;
+            min-width: 250px !important;
+            width: auto !important;
+            height: 36px !important;
+            z-index: 1001 !important;
+        }
+        
+        /* Элементы панелей */
+        .tpp-label, .fpp-label, .npp-label, .file-panel-label {
+            font-family: 'Roboto', Arial, sans-serif !important;
+            font-size: 12px !important;
+            color: #666 !important;
+            font-weight: 500 !important;
+            white-space: nowrap !important;
+        }
+        
+        .font-select, .font-size-select, .fpp-select, .fpp-input {
+            border: 1px solid #ddd !important;
+            border-radius: 4px !important;
+            padding: 4px 8px !important;
+            font-size: 13px !important;
+            background-color: #fff !important;
+            cursor: pointer !important;
+            min-height: 20px !important;
+        }
+        
+        .font-select { min-width: 110px !important; }
+        .font-size-select { min-width: 56px !important; }
+        
+        .current-color-button, .current-bgcolor-button, .fpp-color-button {
+            width: 28px !important;
+            height: 28px !important;
+            border: 1px solid #ddd !important;
+            border-radius: 50% !important;
+            cursor: pointer !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: block !important;
+            box-sizing: border-box !important;
+        }
+    `;
+
+    const style = document.createElement('style');
+    style.id = 'moodboard-forced-panel-styles';
+    style.textContent = forcedPanelCSS;
+    document.head.appendChild(style);
+    
+    console.log('🔧 Принудительные стили панелей добавлены');
 }
 
 /**
@@ -245,6 +399,8 @@ export function quickInitMoodBoard(container, options = {}, basePath = '') {
         if (container) {
             container.classList.add('moodboard-styles-loaded');
         }
+    }).catch(error => {
+        console.warn('⚠️ Не удалось загрузить полные стили, используем критичные:', error);
     });
     
     // Создаем MoodBoard с fallback эмоджи
@@ -254,6 +410,20 @@ export function quickInitMoodBoard(container, options = {}, basePath = '') {
         skipEmojiLoader: true, // Пропускаем автозагрузку эмоджи
         emojiBasePath: basePath ? `${basePath}src/assets/emodji/` : null
     });
+    
+    // Автоматическая проверка и исправление стилей панелей через 3 секунды
+    setTimeout(() => {
+        const panel = document.querySelector('.text-properties-panel, .frame-properties-panel, .note-properties-panel, .file-properties-panel');
+        if (panel) {
+            const computedStyle = getComputedStyle(panel);
+            const width = parseInt(computedStyle.minWidth);
+            
+            if (width < 200) { // Если панель очень узкая
+                console.log('🔧 Обнаружена узкая панель, автоматически исправляем стили...');
+                forceInjectPanelStyles();
+            }
+        }
+    }, 3000);
     
     return moodboard;
 }

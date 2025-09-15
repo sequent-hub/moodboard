@@ -153,6 +153,26 @@ location /node_modules {
 3. Используйте `injectCriticalStyles()` для базовых стилей
 4. **Для панелей свойств**: критичные стили включены в `injectCriticalStyles()`, должны работать сразу
 
+### Панели свойств узкие (не применяются стили)
+**Если панели отображаются узкими, используйте принудительные стили:**
+
+```javascript
+import { forceInjectPanelStyles } from './node_modules/moodboard-futurello/src/index.js';
+
+// После инициализации MoodBoard
+forceInjectPanelStyles(); // Принудительно применяет стили с !important
+```
+
+**Или для Laravel:**
+```php
+<script type="module">
+    import { quickInitMoodBoard, forceInjectPanelStyles } from '{{ asset('node_modules/moodboard-futurello/src/index.js') }}';
+    
+    const moodboard = quickInitMoodBoard('#app');
+    forceInjectPanelStyles(); // Гарантирует правильные размеры панелей
+</script>
+```
+
 ### Эмоджи не отображаются
 1. Проверьте доступность папки `src/assets/emodji/`
 2. Установите правильный `MOODBOARD_BASE_PATH`
