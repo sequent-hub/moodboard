@@ -43,7 +43,7 @@
 }
 .moodboard-toolbar__button:hover { background: #BBDEFB; border-radius: 50%; }
 .moodboard-toolbar__button:active { transform: translateY(0); }
-.moodboard-toolbar__button--active { background: #00B0FF !important; color: inherit !important; border-radius: 50%; }
+.moodboard-toolbar__button--active { background: #80D8FF !important; color: inherit !important; border-radius: 50%; }
 .moodboard-toolbar__button--disabled { opacity: 0.4; cursor: not-allowed; }
 .moodboard-toolbar__button svg { width: 20px; height: 20px; transition: transform 0.2s ease; color: #212121; }
 .moodboard-toolbar__button--text-add svg { height: 16px; width: auto; }
