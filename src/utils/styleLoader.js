@@ -19,15 +19,47 @@ export class StyleLoader {
             'src/ui/styles/panels.css'
         ];
 
-
         for (const stylePath of styles) {
             try {
-                await this.loadStyle(basePath + stylePath);
+                const fullPath = basePath + stylePath;
+                await this.loadStyle(fullPath);
             } catch (error) {
                 console.warn(`⚠️ Ошибка загрузки стиля ${stylePath}:`, error);
+                
+                // Автоматический fallback для панелей
+                if (stylePath.includes('panels.css')) {
+                    this.injectPanelStyles();
+                }
             }
         }
+    }
 
+    /**
+     * Инжектирует критичные стили панелей inline
+     */
+    injectPanelStyles() {
+        const panelCSS = `
+            /* Полные стили панелей */
+            .text-properties-panel, .frame-properties-panel, .note-properties-panel, .file-properties-panel {
+                font-family: 'Roboto', Arial, sans-serif !important;
+                font-size: 13px !important;
+                white-space: nowrap;
+                box-sizing: border-box;
+            }
+            
+            .font-select { min-width: 110px; }
+            .font-size-select { min-width: 56px; }
+            
+            .text-properties-panel .tpp-label--spaced { margin-left: 6px; }
+            
+            .frame-properties-panel .fpp-section { 
+                display: inline-flex; 
+                align-items: center; 
+                gap: 6px; 
+            }
+        `;
+        
+        this.injectInlineStyles(panelCSS, 'moodboard-panel-styles');
     }
 
     /**

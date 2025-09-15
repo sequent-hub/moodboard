@@ -36,7 +36,8 @@
         <strong>Тест вложенных роутов</strong><br>
         Текущий URL: <div class="path-info" id="current-url"></div>
         Базовый путь эмоджи: <div class="path-info" id="emoji-base-path"></div>
-        Статус: <span id="status">Загрузка...</span>
+        Статус: <span id="status">Загрузка...</span><br>
+        Панели: <span id="panels-status">Проверка...</span>
     </div>
 
     <div id="moodboard-container"></div>
@@ -46,45 +47,68 @@
         document.getElementById('current-url').textContent = location.href;
         
         try {
-            import { 
-                quickInitMoodBoard, 
-                injectCriticalStyles 
-            } from './src/index.js';
+            // Импортируем функции
+            import('./src/index.js').then(module => {
+                const { quickInitMoodBoard, injectCriticalStyles } = module;
+                
+                injectCriticalStyles();
+                
+                const moodboard = quickInitMoodBoard('#moodboard-container', {
+                    theme: 'light',
+                    autoSave: false
+                });
             
-            injectCriticalStyles();
-            
-            const moodboard = quickInitMoodBoard('#moodboard-container', {
-                theme: 'light',
-                autoSave: false
-            });
-            
-            // Показываем базовый путь эмоджи
-            setTimeout(() => {
-                try {
-                    const toolbar = moodboard.toolbar;
-                    if (toolbar && toolbar.getEmojiBasePath) {
-                        const basePath = toolbar.getEmojiBasePath();
-                        document.getElementById('emoji-base-path').textContent = basePath;
-                        
-                        // Тестируем загрузку одного эмоджи
-                        const testEmojiUrl = basePath + 'Смайлики/1f600.png';
-                        const img = new Image();
-                        img.onload = () => {
-                            document.getElementById('status').textContent = '✅ Работает! Эмоджи загружаются';
-                            document.getElementById('status').style.color = 'green';
-                        };
-                        img.onerror = () => {
-                            document.getElementById('status').textContent = '❌ Ошибка! Эмоджи не загружаются';
-                            document.getElementById('status').style.color = 'red';
-                            console.error('❌ Тестовый эмоджи не загрузился:', testEmojiUrl);
-                        };
-                        img.src = testEmojiUrl;
+                // Показываем базовый путь эмоджи
+                setTimeout(() => {
+                    try {
+                        const toolbar = moodboard.toolbar;
+                        if (toolbar && toolbar.getEmojiBasePath) {
+                            const basePath = toolbar.getEmojiBasePath();
+                            document.getElementById('emoji-base-path').textContent = basePath;
+                            
+                            // Тестируем загрузку одного эмоджи
+                            const testEmojiUrl = basePath + 'Смайлики/1f600.png';
+                            const img = new Image();
+                            img.onload = () => {
+                                document.getElementById('status').textContent = '✅ Работает! Эмоджи загружаются';
+                                document.getElementById('status').style.color = 'green';
+                            };
+                            img.onerror = () => {
+                                document.getElementById('status').textContent = '❌ Ошибка! Эмоджи не загружаются';
+                                document.getElementById('status').style.color = 'red';
+                                console.error('❌ Тестовый эмоджи не загрузился:', testEmojiUrl);
+                            };
+                            
+                            // Проверяем стили панелей
+                            setTimeout(() => {
+                                const testPanel = document.querySelector('.text-properties-panel, .frame-properties-panel');
+                                if (testPanel) {
+                                    const width = parseInt(getComputedStyle(testPanel).minWidth);
+                                    if (width >= 250) {
+                                        document.getElementById('panels-status').textContent = '✅ Стили загружены';
+                                        document.getElementById('panels-status').style.color = 'green';
+                                    } else {
+                                        document.getElementById('panels-status').textContent = '⚠️ Стили частично';
+                                        document.getElementById('panels-status').style.color = 'orange';
+                                    }
+                                } else {
+                                    document.getElementById('panels-status').textContent = '📋 Панели не найдены';
+                                    document.getElementById('panels-status').style.color = 'gray';
+                                }
+                            }, 3000);
+                            img.src = testEmojiUrl;
+                        }
+                    } catch (e) {
+                        document.getElementById('status').textContent = '⚠️ Ошибка тестирования';
+                        console.error('Ошибка тестирования:', e);
                     }
-                } catch (e) {
-                    document.getElementById('status').textContent = '⚠️ Ошибка тестирования';
-                    console.error('Ошибка тестирования:', e);
-                }
-            }, 2000);
+                }, 2000);
+                
+            }).catch(error => {
+                console.error('❌ Ошибка импорта:', error);
+                document.getElementById('status').textContent = '❌ Ошибка импорта модуля';
+                document.getElementById('status').style.color = 'red';
+            });
             
         } catch (error) {
             console.error('❌ Критическая ошибка:', error);

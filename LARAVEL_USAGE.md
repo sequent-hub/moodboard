@@ -151,6 +151,7 @@ location /node_modules {
 1. Проверьте `window.MOODBOARD_BASE_PATH`
 2. Убедитесь, что CSS файлы доступны по HTTP
 3. Используйте `injectCriticalStyles()` для базовых стилей
+4. **Для панелей свойств**: критичные стили включены в `injectCriticalStyles()`, должны работать сразу
 
 ### Эмоджи не отображаются
 1. Проверьте доступность папки `src/assets/emodji/`

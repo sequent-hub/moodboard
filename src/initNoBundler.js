@@ -14,7 +14,7 @@ import { EmojiLoaderNoBundler } from './utils/emojiLoaderNoBundler.js';
  */
 export async function initMoodBoardNoBundler(container, options = {}, basePath = '') {
     
-    // 1. Загружаем стили
+    // 1. Загружаем стили (с автоматическим fallback для панелей)
     const styleLoader = new StyleLoader();
     await styleLoader.loadAllStyles(basePath);
     
@@ -55,35 +55,46 @@ export function injectCriticalStyles() {
             background: #f7fbff;
         }
         
-        .moodboard-toolbar {
+        .moodboard-workspace__toolbar {
             position: absolute;
-            left: 20px;
+            left: 16px;
             top: 50%;
             transform: translateY(-50%);
-            z-index: 1000;
+            z-index: 3000;
+            pointer-events: none;
+        }
+        
+        .moodboard-toolbar {
             background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-radius: 999px;
             padding: 8px;
-            display: flex;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            border: 1px solid #e0e0e0;
+            display: inline-flex;
             flex-direction: column;
-            gap: 4px;
+            align-items: center;
+            gap: 8px;
+            pointer-events: auto;
+            width: 30px;
+            overflow: hidden;
+            cursor: default;
         }
         
         .moodboard-topbar {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 20px;
-            z-index: 1000;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            padding: 8px 16px;
-            display: flex;
+            top: 12px;
+            left: 16px;
+            height: 30px;
+            display: inline-flex;
             align-items: center;
-            gap: 8px;
-            height: 44px;
+            gap: 6px;
+            padding: 8px 10px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 9999px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            z-index: 3000;
+            pointer-events: auto;
         }
         
         .moodboard-html-handles {
@@ -94,15 +105,118 @@ export function injectCriticalStyles() {
             z-index: 999;
         }
         
+        /* КРИТИЧНЫЕ СТИЛИ ПАНЕЛЕЙ - для корректного отображения */
+        .text-properties-panel {
+            position: absolute;
+            pointer-events: auto;
+            display: flex !important;
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 22px;
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 9999px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+            font-size: 13px;
+            font-family: 'Roboto', Arial, sans-serif;
+            min-width: 320px !important;
+            height: 36px !important;
+            z-index: 1001;
+        }
+        
+        .frame-properties-panel {
+            position: absolute;
+            pointer-events: auto;
+            display: inline-flex !important;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 32px;
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 9999px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+            font-size: 13px;
+            font-family: 'Roboto', Arial, sans-serif;
+            min-width: 320px !important;
+            height: 36px !important;
+            z-index: 1001;
+        }
+        
+        .note-properties-panel {
+            position: absolute;
+            pointer-events: auto;
+            display: inline-flex !important;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 22px;
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 9999px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+            font-size: 13px;
+            font-family: 'Roboto', Arial, sans-serif;
+            min-width: 280px !important;
+            height: 36px !important;
+            z-index: 1001;
+        }
+        
+        .file-properties-panel {
+            position: absolute;
+            pointer-events: auto;
+            display: inline-flex !important;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 22px;
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 9999px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+            font-size: 13px;
+            font-family: 'Roboto', Arial, sans-serif;
+            min-width: 250px !important;
+            height: 36px !important;
+            z-index: 1001;
+        }
+        
+        /* Базовые стили для элементов панелей */
+        .tpp-label, .fpp-label, .npp-label, .file-panel-label {
+            font-family: 'Roboto', Arial, sans-serif;
+            font-size: 12px;
+            color: #666;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        
+        .font-select, .font-size-select, .fpp-select, .fpp-input {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 13px;
+            background-color: #fff;
+            cursor: pointer;
+            min-height: 20px;
+        }
+        
+        .current-color-button, .current-bgcolor-button, .fpp-color-button {
+            width: 28px !important;
+            height: 28px !important;
+            border: 1px solid #ddd;
+            border-radius: 50%;
+            cursor: pointer;
+            margin: 0;
+            padding: 0;
+            display: block;
+            box-sizing: border-box;
+        }
+        
         /* Скрыть до полной загрузки стилей */
-        .moodboard-toolbar__popup,
-        .moodboard-properties-panel {
+        .moodboard-toolbar__popup {
             opacity: 0;
             transition: opacity 0.3s ease;
         }
         
-        .moodboard-styles-loaded .moodboard-toolbar__popup,
-        .moodboard-styles-loaded .moodboard-properties-panel {
+        .moodboard-styles-loaded .moodboard-toolbar__popup {
             opacity: 1;
         }
     `;
