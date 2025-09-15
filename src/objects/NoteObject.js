@@ -412,4 +412,27 @@ export class NoteObject {
         this.textField.x = centerX;
         this.textField.y = centerY;
     }
+
+    /**
+     * Корректирует чёткость текста при изменении масштаба мира.
+     * Увеличиваем resolution текстовой текстуры пропорционально зуму,
+     * затем перерисовываем текст без изменения визуального размера.
+     * @param {number} worldScale текущий масштаб worldLayer (например, 1.2)
+     * @param {number} deviceResolution текущее renderer.resolution (обычно devicePixelRatio)
+     */
+    updateCrispnessForZoom(worldScale, deviceResolution) {
+        try {
+            if (!this.textField) return;
+            const dpr = Math.max(1, Number(deviceResolution) || 1);
+            const s = Math.max(0.1, Number(worldScale) || 1);
+            const targetRes = Math.max(1, dpr * s);
+            if (this.textField.resolution !== targetRes) {
+                this.textField.resolution = targetRes;
+                // Для стабильной отрисовки
+                this.textField.roundPixels = true;
+                // Принудительно пересчитать текстуру под новую resolution
+                this.textField.updateText();
+            }
+        } catch (_) {}
+    }
 }

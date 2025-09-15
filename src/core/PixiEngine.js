@@ -1,6 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { ObjectFactory } from '../objects/ObjectFactory.js';
 import { ObjectRenderer } from './rendering/ObjectRenderer.js';
+import { Events } from './events/Events.js';
 
 export class PixiEngine {
     constructor(container, eventBus, options) {
@@ -39,6 +40,26 @@ export class PixiEngine {
 
         // Инициализируем ObjectRenderer
         this.renderer = new ObjectRenderer(this.objects, this.eventBus);
+
+        // Поддержка чёткости текстов записок при зуме: подписка на событие зума
+        if (this.eventBus) {
+            const onZoom = ({ percentage }) => {
+                try {
+                    const world = this.worldLayer || this.app.stage;
+                    const s = world?.scale?.x || (percentage ? percentage / 100 : 1);
+                    const res = this.app?.renderer?.resolution || 1;
+                    for (const [, pixiObject] of this.objects) {
+                        const mb = pixiObject && pixiObject._mb;
+                        if (mb && mb.type === 'note' && mb.instance && typeof mb.instance.updateCrispnessForZoom === 'function') {
+                            mb.instance.updateCrispnessForZoom(s, res);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('PixiEngine: zoom crispness update failed', e);
+                }
+            };
+            this.eventBus.on(Events.UI.ZoomPercent, onZoom);
+        }
     }
 
     createObject(objectData) {
@@ -56,6 +77,15 @@ export class PixiEngine {
             };
             this.objects.set(objectData.id, pixiObject);
             this.worldLayer.addChild(pixiObject);
+            // Первичная установка чёткости для записок по текущему масштабу/резолюции
+            try {
+                if (pixiObject && pixiObject._mb && pixiObject._mb.type === 'note' && pixiObject._mb.instance && typeof pixiObject._mb.instance.updateCrispnessForZoom === 'function') {
+                    const world = this.worldLayer || this.app.stage;
+                    const s = world?.scale?.x || 1;
+                    const res = this.app?.renderer?.resolution || 1;
+                    pixiObject._mb.instance.updateCrispnessForZoom(s, res);
+                }
+            } catch (_) {}
         } else {
             console.warn(`Unknown object type: ${objectData.type}`);
             pixiObject = this.createDefaultObject(objectData);
