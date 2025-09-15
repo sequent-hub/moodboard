@@ -51,6 +51,7 @@ export class FrameObject {
         });
         // Размещаем заголовок внутри верхней части фрейма, чтобы не влиять на внешние границы
         this.titleText.anchor.set(0, 0);
+        this.titleText.scale.set(1); // Инициализируем базовый масштаб
         this.titleText.x = 8;
         this.titleText.y = 4;
         this.container.addChild(this.titleText);
@@ -61,8 +62,8 @@ export class FrameObject {
         }
         
         this._draw(this.width, this.height, this.fillColor);
-        // Первичная обрезка заголовка
-        this._updateTitleText();
+        // Применяем начальный масштаб и обрезку заголовка
+        this._updateTitleScale();
         // Центрируем pivot контейнера, чтобы совпадали рамка и ручки
         // pivot по центру, чтобы позиция (x,y) контейнера соответствовала центру видимой области фрейма
         this.container.pivot.set(this.width / 2, this.height / 2);
@@ -189,15 +190,14 @@ export class FrameObject {
         // Компенсируем зум мира обратным масштабированием заголовка
         const compensationScale = 1 / this.currentWorldScale;
         
-        // Обновляем размер шрифта
-        const newFontSize = this.baseFontSize * compensationScale;
-        this.titleText.style.fontSize = newFontSize;
+        // Используем scale вместо fontSize для избежания размытия
+        this.titleText.scale.set(compensationScale);
         
-        // Корректируем позицию заголовка с учетом изменения размера
+        // Корректируем позицию заголовка с учетом изменения масштаба
         this.titleText.x = 8 * compensationScale;
         this.titleText.y = 4 * compensationScale;
         
-        // Обновляем текст с учетом нового размера
+        // Обновляем текст с учетом нового масштаба
         this._updateTitleText();
     }
 
@@ -228,23 +228,25 @@ export class FrameObject {
         const availableWidth = this.width - leftPadding - rightPadding;
 
         // Создаем временный стиль для измерения текста
+        // Используем базовый размер шрифта, а масштаб учтем отдельно
         const style = new PIXI.TextStyle({
             fontFamily: this.titleText.style.fontFamily,
-            fontSize: this.titleText.style.fontSize,
+            fontSize: this.baseFontSize,
             fontWeight: this.titleText.style.fontWeight
         });
 
-        // Измеряем ширину оригинального текста
+        // Измеряем ширину оригинального текста с учетом масштаба
         const textMetrics = PIXI.TextMetrics.measureText(text, style);
+        const scaledTextWidth = textMetrics.width * compensationScale;
         
         // Если текст помещается, возвращаем его как есть
-        if (textMetrics.width <= availableWidth) {
+        if (scaledTextWidth <= availableWidth) {
             return text;
         }
 
-        // Измеряем ширину многоточия
+        // Измеряем ширину многоточия с учетом масштаба
         const ellipsisMetrics = PIXI.TextMetrics.measureText('...', style);
-        const ellipsisWidth = ellipsisMetrics.width;
+        const ellipsisWidth = ellipsisMetrics.width * compensationScale;
         
         // Доступная ширина для текста без многоточия
         const textAvailableWidth = availableWidth - ellipsisWidth;
@@ -262,8 +264,9 @@ export class FrameObject {
             const mid = Math.floor((left + right) / 2);
             const subText = text.substring(0, mid);
             const subTextMetrics = PIXI.TextMetrics.measureText(subText, style);
+            const scaledSubTextWidth = subTextMetrics.width * compensationScale;
 
-            if (subTextMetrics.width <= textAvailableWidth) {
+            if (scaledSubTextWidth <= textAvailableWidth) {
                 result = subText;
                 left = mid + 1;
             } else {
