@@ -42,6 +42,7 @@ export class FrameObject {
         // Текст заголовка
         this.baseFontSize = 14; // Сохраняем оригинальный размер шрифта
         this.currentWorldScale = 1.0; // Текущий масштаб мира
+        this.originalTitle = this.title; // Сохраняем оригинальный заголовок
         this.titleText = new PIXI.Text(this.title, {
             fontFamily: 'Arial, sans-serif',
             fontSize: this.baseFontSize,
@@ -60,6 +61,8 @@ export class FrameObject {
         }
         
         this._draw(this.width, this.height, this.fillColor);
+        // Первичная обрезка заголовка
+        this._updateTitleText();
         // Центрируем pivot контейнера, чтобы совпадали рамка и ручки
         // pivot по центру, чтобы позиция (x,y) контейнера соответствовала центру видимой области фрейма
         this.container.pivot.set(this.width / 2, this.height / 2);
@@ -89,9 +92,8 @@ export class FrameObject {
      */
     setTitle(title) {
         this.title = title || 'Новый';
-        if (this.titleText) {
-            this.titleText.text = this.title;
-        }
+        this.originalTitle = this.title;
+        this._updateTitleText();
     }
 
     /**
@@ -116,8 +118,6 @@ export class FrameObject {
         this.width = w;
         this.height = h;
         this._redrawPreserveTransform(w, h, this.fillColor);
-        // Обновляем масштаб заголовка после изменения размера
-        this._updateTitleScale();
     }
 
     /**
@@ -138,8 +138,8 @@ export class FrameObject {
         container.y = y;
         container.rotation = rot;
         
-        // Обновляем масштаб заголовка после перерисовки
-        this._updateTitleScale();
+        // Обновляем заголовок после перерисовки
+        this._updateTitleText();
     }
 
     /**
@@ -196,6 +196,82 @@ export class FrameObject {
         // Корректируем позицию заголовка с учетом изменения размера
         this.titleText.x = 8 * compensationScale;
         this.titleText.y = 4 * compensationScale;
+        
+        // Обновляем текст с учетом нового размера
+        this._updateTitleText();
+    }
+
+    /**
+     * Обновить текст заголовка с учетом доступной ширины
+     */
+    _updateTitleText() {
+        if (!this.titleText) return;
+
+        const truncatedText = this._truncateTextToFit(this.originalTitle);
+        this.titleText.text = truncatedText;
+    }
+
+    /**
+     * Обрезать текст до доступной ширины с добавлением многоточия
+     * @param {string} text Исходный текст
+     * @returns {string} Обрезанный текст с многоточием или оригинальный текст
+     */
+    _truncateTextToFit(text) {
+        if (!text || !this.titleText) return text;
+
+        // Компенсация масштаба для правильного расчета размеров
+        const compensationScale = 1 / this.currentWorldScale;
+        
+        // Доступная ширина = ширина фрейма - отступы слева и справа (с учетом масштаба)
+        const leftPadding = 8 * compensationScale;
+        const rightPadding = 8 * compensationScale;
+        const availableWidth = this.width - leftPadding - rightPadding;
+
+        // Создаем временный стиль для измерения текста
+        const style = new PIXI.TextStyle({
+            fontFamily: this.titleText.style.fontFamily,
+            fontSize: this.titleText.style.fontSize,
+            fontWeight: this.titleText.style.fontWeight
+        });
+
+        // Измеряем ширину оригинального текста
+        const textMetrics = PIXI.TextMetrics.measureText(text, style);
+        
+        // Если текст помещается, возвращаем его как есть
+        if (textMetrics.width <= availableWidth) {
+            return text;
+        }
+
+        // Измеряем ширину многоточия
+        const ellipsisMetrics = PIXI.TextMetrics.measureText('...', style);
+        const ellipsisWidth = ellipsisMetrics.width;
+        
+        // Доступная ширина для текста без многоточия
+        const textAvailableWidth = availableWidth - ellipsisWidth;
+        
+        if (textAvailableWidth <= 0) {
+            return '...';
+        }
+
+        // Бинарный поиск оптимальной длины текста
+        let left = 0;
+        let right = text.length;
+        let result = '';
+
+        while (left <= right) {
+            const mid = Math.floor((left + right) / 2);
+            const subText = text.substring(0, mid);
+            const subTextMetrics = PIXI.TextMetrics.measureText(subText, style);
+
+            if (subTextMetrics.width <= textAvailableWidth) {
+                result = subText;
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
+        }
+
+        return result + '...';
     }
 
     /**
