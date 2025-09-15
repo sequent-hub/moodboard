@@ -1870,28 +1870,31 @@ export class SelectTool extends BaseTool {
             
             // Текст у записки центрирован по обеим осям; textarea тоже центрируем
             const horizontalPadding = 16; // немного больше, чем раньше
-            const editorWidth = Math.min(360, noteWidth - (horizontalPadding * 2));
-            const editorHeight = Math.min(180, noteHeight - (horizontalPadding * 2));
-            
-            const textCenterX = noteWidth / 2;
-            const textCenterY = noteHeight / 2;
-            
-            const editorLeft = textCenterX - (editorWidth / 2);
-            const editorTop = textCenterY - (editorHeight / 2);
-            
-            wrapper.style.left = `${screenPos.x + editorLeft}px`;
-            wrapper.style.top = `${screenPos.y + editorTop}px`;
-            
-            // Устанавливаем размеры редактора (центрируем по контенту)
-            textarea.style.width = `${editorWidth}px`;
-            textarea.style.height = `${editorHeight}px`;
-            wrapper.style.width = `${editorWidth}px`;
-            wrapper.style.height = `${editorHeight}px`;
+            // Преобразуем мировые размеры/отступы в CSS-пиксели с учётом текущего зума
+            const viewResLocal = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
+            const worldLayerRefForCss = this.textEditor.world || (this.app?.stage);
+            const sForCss = worldLayerRefForCss?.scale?.x || 1;
+            const sCssLocal = sForCss / viewResLocal;
+            const editorWidthWorld = Math.min(360, Math.max(1, noteWidth - (horizontalPadding * 2)));
+            const editorHeightWorld = Math.min(180, Math.max(1, noteHeight - (horizontalPadding * 2)));
+            const editorWidthPx = Math.max(1, Math.round(editorWidthWorld * sCssLocal));
+            const editorHeightPx = Math.max(1, Math.round(editorHeightWorld * sCssLocal));
+            const textCenterXWorld = noteWidth / 2;
+            const textCenterYWorld = noteHeight / 2;
+            const editorLeftWorld = textCenterXWorld - (editorWidthWorld / 2);
+            const editorTopWorld = textCenterYWorld - (editorHeightWorld / 2);
+            wrapper.style.left = `${Math.round(screenPos.x + editorLeftWorld * sCssLocal)}px`;
+            wrapper.style.top = `${Math.round(screenPos.y + editorTopWorld * sCssLocal)}px`;
+            // Устанавливаем размеры редактора (центрируем по контенту) в CSS-пикселях
+            textarea.style.width = `${editorWidthPx}px`;
+            textarea.style.height = `${editorHeightPx}px`;
+            wrapper.style.width = `${editorWidthPx}px`;
+            wrapper.style.height = `${editorHeightPx}px`;
 
             // Для записок: авто-ресайз редактора под содержимое с сохранением центрирования
             textarea.style.textAlign = 'center';
-            const maxEditorWidth = Math.max(1, noteWidth - (horizontalPadding * 2));
-            const maxEditorHeight = Math.max(1, noteHeight - (horizontalPadding * 2));
+            const maxEditorWidthPx = Math.max(1, Math.round((noteWidth - (horizontalPadding * 2)) * sCssLocal));
+            const maxEditorHeightPx = Math.max(1, Math.round((noteHeight - (horizontalPadding * 2)) * sCssLocal));
             const MIN_NOTE_EDITOR_W = 20;
             const MIN_NOTE_EDITOR_H = Math.max(1, computeLineHeightPx(effectiveFontPx));
 
@@ -1902,9 +1905,9 @@ export class SelectTool extends BaseTool {
                 textarea.style.width = 'auto';
                 textarea.style.height = 'auto';
 
-                // Ширина по содержимому, но не шире границ записки
+                // Ширина по содержимому, но не шире границ записки (в CSS-пикселях)
                 const naturalW = Math.ceil(textarea.scrollWidth + 1);
-                const targetW = Math.min(maxEditorWidth, Math.max(MIN_NOTE_EDITOR_W, naturalW));
+                const targetW = Math.min(maxEditorWidthPx, Math.max(MIN_NOTE_EDITOR_W, naturalW));
                 textarea.style.width = `${targetW}px`;
                 wrapper.style.width = `${targetW}px`;
 
@@ -1912,18 +1915,79 @@ export class SelectTool extends BaseTool {
                 const computed = (typeof window !== 'undefined') ? window.getComputedStyle(textarea) : null;
                 const lineH = (computed ? parseFloat(computed.lineHeight) : computeLineHeightPx(effectiveFontPx));
                 const naturalH = Math.ceil(textarea.scrollHeight);
-                const targetH = Math.min(maxEditorHeight, Math.max(MIN_NOTE_EDITOR_H, naturalH));
+                const targetH = Math.min(maxEditorHeightPx, Math.max(MIN_NOTE_EDITOR_H, naturalH));
                 textarea.style.height = `${targetH}px`;
                 wrapper.style.height = `${targetH}px`;
 
-                // Центрируем wrapper внутри записки после смены размеров
-                const left = screenPos.x + (noteWidth / 2) - (targetW / 2);
-                const top = screenPos.y + (noteHeight / 2) - (targetH / 2);
+                // Центрируем wrapper внутри записки после смены размеров (в CSS-пикселях)
+                const left = Math.round(screenPos.x + (noteWidth * sCssLocal) / 2 - (targetW / 2));
+                const top = Math.round(screenPos.y + (noteHeight * sCssLocal) / 2 - (targetH / 2));
                 wrapper.style.left = `${left}px`;
                 wrapper.style.top = `${top}px`;
             };
             // Первый вызов — синхронизировать с текущим содержимым
             autoSizeNote();
+
+            // Динамическое обновление позиции/размера редактора при зуме/панорамировании/трансформациях
+            const updateNoteEditor = () => {
+                try {
+                    // Актуальная позиция и размер объекта в мире
+                    const posDataNow = { objectId, position: null };
+                    const sizeDataNow = { objectId, size: null };
+                    this.eventBus.emit(Events.Tool.GetObjectPosition, posDataNow);
+                    this.eventBus.emit(Events.Tool.GetObjectSize, sizeDataNow);
+                    const posNow = posDataNow.position || position;
+                    const sizeNow = sizeDataNow.size || { width: noteWidth, height: noteHeight };
+                    const screenNow = toScreen(posNow.x, posNow.y);
+                    // Пересчитываем масштаб в CSS пикселях
+                    const vr = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
+                    const wl = this.textEditor.world || (this.app?.stage);
+                    const sc = wl?.scale?.x || 1;
+                    const sCss = sc / vr;
+                    const maxWpx = Math.max(1, Math.round((sizeNow.width - (horizontalPadding * 2)) * sCss));
+                    const maxHpx = Math.max(1, Math.round((sizeNow.height - (horizontalPadding * 2)) * sCss));
+                    // Измеряем естественный размер по контенту
+                    const prevW = textarea.style.width;
+                    const prevH = textarea.style.height;
+                    textarea.style.width = 'auto';
+                    textarea.style.height = 'auto';
+                    const naturalW = Math.ceil(textarea.scrollWidth + 1);
+                    const naturalH = Math.ceil(textarea.scrollHeight);
+                    const wPx = Math.min(maxWpx, Math.max(MIN_NOTE_EDITOR_W, naturalW));
+                    const hPx = Math.min(maxHpx, Math.max(MIN_NOTE_EDITOR_H, naturalH));
+                    // Применяем размеры редактора
+                    textarea.style.width = `${wPx}px`;
+                    wrapper.style.width = `${wPx}px`;
+                    textarea.style.height = `${hPx}px`;
+                    wrapper.style.height = `${hPx}px`;
+                    // Центрируем в пределах записки
+                    const left = Math.round(screenNow.x + (sizeNow.width * sCss) / 2 - (wPx / 2));
+                    const top = Math.round(screenNow.y + (sizeNow.height * sCss) / 2 - (hPx / 2));
+                    wrapper.style.left = `${left}px`;
+                    wrapper.style.top = `${top}px`;
+                    // Восстанавливаем прошлые значения, чтобы избежать мигания в стилях при следующем измерении
+                    textarea.style.width = `${wPx}px`;
+                    textarea.style.height = `${hPx}px`;
+                } catch (_) {}
+            };
+            const onZoom = () => updateNoteEditor();
+            const onPan = () => updateNoteEditor();
+            const onDrag = (e) => { if (e && e.object === objectId) updateNoteEditor(); };
+            const onResize = (e) => { if (e && e.object === objectId) updateNoteEditor(); };
+            const onRotate = (e) => { if (e && e.object === objectId) updateNoteEditor(); };
+            this.eventBus.on(Events.UI.ZoomPercent, onZoom);
+            this.eventBus.on(Events.Tool.PanUpdate, onPan);
+            this.eventBus.on(Events.Tool.DragUpdate, onDrag);
+            this.eventBus.on(Events.Tool.ResizeUpdate, onResize);
+            this.eventBus.on(Events.Tool.RotateUpdate, onRotate);
+            // Сохраняем слушателей для снятия при закрытии редактора
+            this.textEditor._listeners = [
+                [Events.UI.ZoomPercent, onZoom],
+                [Events.Tool.PanUpdate, onPan],
+                [Events.Tool.DragUpdate, onDrag],
+                [Events.Tool.ResizeUpdate, onResize],
+                [Events.Tool.RotateUpdate, onRotate],
+            ];
         } else {
             // Для обычного текста используем стандартное позиционирование
             wrapper.style.left = `${screenPos.x}px`;
@@ -2119,6 +2183,14 @@ export class SelectTool extends BaseTool {
             }
 
             // Убираем редактор
+            // Снимем навешанные на время редактирования слушатели
+            try {
+                if (this.textEditor && Array.isArray(this.textEditor._listeners)) {
+                    this.textEditor._listeners.forEach(([evt, fn]) => {
+                        try { this.eventBus.off(evt, fn); } catch (_) {}
+                    });
+                }
+            } catch (_) {}
             wrapper.remove();
             this.textEditor = { active: false, objectId: null, textarea: null, wrapper: null, world: null, position: null, properties: null, objectType: 'text' };
             if (currentObjectType === 'note') {
@@ -2219,51 +2291,8 @@ export class SelectTool extends BaseTool {
         if (!isNote) {
             textarea.addEventListener('input', autoSize);
         } else {
-            // Для заметок растягиваем редактор по содержимому и центрируем
-            textarea.addEventListener('input', () => {
-                try {
-                    // Найдём локальную функцию, если она объявлена выше (в замыкании)
-                    // В некоторых движках можно хранить ссылку на функцию в data-атрибуте
-                    // но здесь просто повторим алгоритм: сброс -> измерение -> ограничение -> центрирование
-                    const view = this.app?.view || document.querySelector('canvas');
-                    // Безопасно получим текущие размеры записки
-                    let noteWidth = 300, noteHeight = 300;
-                    if (objectId) {
-                        const sizeData = { objectId, size: null };
-                        this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
-                        if (sizeData.size) { noteWidth = sizeData.size.width; noteHeight = sizeData.size.height; }
-                    }
-                    const horizontalPadding = 16;
-                    const maxEditorWidth = Math.max(1, noteWidth - (horizontalPadding * 2));
-                    const maxEditorHeight = Math.max(1, noteHeight - (horizontalPadding * 2));
-                    const MIN_NOTE_EDITOR_W = 20;
-                    const MIN_NOTE_EDITOR_H = Math.max(1, computeLineHeightPx(effectiveFontPx));
-
-                    textarea.style.width = 'auto';
-                    textarea.style.height = 'auto';
-                    const naturalW = Math.ceil(textarea.scrollWidth + 1);
-                    const targetW = Math.min(maxEditorWidth, Math.max(MIN_NOTE_EDITOR_W, naturalW));
-                    textarea.style.width = `${targetW}px`;
-                    const computed = (typeof window !== 'undefined') ? window.getComputedStyle(textarea) : null;
-                    const lineH = (computed ? parseFloat(computed.lineHeight) : computeLineHeightPx(effectiveFontPx));
-                    const naturalH = Math.ceil(textarea.scrollHeight);
-                    const targetH = Math.min(maxEditorHeight, Math.max(MIN_NOTE_EDITOR_H, naturalH));
-                    textarea.style.height = `${targetH}px`;
-                    wrapper.style.width = `${targetW}px`;
-                    wrapper.style.height = `${targetH}px`;
-
-                    const toScreen = (wx, wy) => {
-                        const worldLayer = this.textEditor.world || (this.app?.stage);
-                        if (!worldLayer) return { x: wx, y: wy };
-                        const global = worldLayer.toGlobal(new PIXI.Point(wx, wy));
-                        const viewRes = (this.app?.renderer?.resolution) || (view && view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
-                        return { x: global.x / viewRes, y: global.y / viewRes };
-                    };
-                    const screenPos = toScreen(position.x, position.y);
-                    wrapper.style.left = `${screenPos.x + (noteWidth / 2) - (targetW / 2)}px`;
-                    wrapper.style.top = `${screenPos.y + (noteHeight / 2) - (targetH / 2)}px`;
-                } catch (_) {}
-            });
+            // Для заметок растягиваем редактор по содержимому и центрируем с учётом зума
+            textarea.addEventListener('input', () => { try { updateNoteEditor(); } catch (_) {} });
         }
     }
 
