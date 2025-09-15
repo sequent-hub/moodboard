@@ -1,3 +1,6 @@
+// Импортируем встроенные SVG эмоджи
+import { getInlineEmojiUrl, isInlineSvgEmoji } from './inlineSvgEmojis.js';
+
 // Явные переопределения соответствия эмодзи → имя файла (без расширения)
 // Ключ и значение — в нижнем регистре, кодпоинты через дефис
 const EMOJI_OVERRIDES = new Map([
@@ -125,12 +128,33 @@ export function buildLocalPaths(emoji) {
 }
 
 /**
+ * ПРИОРИТЕТНЫЙ РЕЗОЛВЕР: Сначала встроенные SVG, потом файлы
+ * @param {string} emoji - эмоджи символ  
+ * @returns {string|null} Data URL для встроенного SVG или null
+ */
+export function resolveInlineEmojiFirst(emoji) {
+    // Приоритет 1: Встроенные SVG эмоджи (мгновенная загрузка, нет проблем с путями)
+    if (isInlineSvgEmoji(emoji)) {
+        const dataUrl = getInlineEmojiUrl(emoji);
+        if (dataUrl) {
+            console.log('✅ Используем встроенный SVG эмоджи:', emoji);
+            return dataUrl;
+        }
+    }
+    
+    return null; // Эмоджи не найден во встроенных
+}
+
+/**
  * Возвращает абсолютный URL для эмоджи с учетом базового пути
  * @param {string} emoji - эмоджи символ
  * @param {string} basePath - базовый путь к ассетам
  * @returns {string|null} абсолютный URL или null
  */
 export function resolveEmojiAbsoluteUrl(emoji, basePath = null) {
+    // ПРИОРИТЕТ 1: Проверяем встроенные SVG эмоджи
+    const inlineUrl = resolveInlineEmojiFirst(emoji);
+    if (inlineUrl) return inlineUrl;
     try {
         const base = emojiFilenameBase(emoji);
         if (!base) return null;

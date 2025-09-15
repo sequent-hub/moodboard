@@ -174,6 +174,14 @@ export { initMoodBoardNoBundler, quickInitMoodBoard, injectCriticalStyles, force
 export { StyleLoader } from './utils/styleLoader.js';
 export { EmojiLoaderNoBundler } from './utils/emojiLoaderNoBundler.js';
 
+// Экспорт встроенных SVG эмоджи
+export { 
+    addInlineSvgEmoji, 
+    bulkAddInlineSvgEmojis, 
+    getAvailableInlineEmojis,
+    isInlineSvgEmoji 
+} from './utils/inlineSvgEmojis.js';
+
 /**
  * СУПЕР-АГРЕССИВНАЯ функция для исправления панелей в проектах с конфликтами CSS
  */
