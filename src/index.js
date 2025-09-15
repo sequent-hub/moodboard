@@ -2,6 +2,25 @@
 export { MoodBoard } from './moodboard/MoodBoard.js';
 
 /**
+ * БЫСТРОЕ ИСПРАВЛЕНИЕ эмоджи для Vite/bundled версий
+ * Устанавливает правильный базовый путь к ассетам пакета
+ */
+export function fixEmojiPaths(packageName = null) {
+    if (packageName) {
+        // Если указано имя пакета - используем его
+        window.MOODBOARD_BASE_PATH = `${window.location.origin}/node_modules/${packageName}/`;
+        console.log('🔧 Установлен базовый путь для эмоджи:', window.MOODBOARD_BASE_PATH);
+    } else {
+        // Автоопределение - используем стандартное имя пакета
+        const detectedPackage = '@sequent-org/moodboard';
+        window.MOODBOARD_BASE_PATH = `${window.location.origin}/node_modules/${detectedPackage}/`;
+        console.log('🔧 Автоопределен базовый путь для эмоджи:', window.MOODBOARD_BASE_PATH);
+    }
+    
+    return window.MOODBOARD_BASE_PATH;
+}
+
+/**
  * Диагностика конфликтов CSS для панелей
  * Находит что именно переопределяет ширину панелей
  */

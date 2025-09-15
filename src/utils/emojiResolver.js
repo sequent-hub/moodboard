@@ -148,7 +148,30 @@ export function resolveEmojiAbsoluteUrl(emoji, basePath = null) {
                     const globalPath = window.MOODBOARD_BASE_PATH.endsWith('/') ? window.MOODBOARD_BASE_PATH : window.MOODBOARD_BASE_PATH + '/';
                     resolvedBasePath = `${globalPath}src/assets/emodji/`;
                 } else {
-                    resolvedBasePath = '/src/assets/emodji/';
+                    // УНИВЕРСАЛЬНОЕ РЕШЕНИЕ: Пытаемся найти правильный путь к пакету
+                    const currentUrl = window.location.origin;
+                    
+                    // Определяем имя пакета из package.json или по скрипту
+                    let packagePath = null;
+                    
+                    // Метод 1: Ищем в node_modules по известным именам пакетов
+                    const possiblePackageNames = [
+                        '@sequent-org/moodboard',
+                        'moodboard-futurello', 
+                        'moodboard'
+                    ];
+                    
+                    // Используем правильное имя пакета по умолчанию
+                    packagePath = `${currentUrl}/node_modules/@sequent-org/moodboard/src/assets/emodji/`;
+                    
+                    // Fallback на другие возможные имена если основной не работает
+                    // (для форков или других версий пакета)
+                    // const alternativeNames = ['moodboard-futurello', 'moodboard'];
+                    // можно добавить логику проверки доступности
+                    
+                    resolvedBasePath = packagePath || `${currentUrl}/src/assets/emodji/`;
+                    
+                    console.log('🔧 Fallback путь к эмоджи:', resolvedBasePath);
                 }
             }
         }
