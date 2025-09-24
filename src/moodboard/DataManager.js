@@ -73,9 +73,22 @@ export class DataManager {
     clearBoard() {
         if (!this.coreMoodboard) return;
         
+        // 1) Удаляем все объекты, известные состоянию
         const objects = this.coreMoodboard.objects || [];
         objects.forEach(obj => this.coreMoodboard.deleteObject(obj.id));
-        
+
+        // 2) Страховка: удаляем «висячие» PIXI-объекты, которые не попали в state
+        try {
+            const pixi = this.coreMoodboard.pixi;
+            const stateIds = new Set((this.coreMoodboard.state?.state?.objects || []).map(o => o && o.id));
+            if (pixi && pixi.objects && pixi.objects.size > 0) {
+                for (const [objectId] of pixi.objects) {
+                    if (!stateIds.has(objectId)) {
+                        pixi.removeObject(objectId);
+                    }
+                }
+            }
+        } catch (_) { /* no-op */ }
 
         return objects.length;
     }

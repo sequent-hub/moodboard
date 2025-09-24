@@ -2062,6 +2062,17 @@ export class CoreMoodBoard {
      * Создание объекта из полных данных (для загрузки с сервера)
      */
     createObjectFromData(objectData) {
+        // Защита от двойной загрузки одного и того же объекта (дубликаты при повторном вызове loadData)
+        try {
+            const id = objectData && objectData.id;
+            const alreadyInPixi = !!(id && this.pixi && this.pixi.objects && this.pixi.objects.has(id));
+            const alreadyInState = !!(id && Array.isArray(this.state?.state?.objects) && this.state.state.objects.some(o => o && o.id === id));
+            if (alreadyInPixi || alreadyInState) {
+                // Объект уже создан ранее в этой сессии — не добавляем повторно ни в state, ни в PIXI
+                return objectData;
+            }
+        } catch (_) { /* no-op */ }
+
         // Инициализируем флаг компенсации пивота для загруженных объектов.
         // В state координаты хранятся как левый-верх. PIXI позиционирует по центру (anchor/pivot по центру),
         // поэтому при создании нужно ДОБАВИТЬ половину ширины/высоты (т.е. pivotCompensated должен быть false),
