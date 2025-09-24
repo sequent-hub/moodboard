@@ -2062,6 +2062,15 @@ export class CoreMoodBoard {
      * Создание объекта из полных данных (для загрузки с сервера)
      */
     createObjectFromData(objectData) {
+        // Инициализируем флаг компенсации пивота для загруженных объектов,
+        // чтобы PIXI не применял компенсацию повторно
+        if (!objectData.transform) {
+            objectData.transform = {};
+        }
+        if (objectData.transform.pivotCompensated === undefined) {
+            objectData.transform.pivotCompensated = true;
+        }
+
         // Используем существующие данные объекта (с его ID, размерами и т.д.)
         this.state.addObject(objectData);
         this.pixi.createObject(objectData);
