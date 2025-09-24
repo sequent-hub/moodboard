@@ -75,8 +75,6 @@ export class PixiEngine {
                 type: objectData.type,
                 instance: instance // Сохраняем ссылку на сам объект
             };
-            this.objects.set(objectData.id, pixiObject);
-            this.worldLayer.addChild(pixiObject);
             // Первичная установка чёткости для записок по текущему масштабу/резолюции
             try {
                 if (pixiObject && pixiObject._mb && pixiObject._mb.type === 'note' && pixiObject._mb.instance && typeof pixiObject._mb.instance.updateCrispnessForZoom === 'function') {
