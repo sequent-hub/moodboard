@@ -2062,13 +2062,15 @@ export class CoreMoodBoard {
      * Создание объекта из полных данных (для загрузки с сервера)
      */
     createObjectFromData(objectData) {
-        // Инициализируем флаг компенсации пивота для загруженных объектов,
-        // чтобы PIXI не применял компенсацию повторно
+        // Инициализируем флаг компенсации пивота для загруженных объектов.
+        // В state координаты хранятся как левый-верх. PIXI позиционирует по центру (anchor/pivot по центру),
+        // поэтому при создании нужно ДОБАВИТЬ половину ширины/высоты (т.е. pivotCompensated должен быть false),
+        // чтобы PixiEngine выполнил компенсацию.
         if (!objectData.transform) {
             objectData.transform = {};
         }
         if (objectData.transform.pivotCompensated === undefined) {
-            objectData.transform.pivotCompensated = true;
+            objectData.transform.pivotCompensated = false;
         }
 
         // Используем существующие данные объекта (с его ID, размерами и т.д.)
