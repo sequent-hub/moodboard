@@ -37,6 +37,16 @@ export class DataManager {
             this.loadViewport(data.viewport);
         }
         
+        // ИСПРАВЛЕНИЕ: Принудительно пересоздаем HTML элементы после загрузки данных
+        // Это нужно потому что createObjectFromData() НЕ генерирует Events.Object.Created
+        // чтобы не запускать автосохранение, но HtmlTextLayer нуждается в этих событиях
+        setTimeout(() => {
+            // Ищем htmlTextLayer через глобальную переменную (установленную в MoodBoard.js)
+            if (window.moodboardHtmlTextLayer) {
+                window.moodboardHtmlTextLayer.rebuildFromState();
+                window.moodboardHtmlTextLayer.updateAll();
+            }
+        }, 100);
 
     }
     

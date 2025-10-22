@@ -36,6 +36,12 @@ export class MoodBoard {
         // Настройки по умолчанию
         this.options = {
             theme: 'light',
+            boardId: null,
+            apiUrl: '/api/moodboard',
+            autoLoad: true,
+            onSave: null,
+            onLoad: null,
+            onDestroy: null,
             ...options
         };
         
@@ -121,8 +127,13 @@ export class MoodBoard {
             // Предоставляем доступ к сервису через core
             this.coreMoodboard.imageUploadService = this.imageUploadService;
             
-            // Загружаем данные (сначала пробуем загрузить с сервера, потом дефолтные)
-            await this.loadExistingBoard();
+            // Настраиваем коллбеки событий
+            this.setupEventCallbacks();
+            
+            // Автоматически загружаем данные если включено
+            if (this.options.autoLoad) {
+                await this.loadExistingBoard();
+            }
             
         } catch (error) {
             console.error('MoodBoard init failed:', error);
@@ -326,34 +337,65 @@ export class MoodBoard {
         try {
             const boardId = this.options.boardId;
             
-            if (!boardId || !this.options.loadEndpoint) {
-                this.dataManager.loadData(this.data);
+            if (!boardId || !this.options.apiUrl) {
+                console.log('📦 MoodBoard: нет boardId или apiUrl, загружаем пустую доску');
+                this.dataManager.loadData(this.data || { objects: [] });
+                
+                // Вызываем коллбек onLoad
+                if (typeof this.options.onLoad === 'function') {
+                    this.options.onLoad({ success: true, data: this.data || { objects: [] } });
+                }
                 return;
             }
             
-            // Пытаемся загрузить с сервера
-            const boardData = await this.coreMoodboard.saveManager.loadBoardData(boardId);
+            console.log(`📦 MoodBoard: загружаем доску ${boardId} с ${this.options.apiUrl}`);
             
-            if (boardData && boardData.objects) {
-                // Восстанавливаем URL изображений и файлов перед загрузкой (если метод доступен)
-                let restoredData = boardData;
-                if (this.coreMoodboard.apiClient && typeof this.coreMoodboard.apiClient.restoreObjectUrls === 'function') {
-                    try {
-                        restoredData = await this.coreMoodboard.apiClient.restoreObjectUrls(boardData);
-                    } catch (error) {
-                        console.warn('Не удалось восстановить URL объектов:', error);
-                        restoredData = boardData; // Используем исходные данные
-                    }
+            // Формируем URL для загрузки
+            const loadUrl = this.options.apiUrl.endsWith('/') 
+                ? `${this.options.apiUrl}load/${boardId}`
+                : `${this.options.apiUrl}/load/${boardId}`;
+            
+            // Загружаем с сервера через fetch
+            const response = await fetch(loadUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': this.getCsrfToken()
                 }
-                this.dataManager.loadData(restoredData);
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const boardData = await response.json();
+            
+            if (boardData && boardData.data) {
+                console.log('✅ MoodBoard: данные загружены с сервера', boardData.data);
+                this.dataManager.loadData(boardData.data);
+                
+                // Вызываем коллбек onLoad
+                if (typeof this.options.onLoad === 'function') {
+                    this.options.onLoad({ success: true, data: boardData.data });
+                }
             } else {
-                this.dataManager.loadData(this.data);
+                console.log('📦 MoodBoard: нет данных с сервера, загружаем пустую доску');
+                this.dataManager.loadData(this.data || { objects: [] });
+                
+                // Вызываем коллбек onLoad
+                if (typeof this.options.onLoad === 'function') {
+                    this.options.onLoad({ success: true, data: this.data || { objects: [] } });
+                }
             }
             
         } catch (error) {
-            console.warn('⚠️ Ошибка загрузки доски, создаем новую:', error.message);
-            // Если загрузка не удалась, используем дефолтные данные
-            this.dataManager.loadData(this.data);
+            console.warn('⚠️ MoodBoard: ошибка загрузки доски, создаем новую:', error.message);
+            this.dataManager.loadData(this.data || { objects: [] });
+            
+            // Вызываем коллбек onLoad с ошибкой
+            if (typeof this.options.onLoad === 'function') {
+                this.options.onLoad({ success: false, error: error.message, data: this.data || { objects: [] } });
+            }
         }
     }
     
@@ -435,5 +477,206 @@ export class MoodBoard {
         // Очищаем ссылку на контейнер
         this.container = null;
         
+        // Вызываем коллбек onDestroy
+        if (typeof this.options.onDestroy === 'function') {
+            try {
+                this.options.onDestroy();
+            } catch (error) {
+                console.warn('⚠️ Ошибка в коллбеке onDestroy:', error);
+            }
+        }
+    }
+    
+    /**
+     * Настройка коллбеков событий
+     */
+    setupEventCallbacks() {
+        if (!this.coreMoodboard || !this.coreMoodboard.eventBus) return;
+        
+        // Коллбек для успешного сохранения
+        if (typeof this.options.onSave === 'function') {
+            this.coreMoodboard.eventBus.on('save:success', (data) => {
+                try {
+                    // Создаем объединенный скриншот с HTML текстом
+                    let screenshot = null;
+                    if (this.coreMoodboard.pixi && this.coreMoodboard.pixi.app && this.coreMoodboard.pixi.app.view) {
+                        screenshot = this.createCombinedScreenshot('image/jpeg', 0.6);
+                    }
+                    
+                    this.options.onSave({ 
+                        success: true, 
+                        data: data,
+                        screenshot: screenshot,
+                        boardId: this.options.boardId
+                    });
+                } catch (error) {
+                    console.warn('⚠️ Ошибка в коллбеке onSave:', error);
+                }
+            });
+            
+            // Коллбек для ошибки сохранения
+            this.coreMoodboard.eventBus.on('save:error', (data) => {
+                try {
+                    this.options.onSave({ 
+                        success: false, 
+                        error: data.error,
+                        boardId: this.options.boardId
+                    });
+                } catch (error) {
+                    console.warn('⚠️ Ошибка в коллбеке onSave:', error);
+                }
+            });
+        }
+    }
+    
+    /**
+     * Получение CSRF токена из всех возможных источников
+     */
+    getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
+               window.csrfToken || 
+               this.options.csrfToken ||
+               '';
+    }
+    
+    /**
+     * Публичный метод для загрузки данных из API
+     */
+    async loadFromApi(boardId = null) {
+        const targetBoardId = boardId || this.options.boardId;
+        if (!targetBoardId) {
+            throw new Error('boardId не указан');
+        }
+        
+        // Временно меняем boardId для загрузки
+        const originalBoardId = this.options.boardId;
+        this.options.boardId = targetBoardId;
+        
+        try {
+            await this.loadExistingBoard();
+        } finally {
+            // Восстанавливаем оригинальный boardId
+            this.options.boardId = originalBoardId;
+        }
+    }
+    
+    /**
+     * Публичный метод для экспорта скриншота с HTML текстом
+     */
+    exportScreenshot(format = 'image/jpeg', quality = 0.6) {
+        return this.createCombinedScreenshot(format, quality);
+    }
+    
+    /**
+     * Разбивает текст на строки с учетом ширины элемента (имитирует HTML word-break: break-word)
+     */
+    wrapText(ctx, text, maxWidth) {
+        const lines = [];
+        
+        if (!text || maxWidth <= 0) {
+            return [text];
+        }
+        
+        // Разбиваем по символам если не помещается (имитирует word-break: break-word)
+        let currentLine = '';
+        
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            const testLine = currentLine + char;
+            const metrics = ctx.measureText(testLine);
+            
+            if (metrics.width > maxWidth && currentLine !== '') {
+                // Текущая строка не помещается, сохраняем предыдущую
+                lines.push(currentLine);
+                currentLine = char;
+            } else {
+                currentLine = testLine;
+            }
+        }
+        
+        // Добавляем последнюю строку
+        if (currentLine) {
+            lines.push(currentLine);
+        }
+        
+        return lines.length > 0 ? lines : [text];
+    }
+    
+    /**
+     * Создает объединенный скриншот: PIXI canvas + HTML текстовые элементы
+     */
+    createCombinedScreenshot(format = 'image/jpeg', quality = 0.6) {
+        if (!this.coreMoodboard || !this.coreMoodboard.pixi || !this.coreMoodboard.pixi.app || !this.coreMoodboard.pixi.app.view) {
+            throw new Error('Canvas не найден');
+        }
+        
+        try {
+            // Получаем PIXI canvas
+            const pixiCanvas = this.coreMoodboard.pixi.app.view;
+            const pixiWidth = pixiCanvas.width;
+            const pixiHeight = pixiCanvas.height;
+            
+            // Создаем временный canvas для объединения
+            const combinedCanvas = document.createElement('canvas');
+            combinedCanvas.width = pixiWidth;
+            combinedCanvas.height = pixiHeight;
+            const ctx = combinedCanvas.getContext('2d');
+            
+            // 1. Рисуем PIXI canvas как основу
+            ctx.drawImage(pixiCanvas, 0, 0);
+            
+            // 2. Рисуем HTML текстовые элементы поверх
+            const textElements = document.querySelectorAll('.mb-text');
+            
+            textElements.forEach((textEl, index) => {
+                try {
+                    // Получаем стили и позицию элемента
+                    const computedStyle = window.getComputedStyle(textEl);
+                    const text = textEl.textContent || '';
+                    
+                    // Проверяем видимость
+                    if (computedStyle.visibility === 'hidden' || computedStyle.opacity === '0' || !text.trim()) {
+                        return;
+                    }
+                    
+                    // Используем CSS позицию (абсолютная позиция)
+                    const left = parseInt(textEl.style.left) || 0;
+                    const top = parseInt(textEl.style.top) || 0;
+                    
+                    // Настраиваем стили текста
+                    const fontSize = parseInt(computedStyle.fontSize) || 18;
+                    const fontFamily = computedStyle.fontFamily || 'Arial, sans-serif';
+                    const color = computedStyle.color || '#000000';
+                    
+                    ctx.font = `${fontSize}px ${fontFamily}`;
+                    ctx.fillStyle = color;
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    
+                    // Получаем размеры элемента
+                    const elementWidth = parseInt(textEl.style.width) || 182;
+                    
+                    // Разбиваем текст на строки и рисуем каждую строку
+                    const lines = this.wrapText(ctx, text, elementWidth);
+                    const lineHeight = fontSize * 1.3; // Межстрочный интервал
+                    
+                    lines.forEach((line, lineIndex) => {
+                        const yPos = top + (lineIndex * lineHeight) + 2;
+                        ctx.fillText(line, left, yPos);
+                    });
+                } catch (error) {
+                    console.warn(`⚠️ Ошибка при рисовании текста ${index + 1}:`, error);
+                }
+            });
+            
+            // 3. Экспортируем объединенный результат
+            return combinedCanvas.toDataURL(format, quality);
+            
+        } catch (error) {
+            console.warn('⚠️ Ошибка при создании объединенного скриншота, используем только PIXI canvas:', error);
+            // Fallback: только PIXI canvas
+            const canvas = this.coreMoodboard.pixi.app.view;
+            return canvas.toDataURL(format, quality);
+        }
     }
 }
