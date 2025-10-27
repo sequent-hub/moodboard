@@ -69,6 +69,11 @@ export class MoodBoard {
      */
     async init() {
         try {
+            // Добавляем корневой класс к контейнеру для изоляции стилей
+            if (this.container) {
+                this.container.classList.add('moodboard-root');
+            }
+            
             // Создаем HTML структуру
             const { workspace, toolbar, canvas, topbar } = this.workspaceManager.createWorkspaceStructure();
             this.workspaceElement = workspace;
@@ -474,7 +479,10 @@ export class MoodBoard {
         this.dataManager = null;
         this.actionHandler = null;
         
-        // Очищаем ссылку на контейнер
+        // Удаляем корневой класс и очищаем ссылку на контейнер
+        if (this.container) {
+            this.container.classList.remove('moodboard-root');
+        }
         this.container = null;
         
         // Вызываем коллбек onDestroy

@@ -14,8 +14,10 @@
     font-display: swap;
 }
 
-/* Global default cursor */
-html, body, .moodboard-workspace, .moodboard-container, .moodboard-canvas {
+/* Default cursor inside moodboard root only */
+.moodboard-root .moodboard-workspace, 
+.moodboard-root .moodboard-container, 
+.moodboard-root .moodboard-canvas {
     cursor: url('../../assets/icons/cursor-default-custom.svg') 0 0, default;
 }
 

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест изоляции курсоров MoodBoard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .navbar {
+            background: #333;
+            padding: 15px;
+            color: white;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        
+        .navbar ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            gap: 20px;
+        }
+        
+        .navbar li {
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 3px;
+            transition: background 0.2s;
+        }
+        
+        .navbar li:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .content-area {
+            display: grid;
+            grid-template-columns: 1fr 800px;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .sidebar {
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar button {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        
+        .sidebar button:hover {
+            background: #f0f0f0;
+        }
+        
+        .moodboard-container {
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: 600px;
+            position: relative;
+        }
+        
+        .status {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .button-group button {
+            padding: 10px 20px;
+            border: 1px solid #007bff;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+        
+        .button-group button:hover {
+            background: #0056b3;
+        }
+        
+        .button-group button:disabled {
+            background: #ccc;
+            border-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .cursor-info {
+            background: #e9ecef;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="navbar" id="navbarSupportedContent">
+            <ul>
+                <li>Главная</li>
+                <li>Проекты</li>
+                <li>Настройки</li>
+                <li>Профиль</li>
+            </ul>
+        </div>
+        
+        <div class="content-area">
+            <div class="sidebar">
+                <h3>Боковая панель</h3>
+                <button>Создать проект</button>
+                <button>Открыть файл</button>
+                <button>Экспорт</button>
+                <button>Настройки</button>
+                
+                <div class="cursor-info">
+                    <div><strong>Курсор body:</strong> <span id="bodyCursor">-</span></div>
+                    <div><strong>Курсор html:</strong> <span id="htmlCursor">-</span></div>
+                    <div><strong>Курсор navbar:</strong> <span id="navbarCursor">-</span></div>
+                </div>
+            </div>
+            
+            <div class="moodboard-container" id="moodboardContainer">
+                <!-- Здесь будет инициализирован MoodBoard -->
+            </div>
+        </div>
+        
+        <div class="status">
+            <h3>Тестирование изоляции курсоров</h3>
+            <div class="button-group">
+                <button id="initMoodboard">Инициализировать MoodBoard</button>
+                <button id="destroyMoodboard" disabled>Уничтожить MoodBoard</button>
+                <button id="checkCursors">Проверить курсоры</button>
+            </div>
+            
+            <div id="testResults">
+                <p><strong>Статус:</strong> MoodBoard не инициализирован</p>
+                <p><strong>Инструкции:</strong></p>
+                <ol>
+                    <li>Нажмите "Проверить курсоры" - все элементы должны иметь стандартные курсоры</li>
+                    <li>Нажмите "Инициализировать MoodBoard"</li>
+                    <li>Наведите мышь на MoodBoard - там должен быть кастомный курсор</li>
+                    <li>Наведите мышь на навбар и боковую панель - курсор должен оставаться стандартным</li>
+                    <li>Нажмите "Уничтожить MoodBoard"</li>
+                    <li>Проверьте, что все курсоры вернулись к стандартным</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подключаем MoodBoard -->
+    <script type="module">
+        import { MoodBoard } from './src/index.js';
+        
+        let moodboard = null;
+        
+        // Элементы управления
+        const initBtn = document.getElementById('initMoodboard');
+        const destroyBtn = document.getElementById('destroyMoodboard');
+        const checkBtn = document.getElementById('checkCursors');
+        const resultsDiv = document.getElementById('testResults');
+        
+        // Инициализация MoodBoard
+        initBtn.addEventListener('click', () => {
+            try {
+                moodboard = new MoodBoard('#moodboardContainer', {
+                    theme: 'light',
+                    onLoad: (result) => {
+                        console.log('MoodBoard загружен:', result);
+                        updateStatus('MoodBoard инициализирован и готов к работе');
+                        initBtn.disabled = true;
+                        destroyBtn.disabled = false;
+                        
+                        // Проверяем, что класс moodboard-root добавлен
+                        const container = document.getElementById('moodboardContainer');
+                        if (container.classList.contains('moodboard-root')) {
+                            console.log('✅ Класс moodboard-root успешно добавлен');
+                        } else {
+                            console.error('❌ Класс moodboard-root не добавлен');
+                        }
+                    },
+                    onDestroy: () => {
+                        console.log('MoodBoard уничтожен');
+                        updateStatus('MoodBoard уничтожен');
+                        initBtn.disabled = false;
+                        destroyBtn.disabled = true;
+                        
+                        // Проверяем, что класс moodboard-root удален
+                        const container = document.getElementById('moodboardContainer');
+                        if (!container.classList.contains('moodboard-root')) {
+                            console.log('✅ Класс moodboard-root успешно удален');
+                        } else {
+                            console.error('❌ Класс moodboard-root не удален');
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Ошибка инициализации MoodBoard:', error);
+                updateStatus('Ошибка инициализации: ' + error.message);
+            }
+        });
+        
+        // Уничтожение MoodBoard
+        destroyBtn.addEventListener('click', () => {
+            if (moodboard) {
+                moodboard.destroy();
+                moodboard = null;
+            }
+        });
+        
+        // Проверка курсоров
+        checkBtn.addEventListener('click', () => {
+            checkCursorValues();
+        });
+        
+        function updateStatus(message) {
+            const statusP = resultsDiv.querySelector('p');
+            statusP.innerHTML = `<strong>Статус:</strong> ${message}`;
+        }
+        
+        function checkCursorValues() {
+            const body = document.body;
+            const html = document.documentElement;
+            const navbar = document.getElementById('navbarSupportedContent');
+            
+            const bodyCursor = window.getComputedStyle(body).cursor;
+            const htmlCursor = window.getComputedStyle(html).cursor;
+            const navbarCursor = window.getComputedStyle(navbar).cursor;
+            
+            document.getElementById('bodyCursor').textContent = bodyCursor;
+            document.getElementById('htmlCursor').textContent = htmlCursor;
+            document.getElementById('navbarCursor').textContent = navbarCursor;
+            
+            console.log('Проверка курсоров:', {
+                body: bodyCursor,
+                html: htmlCursor,
+                navbar: navbarCursor
+            });
+            
+            // Проверяем, что курсоры стандартные (auto или pointer для интерактивных элементов)
+            const isBodyClean = bodyCursor === 'auto' || bodyCursor === 'default';
+            const isHtmlClean = htmlCursor === 'auto' || htmlCursor === 'default';
+            const isNavbarClean = navbarCursor === 'auto' || navbarCursor === 'pointer';
+            
+            if (isBodyClean && isHtmlClean && isNavbarClean) {
+                console.log('✅ Все курсоры чистые');
+            } else {
+                console.log('❌ Обнаружены кастомные курсоры вне MoodBoard');
+            }
+        }
+        
+        // Автоматическая проверка каждые 2 секунды
+        setInterval(checkCursorValues, 2000);
+        
+        // Изначальная проверка
+        checkCursorValues();
+    </script>
+</body>
+</html>
