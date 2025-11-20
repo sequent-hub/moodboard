@@ -24,10 +24,10 @@ export class DotGrid extends BaseGrid {
         // Рисуем обычные точки
         this.drawDots();
         
-        // Выделяем пересечения (каждые N точек)
-        if (this.highlightIntersections) {
-            this.drawIntersections();
-        }
+        // Выделение пересечений отключено для равномерного тона точек (как в Miro)
+        // if (this.highlightIntersections) {
+        //     this.drawIntersections();
+        // }
     }
     
     /**
