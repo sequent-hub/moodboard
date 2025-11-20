@@ -23,7 +23,7 @@ const TEXT_CURSOR = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(
 export class TextTool extends BaseTool {
     constructor(eventBus) {
         super('text', eventBus);
-        this.cursor = TEXT_CURSOR;
+		this.cursor = 'text';
         this.hotkey = 't';
         this.container = null;
         

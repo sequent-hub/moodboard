@@ -18,7 +18,7 @@
 .moodboard-root .moodboard-workspace, 
 .moodboard-root .moodboard-container, 
 .moodboard-root .moodboard-canvas {
-    cursor: url('../../assets/icons/cursor-default-custom.svg') 0 0, default;
+    cursor: default;
 }
 
 @font-face {

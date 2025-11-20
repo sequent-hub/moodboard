@@ -1274,7 +1274,7 @@ export class PlacementTool extends BaseTool {
 // Возвращает подходящий курсор для текущего pending состояния
 PlacementTool.prototype._getPendingCursor = function() {
     if (!this.pending) return 'crosshair';
-    if (this.pending.type === 'text') return TEXT_CURSOR;
+    if (this.pending.type === 'text') return 'text';
     if (this.pending.type === 'frame-draw') return 'crosshair';
     return 'crosshair';
 };
