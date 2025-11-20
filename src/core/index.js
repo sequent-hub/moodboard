@@ -1189,8 +1189,8 @@ export class CoreMoodBoard {
                 // Принудительно сохраняем пропорции для фреймов (если lockedAspect=true)
                 const objects = this.state.getObjects();
                 const object = objects.find(obj => obj.id === data.object);
-                const objectType = object ? object.type : null;
-                if (objectType === 'frame' && !!(object?.properties && object.properties.lockedAspect === true)) {
+                const objectType = object ? object : null;
+                if (object && object.type === 'frame' && object.properties && object.properties.lockedAspect === true) {
                     const start = this._activeResize?.startSize || { width: object.width, height: object.height };
                     const aspect = (start.width > 0 && start.height > 0) ? (start.width / start.height) : (object.width / Math.max(1, object.height));
                     let w = Math.max(1, data.newSize.width);
@@ -1198,7 +1198,7 @@ export class CoreMoodBoard {
                     const dw = Math.abs(w - start.width);
                     const dh = Math.abs(h - start.height);
                     if (dw >= dh) { h = Math.round(w / aspect); } else { w = Math.round(h * aspect); }
-                    // Минимальная площадь фрейма ~1800px²
+                    // Минимальная площадь фрейма ~х2 по сторонам
                     const minArea = 1800;
                     const area = Math.max(1, w * h);
                     if (area < minArea) {
@@ -1208,7 +1208,7 @@ export class CoreMoodBoard {
                     }
                     data.newSize = { width: w, height: h };
                     if (!data.newPosition && this._activeResize && this._activeResize.objectId === data.object) {
-                        const hndl = (this._activeResize.handle || '').toLowerCase();
+                        const hndl = (this._activeResize?.full || this._activeResize?.handle || '').toLowerCase();
                         const startPos = this._activeResize.startPosition;
                         const sw = this._activeResize.startSize.width;
                         const sh = this._activeResize.startSize.height;
@@ -1216,19 +1216,45 @@ export class CoreMoodBoard {
                         let y = startPos.y;
                         if (hndl.includes('w')) { x = startPos.x + (sw - w); }
                         if (hndl.includes('n')) { y = startPos.y + (sh - h); }
-                        const isEdge = ['n','s','e','w'].includes(hnl = hndl);
+                        const isEdge = ['n','s','e','w'].includes(hndl);
                         if (isEdge) {
-                            if (hnl === 'n' || hnl === 's') {
-                                x = startPos.x + Math.round((sw - w) / 2);
-                            } else if (hnl === 'e' || hnl === 'w') {
-                                y = startPos.y + Math.round((sh - h) / 2);
-                            }
+                            if (hndl === 'n' || hndl === 's') x = Math.round(startPos.x + (sw - w) / 2);
+                            if (hndl === 'e' || hndl === 'w') y = Math.round(startPos.y + (sh - h) / 2);
                         }
                         data.newPosition = { x: Math.round(x), y: Math.round(y) };
                     }
+                } else if (object && object.type === 'image') {
+                    // Для изображений всегда фиксируем исходное соотношение сторон
+                    const start = this._activeResize?.startSize || { width: object.width, height: object.height };
+                    const startW = Math.max(1, start.width);
+                    const startH = Math.max(1, start.height);
+                    const aspect = startW / startH;
+                    let w = Math.max(1, data.newSize.width);
+                    let h = Math.max(1, data.newSize.height);
+                    const dw = Math.abs(w - startW);
+                    const dh = Math.abs(h - startH);
+                    if (dw >= dh) { h = Math.round(w / aspect); } else { w = Math.round(h * aspect); }
+                    data.newSize = { width: w, height: h };
+                    if (!data.newPosition && this._activeResize && this._activeResize.objectId === data.object) {
+                        const hndl = (this.extent?.handle || this._activeResize?.handle || '').match ? (this._activeResize?.handle || '') : '';
+                        const handle = (this._activeResize?.handle || '').toString().toLowerCase();
+                        const startPos = this._activeResize.startPosition || { x: 0, y: 0 };
+                        const sw = this._activeResize.startSize?.width || startW;
+                        const sh = this._activeResize.startSize?.height || startH;
+                        let x = startPos.x;
+                        let y = startPos.y;
+                        if (handle.includes('w')) { x = startPos.x + (sw - w); }
+                        if (handle.includes('n')) { y = startPos.y + (sh - h); }
+                        const edge = ['n','s','e','w'].includes(handle);
+                        if (edge) {
+                            if (handle === 'n' || handle === 's') x = Math.round(startPos.x + (sw - w) / 2);
+                            if (handle === 'e' || handle === 'w') y = Math.round(startPos.y + (sh - h) / 2);
+                        }
+                        data.newPosition = { x: Math.floor(x), y: Math.floor(y) };
+                    }
                 }
                 // Для произвольных фреймов также обеспечим минимальную площадь
-                if (objectType === 'frame' && data.newSize && !(object?.properties && object.properties.lockedAspect === true)) {
+                if (object && object.type === 'frame' && data.newSize && !(object.properties && object.properties === true)) {
                     const minArea = 1800;
                     const w0 = Math.max(1, data.newSize.width);
                     const h0 = Math.max(1, data.newSize.height);
@@ -1239,22 +1265,20 @@ export class CoreMoodBoard {
                         const h = Math.round(h0 * scale);
                         data.newSize = { width: w, height: h };
                         if (!data.newPosition && this._activeResize && this._activeResize.objectId === data.object) {
-                            const hndl2 = (this._activeResize.handle || '').toLowerCase();
-                            const startPos2 = this._activeResize.startPosition;
+                            const h2 = (this._activeResize?.handle || '').toLowerCase();
+                            const sPos2 = this._activeResize.startPosition;
                             const sw2 = this._activeResize.startSize.width;
                             const sh2 = this._activeResize.startSize.height;
-                            let x2 = startPos2.x;
-                            let y2 = startPos2.y;
-                            if (hndl2.includes('w')) { x2 = startPos2.x + (sw2 - w); }
-                            if (hndl2.includes('n')) { y2 = startPos2.y + (sh2 - h); }
+                            let x2 = sPos2.x;
+                            let y2 = sPos2.y;
+                            if (h2.includes('w')) { x2 = sPos2.x + (sw2 - w); }
+                            if (h2.includes('n')) { y2 = sPos2.y + (sh2 - h); }
                             data.newPosition = { x: Math.round(x2), y: Math.round(y2) };
                         }
                     }
                 }
                 // Создаем команду только если размер действительно изменился
-                if (data.oldSize.width !== data.newSize.width || 
-                    data.oldSize.height !== data.newSize.height) {
-                    
+                if (data.oldSize.width !== data.newSize.width || data.oldSize.height !== data.newSize.height) {
                     console.log(`📝 Создаем ResizeObjectCommand:`, {
                         object: data.object,
                         oldSize: data.oldSize,
@@ -1262,14 +1286,13 @@ export class CoreMoodBoard {
                         oldPosition: data.oldPosition,
                         newPosition: data.newPosition
                     });
-                    
                     // Гарантируем согласованность позиции: если UI не передал, вычислим
                     let oldPos = data.oldPosition;
                     let newPos = data.newPosition;
                     if ((!oldPos || !newPos) && this._activeResize && this._activeResize.objectId === data.object) {
-                        const h = (this._activeResize.handle || '').toLowerCase();
+                        const h = (this._activeResize?.handle || '').toLowerCase();
                         const start = this._activeResize.startPosition;
-                        const startSize = this._activeResize.startSize;
+                        const startSize = this.optimization?.startSize || this._activeResize.startSize;
                         const dw = (data.newSize?.width || startSize.width) - startSize.width;
                         const dh = (data.newSize?.height || startSize.height) - startSize.height;
                         const calcNew = { x: start.x + (h.includes('w') ? dw : 0), y: start.y + (h.includes('n') ? dh : 0) };
@@ -1277,6 +1300,7 @@ export class CoreMoodBoard {
                         if (!newPos) newPos = calcNew;
                     }
                     const command = new ResizeObjectCommand(
+                        this, 
                         this, 
                         data.object, 
                         data.oldSize, 
