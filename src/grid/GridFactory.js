@@ -77,7 +77,7 @@ export class GridFactory {
             dot: {
                 enabled: true,
                 size: 20,
-                color: 0xE0E0E0,
+                color: 0x6a6aff,
                 opacity: 0.5,
                 dotSize: 2,
                 dotStyle: 'circle',
@@ -86,7 +86,7 @@ export class GridFactory {
             cross: {
                 enabled: true,
                 size: 40,
-                color: 0xB0B0B0,
+                color: 0x6a6aff,
                 opacity: 0.5,
                 crossHalfSize: 4,
                 crossLineWidth: 1
