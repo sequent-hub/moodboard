@@ -1067,80 +1067,84 @@ export class CoreMoodBoard {
             const object = objects.find(obj => obj.id === data.object);
             const objectType = object ? object.type : null;
 
-            // Сохраняем пропорции для фреймов, кроме произвольных (lockedAspect=false)
-            if ((objectType === 'frame' || (objectType === 'image' && object?.properties?.isEmojiIcon)) && data.size) {
-                const lockedAspect = !!(object?.properties && (object.properties.lockedAspect === true));
+            // Сохраняем пропорции:
+            // - всегда для изображений (включая эмоджи-иконки, которые квадратные)
+            // - для фреймов только если lockedAspect=true
+            if (data.size && (objectType === 'image' || objectType === 'frame')) {
                 const isEmoji = (objectType === 'image' && object?.properties?.isEmojiIcon);
-                if (!lockedAspect && !isEmoji) {
-                    // произвольные фреймы — без ограничений
-                } else {
-                const start = this._activeResize?.startSize || { width: object.width, height: object.height };
-                const aspect = isEmoji ? 1 : ((start.width > 0 && start.height > 0) ? (start.width / start.height) : (object.width / Math.max(1, object.height)));
-                let w = Math.max(1, data.size.width);
-                let h = Math.max(1, data.size.height);
-                const hndl = (this._activeResize?.handle || '').toLowerCase();
-                if (isEmoji) {
-                    // Делаем квадрат, фиксируя противоположную сторону к старту
-                    const s = Math.max(w, h);
-                    // Вычислим позицию сразу, чтобы не было дрейфа правой/нижней границы
+                const isImage = (objectType === 'image');
+                const lockedAspect = objectType === 'frame'
+                    ? !!(object?.properties && object.properties.lockedAspect === true)
+                    : true; // для изображений всегда держим аспект
+
+                if (lockedAspect || isImage || isEmoji) {
+                    const start = this._activeResize?.startSize || { width: object.width, height: object.height };
+                    const startW = Math.max(1, start.width);
+                    const startH = Math.max(1, start.height);
+                    const aspect = isEmoji ? 1 : (startW / startH);
+
+                    let w = Math.max(1, data.size.width);
+                    let h = Math.max(1, data.size.height);
+                    const hndl = (this._activeResize?.handle || '').toLowerCase();
+
+                    if (isEmoji) {
+                        // Квадрат
+                        const s = Math.max(w, h);
+                        if (!data.position && this._activeResize && this._activeResize.objectId === data.object) {
+                            const startPos = this._activeResize.startPosition;
+                            const sw = this._activeResize.startSize.width;
+                            const sh = this._activeResize.startSize.height;
+                            let x = startPos.x;
+                            let y = startPos.y;
+                            if (hndl.includes('w')) { x = startPos.x + (sw - s); }
+                            if (hndl.includes('n')) { y = startPos.y + (sh - s); }
+                            const isEdge = ['n','s','e','w'].includes(hndl);
+                            if (isEdge) {
+                                if (hndl === 'n' || hndl === 's') x = startPos.x + Math.round((sw - s) / 2);
+                                if (hndl === 'e' || hndl === 'w') y = startPos.y + Math.round((sh - s) / 2);
+                            }
+                            data.position = { x: Math.round(x), y: Math.round(y) };
+                        }
+                        w = s; h = s;
+                    } else {
+                        // Поддержка аспекта (для images всегда; для frames — если lockedAspect)
+                        const dw = Math.abs(w - startW);
+                        const dh = Math.abs(h - startH);
+                        if (dw >= dh) { h = Math.round(w / aspect); } else { w = Math.round(h * aspect); }
+                    }
+
+                    // Минимальная площадь — только для фреймов (как раньше)
+                    if (objectType === 'frame') {
+                        const minArea = 1800;
+                        const area = Math.max(1, w * h);
+                        if (area < minArea) {
+                            const scale = Math.sqrt(minArea / area);
+                            w = Math.round(w * scale);
+                            h = Math.round(h * scale);
+                        }
+                    }
+
+                    data.size = { width: w, height: h };
+
+                    // Компенсация позиции по зафиксированной стороне
                     if (!data.position && this._activeResize && this._activeResize.objectId === data.object) {
                         const startPos = this._activeResize.startPosition;
                         const sw = this._activeResize.startSize.width;
                         const sh = this._activeResize.startSize.height;
                         let x = startPos.x;
                         let y = startPos.y;
-                        if (hndl.includes('w')) { x = startPos.x + (sw - s); }
-                        if (hndl.includes('n')) { y = startPos.y + (sh - s); }
+                        if (hndl.includes('w')) { x = startPos.x + (sw - data.size.width); }
+                        if (hndl.includes('n')) { y = startPos.y + (sh - data.size.height); }
                         const isEdge = ['n','s','e','w'].includes(hndl);
                         if (isEdge) {
-                            if (hndl === 'n' || hndl === 's') x = startPos.x + Math.round((sw - s) / 2);
-                            if (hndl === 'e' || hndl === 'w') y = startPos.y + Math.round((sh - s) / 2);
+                            if (hndl === 'n' || hndl === 's') {
+                                x = startPos.x + Math.round((sw - data.size.width) / 2);
+                            } else if (hndl === 'e' || hndl === 'w') {
+                                y = startPos.y + Math.round((sh - data.size.height) / 2);
+                            }
                         }
                         data.position = { x: Math.round(x), y: Math.round(y) };
                     }
-                    w = s; h = s;
-                } else {
-                    // Обычная поддержка аспекта для фреймов
-                    const dw = Math.abs(w - start.width);
-                    const dh = Math.abs(h - start.height);
-                    if (dw >= dh) { h = Math.round(w / aspect); } else { w = Math.round(h * aspect); }
-                }
-                 // Минимальная площадь — только для фреймов
-                 if (!isEmoji) {
-                     const minArea = 1800;
-                     const area = Math.max(1, w * h);
-                     if (area < minArea) {
-                         const scale = Math.sqrt(minArea / area);
-                         w = Math.round(w * scale);
-                         h = Math.round(h * scale);
-                     }
-                 }
-                 data.size = { width: w, height: h };
-
-                // Если позиция известна (фиксированная противоположная сторона) — откорректируем её
-                if (!data.position && this._activeResize && this._activeResize.objectId === data.object) {
-                    const hndl = (this._activeResize.handle || '').toLowerCase();
-                    const startPos = this._activeResize.startPosition;
-                    const sw = this._activeResize.startSize.width;
-                    const sh = this._activeResize.startSize.height;
-                    let x = startPos.x;
-                    let y = startPos.y;
-                    // Базовая привязка противоположной стороны
-                    if (hndl.includes('w')) { x = startPos.x + (sw - w); }
-                    if (hndl.includes('n')) { y = startPos.y + (sh - h); }
-                    // Симметрическая компенсация по перпендикулярной оси для edge-хэндлов
-                    const isEdge = ['n','s','e','w'].includes(hndl);
-                    if (isEdge) {
-                        if (hndl === 'n' || hndl === 's') {
-                            // Вверх/вниз: верх или низ фиксируется, ширина меняется симметрично относительно центра
-                            x = startPos.x + Math.round((sw - w) / 2);
-                        } else if (hndl === 'e' || hndl === 'w') {
-                            // Вправо/влево: левая или правая фиксируется, высота меняется симметрично относительно центра
-                            y = startPos.y + Math.round((sh - h) / 2);
-                        }
-                    }
-                    data.position = { x: Math.round(x), y: Math.round(y) };
-                }
                 }
             }
 
