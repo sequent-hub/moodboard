@@ -63,10 +63,9 @@ export class Toolbar {
         ];
 
         // Существующие элементы ниже новых
+        // убрал { id: 'clear', iconName: 'clear', title: 'Очистить холст', type: 'clear' },
         const existingTools = [
-            { id: 'frame', iconName: 'frame', title: 'Добавить фрейм', type: 'frame' },
-            { id: 'divider', type: 'divider' },
-            { id: 'clear', iconName: 'clear', title: 'Очистить холст', type: 'clear' },
+            { id: 'frame', iconName: 'frame', title: 'Добавить фрейм', type: 'frame' },  
             { id: 'divider', type: 'divider' },
             { id: 'undo', iconName: 'undo', title: 'Отменить (Ctrl+Z)', type: 'undo', disabled: true },
             { id: 'redo', iconName: 'redo', title: 'Повторить (Ctrl+Y)', type: 'redo', disabled: true }
