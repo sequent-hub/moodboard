@@ -44,9 +44,10 @@ export class SaveManager {
     setupEventListeners() {
         if (!this.options.autoSave) return;
         
-        // Отслеживаем изменения в данных
-        this.eventBus.on(Events.Grid.BoardDataChanged, (data) => {
-            this.scheduleAutoSave(data);
+        // Отслеживаем изменения сетки: не передаём частичные данные в сохранение,
+        // чтобы собрать полный snapshot через getBoardData()
+        this.eventBus.on(Events.Grid.BoardDataChanged, () => {
+            this.markAsChanged();
         });
         
         // Отслеживаем создание объектов
