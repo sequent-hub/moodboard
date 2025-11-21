@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест: Сетка «точки»</title>
+    <link rel="stylesheet" href="./src/ui/styles/index.css">
+    <style>
+        html, body { height: 100%; margin: 0; background: #f7fbff; }
+        #app { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+        .panel {
+            position: absolute; top: 16px; right: 16px;
+            z-index: 4000; background: #fff; border: 1px solid #e5e7eb;
+            border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12);
+            padding: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            min-width: 260px;
+        }
+        .panel h3 { margin: 0 0 10px; font-size: 14px; color: #111827; }
+        .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin: 8px 0; }
+        .row label { font-size: 12px; color: #374151; }
+        .row input[type="number"], .row input[type="range"], .row select, .row input[type="color"] {
+            width: 120px; font-size: 12px; padding: 2px 6px;
+        }
+        .row input[type="range"] { width: 140px; }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <div class="panel">
+        <h3>Настройки «крестов»</h3>
+        <div class="row">
+            <label>Шаг (size)</label>
+            <input id="in-size" type="number" min="2" max="200" step="1" value="20">
+        </div>
+        <div class="row">
+            <label>Толщина линии</label>
+            <input id="in-lineWidth" type="number" min="1" max="12" step="1" value="1">
+        </div>
+        <div class="row">
+            <label>Длина луча</label>
+            <input id="in-halfSize" type="number" min="1" max="50" step="1" value="4">
+        </div>
+        <div class="row">
+            <label>Прозрачность <span id="out-opacity" style="color:#6b7280;font-size:12px;">0.50</span></label>
+            <input id="in-opacity" type="range" min="0" max="1" step="0.05" value="0.5">
+        </div>
+    </div>
+
+    <script type="module">
+        import { MoodBoard } from './src/index.js';
+        import { Events } from './src/core/events/Events.js';
+        import { GridFactory } from './src/grid/GridFactory.js';
+
+        const container = document.getElementById('app');
+        const moodboard = new MoodBoard(container, { theme: 'light' });
+
+        // Экспорт в window для отладки
+        window.moodboard = moodboard;
+
+        // Дождёмся инициализации Core и включим «точки»
+        const waitForCore = () =>
+            new Promise((resolve) => {
+                const tryInit = () => {
+                    const core = moodboard?.coreMoodboard;
+                    if (core && core.eventBus) return resolve(core);
+                    setTimeout(tryInit, 30);
+                };
+                tryInit();
+            });
+
+        const hexToInt = (hex) => {
+            if (!hex) return 0;
+            const h = hex.startsWith('#') ? hex.slice(1) : hex;
+            return parseInt(h, 16);
+        };
+
+        waitForCore().then((core) => {
+            const ensureCrossGrid = async () => {
+                // Дождаться появления BoardService
+                await new Promise((res) => {
+                    const spin = () => {
+                        if (core.boardService) return res();
+                        setTimeout(spin, 30);
+                    };
+                    spin();
+                });
+                // Попросить через события переключить на cross
+                core.eventBus.emit(Events.UI.GridChange, { type: 'cross' });
+                // Подождать применения
+                let tries = 0;
+                while (tries++ < 20) {
+                    const g = core.boardService?.grid;
+                    if (g && g.type === 'cross') return g;
+                    await new Promise((r) => setTimeout(r, 30));
+                }
+                // Фолбэк: создать cross вручную и установить в Pixi
+                const size = core.workspaceSize?.() || { width: 800, height: 600 };
+                const g = GridFactory.createGrid('cross', {
+                    ...GridFactory.getDefaultOptions('cross'),
+                    enabled: true,
+                    width: size.width,
+                    height: size.height,
+                });
+                g.updateVisual();
+                core.boardService.grid = g;
+                core.pixi.setGrid(g);
+                core.eventBus.emit(Events.UI.GridCurrent, { type: 'cross' });
+                return g;
+            };
+
+            ensureCrossGrid().then(() => {
+                const getGrid = () => core.boardService?.grid;
+                // Инициализируем контролы текущими значениями
+                const elSize = document.getElementById('in-size');
+                const elLineWidth = document.getElementById('in-lineWidth');
+                const elHalfSize = document.getElementById('in-halfSize');
+                const elOpacity = document.getElementById('in-opacity');
+                const outOpacity = document.getElementById('out-opacity');
+
+                try { elSize.value = getGrid().size; } catch (_) {}
+                try { elLineWidth.value = getGrid().crossLineWidth || 1; } catch (_) {}
+                try { elHalfSize.value = getGrid().crossHalfSize || 4; } catch (_) {}
+                try { elOpacity.value = getGrid().opacity; } catch (_) {}
+                try { outOpacity.textContent = Number(getGrid().opacity).toFixed(2); } catch (_) {}
+
+                // Обработчики изменений
+                elSize.addEventListener('input', () => {
+                    const v = parseInt(elSize.value, 10) || 20;
+                    const g = getGrid();
+                    if (!g || g.type !== 'cross') return;
+                    g.setSize(v);
+                    core.pixi.setGrid(g);
+                });
+                elLineWidth.addEventListener('input', () => {
+                    const v = parseInt(elLineWidth.value, 10) || 1;
+                    const g = getGrid();
+                    if (!g || g.type !== 'cross') return;
+                    if (typeof g.setCrossLineWidth === 'function') g.setCrossLineWidth(v);
+                    else { g.crossLineWidth = v; g.updateVisual(); }
+                    core.pixi.setGrid(g);
+                });
+                elHalfSize.addEventListener('input', () => {
+                    const v = parseInt(elHalfSize.value, 10) || 4;
+                    const g = getGrid();
+                    if (!g || g.type !== 'cross') return;
+                    if (typeof g.setCrossHalfSize === 'function') g.setCrossHalfSize(v);
+                    else { g.crossHalfSize = v; g.updateVisual(); }
+                    core.pixi.setGrid(g);
+                });
+                elOpacity.addEventListener('input', () => {
+                    const v = parseFloat(elOpacity.value);
+                    const g = getGrid();
+                    if (!g || g.type !== 'cross') return;
+                    g.setOpacity(v);
+                    core.pixi.setGrid(g);
+                    if (outOpacity) outOpacity.textContent = Number(v).toFixed(2);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+
