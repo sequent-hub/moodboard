@@ -34,7 +34,7 @@ export class SettingsApplier {
             if (this.ui.topbar) {
                 try {
                     const boardHex = this._toHex(bgInt);
-                    this.ui.topbar.setCurrentBoardHex(boardHex);
+                    this.ui.topbar.setPaintButtonHex(this.ui.topbar.mapBoardToBtnHex(boardHex));
                 } catch (_) {}
             }
         }
