@@ -2015,6 +2015,9 @@ export class SelectTool extends BaseTool {
             const topPx = create ? Math.round(screenPos.y - padTop - (lineHeightPx / 2)) : Math.round(screenPos.y);
             wrapper.style.left = `${leftPx}px`;
             wrapper.style.top = `${topPx}px`;
+            // Сохраняем CSS-позицию редактора для точной синхронизации при закрытии
+            this.textEditor._cssLeftPx = leftPx;
+            this.textEditor._cssTopPx = topPx;
             // Диагностика: логируем позицию инпута и вычисленные параметры позиционирования
             try {
                 console.log('🧭 Text input', {
@@ -2592,6 +2595,29 @@ export class SelectTool extends BaseTool {
                 const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
                 if (el) {
                     this.eventBus.emit(Events.Tool.ShowObjectText, { objectId });
+                    // После отображения статичного текста — выровняем его позицию ровно под textarea
+                    try {
+                        const view = this.app?.view;
+                        const worldLayerRef = this.textEditor.world || (this.app?.stage);
+                        const viewRes = (this.app?.renderer?.resolution) || (view && view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
+                        const cssLeft = this.textEditor._cssLeftPx;
+                        const cssTop = this.textEditor._cssTopPx;
+                        if (isFinite(cssLeft) && isFinite(cssTop) && worldLayerRef) {
+                            // Ждем один тик, чтобы HtmlTextLayer успел обновить DOM
+                            setTimeout(() => {
+                                try {
+                                    const desiredGlobal = new PIXI.Point(Math.round(cssLeft * viewRes), Math.round(cssTop * viewRes));
+                                    const desiredWorld = worldLayerRef.toLocal(desiredGlobal);
+                                    const newPos = { x: Math.round(desiredWorld.x), y: Math.round(desiredWorld.y) };
+                                    this.eventBus.emit(Events.Object.StateChanged, {
+                                        objectId,
+                                        updates: { position: newPos }
+                                    });
+                                    console.log('🧭 Text post-show align', { objectId, cssLeft, cssTop, newPos });
+                                } catch (_) {}
+                            }, 0);
+                        }
+                    } catch (_) {}
                 } else {
                     console.warn(`❌ SelectTool: HTML-элемент для объекта ${objectId} не найден, пропускаем ShowObjectText`);
                 }
