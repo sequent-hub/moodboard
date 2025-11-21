@@ -14,6 +14,7 @@ export class SettingsApplier {
     }
 
     set(partial) {
+        try { console.log('[SA] set()', partial); } catch (_) {}
         this.settings = { ...this.settings, ...(partial || {}) };
         this.apply(this.settings);
         // Сообщаем системе об изменении настроек для автосохранения
