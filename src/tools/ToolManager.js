@@ -176,7 +176,17 @@ export class ToolManager {
             }
         });
         this.container.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
-        this.container.addEventListener('wheel', (e) => this.handleMouseWheel(e));
+        // wheel должен быть non-passive, чтобы preventDefault работал корректно
+        this.container.addEventListener('wheel', (e) => this.handleMouseWheel(e), { passive: false });
+        // Блокируем системный зум браузера (Ctrl + колесо) над рабочей областью
+        this._onWindowWheel = (e) => {
+            try {
+                if (e && e.ctrlKey && this.isMouseOverContainer) {
+                    e.preventDefault();
+                }
+            } catch (_) {}
+        };
+        window.addEventListener('wheel', this._onWindowWheel, { passive: false });
         
         // События клавиатуры (на document)
         document.addEventListener('keydown', (e) => this.handleKeyDown(e));
@@ -599,5 +609,10 @@ export class ToolManager {
         
         document.removeEventListener('keydown', this.handleKeyDown);
         document.removeEventListener('keyup', this.handleKeyUp);
+        // Снимаем глобальный блокировщик Ctrl+колесо
+        if (this._onWindowWheel) {
+            try { window.removeEventListener('wheel', this._onWindowWheel); } catch (_) {}
+            this._onWindowWheel = null;
+        }
     }
 }
