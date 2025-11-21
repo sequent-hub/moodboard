@@ -2026,6 +2026,24 @@ export class SelectTool extends BaseTool {
                     create
                 });
             } catch (_) {}
+
+            // Для новых текстов: синхронизируем мировую позицию объекта с фактической позицией wrapper,
+            // чтобы после закрытия редактора статичный текст встал ровно туда же без сдвига
+            try {
+                if (create && objectId) {
+                    const worldLayerRef = this.textEditor.world || (this.app?.stage);
+                    const viewRes = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
+                    const globalPoint = new PIXI.Point(Math.round(leftPx * viewRes), Math.round(topPx * viewRes));
+                    const worldPoint = worldLayerRef && worldLayerRef.toLocal ? worldLayerRef.toLocal(globalPoint) : { x: position.x, y: position.y };
+                    const newWorldPos = { x: Math.round(worldPoint.x), y: Math.round(worldPoint.y) };
+                    this.eventBus.emit(Events.Object.StateChanged, {
+                        objectId: objectId,
+                        updates: { position: newWorldPos }
+                    });
+                    // Диагностика
+                    console.log('🧭 Text position sync', { objectId, newWorldPos, leftPx, topPx, viewRes });
+                }
+            } catch (_) {}
         }
         // Минимальные границы (зависят от текущего режима: новый объект или редактирование существующего)
         const worldLayerRef = this.textEditor.world || (this.app?.stage);
