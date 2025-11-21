@@ -17,46 +17,33 @@ export class DataManager {
         // Очищаем доску перед загрузкой
         this.clearBoard();
 
-        // Восстанавливаем тип сетки и её параметры до загрузки объектов
+        // Применяем settings централизованно (если есть апплаер), иначе — старым способом
         try {
-            const grid = (data.settings && data.settings.grid) || data.grid || (data.board && data.board.grid);
-            if (grid && grid.type) {
-                const payload = { type: grid.type };
-                const opts = grid.options || null;
-                if (opts && typeof opts === 'object') {
-                    payload.options = opts;
+            if (this.coreMoodboard?.settingsApplier && data.settings) {
+                this.coreMoodboard.settingsApplier.apply(data.settings);
+            } else {
+                // fallback оставлен для совместимости (если где-то аплеер не создан)
+                const grid = (data.settings && data.settings.grid) || data.grid || (data.board && data.board.grid);
+                if (grid && grid.type) {
+                    const payload = { type: grid.type };
+                    const opts = grid.options || null;
+                    if (opts && typeof opts === 'object') payload.options = opts;
+                    this.coreMoodboard.eventBus.emit(this.coreMoodboard.Events?.UI?.GridChange || 'ui:grid:change', payload);
                 }
-                this.coreMoodboard.eventBus.emit(this.coreMoodboard.Events?.UI?.GridChange || 'ui:grid:change', payload);
-            }
-        } catch (_) {}
-
-        // Восстановим фон и зум из settings, если есть
-        try {
-            const settings = data.settings || {};
-            // Фон
-            const bg = settings.backgroundColor;
-            if (bg && this.coreMoodboard?.pixi?.app?.renderer) {
-                const parseHex = (v) => {
-                    if (typeof v === 'number') return v;
-                    if (typeof v === 'string') {
-                        const s = v.startsWith('#') ? v.slice(1) : v;
-                        const n = parseInt(s, 16);
-                        if (Number.isFinite(n)) return n;
-                    }
-                    return null;
-                };
-                const bgInt = parseHex(bg);
-                if (bgInt != null) this.coreMoodboard.pixi.app.renderer.backgroundColor = bgInt;
-            }
-            // Зум
-            const z = settings.zoom && (settings.zoom.current || settings.zoom.default);
-            const world = this.coreMoodboard?.pixi?.worldLayer || this.coreMoodboard?.pixi?.app?.stage;
-            if (world && Number.isFinite(z) && z > 0) {
-                world.scale.set(z);
-                const percent = Math.round(z * 100);
-                try {
-                    this.coreMoodboard.eventBus.emit('ui:zoom:percent', { percentage: percent });
-                } catch (_) {}
+                const settings = data.settings || {};
+                const bg = settings.backgroundColor;
+                if (bg && this.coreMoodboard?.pixi?.app?.renderer) {
+                    const s = typeof bg === 'string' ? (bg.startsWith('#') ? bg.slice(1) : bg) : null;
+                    const bgInt = typeof bg === 'number' ? bg : (s ? parseInt(s, 16) : null);
+                    if (bgInt != null) this.coreMoodboard.pixi.app.renderer.backgroundColor = bgInt;
+                }
+                const z = settings.zoom && (settings.zoom.current || settings.zoom.default);
+                const world = this.coreMoodboard?.pixi?.worldLayer || this.coreMoodboard?.pixi?.app?.stage;
+                if (world && Number.isFinite(z) && z > 0) {
+                    world.scale.set(z);
+                    const percent = Math.round(z * 100);
+                    try { this.coreMoodboard.eventBus.emit('ui:zoom:percent', { percentage: percent }); } catch (_) {}
+                }
             }
         } catch (_) {}
         

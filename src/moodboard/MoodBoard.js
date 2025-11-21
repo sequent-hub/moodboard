@@ -18,6 +18,7 @@ import { NotePropertiesPanel } from '../ui/NotePropertiesPanel.js';
 import { FilePropertiesPanel } from '../ui/FilePropertiesPanel.js';
 import { AlignmentGuides } from '../tools/AlignmentGuides.js';
 import { ImageUploadService } from '../services/ImageUploadService.js';
+import { SettingsApplier } from '../services/SettingsApplier.js';
 
 /**
  * Готовый MoodBoard с UI - главный класс пакета
@@ -84,6 +85,15 @@ export class MoodBoard {
             // Инициализируем CoreMoodBoard
             await this.initCoreMoodBoard();
             
+            // Настройки (единая точка применения)
+            this.settingsApplier = new SettingsApplier(
+                this.coreMoodboard.eventBus,
+                this.coreMoodboard.pixi,
+                this.coreMoodboard.boardService || null
+            );
+            // Делаем доступным для других подсистем
+            this.coreMoodboard.settingsApplier = this.settingsApplier;
+            
             // Создаем менеджеры
             this.dataManager = new DataManager(this.coreMoodboard);
             this.actionHandler = new ActionHandler(this.dataManager, this.workspaceManager);
@@ -131,6 +141,10 @@ export class MoodBoard {
             
             // Предоставляем доступ к сервису через core
             this.coreMoodboard.imageUploadService = this.imageUploadService;
+            // Передаем ссылку на topbar в апплаер настроек для синхронизации UI
+            if (this.settingsApplier && this.topbar) {
+                this.settingsApplier.setUI({ topbar: this.topbar });
+            }
             
             // Настраиваем коллбеки событий
             this.setupEventCallbacks();
