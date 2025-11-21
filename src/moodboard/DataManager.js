@@ -19,7 +19,7 @@ export class DataManager {
 
         // Восстанавливаем тип сетки и её параметры до загрузки объектов
         try {
-            const grid = data.grid || (data.board && data.board.grid);
+            const grid = (data.settings && data.settings.grid) || data.grid || (data.board && data.board.grid);
             if (grid && grid.type) {
                 const payload = { type: grid.type };
                 const opts = grid.options || null;
@@ -27,6 +27,36 @@ export class DataManager {
                     payload.options = opts;
                 }
                 this.coreMoodboard.eventBus.emit(this.coreMoodboard.Events?.UI?.GridChange || 'ui:grid:change', payload);
+            }
+        } catch (_) {}
+
+        // Восстановим фон и зум из settings, если есть
+        try {
+            const settings = data.settings || {};
+            // Фон
+            const bg = settings.backgroundColor;
+            if (bg && this.coreMoodboard?.pixi?.app?.renderer) {
+                const parseHex = (v) => {
+                    if (typeof v === 'number') return v;
+                    if (typeof v === 'string') {
+                        const s = v.startsWith('#') ? v.slice(1) : v;
+                        const n = parseInt(s, 16);
+                        if (Number.isFinite(n)) return n;
+                    }
+                    return null;
+                };
+                const bgInt = parseHex(bg);
+                if (bgInt != null) this.coreMoodboard.pixi.app.renderer.backgroundColor = bgInt;
+            }
+            // Зум
+            const z = settings.zoom && (settings.zoom.current || settings.zoom.default);
+            const world = this.coreMoodboard?.pixi?.worldLayer || this.coreMoodboard?.pixi?.app?.stage;
+            if (world && Number.isFinite(z) && z > 0) {
+                world.scale.set(z);
+                const percent = Math.round(z * 100);
+                try {
+                    this.coreMoodboard.eventBus.emit('ui:zoom:percent', { percentage: percent });
+                } catch (_) {}
             }
         } catch (_) {}
         

@@ -2151,7 +2151,52 @@ export class CoreMoodBoard {
      * Получение данных доски для сохранения
      */
     getBoardData() {
-        return this.state.serialize();
+        // Базовые данные доски (объекты и метаданные из state)
+        const s = this.state.serialize();
+        const boardData = {
+            objects: Array.isArray(s.objects) ? s.objects : [],
+            name: s.name || s.title || 'Untitled Board',
+            description: s.description || null
+        };
+
+        // Настройки (settings): фон, сетка, зум, размеры канваса
+        const app = this.pixi?.app;
+        const rendererBg = app?.renderer?.background?.color ?? app?.renderer?.backgroundColor;
+        const toHex = (num) => {
+            try { return '#' + Number(num >>> 0).toString(16).padStart(6, '0'); } catch (_) { return '#F5F5F5'; }
+        };
+        const world = this.pixi?.worldLayer || app?.stage;
+        const currentZoom = Math.max(0.1, Math.min(5, world?.scale?.x || 1));
+        const canvasW = app?.view?.clientWidth || app?.view?.width || 0;
+        const canvasH = app?.view?.clientHeight || app?.view?.height || 0;
+
+        // Сетка: берём то, что накапливается в state.board.grid через BoardService
+        const gridState = (this.state?.state?.board && this.state.state.board.grid) ? this.state.state.board.grid : null;
+        const gridSettings = (() => {
+            if (gridState && gridState.type) {
+                // Если храним полные options от serialize(), извлекаем ключевые
+                const opts = gridState.options || {};
+                // Унификация ключей под формат из задачи
+                return {
+                    type: gridState.type,
+                    size: opts.size || 20,
+                    visible: opts.enabled !== false,
+                    color: toHex(opts.color ?? 0xE0E0E0)
+                };
+            }
+            return null;
+        })();
+
+        const settings = {
+            backgroundColor: toHex(rendererBg ?? 0xF5F5F5),
+            grid: gridSettings || undefined,
+            zoom: { min: 0.1, max: 5.0, default: 1.0, current: currentZoom },
+            canvas: { width: canvasW, height: canvasH }
+        };
+
+        const boardId = (this.state?.state?.board && this.state.state.board.id) || this.options?.boardId || null;
+
+        return { id: boardId, boardData, settings };
     }
 
     /**

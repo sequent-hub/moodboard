@@ -42,8 +42,12 @@ export class ApiClient {
 
     async saveBoard(boardId, boardData) {
         try {
+            // Поддержка нового формата: { boardData: {...}, settings: {...} }
+            let payloadBoardData = boardData && boardData.boardData ? boardData.boardData : boardData;
+            let payloadSettings = boardData && boardData.settings ? boardData.settings : undefined;
+
             // Фильтруем объекты изображений и файлов - убираем избыточные данные
-            const cleanedData = this._cleanObjectData(boardData);
+            const cleanedData = this._cleanObjectData(payloadBoardData);
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
@@ -58,7 +62,8 @@ export class ApiClient {
                 credentials: 'same-origin',
                 body: JSON.stringify({
                     boardId: boardId,
-                    boardData: cleanedData
+                    boardData: cleanedData,
+                    settings: payloadSettings
                 })
             });
 
