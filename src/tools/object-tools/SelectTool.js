@@ -2033,7 +2033,10 @@ export class SelectTool extends BaseTool {
                 if (create && objectId) {
                     const worldLayerRef = this.textEditor.world || (this.app?.stage);
                     const viewRes = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
-                    const globalPoint = new PIXI.Point(Math.round(leftPx * viewRes), Math.round(topPx * viewRes));
+                    // Статичный HTML-текст не имеет верхнего внутреннего отступа (HtmlTextLayer ставит padding: 0),
+                    // поэтому добавляем padTop к topPx при расчёте мировых координат
+                    const yCssStaticTop = Math.round(topPx + padTop);
+                    const globalPoint = new PIXI.Point(Math.round(leftPx * viewRes), Math.round(yCssStaticTop * viewRes));
                     const worldPoint = worldLayerRef && worldLayerRef.toLocal ? worldLayerRef.toLocal(globalPoint) : { x: position.x, y: position.y };
                     const newWorldPos = { x: Math.round(worldPoint.x), y: Math.round(worldPoint.y) };
                     this.eventBus.emit(Events.Object.StateChanged, {
@@ -2041,7 +2044,7 @@ export class SelectTool extends BaseTool {
                         updates: { position: newWorldPos }
                     });
                     // Диагностика
-                    console.log('🧭 Text position sync', { objectId, newWorldPos, leftPx, topPx, viewRes });
+                    console.log('🧭 Text position sync', { objectId, newWorldPos, leftPx, topPx, yCssStaticTop, padTop, viewRes });
                 }
             } catch (_) {}
         }
