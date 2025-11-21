@@ -473,6 +473,10 @@ export class SelectTool extends BaseTool {
                     type: 'text', 
                     position: posData.position,
                     properties: { content: textContent },
+                    caretClick: {
+                        clientX: event?.originalEvent?.clientX,
+                        clientY: event?.originalEvent?.clientY
+                    },
                     create: false 
                 });
                 return;
@@ -2179,6 +2183,59 @@ export class SelectTool extends BaseTool {
         styleEl.textContent = `.${uid}::placeholder{font-size:${phSize}px;opacity:${placeholderOpacity};line-height:${computeLineHeightPx(phSize)}px;white-space:nowrap;}`;
         document.head.appendChild(styleEl);
         this.textEditor = { active: true, objectId, textarea, wrapper, world: this.textEditor.world, position, properties: { fontSize }, objectType, _phStyle: styleEl };
+
+        // Если переходим в редактирование существующего текста по двойному клику,
+        // устанавливаем каретку по координате клика между буквами
+        try {
+            const click = (object && object.caretClick) ? object.caretClick : null;
+            if (!create && objectId && click && typeof window !== 'undefined') {
+                setTimeout(() => {
+                    try {
+                        const el = window.moodboardHtmlTextLayer ? window.moodboardHtmlTextLayer.idToEl.get(objectId) : null;
+                        const fullText = (typeof textarea.value === 'string') ? textarea.value : '';
+                        if (!el || !fullText || !el.firstChild) return;
+                        const textNode = el.firstChild;
+                        const len = textNode.textContent.length;
+                        if (len === 0) {
+                            textarea.selectionStart = textarea.selectionEnd = 0;
+                            return;
+                        }
+                        const doc = el.ownerDocument || document;
+                        let bestIdx = 0;
+                        let bestDist = Infinity;
+                        for (let i = 0; i <= len; i++) {
+                            const range = doc.createRange();
+                            range.setStart(textNode, i);
+                            range.setEnd(textNode, i);
+                            const rects = range.getClientRects();
+                            const rect = rects && rects.length > 0 ? rects[0] : range.getBoundingClientRect();
+                            if (rect && isFinite(rect.left) && isFinite(rect.top)) {
+                                if (click.clientX >= rect.left && click.clientX <= rect.right &&
+                                    click.clientY >= rect.top && click.clientY <= rect.bottom) {
+                                    bestIdx = i;
+                                    bestDist = 0;
+                                    break;
+                                }
+                                const cx = Math.max(rect.left, Math.min(click.clientX, rect.right));
+                                const cy = Math.max(rect.top, Math.min(click.clientY, rect.bottom));
+                                const dx = click.clientX - cx;
+                                const dy = click.clientY - cy;
+                                const d2 = dx * dx + dy * dy;
+                                if (d2 < bestDist) {
+                                    bestDist = d2;
+                                    bestIdx = i;
+                                }
+                            }
+                        }
+                        const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+                        const caret = clamp(bestIdx, 0, fullText.length);
+                        textarea.selectionStart = textarea.selectionEnd = caret;
+                        if (typeof textarea.scrollTop === 'number') textarea.scrollTop = 0;
+                        console.log('🧭 Text caret set', { objectId, caret, len: fullText.length });
+                    } catch (_) {}
+                }, 0);
+            }
+        } catch (_) {}
 
         // Если редактируем записку — скрываем PIXI-текст записки (чтобы не было дублирования)
         if (objectType === 'note' && objectId) {
