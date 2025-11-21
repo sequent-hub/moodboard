@@ -2006,6 +2006,15 @@ export class SelectTool extends BaseTool {
             const topPx = create ? Math.round(screenPos.y - padTop) : Math.round(screenPos.y);
             wrapper.style.left = `${leftPx}px`;
             wrapper.style.top = `${topPx}px`;
+            // Диагностика: логируем позицию инпута и вычисленные параметры позиционирования
+            try {
+                console.log('🧭 Text input', {
+                    input: { left: leftPx, top: topPx },
+                    screenPos,
+                    padding: { top: padTop, left: padLeft },
+                    create
+                });
+            } catch (_) {}
         }
         // Минимальные границы (зависят от текущего режима: новый объект или редактирование существующего)
         const worldLayerRef = this.textEditor.world || (this.app?.stage);

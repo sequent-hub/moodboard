@@ -253,6 +253,13 @@ export class PlacementTool extends BaseTool {
 
         if (isTextWithEditing) {
             // Для текста позиция должна совпадать с точкой клика без смещений
+            // Диагностика: логируем позицию курсора и мировые координаты в момент клика
+            try {
+                console.log('🧭 Text click', {
+                    cursor: { x: event.x, y: event.y },
+                    world: { x: Math.round(worldPoint.x), y: Math.round(worldPoint.y) }
+                });
+            } catch (_) {}
             position = {
                 x: Math.round(worldPoint.x),
                 y: Math.round(worldPoint.y)
