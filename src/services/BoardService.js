@@ -11,25 +11,9 @@ export class BoardService {
 
 	async init(getCanvasSize) {
 		this._getCanvasSize = getCanvasSize;
-		// Инициализируем сетку (по умолчанию линейная)
-		const canvasSize = (this._getCanvasSize?.() || {});
-		this.grid = GridFactory.createGrid('line', {
-			enabled: true,
-			size: 32,
-			width: canvasSize.width || 800,
-			height: canvasSize.height || 600,
-			color: 0x6a6aff,
-			opacity: 0.4
-		});
-		this.grid.updateVisual();
-		this.pixi.setGrid(this.grid);
-		this.eventBus.emit(Events.UI.GridCurrent, { type: 'line' });
-		// Сообщаем о текущих данных сетки для сохранения в boardData
-		try {
-			this.eventBus.emit(Events.Grid.BoardDataChanged, {
-				grid: { type: 'line', options: this.grid.serialize ? this.grid.serialize() : {} }
-			});
-		} catch (_) {}
+		// Не создаём сетку по умолчанию, чтобы избежать визуального переключения.
+		// Сетка будет установлена из сохранённых настроек через Events.UI.GridChange.
+		this.grid = null;
 
 		this._attachEvents();
 	}
