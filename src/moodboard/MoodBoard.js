@@ -232,11 +232,19 @@ export class MoodBoard {
         // Смена фона доски по выбору цвета в топбаре
         this.coreMoodboard.eventBus.on(Events.UI.PaintPick, ({ color }) => {
             if (!color) return;
-            const hex = typeof color === 'string' && color.startsWith('#')
-                ? parseInt(color.slice(1), 16)
-                : color;
-            if (this.coreMoodboard?.pixi?.app?.renderer) {
-                this.coreMoodboard.pixi.app.renderer.backgroundColor = hex;
+            // Централизованное применение через SettingsApplier,
+            // чтобы гарантировать эмит события для автосохранения
+            if (this.settingsApplier && typeof this.settingsApplier.set === 'function') {
+                this.settingsApplier.set({ backgroundColor: color });
+            } else {
+                // Fallback на случай отсутствия аплаера (не должен случаться)
+                const hex = (typeof color === 'string' && color.startsWith('#'))
+                    ? parseInt(color.slice(1), 16)
+                    : color;
+                if (this.coreMoodboard?.pixi?.app?.renderer) {
+                    this.coreMoodboard.pixi.app.renderer.backgroundColor = hex;
+                }
+                this.coreMoodboard.eventBus.emit(Events.Grid.BoardDataChanged, { settings: { backgroundColor: color } });
             }
         });
     }

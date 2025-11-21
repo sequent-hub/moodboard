@@ -16,6 +16,10 @@ export class SettingsApplier {
     set(partial) {
         this.settings = { ...this.settings, ...(partial || {}) };
         this.apply(this.settings);
+        // Сообщаем системе об изменении настроек для автосохранения
+        try {
+            this.eventBus && this.eventBus.emit(Events.Grid.BoardDataChanged, { settings: this.get() });
+        } catch (_) {}
     }
 
     get() {
