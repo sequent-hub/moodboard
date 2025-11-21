@@ -1990,7 +1990,7 @@ export class SelectTool extends BaseTool {
             ];
         } else {
             // Для обычного текста используем стандартное позиционирование
-            // Динамически компенсируем внутренние отступы textarea, чтобы каретка оказалась ровно в точке клика
+            // Динамически компенсируем внутренние отступы textarea для точного совпадения со статичным текстом
             let padTop = 0;
             let padLeft = 0;
             let lineHeightPx = 0;
@@ -2011,8 +2011,27 @@ export class SelectTool extends BaseTool {
                     if (r && isFinite(r.height)) lineHeightPx = r.height;
                 } catch (_) {}
             }
-            const leftPx = create ? Math.round(screenPos.x - padLeft) : Math.round(screenPos.x);
-            const topPx = create ? Math.round(screenPos.y - padTop - (lineHeightPx / 2)) : Math.round(screenPos.y);
+
+            // Базовая точка позиционирования: для редактирования берём точные координаты статичного HTML-текста,
+            // для создания — используем рассчитанные screenPos
+            let baseLeftPx = screenPos.x;
+            let baseTopPx = screenPos.y;
+            try {
+                if (!create && objectId && typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
+                    const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
+                    if (el) {
+                        const cssLeft = parseFloat(el.style.left || 'NaN');
+                        const cssTop = parseFloat(el.style.top || 'NaN');
+                        if (isFinite(cssLeft)) baseLeftPx = cssLeft;
+                        if (isFinite(cssTop)) baseTopPx = cssTop;
+                    }
+                }
+            } catch (_) {}
+
+            const leftPx = Math.round(baseLeftPx - padLeft);
+            const topPx = create
+                ? Math.round(baseTopPx - padTop - (lineHeightPx / 2)) // по клику совмещаем центр строки с точкой клика
+                : Math.round(baseTopPx - padTop); // при редактировании совмещаем верх контента
             wrapper.style.left = `${leftPx}px`;
             wrapper.style.top = `${topPx}px`;
             // Сохраняем CSS-позицию редактора для точной синхронизации при закрытии
@@ -2023,6 +2042,7 @@ export class SelectTool extends BaseTool {
                 console.log('🧭 Text input', {
                     input: { left: leftPx, top: topPx },
                     screenPos,
+                    baseFromStatic: (!create && objectId) ? { left: baseLeftPx, top: baseTopPx } : null,
                     padding: { top: padTop, left: padLeft },
                     lineHeightPx,
                     caretCenterY: create ? (topPx + padTop + (lineHeightPx / 2)) : topPx,
