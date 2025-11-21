@@ -76,19 +76,19 @@ export class GridFactory {
             },
             dot: {
                 enabled: true,
-                size: 20,
+                size: 30,
                 color: 0x6a6aff,
-                opacity: 0.5,
-                dotSize: 2,
+                opacity: 0.7,
+                dotSize: 1,
                 dotStyle: 'circle',
                 highlightIntersections: true
             },
             cross: {
                 enabled: true,
-                size: 40,
+                size: 90,
                 color: 0x6a6aff,
-                opacity: 0.5,
-                crossHalfSize: 4,
+                opacity: 0.3,
+                crossHalfSize: 30,
                 crossLineWidth: 1
             }
         };

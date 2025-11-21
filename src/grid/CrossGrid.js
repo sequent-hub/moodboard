@@ -24,19 +24,28 @@ export class CrossGrid extends BaseGrid {
      */
     createVisual() {
         const g = this.graphics;
-        // Прозрачность задаем через graphics.alpha из BaseGrid; штрих рисуем с полным альфа
-        g.lineStyle(this.crossLineWidth, this.color, 1);
+        // Прозрачность — через alpha графики (как у линейной сетки)
+        g.alpha = this.opacity;
+        // Тонкие чёткие линии как у линейной сетки: alignment = 0.5
+        try {
+            g.lineStyle({ width: Math.max(0.5, this.crossLineWidth), color: this.color, alpha: 1, alignment: 0.5 });
+        } catch (_) {
+            g.lineStyle(Math.max(0.5, this.crossLineWidth), this.color, 1);
+        }
 
         const hs = this.crossHalfSize;
 
         for (let x = 0; x <= this.width; x += this.size) {
             for (let y = 0; y <= this.height; y += this.size) {
+                // Выравниваем к полу-пикселю для чётких 1px линий
+                const px = Math.round(x) + 0.5;
+                const py = Math.round(y) + 0.5;
                 // Горизонтальная часть креста
-                g.moveTo(x - hs, y);
-                g.lineTo(x + hs, y);
+                g.moveTo(px - hs, py);
+                g.lineTo(px + hs, py);
                 // Вертикальная часть креста
-                g.moveTo(x, y - hs);
-                g.lineTo(x, y + hs);
+                g.moveTo(px, py - hs);
+                g.lineTo(px, py + hs);
             }
         }
     }
