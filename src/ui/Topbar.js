@@ -199,10 +199,30 @@ export class Topbar {
     setPaintButtonHex(btnHex) {
         if (!btnHex) return;
         if (this._paintBtn) {
-            try { this._paintBtn.style.setProperty('--paint-btn-color', btnHex); } catch (_) {}
+            try { 
+                this._paintBtn.style.setProperty('--paint-btn-color', btnHex); 
+                // Прямое применение фона/бордера, чтобы цвет был виден сразу
+                this._paintBtn.style.background = btnHex;
+                const darker = this._darkenHex ? this._darkenHex(btnHex, 0.35) : btnHex;
+                this._paintBtn.style.borderColor = darker;
+            } catch (_) {}
         } else {
             this._pendingPaintHex = btnHex;
         }
+    }
+
+    /** Утилита: затемнить hex-цвет на долю amount */
+    _darkenHex(hex, amount = 0.25) {
+        try {
+            const h = String(hex).replace('#','');
+            const r = parseInt(h.substring(0,2), 16);
+            const g = parseInt(h.substring(2,4), 16);
+            const b = parseInt(h.substring(4,6), 16);
+            const dr = Math.max(0, Math.min(255, Math.round(r * (1 - amount))));
+            const dg = Math.max(0, Math.min(255, Math.round(g * (1 - amount))));
+            const db = Math.max(0, Math.min(255, Math.round(b * (1 - amount))));
+            return `#${dr.toString(16).padStart(2,'0')}${dg.toString(16).padStart(2,'0')}${db.toString(16).padStart(2,'0')}`;
+        } catch (_) { return hex; }
     }
 
     setActive(type) {
