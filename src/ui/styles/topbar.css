@@ -51,8 +51,8 @@
     color: #1d4ed8;
 }
 
-.moodboard-topbar__button--paint { background: var(--paint-btn-color, #f0f0f0); }
-.moodboard-topbar__button--paint:hover { background: var(--paint-btn-color, #f0f0f0); }
+.moodboard-topbar__button--paint { background: var(--paint-btn-color); }
+.moodboard-topbar__button--paint:hover { background: var(--paint-btn-color); }
 
 .moodboard-topbar__paint-popover {
     position: absolute;
