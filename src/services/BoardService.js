@@ -36,7 +36,7 @@ export class BoardService {
 
 	_attachEvents() {
 		// Смена вида сетки из UI
-		this.eventBus.on(Events.UI.GridChange, ({ type, options }) => {
+		this.eventBus.on(Events.UI.GridChange, ({ type, options: overrideOptions }) => {
 			const size = this._getCanvasSize?.() || { width: 800, height: 600 };
 			if (type === 'off') {
 				this.grid?.setEnabled(false);
@@ -50,23 +50,23 @@ export class BoardService {
 				} catch (_) {}
 				return;
 			}
-			const options = {
+			const gridOptions = {
 				...GridFactory.getDefaultOptions(type),
 				enabled: true,
 				width: size.width,
 				height: size.height,
 				// Перекрываем входящими опциями (если пришли из сохранения)
-				...(options || {})
+				...(overrideOptions || {})
 			};
 			try {
-				this.grid = GridFactory.createGrid(type, options);
+				this.grid = GridFactory.createGrid(type, gridOptions);
 				this.grid.updateVisual();
 				this.pixi.setGrid(this.grid);
 				this.eventBus.emit(Events.UI.GridCurrent, { type });
 				// Сообщаем об обновлении данных сетки для сохранения в boardData
 				try {
 					this.eventBus.emit(Events.Grid.BoardDataChanged, {
-						grid: { type, options: this.grid.serialize ? this.grid.serialize() : options }
+						grid: { type, options: this.grid.serialize ? this.grid.serialize() : gridOptions }
 					});
 				} catch (_) {}
 			} catch (e) {
