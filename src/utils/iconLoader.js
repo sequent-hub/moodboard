@@ -50,7 +50,6 @@ export class IconLoader {
 
         } catch (error) {
             console.error('❌ Ошибка статической загрузки иконок:', error);
-            console.log('🔄 Пробуем загрузить встроенные SVG иконки...');
             // В случае ошибки загружаем встроенные SVG иконки
             this.loadBuiltInIcons();
         }
@@ -142,7 +141,7 @@ export class IconLoader {
             this.cache.set(name, builtInIcons[name]);
         });
 
-        console.log('📦 Загружены встроенные SVG иконки');
+        
     }
 
     /**
@@ -152,13 +151,11 @@ export class IconLoader {
      */
     async loadIcon(iconName) {
         if (this.cache.has(iconName)) {
-            console.log(`📦 Загружаем иконку ${iconName} из кэша`);
             return this.cache.get(iconName);
         }
 
         // Если иконка уже загружена статически
         if (this.icons[iconName]) {
-            console.log(`📦 Загружаем иконку ${iconName} из статического кэша`);
             return this.icons[iconName];
         }
 
@@ -195,7 +192,7 @@ export class IconLoader {
             this.cache.set(name, this.getFallbackIcon(name));
         });
 
-        console.log('📦 Загружены fallback иконки');
+        
     }
 
     /**
@@ -239,7 +236,7 @@ export class IconLoader {
      */
     async reloadIcon(iconName) {
         // Удаляем из кэша
-        console.log(`🗑️ Очищаем кэш для иконки ${iconName}`);
+        
         this.cache.delete(iconName);
         
         try {
@@ -247,7 +244,6 @@ export class IconLoader {
             const iconModule = await import(`../assets/icons/${iconName}.svg?raw`);
             if (iconModule && iconModule.default) {
                 const svgContent = iconModule.default;
-                console.log(`✅ Иконка ${iconName} перезагружена успешно`);
                 this.icons[iconName] = svgContent;
                 this.cache.set(iconName, svgContent);
                 return svgContent;

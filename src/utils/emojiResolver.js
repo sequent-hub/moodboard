@@ -137,7 +137,7 @@ export function resolveInlineEmojiFirst(emoji) {
     if (isInlineSvgEmoji(emoji)) {
         const dataUrl = getInlineEmojiUrl(emoji);
         if (dataUrl) {
-            console.log('✅ Используем встроенный SVG эмоджи:', emoji);
+            
             return dataUrl;
         }
     }
@@ -195,7 +195,7 @@ export function resolveEmojiAbsoluteUrl(emoji, basePath = null) {
                     
                     resolvedBasePath = packagePath || `${currentUrl}/src/assets/emodji/`;
                     
-                    console.log('🔧 Fallback путь к эмоджи:', resolvedBasePath);
+                    
                 }
             }
         }

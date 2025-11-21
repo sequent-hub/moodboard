@@ -397,7 +397,7 @@ export class KeyboardManager {
         this.registerShortcut('delete', () => {
             // Проверяем, не активен ли какой-либо текстовый редактор
             if (this._isTextEditorActive()) {
-                console.log('🔒 KeyboardManager: Текстовый редактор активен, пропускаем удаление объектов');
+                
                 return;
             }
             this.eventBus.emit(Events.Keyboard.Delete);
@@ -406,7 +406,7 @@ export class KeyboardManager {
         this.registerShortcut('backspace', () => {
             // Проверяем, не активен ли какой-либо текстовый редактор
             if (this._isTextEditorActive()) {
-                console.log('🔒 KeyboardManager: Текстовый редактор активен, пропускаем удаление объектов');
+                
                 return;
             }
             this.eventBus.emit(Events.Keyboard.Delete);
@@ -592,7 +592,7 @@ export class KeyboardManager {
         this.registerShortcut('delete', () => {
             // Проверяем, не активен ли какой-либо текстовый редактор
             if (this._isTextEditorActive()) {
-                console.log('🔒 KeyboardManager: Текстовый редактор активен, пропускаем удаление объектов');
+                
                 return;
             }
             this.eventBus.emit(Events.Keyboard.Delete);
@@ -601,7 +601,7 @@ export class KeyboardManager {
         this.registerShortcut('backspace', () => {
             // Проверяем, не активен ли какой-либо текстовый редактор
             if (this._isTextEditorActive()) {
-                console.log('🔒 KeyboardManager: Текстовый редактор активен, пропускаем удаление объектов');
+                
                 return;
             }
             this.eventBus.emit(Events.Keyboard.Delete);

@@ -168,7 +168,6 @@ export class SaveStatus {
     showSuccess(data) {
         // Дополнительные действия при успешном сохранении
         if (data.timestamp && this.options.showTimestamp) {
-            console.log('Данные сохранены в:', data.timestamp);
         }
     }
     

@@ -103,8 +103,7 @@ export class NoteObject {
         // Гарантируем применение web-font (например, Caveat) при первом создании
         this._ensureWebFontApplied(fontFamily, this.fontSize);
         
-        // Отладочная информация
-        console.log('NoteObject created with content:', this.content);
+        
 
         // Метаданные
         this.container._mb = {
@@ -217,9 +216,7 @@ export class NoteObject {
                 content: this.content
             };
         }
-        console.log('NoteObject setContent called:', this.content);
-        // Перерисовываем фон после обновления содержимого
-        console.log('NoteObject: calling _redraw() to restore background');
+        
         this._redraw();
     }
 

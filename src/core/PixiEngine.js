@@ -198,7 +198,6 @@ export class PixiEngine {
     removeObject(objectId) {
         const pixiObject = this.objects.get(objectId);
         if (pixiObject) {
-            console.log('🗑️ PixiEngine: удаляем объект из сцены:', objectId);
             
             // Удаляем из родительского контейнера
             if (this.worldLayer) {
@@ -209,7 +208,7 @@ export class PixiEngine {
             
             // ИСПРАВЛЕНИЕ: Полная очистка для изображений/эмоджи
             if (pixiObject instanceof PIXI.Sprite) {
-                console.log('🗑️ PixiEngine: очищаем ресурсы изображения/эмоджи');
+                
                 
                 // Очищаем текстуру (особенно важно для data URL)
                 if (pixiObject.texture && pixiObject.texture !== PIXI.Texture.WHITE) {
@@ -240,7 +239,7 @@ export class PixiEngine {
                 this.app.renderer.render(this.app.stage);
             }
             
-            console.log(`✅ PixiEngine: объект ${objectId} полностью удален и рендер обновлен`);
+            
         } else {
             console.warn(`⚠️ PixiEngine: объект ${objectId} не найден для удаления`);
         }

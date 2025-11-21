@@ -64,21 +64,17 @@ export class HtmlTextLayer {
 
         // Обработка событий скрытия/показа текста от SelectTool
         this.eventBus.on(Events.Tool.HideObjectText, ({ objectId }) => {
-            console.log(`🔍 HtmlTextLayer: скрываю текст для объекта ${objectId}`);
             const el = this.idToEl.get(objectId);
             if (el) {
                 el.style.visibility = 'hidden';
-                console.log(`🔍 HtmlTextLayer: текст ${objectId} скрыт (visibility: hidden)`);
             } else {
                 console.warn(`❌ HtmlTextLayer: HTML-элемент для объекта ${objectId} не найден`);
             }
         });
         this.eventBus.on(Events.Tool.ShowObjectText, ({ objectId }) => {
-            console.log(`🔍 HtmlTextLayer: показываю текст для объекта ${objectId}`);
             const el = this.idToEl.get(objectId);
             if (el) {
                 el.style.visibility = '';
-                console.log(`🔍 HtmlTextLayer: текст ${objectId} показан (visibility: visible)`);
             } else {
                 console.warn(`❌ HtmlTextLayer: HTML-элемент для объекта ${objectId} не найден`);
             }
@@ -86,11 +82,9 @@ export class HtmlTextLayer {
 
         // Обработка обновления содержимого текста
         this.eventBus.on(Events.Tool.UpdateObjectContent, ({ objectId, content }) => {
-            console.log(`🔍 HtmlTextLayer: обновляю содержимое для объекта ${objectId}:`, content);
             const el = this.idToEl.get(objectId);
             if (el && typeof content === 'string') {
                 el.textContent = content;
-                console.log(`🔍 HtmlTextLayer: содержимое обновлено для ${objectId}:`, content);
             } else {
                 console.warn(`❌ HtmlTextLayer: не удалось обновить содержимое для ${objectId}:`, { el: !!el, content });
             }
@@ -104,7 +98,7 @@ export class HtmlTextLayer {
                 const nextFont = updates.fontFamily || (updates.properties && updates.properties.fontFamily);
                 if (nextFont) {
                     el.style.fontFamily = nextFont;
-                    console.log(`🔍 HtmlTextLayer: обновлен шрифт для ${objectId}:`, nextFont);
+                    
                 }
                 if (updates.fontSize) {
                     el.style.fontSize = `${updates.fontSize}px`;
@@ -120,15 +114,15 @@ export class HtmlTextLayer {
                     el.style.lineHeight = `${lh}px`;
                     // Синхронизируем базовый размер шрифта для дальнейших пересчётов (zoom/resize)
                     el.dataset.baseFontSize = String(fs);
-                    console.log(`🔍 HtmlTextLayer: обновлен размер шрифта для ${objectId}:`, updates.fontSize);
+                    
                 }
                 if (updates.color) {
                     el.style.color = updates.color;
-                    console.log(`🔍 HtmlTextLayer: обновлен цвет для ${objectId}:`, updates.color);
+                    
                 }
                 if (updates.backgroundColor !== undefined) {
                     el.style.backgroundColor = updates.backgroundColor === 'transparent' ? '' : updates.backgroundColor;
-                    console.log(`🔍 HtmlTextLayer: обновлен фон для ${objectId}:`, updates.backgroundColor);
+                    
                 }
                 // После изменения свойств текста — автоподгон высоты рамки под контент и принудительное обновление
                 this._autoFitTextHeight(objectId);
@@ -176,11 +170,11 @@ export class HtmlTextLayer {
     rebuildFromState() {
         if (!this.core?.state) return;
         const objs = this.core.state.state.objects || [];
-        console.log(`🔍 HtmlTextLayer: rebuildFromState, найдено объектов:`, objs.length);
+        
         
         objs.forEach((o) => {
             if (o.type === 'text' || o.type === 'simple-text') {
-                console.log(`🔍 HtmlTextLayer: создаю HTML-элемент для текстового объекта:`, o);
+                
                 this._ensureTextEl(o.id, o);
             }
         });
@@ -191,7 +185,7 @@ export class HtmlTextLayer {
         if (!this.layer || !objectId) return;
         if (this.idToEl.has(objectId)) return;
         
-        console.log(`🔍 HtmlTextLayer: создаю HTML-элемент для текста ${objectId}:`, objectData);
+        
         
         const el = document.createElement('div');
         el.className = 'mb-text';
@@ -239,7 +233,7 @@ export class HtmlTextLayer {
         this.layer.appendChild(el);
         this.idToEl.set(objectId, el);
         
-        console.log(`🔍 HtmlTextLayer: HTML-элемент создан и добавлен в DOM:`, el);
+        
     }
 
     _removeTextEl(objectId) {
@@ -257,7 +251,7 @@ export class HtmlTextLayer {
         const el = this.idToEl.get(objectId);
         if (!el || !this.core) return;
         
-        console.log(`🔍 HtmlTextLayer: обновляю позицию для текста ${objectId}`);
+        
         
         const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
         const s = world?.scale?.x || 1;
@@ -321,7 +315,7 @@ export class HtmlTextLayer {
         const content = obj.content || obj.properties?.content;
         if (typeof content === 'string') {
             el.textContent = content;
-            console.log(`🔍 HtmlTextLayer: содержимое обновлено в updateOne для ${objectId}:`, content);
+            
         }
 
         // Гарантируем, что высота соответствует контенту (особенно после смены font-size)
@@ -332,16 +326,7 @@ export class HtmlTextLayer {
             el.style.height = `${h}px`;
         } catch (_) {}
         
-        console.log(`🔍 HtmlTextLayer: позиция обновлена для ${objectId}:`, {
-            left: `${left}px`,
-            top: `${top}px`,
-            width: `${Math.max(1, (w * s) / res)}px`,
-            height: `${Math.max(1, (h * s) / res)}px`,
-            fontSize: `${fontSizePx}px`,
-            content: content,
-            visibility: el.style.visibility,
-            textContent: el.textContent
-        });
+        
     }
 
     _autoFitTextHeight(objectId) {

@@ -244,8 +244,6 @@ export class HistoryManager {
         const info = this.getHistoryInfo();
         console.group('📚 История команд');
         console.table(info.commands);
-        console.log(`Позиция: ${this.currentIndex + 1}/${this.history.length}`);
-        console.log(`Undo: ${this.canUndo()}, Redo: ${this.canRedo()}`);
         console.groupEnd();
     }
 

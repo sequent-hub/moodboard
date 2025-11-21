@@ -31,7 +31,6 @@ export class HandlesSync {
                 // Проверяем тип объекта - для записок не показываем ручки
                 const meta = req.pixiObject._mb || {};
                 if (meta.type === 'note') {
-                    console.log(`📝 Скрываем ручки для записки ${objectId} - записки не должны иметь ручек`);
                     this.resizeHandles.hideHandles();
                 } else {
                     this.resizeHandles.showHandles(req.pixiObject, objectId);

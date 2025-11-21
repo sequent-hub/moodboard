@@ -111,7 +111,7 @@ export class EmojiLoaderNoBundler {
                 }
             });
 
-            console.log('📁 Индекс эмоджи:', JSON.stringify(index, null, 2));
+            
             return index;
         }
         

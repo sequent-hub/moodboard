@@ -71,7 +71,7 @@ export class EditFileNameCommand extends BaseCommand {
                     await this.coreMoodboard.fileUploadService.updateFileMetadata(objectData.fileId, { 
                         fileName: fileName 
                     });
-                    console.log('✅ Название файла успешно обновлено на сервере');
+                    
                 } catch (error) {
                     console.warn('⚠️ Ошибка синхронизации названия файла с сервером:', error);
                     // Не останавливаем выполнение, продолжаем с локальным обновлением

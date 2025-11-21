@@ -177,7 +177,7 @@ export function addInlineSvgEmoji(emoji, svgCode) {
     try {
         if (!emoji || !svgCode) return false;
         INLINE_SVG_EMOJIS[emoji] = svgCode;
-        console.log('✅ Добавлен встроенный SVG эмоджи:', emoji);
+        
         return true;
     } catch (error) {
         console.error('❌ Ошибка добавления SVG эмоджи:', error);
@@ -198,7 +198,7 @@ export function bulkAddInlineSvgEmojis(emojiMap) {
                 added++;
             }
         }
-        console.log(`✅ Массово добавлено ${added} встроенных SVG эмоджи`);
+        
         return added;
     } catch (error) {
         console.error('❌ Ошибка массового добавления эмоджи:', error);

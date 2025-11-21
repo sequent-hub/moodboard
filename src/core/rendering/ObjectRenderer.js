@@ -140,7 +140,7 @@ export class ObjectRenderer {
         const pixiObject = this.objects.get(objectId);
         if (!pixiObject) return;
 
-        console.log(`🎨 Обновляем размер объекта ${objectId}, тип: ${objectType}`);
+        
         
         // Делегируем изменение размера объекту
         const meta = pixiObject._mb || {};
@@ -161,7 +161,7 @@ export class ObjectRenderer {
     _recreateGraphicsObject(pixiObject, size, objectType = null) {
         pixiObject.clear();
         
-        console.log(`🔄 Пересоздаем Graphics объект, тип: ${objectType}`);
+        
         
         if (objectType === 'drawing') {
             this._redrawDrawingObject(pixiObject, size);
@@ -264,7 +264,7 @@ export class ObjectRenderer {
         const pixiObject = this.objects.get(objectId);
         if (!pixiObject) return;
 
-        console.log(`🎨 Обновляем содержимое объекта ${objectId}:`, content);
+        
         
         // Делегируем изменение содержимого объекту
         const meta = pixiObject._mb || {};

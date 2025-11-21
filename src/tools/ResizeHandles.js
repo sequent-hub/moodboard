@@ -45,14 +45,13 @@ export class ResizeHandles {
      * Показать ручки для объекта
      */
     showHandles(pixiObject, objectId) {
-        console.log(`👁️ showHandles вызван для ${objectId}`);
         this.hideHandles();
         
         this.targetObject = pixiObject;
         this.targetObjectId = objectId;
         this.updateHandles();
         this.container.visible = true;
-        console.log(`👁️ Контейнер установлен как visible: ${this.container.visible}`);
+        
     }
     
     /**
@@ -173,8 +172,7 @@ export class ResizeHandles {
         this.handles.push(rotateHandle);
         this.container.addChild(rotateHandle);
         
-        console.log(`🔄 Ручка вращения создана: x=${rotateHandle.x}, y=${rotateHandle.y}, visible=${rotateHandle.visible}, eventMode=${rotateHandle.eventMode}`);
-        console.log(`📦 Контейнер ручек: zIndex=${this.container.zIndex}, visible=${this.container.visible}, children=${this.container.children.length}`);
+        
     }
     
     /**
@@ -353,7 +351,6 @@ export class ResizeHandles {
      * Временно скрыть ручки (например, во время перетаскивания)
      */
     temporaryHide() {
-        console.log(`🙈 temporaryHide вызван`);
         this.container.visible = false;
     }
     
@@ -361,7 +358,6 @@ export class ResizeHandles {
      * Показать ручки снова
      */
     temporaryShow() {
-        console.log(`👁️ temporaryShow вызван, targetObject: ${!!this.targetObject}`);
         if (this.targetObject) {
             this.container.visible = true;
         }

@@ -232,9 +232,6 @@ export class MoodBoard {
         // Смена фона доски по выбору цвета в топбаре
         this.coreMoodboard.eventBus.on(Events.UI.PaintPick, ({ color }) => {
             if (!color) return;
-            try {
-                console.log('[MB] PaintPick handler: received color', color, 'settingsApplier?', !!this.settingsApplier);
-            } catch (_) {}
             // Централизованное применение через SettingsApplier,
             // чтобы гарантировать эмит события для автосохранения
             if (this.settingsApplier && typeof this.settingsApplier.set === 'function') {
@@ -368,7 +365,6 @@ export class MoodBoard {
             const boardId = this.options.boardId;
             
             if (!boardId || !this.options.apiUrl) {
-                console.log('📦 MoodBoard: нет boardId или apiUrl, загружаем пустую доску');
                 this.dataManager.loadData(this.data || { objects: [] });
                 
                 // Вызываем коллбек onLoad
@@ -378,7 +374,7 @@ export class MoodBoard {
                 return;
             }
             
-            console.log(`📦 MoodBoard: загружаем доску ${boardId} с ${this.options.apiUrl}`);
+            
             
             // Формируем URL для загрузки
             const loadUrl = this.options.apiUrl.endsWith('/') 
@@ -401,7 +397,6 @@ export class MoodBoard {
             const boardData = await response.json();
             
             if (boardData && boardData.data) {
-                console.log('✅ MoodBoard: данные загружены с сервера', boardData.data);
                 this.dataManager.loadData(boardData.data);
                 
                 // Вызываем коллбек onLoad
@@ -409,7 +404,6 @@ export class MoodBoard {
                     this.options.onLoad({ success: true, data: boardData.data });
                 }
             } else {
-                console.log('📦 MoodBoard: нет данных с сервера, загружаем пустую доску');
                 this.dataManager.loadData(this.data || { objects: [] });
                 
                 // Вызываем коллбек onLoad

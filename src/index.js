@@ -9,7 +9,7 @@ function autoSetupEmojiPaths() {
     if (typeof window !== 'undefined' && !window.MOODBOARD_BASE_PATH) {
         const detectedPackage = '@sequent-org/moodboard';
         window.MOODBOARD_BASE_PATH = `${window.location.origin}/node_modules/${detectedPackage}/`;
-        console.log('🔧 Мудборд: автоматически установлен базовый путь для эмоджи:', window.MOODBOARD_BASE_PATH);
+        
     }
 }
 

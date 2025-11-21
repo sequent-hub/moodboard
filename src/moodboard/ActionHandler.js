@@ -75,7 +75,6 @@ export class ActionHandler {
         const data = this.dataManager.exportBoardData();
         
         if (data) {
-            console.log('Board data:', data);
             this.workspaceManager.showNotification('Board data exported to console');
         } else {
             this.workspaceManager.showNotification('Failed to export board data');

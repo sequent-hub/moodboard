@@ -241,17 +241,11 @@ export class FileUploadService {
         try {
             const downloadUrl = this.getDownloadUrl(fileId);
             
-            console.log('📥 FileUploadService: Начинаем скачивание файла:', {
-                fileId,
-                fileName,
-                downloadUrl,
-                userAgent: navigator.userAgent,
-                isSecureContext: window.isSecureContext
-            });
+            
             
             // Метод 1: Попробуем через fetch + blob (более надежно для современных браузеров)
             try {
-                console.log('🔄 Метод 1: Пробуем скачивание через fetch...');
+                
                 
                 const response = await fetch(downloadUrl, {
                     method: 'GET',
@@ -261,13 +255,7 @@ export class FileUploadService {
                     credentials: 'same-origin'
                 });
                 
-                console.log('📥 Ответ сервера:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    contentType: response.headers.get('content-type'),
-                    contentLength: response.headers.get('content-length'),
-                    contentDisposition: response.headers.get('content-disposition')
-                });
+                
                 
                 if (!response.ok) {
                     // Пытаемся получить JSON ошибку от Laravel
@@ -294,10 +282,7 @@ export class FileUploadService {
                 
                 // Получаем blob файла
                 const blob = await response.blob();
-                console.log('📦 Получен blob:', {
-                    size: blob.size,
-                    type: blob.type
-                });
+                
                 
                 // Создаем URL для blob
                 const blobUrl = window.URL.createObjectURL(blob);
@@ -315,19 +300,19 @@ export class FileUploadService {
                 // Освобождаем память
                 window.URL.revokeObjectURL(blobUrl);
                 
-                console.log('✅ Файл успешно скачан через fetch/blob:', fileName || fileId);
+                
                 return true;
                 
             } catch (fetchError) {
                 console.warn('❌ Ошибка скачивания через fetch:', fetchError);
                 
                 // Метод 2: Fallback - открываем в новом окне
-                console.log('🔄 Метод 2: Пробуем открытие в новом окне...');
+                
                 
                 try {
                     const newWindow = window.open(downloadUrl, '_blank');
                     if (newWindow) {
-                        console.log('✅ Файл открыт в новом окне');
+                        
                         return true;
                     } else {
                         throw new Error('Popup заблокирован браузером');
@@ -336,7 +321,7 @@ export class FileUploadService {
                     console.warn('❌ Ошибка открытия в новом окне:', windowError);
                     
                     // Метод 3: Последний fallback - прямая ссылка
-                    console.log('🔄 Метод 3: Создаем прямую ссылку...');
+                    
                     
                     const link = document.createElement('a');
                     link.href = downloadUrl;
@@ -349,7 +334,7 @@ export class FileUploadService {
                     link.click();
                     document.body.removeChild(link);
                     
-                    console.log('✅ Создана прямая ссылка для скачивания');
+                    
                     return true;
                 }
             }

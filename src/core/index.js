@@ -148,7 +148,6 @@ export class CoreMoodBoard {
         this.selectTool = selectTool;
         
         // Активируем SelectTool по умолчанию
-        console.log('🔧 Активируем SelectTool с PIXI app:', !!this.pixi.app);
         this.toolManager.activateTool('select');
         
         // Подписываемся на события инструментов
@@ -1279,13 +1278,13 @@ export class CoreMoodBoard {
                 }
                 // Создаем команду только если размер действительно изменился
                 if (data.oldSize.width !== data.newSize.width || data.oldSize.height !== data.newSize.height) {
-                    console.log(`📝 Создаем ResizeObjectCommand:`, {
+                    {
                         object: data.object,
                         oldSize: data.oldSize,
                         newSize: data.newSize,
                         oldPosition: data.oldPosition,
                         newPosition: data.newPosition
-                    });
+                    }
                     // Гарантируем согласованность позиции: если UI не передал, вычислим
                     let oldPos = data.oldPosition;
                     let newPos = data.newPosition;
@@ -1529,7 +1528,6 @@ export class CoreMoodBoard {
         this.eventBus.on(Events.Object.StateChanged, (data) => {
             const { objectId, updates } = data;
             if (objectId && updates && this.state) {
-                console.log(`🔧 Обновляем состояние объекта ${objectId}:`, updates);
                 const objects = this.state.getObjects();
                 const object = objects.find(obj => obj.id === objectId);
                 if (object) {
@@ -1552,7 +1550,6 @@ export class CoreMoodBoard {
                         if (object.type === 'frame' && updates.properties && updates.properties.title !== undefined) {
                             if (instance.setTitle) {
                                 instance.setTitle(updates.properties.title);
-                                console.log(`🖼️ Обновлен заголовок фрейма ${objectId}: "${updates.properties.title}"`);
                             }
                         }
 
@@ -1560,7 +1557,6 @@ export class CoreMoodBoard {
                         if (object.type === 'frame' && updates.backgroundColor !== undefined) {
                             if (instance.setBackgroundColor) {
                                 instance.setBackgroundColor(updates.backgroundColor);
-                                console.log(`🎨 Обновлен цвет фона фрейма ${objectId}: ${updates.backgroundColor}`);
                             }
                         }
 
@@ -1586,7 +1582,6 @@ export class CoreMoodBoard {
                                 
                                 if (Object.keys(styleUpdates).length > 0) {
                                     instance.setStyle(styleUpdates);
-                                    console.log(`📝 Обновлены свойства записки ${objectId}:`, styleUpdates);
                                 }
                             }
                         }
@@ -1604,7 +1599,6 @@ export class CoreMoodBoard {
         this.eventBus.on(Events.Object.FileNameChange, (data) => {
             const { objectId, oldName, newName } = data;
             if (objectId && oldName !== undefined && newName !== undefined) {
-                console.log(`🔧 Изменение названия файла ${objectId}: "${oldName}" → "${newName}"`);
                 
                 // Создаем команду для истории изменений
                 const command = new EditFileNameCommand(this, objectId, oldName, newName);
@@ -2243,7 +2237,6 @@ export class CoreMoodBoard {
             const errors = Array.isArray(result.errors) ? result.errors : [];
 
             if (deletedCount > 0) {
-                console.log(`Очищено ${deletedCount} неиспользуемых изображений`);
             }
             if (errors.length > 0) {
                 console.warn('Ошибки при очистке изображений:', errors);
@@ -2317,6 +2310,5 @@ export class CoreMoodBoard {
         // Очищаем контейнер
         this.container = null;
         
-        console.log('CoreMoodBoard успешно уничтожен');
     }
 }

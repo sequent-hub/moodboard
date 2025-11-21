@@ -204,9 +204,7 @@ export class BaseTool {
 
         // Для остальных событий добавляем контекст инструмента
         const eventData = { tool: this.name, ...data };
-        if (name.includes('rotate')) {
-            console.log(`📡 BaseTool отправляет событие tool:${name}:`, eventData);
-        }
+        
         const map2 = new Map([
             ['drag:start', Events.Tool.DragStart],
             ['drag:update', Events.Tool.DragUpdate],

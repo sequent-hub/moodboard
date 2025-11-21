@@ -912,7 +912,7 @@ export class Toolbar {
         let groups = new Map();
         let convertedCount = 0;
         
-        console.log('🎯 Создание EmojiPopup: заменяем файловые эмоджи на встроенные PNG...');
+        
         if (typeof import.meta !== 'undefined' && import.meta.glob) {
             // Режим с bundler (Vite) - используем import.meta.glob
             const modules = import.meta.glob('../assets/emodji/**/*.{png,PNG,svg,SVG}', { eager: true, as: 'url' });
@@ -966,7 +966,7 @@ export class Toolbar {
         // Задаем желаемый порядок категорий (используем ваши оригинальные разделы)
         const ORDER = ['Смайлики', 'Жесты', 'Женские эмоции', 'Котики', 'Обезьянка', 'Разное'];
         
-        console.log(`✅ Заменено ${convertedCount} файловых эмоджи на встроенные PNG`);
+        
         const present = [...groups.keys()];
         const orderedFirst = ORDER.filter(name => groups.has(name));
         const theRest = present.filter(name => !ORDER.includes(name)).sort((a, b) => a.localeCompare(b));
@@ -1059,7 +1059,7 @@ export class Toolbar {
                     const targetW = target;
                     const targetH = target;
                     
-                    console.log(`🎯 Создаем эмоджи: ${isInline ? 'встроенный PNG' : 'файл'} (${emojiCode})`);
+                
                     
                     this.eventBus.emit(Events.Place.Set, {
                         type: 'image',
@@ -1092,7 +1092,7 @@ export class Toolbar {
         const groups = new Map();
         let convertedCount = 0;
         
-        console.log('🎯 Fallback режим: заменяем файловые эмоджи на встроенные PNG...');
+        
         
         // Статичный список эмоджи с реальными именами файлов
         const fallbackEmojis = {
@@ -1155,7 +1155,7 @@ export class Toolbar {
             }
         });
 
-        console.log(`✅ Fallback: заменено ${convertedCount} файловых эмоджи на встроенные PNG`);
+        
         return groups;
     }
 

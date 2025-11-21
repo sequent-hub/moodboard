@@ -33,7 +33,7 @@ export class RotateObjectCommand extends BaseCommand {
             objectId: this.objectId,
             angle: this.oldAngle
         });
-        console.log(`↩️ Отменяем поворот объекта ${this.objectId}, возвращаем ${this.oldAngle}°`);
+        
     }
 
     /**

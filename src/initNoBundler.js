@@ -47,11 +47,10 @@ export async function initMoodBoardNoBundler(container, options = {}, basePath =
 export function injectCriticalStyles() {
     // Проверяем, не добавлены ли уже критичные стили
     if (document.getElementById('moodboard-critical-styles')) {
-        console.log('⚠️ Критичные стили уже добавлены');
         return;
     }
     
-    console.log('🎨 Добавляем критичные стили MoodBoard...');
+    
     const criticalCSS = `
         /* Критичные стили для мгновенного отображения */
         .moodboard-workspace {
@@ -231,21 +230,14 @@ export function injectCriticalStyles() {
     style.textContent = criticalCSS;
     document.head.appendChild(style);
     
-    console.log('✅ Критичные стили добавлены в DOM');
+    
     
     // Проверяем, применились ли стили панелей
     setTimeout(() => {
         const testPanel = document.querySelector('.text-properties-panel');
         if (testPanel) {
             const computedStyle = getComputedStyle(testPanel);
-            console.log('📋 Стили панели применены:', {
-                minWidth: computedStyle.minWidth,
-                height: computedStyle.height,
-                display: computedStyle.display,
-                padding: computedStyle.padding
-            });
         } else {
-            console.log('📋 Панели пока не созданы, стили ожидают применения');
         }
     }, 100);
 }
@@ -255,7 +247,7 @@ export function injectCriticalStyles() {
  * Используйте если панели отображаются узкими
  */
 export function forceInjectPanelStyles() {
-    console.log('🔧 Принудительно добавляем стили панелей...');
+    
     
     const forcedPanelCSS = `
         /* ПРИНУДИТЕЛЬНЫЕ стили панелей - с !important */
@@ -376,7 +368,7 @@ export function forceInjectPanelStyles() {
     style.textContent = forcedPanelCSS;
     document.head.appendChild(style);
     
-    console.log('🔧 Принудительные стили панелей добавлены');
+    
 }
 
 /**
@@ -417,7 +409,6 @@ export function quickInitMoodBoard(container, options = {}, basePath = '') {
             const width = parseInt(computedStyle.minWidth);
             
             if (width < 200) { // Если панель очень узкая
-                console.log('🔧 Обнаружена узкая панель, автоматически исправляем стили...');
                 forceInjectPanelStyles();
             }
         }

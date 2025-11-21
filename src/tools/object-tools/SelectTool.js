@@ -135,7 +135,7 @@ export class SelectTool extends BaseTool {
             // Обработка удаления объектов (undo создания, delete команды и т.д.)
             this.eventBus.on(Events.Object.Deleted, (data) => {
                 const objectId = data?.objectId || data;
-                console.log('🗑️ SelectTool: получено событие удаления объекта:', objectId, 'данные:', data);
+                
                 
                 // ЗАЩИТА: Проверяем что данные валидны
                 if (!objectId) {
@@ -144,17 +144,17 @@ export class SelectTool extends BaseTool {
                 }
                 
                 if (this.selection.has(objectId)) {
-                    console.log('🗑️ SelectTool: удаляем объект из selection:', objectId);
+                    
                     this.removeFromSelection(objectId);
                     
                     // ИСПРАВЛЕНИЕ: Принудительно очищаем selection если он стал пустым
                     if (this.selection.size() === 0) {
-                        console.log('🗑️ SelectTool: selection пустой, скрываем ручки');
+                        
                         this.emit(Events.Tool.SelectionClear);
                         this.updateResizeHandles();
                     }
                 } else {
-                    console.log('🗑️ SelectTool: объект не был в selection, обновляем ручки на всякий случай');
+                    
                     // Принудительно обновляем ручки без излишних действий
                     this.updateResizeHandles();
                 }
@@ -235,7 +235,7 @@ export class SelectTool extends BaseTool {
                 rectIntersectsRect: (a, b) => this.rectIntersectsRect(a, b)
             });
         } else if (!app) {
-            console.log('❌ PIXI app не передан в activate');
+            
         } else {
         }
     }
@@ -2042,17 +2042,7 @@ export class SelectTool extends BaseTool {
             this.textEditor._cssLeftPx = leftPx;
             this.textEditor._cssTopPx = topPx;
             // Диагностика: логируем позицию инпута и вычисленные параметры позиционирования
-            try {
-                console.log('🧭 Text input', {
-                    input: { left: leftPx, top: topPx },
-                    screenPos,
-                    baseFromStatic: (!create && objectId) ? { left: baseLeftPx, top: baseTopPx } : null,
-                    padding: { top: padTop, left: padLeft },
-                    lineHeightPx,
-                    caretCenterY: create ? (topPx + padTop + (lineHeightPx / 2)) : topPx,
-                    create
-                });
-            } catch (_) {}
+            try {} catch (_) {}
 
             // Для новых текстов: синхронизируем мировую позицию объекта с фактической позицией wrapper,
             // чтобы после закрытия редактора статичный текст встал ровно туда же без сдвига
@@ -2071,7 +2061,7 @@ export class SelectTool extends BaseTool {
                         updates: { position: newWorldPos }
                     });
                     // Диагностика
-                    console.log('🧭 Text position sync', { objectId, newWorldPos, leftPx, topPx, yCssStaticTop, padTop, viewRes });
+                    
                 }
             } catch (_) {}
         }
@@ -2231,7 +2221,7 @@ export class SelectTool extends BaseTool {
                         const caret = clamp(bestIdx, 0, fullText.length);
                         textarea.selectionStart = textarea.selectionEnd = caret;
                         if (typeof textarea.scrollTop === 'number') textarea.scrollTop = 0;
-                        console.log('🧭 Text caret set', { objectId, caret, len: fullText.length });
+                        
                     } catch (_) {}
                 }, 0);
             }
@@ -2690,7 +2680,7 @@ export class SelectTool extends BaseTool {
                                         objectId,
                                         updates: { position: newPos }
                                     });
-                                    console.log('🧭 Text post-show align', { objectId, cssLeft, cssTop, newPos });
+                                    
                                 } catch (_) {}
                             }, 0);
                         }
@@ -2717,7 +2707,7 @@ export class SelectTool extends BaseTool {
         } else {
             // Обновление существующего: используем команду обновления содержимого
             if (objectType === 'note') {
-                console.log('🔧 SelectTool: updating note content via UpdateObjectContent');
+                
                 // Для записок обновляем содержимое через PixiEngine
                 this.eventBus.emit(Events.Tool.UpdateObjectContent, { 
                     objectId: objectId, 
@@ -2733,7 +2723,7 @@ export class SelectTool extends BaseTool {
                 });
             } else {
                 // Для обычного текста тоже используем обновление содержимого
-                console.log('🔧 SelectTool: updating text content via UpdateObjectContent');
+                
                 this.eventBus.emit(Events.Tool.UpdateObjectContent, { 
                     objectId: objectId, 
                     content: value 
