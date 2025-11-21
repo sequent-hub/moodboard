@@ -37,7 +37,7 @@ export class Topbar {
         this.createTopbar();
         this.attachEvents();
         // Активируем дефолтную кнопку (line) до прихода события из ядра
-        this.setActive('line');
+        // не подсвечиваем дефолт до прихода актуального типа из ядра
 
         // Синхронизация активного состояния по событию из ядра
         this.eventBus.on(Events.UI.GridCurrent, ({ type }) => {
@@ -50,11 +50,13 @@ export class Topbar {
             this.setPaintButtonHex(btnHex);
         });
 
-        // Инициализация цвета кнопки "краска" из текущего фона доски, если доступен
+        // Инициализация цвета кнопки "краска" из настроек (или фона рендерера)
         try {
-            const bgHex = this._getCurrentBoardBackgroundHex();
+            const ap = window?.moodboard?.coreMoodboard?.settingsApplier;
+            const bgHex = (ap && ap.get && ap.get().backgroundColor) || this._getCurrentBoardBackgroundHex();
             if (bgHex) {
-                const mapped = this.mapBoardToBtnHex(bgHex);
+                this._currentBoardHex = String(bgHex).toLowerCase();
+                const mapped = this.mapBoardToBtnHex(this._currentBoardHex);
                 this.setPaintButtonHex(mapped);
             }
         } catch (_) {}
@@ -178,7 +180,7 @@ export class Topbar {
     /** Возвращает текущий цвет фона канваса как hex-строку #RRGGBB */
     _getCurrentBoardBackgroundHex() {
         try {
-            const app = window?.moodboard?.core?.pixi?.app;
+            const app = window?.moodboard?.coreMoodboard?.pixi?.app || window?.moodboard?.core?.pixi?.app;
             const colorInt = app?.renderer?.background?.color ?? app?.renderer?.backgroundColor;
             if (typeof colorInt !== 'number') return null;
             const hex = `#${colorInt.toString(16).padStart(6, '0')}`;
@@ -255,8 +257,9 @@ export class Topbar {
             b.style.borderColor = darken(c.hex, 0.35);
             // Цвет галочки — чёрный для максимальной видимости
             b.style.color = '#111';
-            // Для надёжного сравнения — сохраняем исходный hex в dataset
+            // Для надёжного сравнения — сохраняем оба значения в dataset
             b.dataset.hex = String(c.hex).toLowerCase();
+            b.dataset.board = String(c.board).toLowerCase();
             // Галочка по центру
             const tick = document.createElement('i');
             tick.className = 'moodboard-topbar__paint-tick';
@@ -279,11 +282,16 @@ export class Topbar {
         });
         pop.appendChild(grid);
 
-        // Выделяем активный цвет галочкой
+        // Выделяем активный цвет галочкой по фактическому boardHex
         try {
-            const boardHex = this._getCurrentBoardBackgroundHex();
-            const targetHex = (this.mapBoardToBtnHex(boardHex) || '#B3E5FC').toLowerCase();
-            const match = grid.querySelector(`[data-hex="${targetHex}"]`);
+            const ap = window?.moodboard?.coreMoodboard?.settingsApplier;
+            const boardHex = (
+                (ap && ap.get && ap.get().backgroundColor) ||
+                this._currentBoardHex ||
+                this._getCurrentBoardBackgroundHex() ||
+                ''
+            ).toLowerCase();
+            const match = boardHex ? grid.querySelector(`[data-board="${boardHex}"]`) : null;
             if (match) match.classList.add('is-active');
         } catch (_) {}
 
@@ -293,16 +301,7 @@ export class Topbar {
         pop.style.left = `${rect.left - this.element.getBoundingClientRect().left}px`;
         pop.style.top = `${rect.bottom - this.element.getBoundingClientRect().top + 6}px`;
 
-        // Подсветить текущий активный кружок (с галочкой)
-        try {
-            const currentBtnHex = (this._paintBtn && getComputedStyle(this._paintBtn).getPropertyValue('--paint-btn-color')) || '';
-            const normalized = currentBtnHex.trim() || '#B3E5FC';
-            const match = Array.from(grid.children).find((el) => {
-                const bg = el && el.style && el.style.background ? el.style.background.toLowerCase() : '';
-                return bg === normalized.toLowerCase();
-            });
-            if (match) match.classList.add('is-active');
-        } catch (_) {}
+        // (дополнительная подсветка не требуется — см. блок выше)
 
         this.element.appendChild(pop);
         this._paintPopover = pop;
