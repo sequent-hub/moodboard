@@ -132,6 +132,13 @@ export class SaveManager {
         try {
             // Получаем данные для сохранения
             const saveData = data || await this.getBoardData();
+
+            // Защита: если данные не получены (например, при уничтожении/отписке обработчиков) — выходим без ошибки
+            if (!saveData || typeof saveData !== 'object') {
+                console.warn('SaveManager: нет данных для сохранения (saveData is null) — пропускаем сохранение');
+                this.updateSaveStatus('idle');
+                return;
+            }
             
             // Проверяем, изменились ли данные с последнего сохранения
             if (this.lastSavedData && JSON.stringify(saveData) === JSON.stringify(this.lastSavedData)) {
