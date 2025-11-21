@@ -1990,8 +1990,22 @@ export class SelectTool extends BaseTool {
             ];
         } else {
             // Для обычного текста используем стандартное позиционирование
-            wrapper.style.left = `${screenPos.x}px`;
-            wrapper.style.top = `${screenPos.y}px`;
+            // Динамически компенсируем внутренние отступы textarea, чтобы каретка оказалась ровно в точке клика
+            let padTop = 0;
+            let padLeft = 0;
+            try {
+                if (typeof window !== 'undefined' && window.getComputedStyle) {
+                    const cs = window.getComputedStyle(textarea);
+                    const pt = parseFloat(cs.paddingTop);
+                    const pl = parseFloat(cs.paddingLeft);
+                    if (isFinite(pt)) padTop = pt;
+                    if (isFinite(pl)) padLeft = pl;
+                }
+            } catch (_) {}
+            const leftPx = create ? Math.round(screenPos.x - padLeft) : Math.round(screenPos.x);
+            const topPx = create ? Math.round(screenPos.y - padTop) : Math.round(screenPos.y);
+            wrapper.style.left = `${leftPx}px`;
+            wrapper.style.top = `${topPx}px`;
         }
         // Минимальные границы (зависят от текущего режима: новый объект или редактирование существующего)
         const worldLayerRef = this.textEditor.world || (this.app?.stage);
