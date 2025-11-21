@@ -24,31 +24,51 @@ export class BoardService {
 		this.grid.updateVisual();
 		this.pixi.setGrid(this.grid);
 		this.eventBus.emit(Events.UI.GridCurrent, { type: 'line' });
+		// Сообщаем о текущих данных сетки для сохранения в boardData
+		try {
+			this.eventBus.emit(Events.Grid.BoardDataChanged, {
+				grid: { type: 'line', options: this.grid.serialize ? this.grid.serialize() : {} }
+			});
+		} catch (_) {}
 
 		this._attachEvents();
 	}
 
 	_attachEvents() {
 		// Смена вида сетки из UI
-		this.eventBus.on(Events.UI.GridChange, ({ type }) => {
+		this.eventBus.on(Events.UI.GridChange, ({ type, options }) => {
 			const size = this._getCanvasSize?.() || { width: 800, height: 600 };
 			if (type === 'off') {
 				this.grid?.setEnabled(false);
 				this.grid?.updateVisual();
 				this.pixi.setGrid(this.grid);
+				// Обновляем сохранённые данные
+				try {
+					this.eventBus.emit(Events.Grid.BoardDataChanged, {
+						grid: { type: 'off', options: this.grid?.serialize ? this.grid.serialize() : {} }
+					});
+				} catch (_) {}
 				return;
 			}
 			const options = {
 				...GridFactory.getDefaultOptions(type),
 				enabled: true,
 				width: size.width,
-				height: size.height
+				height: size.height,
+				// Перекрываем входящими опциями (если пришли из сохранения)
+				...(options || {})
 			};
 			try {
 				this.grid = GridFactory.createGrid(type, options);
 				this.grid.updateVisual();
 				this.pixi.setGrid(this.grid);
 				this.eventBus.emit(Events.UI.GridCurrent, { type });
+				// Сообщаем об обновлении данных сетки для сохранения в boardData
+				try {
+					this.eventBus.emit(Events.Grid.BoardDataChanged, {
+						grid: { type, options: this.grid.serialize ? this.grid.serialize() : options }
+					});
+				} catch (_) {}
 			} catch (e) {
 				console.warn('Unknown grid type:', type);
 			}

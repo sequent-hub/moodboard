@@ -16,6 +16,19 @@ export class DataManager {
         
         // Очищаем доску перед загрузкой
         this.clearBoard();
+
+        // Восстанавливаем тип сетки и её параметры до загрузки объектов
+        try {
+            const grid = data.grid || (data.board && data.board.grid);
+            if (grid && grid.type) {
+                const payload = { type: grid.type };
+                const opts = grid.options || null;
+                if (opts && typeof opts === 'object') {
+                    payload.options = opts;
+                }
+                this.coreMoodboard.eventBus.emit(this.coreMoodboard.Events?.UI?.GridChange || 'ui:grid:change', payload);
+            }
+        } catch (_) {}
         
         // Загружаем объекты
         if (data.objects && Array.isArray(data.objects)) {

@@ -1854,6 +1854,17 @@ export class CoreMoodBoard {
             requestData.data = this.getBoardData();
         });
 
+        // Обновляем состояние board.grid при смене сетки
+        this.eventBus.on(Events.Grid.BoardDataChanged, ({ grid }) => {
+            try {
+                if (grid) {
+                    if (!this.state.state.board) this.state.state.board = {};
+                    this.state.state.board.grid = grid;
+                    this.state.markDirty();
+                }
+            } catch (_) {}
+        });
+
         // Обработка статуса сохранения
         this.eventBus.on(Events.Save.StatusChanged, (data) => {
             // Можно добавить UI индикатор статуса сохранения
