@@ -48,11 +48,9 @@ export class PlacementTool extends BaseTool {
                     this.app.view.style.cursor = (cur === 'default') ? '' : cur;
                 }
                 
-                // Показываем призрак для текста, записки, эмоджи, фрейма или фигур, если они активны
+                // Показываем призрак для записки, эмоджи, фрейма или фигур, если они активны
                 if (this.pending && this.app && this.world) {
-                    if (this.pending.type === 'text') {
-                        this.showTextGhost();
-                    } else if (this.pending.type === 'note') {
+                    if (this.pending.type === 'note') {
                         this.showNoteGhost();
                     } else if (this.pending.type === 'emoji') {
                         this.showEmojiGhost();
@@ -154,9 +152,7 @@ export class PlacementTool extends BaseTool {
         } else if (this.selectedImage) {
             this.showImageGhost();
         } else if (this.pending) {
-            if (this.pending.type === 'text') {
-                this.showTextGhost();
-            } else if (this.pending.type === 'note') {
+            if (this.pending.type === 'note') {
                 this.showNoteGhost();
             } else if (this.pending.type === 'emoji') {
                 this.showEmojiGhost();
@@ -256,14 +252,10 @@ export class PlacementTool extends BaseTool {
         };
 
         if (isTextWithEditing) {
-            // Для текста используем те же размеры, что и у "призрака",
-            // чтобы позиция совпадала пиксель-в-пиксель
-            const fontSize = props.fontSize || 18;
-            const ghostWidth = 120;
-            const ghostHeight = fontSize + 20;
+            // Для текста позиция должна совпадать с точкой клика без смещений
             position = {
-                x: Math.round(worldPoint.x - ghostWidth / 2),
-                y: Math.round(worldPoint.y - ghostHeight / 2)
+                x: Math.round(worldPoint.x),
+                y: Math.round(worldPoint.y)
             };
             // Слушаем событие создания объекта, чтобы получить его ID
             const handleObjectCreated = (objectData) => {
