@@ -1993,17 +1993,26 @@ export class SelectTool extends BaseTool {
             // Динамически компенсируем внутренние отступы textarea, чтобы каретка оказалась ровно в точке клика
             let padTop = 0;
             let padLeft = 0;
+            let lineHeightPx = 0;
             try {
                 if (typeof window !== 'undefined' && window.getComputedStyle) {
                     const cs = window.getComputedStyle(textarea);
                     const pt = parseFloat(cs.paddingTop);
                     const pl = parseFloat(cs.paddingLeft);
+                    const lh = parseFloat(cs.lineHeight);
                     if (isFinite(pt)) padTop = pt;
                     if (isFinite(pl)) padLeft = pl;
+                    if (isFinite(lh)) lineHeightPx = lh;
                 }
             } catch (_) {}
+            if (!isFinite(lineHeightPx) || lineHeightPx <= 0) {
+                try {
+                    const r = textarea.getBoundingClientRect && textarea.getBoundingClientRect();
+                    if (r && isFinite(r.height)) lineHeightPx = r.height;
+                } catch (_) {}
+            }
             const leftPx = create ? Math.round(screenPos.x - padLeft) : Math.round(screenPos.x);
-            const topPx = create ? Math.round(screenPos.y - padTop) : Math.round(screenPos.y);
+            const topPx = create ? Math.round(screenPos.y - padTop - (lineHeightPx / 2)) : Math.round(screenPos.y);
             wrapper.style.left = `${leftPx}px`;
             wrapper.style.top = `${topPx}px`;
             // Диагностика: логируем позицию инпута и вычисленные параметры позиционирования
@@ -2012,6 +2021,8 @@ export class SelectTool extends BaseTool {
                     input: { left: leftPx, top: topPx },
                     screenPos,
                     padding: { top: padTop, left: padLeft },
+                    lineHeightPx,
+                    caretCenterY: create ? (topPx + padTop + (lineHeightPx / 2)) : topPx,
                     create
                 });
             } catch (_) {}
