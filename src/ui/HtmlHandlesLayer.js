@@ -201,7 +201,7 @@ export class HtmlHandlesLayer {
         if (!this.layer) return;
         // Преобразуем world координаты в CSS-пиксели
         const view = this.core.pixi.app.view;
-        const res = (this.core.pixi.app.renderer?.resolution) || 1;
+        const rendererRes = (this.core.pixi.app.renderer?.resolution) || 1;
         const containerRect = this.container.getBoundingClientRect();
         const viewRect = view.getBoundingClientRect();
         const offsetLeft = viewRect.left - containerRect.left;
@@ -227,10 +227,12 @@ export class HtmlHandlesLayer {
         // Вычисляем позицию и размер через математику сцены (toGlobal) и переводим в CSS px
         const tl = world.toGlobal(new PIXI.Point(worldBounds.x, worldBounds.y));
         const br = world.toGlobal(new PIXI.Point(worldBounds.x + worldBounds.width, worldBounds.y + worldBounds.height));
-        const cssX = offsetLeft + (tl.x / res);
-        const cssY = offsetTop + (tl.y / res);
-        const cssWidth = Math.max(1, (br.x - tl.x) / res);
-        const cssHeight = Math.max(1, (br.y - tl.y) / res);
+        // Отношение пикселей canvas к CSS-пикселям (устойчиво к зуму браузера и autoDensity)
+        const pxPerCss = (view && view.width && viewRect.width) ? (view.width / viewRect.width) : rendererRes;
+        const cssX = offsetLeft + (tl.x / pxPerCss);
+        const cssY = offsetTop + (tl.y / pxPerCss);
+        const cssWidth = Math.max(1, (br.x - tl.x) / pxPerCss);
+        const cssHeight = Math.max(1, (br.y - tl.y) / pxPerCss);
 
         const left = Math.round(cssX);
         const top = Math.round(cssY);
@@ -391,8 +393,10 @@ export class HtmlHandlesLayer {
     _toWorldScreenInverse(dx, dy) {
         const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
         const s = world?.scale?.x || 1;
-        const res = (this.core.pixi.app.renderer?.resolution) || 1;
-        return { dxWorld: (dx * res) / s, dyWorld: (dy * res) / s };
+        const view = this.core.pixi.app.view;
+        const viewRect = view.getBoundingClientRect();
+        const pxPerCss = (view && view.width && viewRect.width) ? (view.width / viewRect.width) : ((this.core.pixi.app.renderer?.resolution) || 1);
+        return { dxWorld: (dx * pxPerCss) / s, dyWorld: (dy * pxPerCss) / s };
     }
 
     _onHandleDown(e, box) {
@@ -404,10 +408,10 @@ export class HtmlHandlesLayer {
         const s = world?.scale?.x || 1;
         const tx = world?.x || 0;
         const ty = world?.y || 0;
-        const res = (this.core.pixi.app.renderer?.resolution) || 1;
         const view = this.core.pixi.app.view;
-        const containerRect = this.container.getBoundingClientRect();
         const viewRect = view.getBoundingClientRect();
+        const pxPerCss = (view && view.width && viewRect.width) ? (view.width / viewRect.width) : ((this.core.pixi.app.renderer?.resolution) || 1);
+        const containerRect = this.container.getBoundingClientRect();
         const offsetLeft = viewRect.left - containerRect.left;
         const offsetTop = viewRect.top - containerRect.top;
 
@@ -418,10 +422,10 @@ export class HtmlHandlesLayer {
             height: parseFloat(box.style.height),
         };
         const startScreen = {
-            x: (startCSS.left - offsetLeft) * res,
-            y: (startCSS.top - offsetTop) * res,
-            w: startCSS.width * res,
-            h: startCSS.height * res,
+            x: (startCSS.left - offsetLeft) * pxPerCss,
+            y: (startCSS.top - offsetTop) * pxPerCss,
+            w: startCSS.width * pxPerCss,
+            h: startCSS.height * pxPerCss,
         };
         const startWorld = {
             x: (startScreen.x - tx) / s,
@@ -564,10 +568,10 @@ export class HtmlHandlesLayer {
             this._repositionBoxChildren(box);
 
             // Перевод в мировые координаты
-            const screenX = (newLeft - offsetLeft) * res;
-            const screenY = (newTop - offsetTop) * res;
-            const screenW = newW * res;
-            const screenH = newH * res;
+            const screenX = (newLeft - offsetLeft) * pxPerCss;
+            const screenY = (newTop - offsetTop) * pxPerCss;
+            const screenW = newW * pxPerCss;
+            const screenH = newH * pxPerCss;
             const worldX = (screenX - tx) / s;
             const worldY = (screenY - ty) / s;
             const worldW = screenW / s;
@@ -612,10 +616,10 @@ export class HtmlHandlesLayer {
                 width: parseFloat(box.style.width),
                 height: parseFloat(box.style.height),
             };
-            const screenX = (endCSS.left - offsetLeft) * res;
-            const screenY = (endCSS.top - offsetTop) * res;
-            const screenW = endCSS.width * res;
-            const screenH = endCSS.height * res;
+            const screenX = (endCSS.left - offsetLeft) * pxPerCss;
+            const screenY = (endCSS.top - offsetTop) * pxPerCss;
+            const screenW = endCSS.width * pxPerCss;
+            const screenH = endCSS.height * pxPerCss;
             const worldX = (screenX - tx) / s;
             const worldY = (screenY - ty) / s;
             const worldW = screenW / s;
@@ -681,10 +685,10 @@ export class HtmlHandlesLayer {
         const s = world?.scale?.x || 1;
         const tx = world?.x || 0;
         const ty = world?.y || 0;
-        const res = (this.core.pixi.app.renderer?.resolution) || 1;
         const view = this.core.pixi.app.view;
-        const containerRect = this.container.getBoundingClientRect();
         const viewRect = view.getBoundingClientRect();
+        const pxPerCss = (view && view.width && viewRect.width) ? (view.width / viewRect.width) : ((this.core.pixi.app.renderer?.resolution) || 1);
+        const containerRect = this.container.getBoundingClientRect();
         const offsetLeft = viewRect.left - containerRect.left;
         const offsetTop = viewRect.top - containerRect.top;
 
@@ -696,10 +700,10 @@ export class HtmlHandlesLayer {
             height: parseFloat(box.style.height),
         };
         const startScreen = {
-            x: (startCSS.left - offsetLeft) * res,
-            y: (startCSS.top - offsetTop) * res,
-            w: startCSS.width * res,
-            h: startCSS.height * res,
+            x: (startCSS.left - offsetLeft) * pxPerCss,
+            y: (startCSS.top - offsetTop) * pxPerCss,
+            w: startCSS.width * pxPerCss,
+            h: startCSS.height * pxPerCss,
         };
         const startWorld = {
             x: (startScreen.x - tx) / s,
@@ -827,10 +831,10 @@ export class HtmlHandlesLayer {
             this._repositionBoxChildren(box);
 
             // Перевод в мировые координаты
-            const screenX = (newLeft - offsetLeft) * res;
-            const screenY = (newTop - offsetTop) * res;
-            const screenW = newW * res;
-            const screenH = newH * res;
+            const screenX = (newLeft - offsetLeft) * pxPerCss;
+            const screenY = (newTop - offsetTop) * pxPerCss;
+            const screenW = newW * pxPerCss;
+            const screenH = newH * pxPerCss;
             const worldX = (screenX - tx) / s;
             const worldY = (screenY - ty) / s;
             const worldW = screenW / s;
@@ -864,10 +868,10 @@ export class HtmlHandlesLayer {
                 width: parseFloat(box.style.width),
                 height: parseFloat(box.style.height),
             };
-            const screenX = (endCSS.left - offsetLeft) * res;
-            const screenY = (endCSS.top - offsetTop) * res;
-            const screenW = endCSS.width * res;
-            const screenH = endCSS.height * res;
+            const screenX = (endCSS.left - offsetLeft) * pxPerCss;
+            const screenY = (endCSS.top - offsetTop) * pxPerCss;
+            const screenW = endCSS.width * pxPerCss;
+            const screenH = endCSS.height * pxPerCss;
             const worldX = (screenX - tx) / s;
             const worldY = (screenY - ty) / s;
             const worldW = screenW / s;
@@ -889,7 +893,7 @@ export class HtmlHandlesLayer {
                             el.style.width = `${Math.max(1, Math.round(endCSS.width))}px`;
                             el.style.height = 'auto';
                             const measured = Math.max(1, Math.round(el.scrollHeight));
-                            finalWorldH = (measured * res) / s;
+                            finalWorldH = (measured * pxPerCss) / s;
                         }
                     } catch (_) {}
                 }
