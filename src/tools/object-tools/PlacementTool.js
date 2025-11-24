@@ -592,28 +592,30 @@ export class PlacementTool extends BaseTool {
         background.drawRect(0, 0, width, height);
         background.endFill();
 
-        // Иконка-заглушка файла наверху
+        // Иконка-заглушка файла наверху (центрируем фактическую ширину)
         const icon = new PIXI.Graphics();
         const iconSize = Math.min(48, width * 0.4);
-        const iconX = (width - iconSize) / 2;
+        const iconWidthDrawn = iconSize * 0.8;
+        const iconX = (width - iconWidthDrawn) / 2;
         const iconY = 16;
         icon.beginFill(0x6B7280, 1);
-        icon.drawRect(iconX, iconY, iconSize * 0.8, iconSize);
+        icon.drawRect(iconX, iconY, iconWidthDrawn, iconSize);
         icon.endFill();
 
         // Текст названия файла
         const fileName = this.selectedFile.fileName || 'File';
-        const displayName = fileName.length > 15 ? fileName.substring(0, 12) + '...' : fileName;
+        const displayName = fileName;
         const nameText = new PIXI.Text(displayName, {
             fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
             fontSize: 12,
             fill: 0x333333,
             align: 'center',
             wordWrap: true,
-            wordWrapWidth: width - 8
+            wordWrapWidth: Math.max(1, width - 16)
         });
-        nameText.x = (width - nameText.width) / 2;
-        nameText.y = height - 40;
+        nameText.anchor.set(0.5, 0);
+        nameText.x = width / 2;
+        nameText.y = iconY + iconSize + 8;
 
         // Добавляем в контейнер в правильном порядке
         this.ghostContainer.addChild(shadow);

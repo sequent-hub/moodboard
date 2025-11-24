@@ -175,7 +175,9 @@ export class FileObject {
         
         // Иконка файла в верхней части
         const iconSize = Math.min(48, w * 0.4);
-        const iconX = (w - iconSize) / 2;
+        // Центрируем фактическую ширину иконки (она рисуется как 80% от size)
+        const iconWidthDrawn = iconSize * 0.8;
+        const iconX = (w - iconWidthDrawn) / 2;
         const iconY = 16;
         
         // Определяем цвет иконки по расширению файла
@@ -236,21 +238,55 @@ export class FileObject {
 
     _updateTextPosition() {
         if (!this.fileNameText) return;
-        
-        // Обновляем стиль текста
-        this.fileNameText.style.wordWrapWidth = this.width - 8;
+
+        // Обновляем стиль текста (ограничиваем по подложке и переносим слова)
+        this.fileNameText.style.wordWrap = true;
+        this.fileNameText.style.wordWrapWidth = Math.max(1, this.width - 16);
         this.fileNameText.updateText();
-        
-        // Позиционируем название файла
+
+        // Параметры иконки и отступов
+        const iconSize = Math.min(48, this.width * 0.4);
+        const iconY = 16;
+        const gapName = 8;       // расстояние между иконкой и названием (уменьшено в 2 раза)
+        const gapSize = 6;       // расстояние между названием и размером
+        const bottomPad = 10;    // нижний внутренний отступ подложки
+
+        // Позиционируем название файла непосредственно под иконкой и по центру
         this.fileNameText.anchor.set(0.5, 0);
         this.fileNameText.x = this.width / 2;
-        this.fileNameText.y = this.height - 40;
-        
-        // Позиционируем размер файла
+        this.fileNameText.y = iconY + iconSize + gapName;
+
+        // Позиционируем размер файла под названием
         if (this.fileSizeText) {
             this.fileSizeText.anchor.set(0.5, 0);
             this.fileSizeText.x = this.width / 2;
-            this.fileSizeText.y = this.height - 20;
+            this.fileSizeText.y = this.fileNameText.y + this.fileNameText.height + gapSize;
+        }
+
+        // Адаптивная высота подложки: не даём текстам выходить за пределы
+        const contentBottom = this.fileSizeText
+            ? (this.fileSizeText.y + this.fileSizeText.height)
+            : (this.fileNameText.y + this.fileNameText.height);
+        const requiredHeight = Math.ceil(contentBottom + bottomPad);
+        if (requiredHeight > this.height) {
+            const previous = this.height;
+            this.height = requiredHeight;
+            // Перерисовываем фон и иконку под новую высоту
+            this._redraw();
+            // Повторно позиционируем тексты (одноразово)
+            if (this.height !== previous) {
+                // Предотвращаем возможную рекурсию: вторая установка не должна дальше менять высоту
+                this.fileNameText.style.wordWrapWidth = Math.max(1, this.width - 16);
+                this.fileNameText.updateText();
+                this.fileNameText.anchor.set(0.5, 0);
+                this.fileNameText.x = this.width / 2;
+                this.fileNameText.y = iconY + iconSize + gapName;
+                if (this.fileSizeText) {
+                    this.fileSizeText.anchor.set(0.5, 0);
+                    this.fileSizeText.x = this.width / 2;
+                    this.fileSizeText.y = this.fileNameText.y + this.fileNameText.height + gapSize;
+                }
+            }
         }
     }
 
