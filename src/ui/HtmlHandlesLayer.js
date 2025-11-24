@@ -201,11 +201,7 @@ export class HtmlHandlesLayer {
         if (!this.layer) return;
         // Преобразуем world координаты в CSS-пиксели
         const view = this.core.pixi.app.view;
-        // Динамически вычисляем фактическое соотношение пикселей canvas/CSS,
-        // чтобы корректно работать при зуме браузера
-        const res = (view && view.width && view.clientWidth) 
-            ? (view.width / view.clientWidth) 
-            : (this.core.pixi.app.renderer?.resolution || 1);
+        const res = (this.core.pixi.app.renderer?.resolution) || 1;
         const containerRect = this.container.getBoundingClientRect();
         const viewRect = view.getBoundingClientRect();
         const offsetLeft = viewRect.left - containerRect.left;
@@ -228,11 +224,13 @@ export class HtmlHandlesLayer {
             isFrameTarget = mbType === 'frame';
         }
 
-        // Вычисляем позицию и размер в CSS координатах, округляем до целых px
-        const cssX = offsetLeft + (worldX + worldBounds.x * worldScale) / res;
-        const cssY = offsetTop + (worldY + worldBounds.y * worldScale) / res;
-        const cssWidth = Math.max(1, (worldBounds.width * worldScale) / res);
-        const cssHeight = Math.max(1, (worldBounds.height * worldScale) / res);
+        // Вычисляем позицию и размер через математику сцены (toGlobal) и переводим в CSS px
+        const tl = world.toGlobal(new PIXI.Point(worldBounds.x, worldBounds.y));
+        const br = world.toGlobal(new PIXI.Point(worldBounds.x + worldBounds.width, worldBounds.y + worldBounds.height));
+        const cssX = offsetLeft + (tl.x / res);
+        const cssY = offsetTop + (tl.y / res);
+        const cssWidth = Math.max(1, (br.x - tl.x) / res);
+        const cssHeight = Math.max(1, (br.y - tl.y) / res);
 
         const left = Math.round(cssX);
         const top = Math.round(cssY);
@@ -393,10 +391,7 @@ export class HtmlHandlesLayer {
     _toWorldScreenInverse(dx, dy) {
         const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
         const s = world?.scale?.x || 1;
-        const view = this.core.pixi.app.view;
-        const res = (view && view.width && view.clientWidth) 
-            ? (view.width / view.clientWidth) 
-            : (this.core.pixi.app.renderer?.resolution || 1);
+        const res = (this.core.pixi.app.renderer?.resolution) || 1;
         return { dxWorld: (dx * res) / s, dyWorld: (dy * res) / s };
     }
 
@@ -409,10 +404,8 @@ export class HtmlHandlesLayer {
         const s = world?.scale?.x || 1;
         const tx = world?.x || 0;
         const ty = world?.y || 0;
+        const res = (this.core.pixi.app.renderer?.resolution) || 1;
         const view = this.core.pixi.app.view;
-        const res = (view && view.width && view.clientWidth) 
-            ? (view.width / view.clientWidth) 
-            : (this.core.pixi.app.renderer?.resolution || 1);
         const containerRect = this.container.getBoundingClientRect();
         const viewRect = view.getBoundingClientRect();
         const offsetLeft = viewRect.left - containerRect.left;
@@ -688,10 +681,8 @@ export class HtmlHandlesLayer {
         const s = world?.scale?.x || 1;
         const tx = world?.x || 0;
         const ty = world?.y || 0;
+        const res = (this.core.pixi.app.renderer?.resolution) || 1;
         const view = this.core.pixi.app.view;
-        const res = (view && view.width && view.clientWidth) 
-            ? (view.width / view.clientWidth) 
-            : (this.core.pixi.app.renderer?.resolution || 1);
         const containerRect = this.container.getBoundingClientRect();
         const viewRect = view.getBoundingClientRect();
         const offsetLeft = viewRect.left - containerRect.left;
