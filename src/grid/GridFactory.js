@@ -85,10 +85,10 @@ export class GridFactory {
             },
             cross: {
                 enabled: true,
-                size: 90,
-                color: 0x6a6aff,
-                opacity: 0.3,
-                crossHalfSize: 30,
+                size: 65,            // шаг между крестиками
+                color: 0xB8BAFF,     // целевой цвет
+                opacity: 1,          // непрозрачно
+                crossHalfSize: 5,    // длина луча (половина креста) в px
                 crossLineWidth: 1
             }
         };
