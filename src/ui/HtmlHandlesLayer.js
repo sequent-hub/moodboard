@@ -30,6 +30,21 @@ export class HtmlHandlesLayer {
         this.layer.className = 'moodboard-html-handles';
         this.container.appendChild(this.layer);
 
+        // Обновление при изменении размеров окна/масштаба (DPR)
+        window.addEventListener('resize', () => this.update(), { passive: true });
+        // Некоторые браузеры меняют devicePixelRatio без resize — страхуемся
+        if (typeof window !== 'undefined' && 'matchMedia' in window) {
+            try {
+                // media-query, реагирующая на изменение DPR
+                const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+                if (mq && mq.addEventListener) {
+                    mq.addEventListener('change', () => this.update());
+                } else if (mq && mq.addListener) {
+                    mq.addListener(() => this.update());
+                }
+            } catch (_) {}
+        }
+
         // Подписки: обновлять при изменениях выбора и трансформациях
         this.eventBus.on(Events.Tool.SelectionAdd, () => this.update());
         this.eventBus.on(Events.Tool.SelectionRemove, () => this.update());
@@ -185,8 +200,12 @@ export class HtmlHandlesLayer {
     _showBounds(worldBounds, id) {
         if (!this.layer) return;
         // Преобразуем world координаты в CSS-пиксели
-        const res = (this.core.pixi.app.renderer?.resolution) || 1;
         const view = this.core.pixi.app.view;
+        // Динамически вычисляем фактическое соотношение пикселей canvas/CSS,
+        // чтобы корректно работать при зуме браузера
+        const res = (view && view.width && view.clientWidth) 
+            ? (view.width / view.clientWidth) 
+            : (this.core.pixi.app.renderer?.resolution || 1);
         const containerRect = this.container.getBoundingClientRect();
         const viewRect = view.getBoundingClientRect();
         const offsetLeft = viewRect.left - containerRect.left;
@@ -374,7 +393,10 @@ export class HtmlHandlesLayer {
     _toWorldScreenInverse(dx, dy) {
         const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
         const s = world?.scale?.x || 1;
-        const res = (this.core.pixi.app.renderer?.resolution) || 1;
+        const view = this.core.pixi.app.view;
+        const res = (view && view.width && view.clientWidth) 
+            ? (view.width / view.clientWidth) 
+            : (this.core.pixi.app.renderer?.resolution || 1);
         return { dxWorld: (dx * res) / s, dyWorld: (dy * res) / s };
     }
 
@@ -387,8 +409,10 @@ export class HtmlHandlesLayer {
         const s = world?.scale?.x || 1;
         const tx = world?.x || 0;
         const ty = world?.y || 0;
-        const res = (this.core.pixi.app.renderer?.resolution) || 1;
         const view = this.core.pixi.app.view;
+        const res = (view && view.width && view.clientWidth) 
+            ? (view.width / view.clientWidth) 
+            : (this.core.pixi.app.renderer?.resolution || 1);
         const containerRect = this.container.getBoundingClientRect();
         const viewRect = view.getBoundingClientRect();
         const offsetLeft = viewRect.left - containerRect.left;
@@ -664,8 +688,10 @@ export class HtmlHandlesLayer {
         const s = world?.scale?.x || 1;
         const tx = world?.x || 0;
         const ty = world?.y || 0;
-        const res = (this.core.pixi.app.renderer?.resolution) || 1;
         const view = this.core.pixi.app.view;
+        const res = (view && view.width && view.clientWidth) 
+            ? (view.width / view.clientWidth) 
+            : (this.core.pixi.app.renderer?.resolution || 1);
         const containerRect = this.container.getBoundingClientRect();
         const viewRect = view.getBoundingClientRect();
         const offsetLeft = viewRect.left - containerRect.left;
