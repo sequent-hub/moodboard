@@ -574,6 +574,13 @@ export class CoreMoodBoard {
                 stage.x += delta.x;
                 stage.y += delta.y;
             }
+            // Сообщаем системе об обновлении позиции мира для автосохранения
+            try {
+                const world = this.pixi.worldLayer || this.pixi.app.stage;
+                this.eventBus.emit(Events.Grid.BoardDataChanged, {
+                    settings: { pan: { x: world.x || 0, y: world.y || 0 } }
+                });
+            } catch (_) {}
         });
 
         // Миникарта перенесена в BoardService
@@ -2167,6 +2174,10 @@ export class CoreMoodBoard {
         };
         const world = this.pixi?.worldLayer || app?.stage;
         const currentZoom = Math.max(0.1, Math.min(5, world?.scale?.x || 1));
+        const currentPan = {
+            x: (world?.x ?? 0),
+            y: (world?.y ?? 0)
+        };
         const canvasW = app?.view?.clientWidth || app?.view?.width || 0;
         const canvasH = app?.view?.clientHeight || app?.view?.height || 0;
 
@@ -2191,6 +2202,7 @@ export class CoreMoodBoard {
             backgroundColor: toHex(rendererBg ?? 0xF5F5F5),
             grid: gridSettings || undefined,
             zoom: { min: 0.1, max: 5.0, default: 1.0, current: currentZoom },
+            pan: currentPan,
             canvas: { width: canvasW, height: canvasH }
         };
 

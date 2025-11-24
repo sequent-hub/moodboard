@@ -70,6 +70,16 @@ export class SettingsApplier {
                 try { this.eventBus.emit(Events.UI.ZoomPercent, { percentage: Math.round(z * 100) }); } catch (_) {}
             }
         }
+
+        // 4) Панорамирование (позиция мира)
+        if (s.pan && typeof s.pan.x === 'number' && typeof s.pan.y === 'number') {
+            const world = this.pixi?.worldLayer || this.pixi?.app?.stage;
+            if (world) {
+                world.x = s.pan.x;
+                world.y = s.pan.y;
+                // Обновление зависимых слоёв/панелей выполняется по их событиям; здесь только применяем позицию
+            }
+        }
     }
 
     _toIntColor(hexOrInt) {
