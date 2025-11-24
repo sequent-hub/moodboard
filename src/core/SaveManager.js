@@ -98,6 +98,31 @@ export class SaveManager {
             e.returnValue = '';
             return '';
         }, { capture: true });
+
+        // Дополнительно: обработка быстрого ухода со страницы (pagehide надёжнее в части браузеров)
+        window.addEventListener('pagehide', () => {
+            if (!this.hasUnsavedChanges) return;
+            try {
+                if (!this.options || this.options.useBeaconOnUnload) {
+                    this._flushOnUnload();
+                } else {
+                    this._flushSyncFallback();
+                }
+            } catch (_) { /* игнорируем */ }
+        }, { capture: true });
+
+        // Подстраховка на случай, когда вкладка просто уходит в фон без beforeunload/pagehide
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'hidden') return;
+            if (!this.hasUnsavedChanges) return;
+            try {
+                if (!this.options || this.options.useBeaconOnUnload) {
+                    this._flushOnUnload();
+                } else {
+                    this._flushSyncFallback();
+                }
+            } catch (_) { /* игнорируем */ }
+        });
         
         // Периодическое автосохранение
         if (this.options.autoSave) {
