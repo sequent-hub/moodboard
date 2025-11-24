@@ -7,13 +7,19 @@ export class SaveManager {
         this.eventBus = eventBus;
         this.apiClient = null; // Будет установлен позже через setApiClient
         this.options = {
-            // Фиксированные настройки автосохранения (не настраиваются клиентом)
+            // Фиксированные настройки автосохранения данных
             autoSave: true,
-            saveDelay: 1500, // Оптимальная задержка 1.5 секунды
+            // Уменьшенная задержка, чтобы изменения чаще успевали сохраняться
+            // (раньше было 1500 мс)
+            saveDelay: 400,
             maxRetries: 3,
             retryDelay: 1000,
             periodicSaveInterval: 30000, // Периодическое сохранение каждые 30 сек
-            
+
+            // Фоновая отправка при закрытии вкладки/перезагрузке страницы
+            // (используется navigator.sendBeacon при поддержке браузером)
+            useBeaconOnUnload: true,
+
             // Настраиваемые эндпоинты (берем из options)
             saveEndpoint: options.saveEndpoint || '/api/moodboard/save',
             loadEndpoint: options.loadEndpoint || '/api/moodboard/load'
@@ -74,16 +80,24 @@ export class SaveManager {
         
         // Отслеживание перемещений теперь происходит через команды и state:changed
         
-        // Сохранение при закрытии страницы
+        // Сохранение при закрытии страницы (в том числе при резком закрытии окна)
         window.addEventListener('beforeunload', (e) => {
-            if (this.hasUnsavedChanges) {
-                this.saveImmediately();
-                // Предупреждаем о несохраненных изменениях
-                e.preventDefault();
-                e.returnValue = 'У вас есть несохраненные изменения. Вы уверены, что хотите покинуть страницу?';
-                return e.returnValue;
-            }
-        });
+            if (!this.hasUnsavedChanges) return;
+            try {
+                if (this.options.useBeaconOnUnload) {
+                    this._flushOnUnload();
+                } else {
+                    this._flushSyncFallback();
+                }
+            } catch (_) { /* игнорируем, чтобы не блокировать закрытие */ }
+
+            // Сообщаем браузеру, что есть незафиксированные изменения
+            // (текст может быть проигнорирован, но событие задержит закрытие на доли секунды)
+            e.preventDefault();
+            e.returnedValue = '';
+            e.returnValue = '';
+            return '';
+        }, { capture: true });
         
         // Периодическое автосохранение
         if (this.options.autoSave) {
@@ -366,6 +380,84 @@ export class SaveManager {
         };
     }
     
+    /**
+     * Синхронно собирает текущие данные для сохранения через EventBus.
+     * Используется в обработчиках закрытия вкладки, где нет времени на ожидание async.
+     */
+    _collectCurrentDataSync() {
+        try {
+            const requestData = { data: null };
+            this.eventBus && this.eventBus.emit(Events.Save.GetBoardData, requestData);
+            return requestData.data || null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    /**
+     * Отправляет данные в фоне при закрытии вкладки (navigator.sendBeacon),
+     * а при отсутствии поддержки — выполняет синхронный XHR как запасной вариант.
+     */
+    _flushOnUnload() {
+        const data = this._collectCurrentDataSync();
+        if (!data) return;
+
+        const boardId = data.id || 'default';
+        const payload = {
+            boardId,
+            // отправляем «сырой» снимок; на серверной стороне допускается приём JSON
+            boardData: data,
+            settings: data.settings || undefined,
+            // CSRF токен добавим в тело (для серверов, которые принимают _token из JSON)
+            _token: (typeof document !== 'undefined') ? (document.querySelector('meta[name="csrf-token"]')?.value || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')) : undefined
+        };
+
+        const body = JSON.stringify(payload);
+
+        let sent = false;
+        try {
+            if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+                const blob = new Blob([body], { type: 'application/json' });
+                sent = navigator.sendBeacon(this.options.saveEndpoint, blob);
+            }
+        } catch (_) { /* игнорируем */ }
+
+        if (!sent) {
+            // Фолбэк: синхронный XHR (доступен в beforeunload, но может быть заблокирован политиками браузера)
+            this._flushSyncFallback(data);
+        }
+
+        // Считаем, что попытались сохранить; снимаем флаг, чтобы не спамить повторно
+        this.hasUnsavedChanges = false;
+    }
+
+    /**
+     * Синхронная отправка запроса на сохранение (fallback для устаревших браузеров).
+     */
+    _flushSyncFallback(existingData) {
+        try {
+            const data = existingData || this._collectCurrentDataSync();
+            if (!data) return;
+
+            const boardId = data.id || 'default';
+            const csrfToken = (typeof document !== 'undefined') ? (document.querySelector('meta[name="csrf-token"]').getAttribute('content')) : null;
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', this.options.saveEndpoint, false); // синхронно
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('Accept', 'application/json');
+            if (csrfToken) xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
+
+            const payload = {
+                b: boardId,
+                boardData: data,
+                settings: data.settings || undefined,
+                _token: csrfToken || undefined
+            };
+            try { xhr.send(JSON.stringify(payload)); } catch (_) { /* игнорируем */ }
+        } catch (_) { /* игнорируем */ }
+    }
+
     /**
      * Очистка ресурсов
      */
