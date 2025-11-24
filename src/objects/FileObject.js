@@ -49,7 +49,8 @@ export class FileObject {
             fill: 0x333333,
             align: 'center',
             wordWrap: true,
-            wordWrapWidth: this.width - 8,
+            breakWords: true,
+            wordWrapWidth: Math.max(1, this.width - 24), // горизонтальный padding 12px с каждой стороны
             lineHeight: 14,
             resolution: (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1
         });
@@ -239,9 +240,11 @@ export class FileObject {
     _updateTextPosition() {
         if (!this.fileNameText) return;
 
-        // Обновляем стиль текста (ограничиваем по подложке и переносим слова)
+        // Обновляем стиль текста (ограничиваем по подложке и переносим слова, учитываем padding)
+        const sidePad = 12;
         this.fileNameText.style.wordWrap = true;
-        this.fileNameText.style.wordWrapWidth = Math.max(1, this.width - 16);
+        this.fileNameText.style.breakWords = true;
+        this.fileNameText.style.wordWrapWidth = Math.max(1, this.width - sidePad * 2);
         this.fileNameText.updateText();
 
         // Параметры иконки и отступов

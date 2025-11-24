@@ -611,7 +611,8 @@ export class PlacementTool extends BaseTool {
             fill: 0x333333,
             align: 'center',
             wordWrap: true,
-            wordWrapWidth: Math.max(1, width - 16)
+            breakWords: true,
+            wordWrapWidth: Math.max(1, width - 24) // padding 12px по бокам
         });
         nameText.anchor.set(0.5, 0);
         nameText.x = width / 2;
