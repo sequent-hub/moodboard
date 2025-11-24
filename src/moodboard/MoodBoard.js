@@ -232,9 +232,6 @@ export class MoodBoard {
         // Смена фона доски по выбору цвета в топбаре
         this.coreMoodboard.eventBus.on(Events.UI.PaintPick, ({ color }) => {
             if (!color) return;
-            try {
-                console.log('[MB] PaintPick handler: received color', color, 'settingsApplier?', !!this.settingsApplier);
-            } catch (_) {}
             // Централизованное применение через SettingsApplier,
             // чтобы гарантировать эмит события для автосохранения
             if (this.settingsApplier && typeof this.settingsApplier.set === 'function') {
