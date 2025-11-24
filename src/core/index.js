@@ -361,46 +361,82 @@ export class CoreMoodBoard {
             this._cursor.y = y;
         });
 
-        // Вставка изображения из буфера обмена — по курсору, если он над холстом; иначе по центру видимой области
-        this.eventBus.on(Events.UI.PasteImage, ({ src, name, imageId }) => {
-            if (!src) return;
-            const view = this.pixi.app.view;
-            const world = this.pixi.worldLayer || this.pixi.app.stage;
-            const s = world?.scale?.x || 1;
-            const hasCursor = Number.isFinite(this._cursor.x) && Number.isFinite(this._cursor.y);
-            
-            let screenX, screenY;
-            if (hasCursor) {
-                // Используем позицию курсора
-                screenX = this._cursor.x;
-                screenY = this._cursor.y;
-            } else {
-                // Центр экрана
-                screenX = view.clientWidth / 2;
-                screenY = view.clientHeight / 2;
-            }
-            
-            // Преобразуем экранные координаты в мировые (с учетом zoom и pan)
-            const worldX = (screenX - (world?.x || 0)) / s;
-            const worldY = (screenY - (world?.y || 0)) / s;
-            
-            // Центруем изображение относительно точки вставки
-            const properties = { src, name, width: 300, height: 200 };
-            const extraData = imageId ? { imageId } : {};
-            this.createObject('image', { x: Math.round(worldX - 150), y: Math.round(worldY - 100) }, properties, extraData);
-        });
+		// Вставка изображения из буфера обмена — по курсору, если он над холстом; иначе по центру видимой области
+		this.eventBus.on(Events.UI.PasteImage, ({ src, name, imageId }) => {
+			if (!src) return;
+			const view = this.pixi.app.view;
+			const world = this.pixi.worldLayer || this.pixi.app.stage;
+			const s = world?.scale?.x || 1;
+			const hasCursor = Number.isFinite(this._cursor.x) && Number.isFinite(this._cursor.y);
+			
+			let screenX, screenY;
+			if (hasCursor) {
+				// Используем позицию курсора
+				screenX = this._cursor.x;
+				screenY = this._cursor.y;
+			} else {
+				// Центр экрана
+				screenX = view.clientWidth / 2;
+				screenY = view.clientHeight / 2;
+			}
+			
+			// Преобразуем экранные координаты в мировые (с учетом zoom и pan)
+			const worldX = (screenX - (world?.x || 0)) / s;
+			const worldY = (screenY - (world?.y || 0)) / s;
 
-        // Вставка изображения из буфера обмена по контекстному клику (координаты на экране)
-        this.eventBus.on(Events.UI.PasteImageAt, ({ x, y, src, name, imageId }) => {
-            if (!src) return;
-            const world = this.pixi.worldLayer || this.pixi.app.stage;
-            const s = world?.scale?.x || 1;
-            const worldX = (x - (world?.x || 0)) / s;
-            const worldY = (y - (world?.y || 0)) / s;
-            const properties = { src, name, width: 300, height: 200 };
-            const extraData = imageId ? { imageId } : {};
-            this.createObject('image', { x: Math.round(worldX - 150), y: Math.round(worldY - 100) }, properties, extraData);
-        });
+			const placeWithAspect = (natW, natH) => {
+				let w = 300, h = 200;
+				if (natW > 0 && natH > 0) {
+					const ar = natW / natH;
+					w = 300;
+					h = Math.max(1, Math.round(w / ar));
+				}
+				const properties = { src, name, width: w, height: h };
+				const extraData = imageId ? { imageId } : {};
+				this.createObject('image', { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) }, properties, extraData);
+			};
+
+			try {
+				const img = new Image();
+				img.decoding = 'async';
+				img.onload = () => placeWithAspect(img.naturalWidth || 0, img.naturalHeight || 0);
+				img.onerror = () => placeWithAspect(0, 0);
+				img.src = src;
+			} catch (_) {
+				placeWithAspect(0, 0);
+			}
+		});
+
+		// Вставка изображения из буфера обмена по контекстному клику (координаты на экране)
+		this.eventBus.on(Events.UI.PasteImageAt, ({ x, y, src, name, imageId }) => {
+			if (!src) return;
+			const world = this.pixi.worldLayer || this.pixi.app.stage;
+			const s = world?.scale?.x || 1;
+			const worldX = (x - (world?.x || 0)) / s;
+			const worldY = (y - (world?.y || 0)) / s;
+
+			const placeWithAspect = (natW, natH) => {
+				let w = 300, h = 200;
+				if (natW > 0 && natH > 0) {
+					const ar = natW / natH;
+					w = 300;
+					h = Math.max(1, Math.round(w / ar));
+				}
+				const properties = { src, name, width: w, height: h };
+				const extraData = imageId ? { imageId } : {};
+				this.createObject('image', { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) }, properties, extraData);
+			};
+
+			try {
+				const img = new Image();
+				img.decoding = 'async';
+				img.onload = () => placeWithAspect(img.naturalWidth || 0, img.naturalHeight || 0);
+				img.onerror = () => placeWithAspect(0, 0);
+				img.src = src;
+			} catch (_) {
+				placeWithAspect(0, 0);
+			}
+		});
 
         // Слойность: изменение порядка отрисовки (локальные операции)
         const applyZOrderFromState = () => {
