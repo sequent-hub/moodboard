@@ -1,4 +1,5 @@
 import { Events } from '../core/events/Events.js';
+import * as PIXI from 'pixi.js';
 
 /**
  * HtmlTextLayer — рисует текст как HTML-элементы поверх PIXI для максимальной чёткости
