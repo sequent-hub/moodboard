@@ -259,7 +259,7 @@ export class HtmlTextLayer {
         if (!el || !this.core) return;
         
         console.log(`🔍 HtmlTextLayer: обновляю позицию для текста ${objectId}`);
-        
+
         const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
         const s = world?.scale?.x || 1;
         const tx = world?.x || 0;
@@ -309,7 +309,12 @@ export class HtmlTextLayer {
         // Позиция и габариты в CSS координатах - используем тот же подход что в HtmlHandlesLayer
         const worldLayer = this.core.pixi.worldLayer || this.core.pixi.app.stage;
         const view = this.core.pixi.app.view;
-        
+        // Эти переменные нужны и для лога ниже, поэтому задаём их тут
+        let logLeft = 0;
+        let logTop = 0;
+        let logWidth = 0;
+        let logHeight = 0;
+
         if (worldLayer && view && view.parentElement) {
             const containerRect = view.parentElement.getBoundingClientRect();
             const viewRect = view.getBoundingClientRect();
@@ -325,13 +330,20 @@ export class HtmlTextLayer {
             const top = offsetTop + tl.y;
             const width = Math.max(1, br.x - tl.x);
             const height = Math.max(1, br.y - tl.y);
-            
+
+            // Применяем к элементу
             el.style.left = `${left}px`;
             el.style.top = `${top}px`;
             if (w && h) {
                 el.style.width = `${width}px`;
                 el.style.height = `${height}px`;
             }
+
+            // Значения для лога
+            logLeft = left;
+            logTop = top;
+            logWidth = width;
+            logHeight = height;
         } else {
             // Fallback к старому методу
             const left = (tx + s * x) / res;
@@ -339,9 +351,15 @@ export class HtmlTextLayer {
             el.style.left = `${left}px`;
             el.style.top = `${top}px`;
             if (w && h) {
-                el.style.width = `${Math.max(1, (w * s) / res)}px`;
-                el.style.height = `${Math.max(1, (h * s) / res)}px`;
+                const cssW = Math.max(1, (w * s) / res);
+                const cssH = Math.max(1, (h * s) / res);
+                el.style.width = `${cssW}px`;
+                el.style.height = `${cssH}px`;
+                logWidth = cssW;
+                logHeight = cssH;
             }
+            logLeft = left;
+            logTop = top;
         }
         // Поворот вокруг центра (как у PIXI и HTML-ручек)
         el.style.transformOrigin = 'center center';
@@ -357,15 +375,19 @@ export class HtmlTextLayer {
         try {
             el.style.height = 'auto';
             // Добавим небольшой нижний отступ для хвостов букв, чтобы не отсекались (например, у «з»)
-            const h = Math.max(1, Math.round(el.scrollHeight + 2));
-            el.style.height = `${h}px`;
+            const hCss = Math.max(1, Math.round(el.scrollHeight + 2));
+            el.style.height = `${hCss}px`;
+            // Обновим высоту для лога, если её ещё не устанавливали
+            if (!logHeight) {
+                logHeight = hCss;
+            }
         } catch (_) {}
         
         console.log(`🔍 HtmlTextLayer: позиция обновлена для ${objectId}:`, {
-            left: `${left}px`,
-            top: `${top}px`,
-            width: `${Math.max(1, (w * s) / res)}px`,
-            height: `${Math.max(1, (h * s) / res)}px`,
+            left: `${logLeft}px`,
+            top: `${logTop}px`,
+            width: `${logWidth}px`,
+            height: `${logHeight}px`,
             fontSize: `${fontSizePx}px`,
             content: content,
             visibility: el.style.visibility,

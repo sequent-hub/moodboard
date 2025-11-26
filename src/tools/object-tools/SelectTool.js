@@ -2688,15 +2688,23 @@ export class SelectTool extends BaseTool {
                     try {
                         const view = this.app?.view;
                         const worldLayerRef = this.textEditor.world || (this.app?.stage);
-                        const viewRes = (this.app?.renderer?.resolution) || (view && view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
                         const cssLeft = this.textEditor._cssLeftPx;
                         const cssTop = this.textEditor._cssTopPx;
-                        if (isFinite(cssLeft) && isFinite(cssTop) && worldLayerRef) {
+                        if (view && view.parentElement && isFinite(cssLeft) && isFinite(cssTop) && worldLayerRef) {
                             // Ждем один тик, чтобы HtmlTextLayer успел обновить DOM
                             setTimeout(() => {
                                 try {
-                                    const desiredGlobal = new PIXI.Point(Math.round(cssLeft * viewRes), Math.round(cssTop * viewRes));
-                                    const desiredWorld = worldLayerRef.toLocal(desiredGlobal);
+                                    // Инвертируем ту же трансформацию, что использует HtmlHandlesLayer/HtmlTextLayer:
+                                    // world → toGlobal → offset → CSS px
+                                    const containerRect = view.parentElement.getBoundingClientRect();
+                                    const viewRect = view.getBoundingClientRect();
+                                    const offsetLeft = viewRect.left - containerRect.left;
+                                    const offsetTop = viewRect.top - containerRect.top;
+                                    // CSS → экранные координаты внутри canvas
+                                    const screenX = cssLeft - offsetLeft;
+                                    const screenY = cssTop - offsetTop;
+                                    // Экранные → мировые координаты через toLocal
+                                    const desiredWorld = worldLayerRef.toLocal(new PIXI.Point(screenX, screenY));
                                     const newPos = { x: Math.round(desiredWorld.x), y: Math.round(desiredWorld.y) };
                                     this.eventBus.emit(Events.Object.StateChanged, {
                                         objectId,
