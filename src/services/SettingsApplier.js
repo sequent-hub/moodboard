@@ -15,7 +15,8 @@ export class SettingsApplier {
 
     set(partial) {
         this.settings = { ...this.settings, ...(partial || {}) };
-        this.apply(this.settings);
+        // Применяем только изменённые части, чтобы не трогать сетку при смене фона и наоборот
+        this.apply(partial || {});
         // Сообщаем системе об изменении настроек для автосохранения
         try {
             this.eventBus && this.eventBus.emit(Events.Grid.BoardDataChanged, { settings: this.get() });
@@ -26,12 +27,13 @@ export class SettingsApplier {
         return { ...this.settings };
     }
 
-    apply(settings = {}) {
-        this.settings = { ...this.settings, ...settings };
+    apply(partial = {}) {
+        // Копим полные настройки, но применяем только то, что пришло в partial
+        this.settings = { ...this.settings, ...partial };
         const s = this.settings;
 
         // 1) Фон
-        if (s.backgroundColor && this.pixi?.app?.renderer) {
+        if (partial.backgroundColor && this.pixi?.app?.renderer) {
             const bgInt = this._toIntColor(s.backgroundColor);
             if (bgInt != null) this.pixi.app.renderer.backgroundColor = bgInt;
             // Синхронизация UI цвета (если доступен topbar)
@@ -43,17 +45,22 @@ export class SettingsApplier {
             }
         }
 
-        // 2) Сетка
-        if (s.grid && s.grid.type) {
+        // 2) Сетка — применяем только если grid пришёл в partial
+        if (partial.grid && s.grid && s.grid.type) {
             try {
                 const payload = { type: s.grid.type };
-                // Пробрасываем дополнительные опции, если есть
-                const options = s.grid.options || {
-                    size: s.grid.size,
-                    color: this._maybeInt(s.grid.color),
-                    enabled: s.grid.visible !== false
-                };
-                if (options) payload.options = options;
+                // Пробрасываем только явно заданные опции, чтобы не затирать дефолты фабрики
+                const overrides = {};
+                if (s.grid.options && typeof s.grid.options === 'object') {
+                    Object.keys(s.grid.options).forEach((k) => {
+                        const v = s.grid.options[k];
+                        if (v !== undefined) overrides[k] = k === 'color' ? this._maybeInt(v) : v;
+                    });
+                }
+                if (s.grid.size !== undefined) overrides.size = s.grid.size;
+                if (s.grid.color !== undefined) overrides.color = this._maybeInt(s.grid.color);
+                if (s.grid.visible !== undefined) overrides.enabled = s.grid.visible !== false;
+                if (Object.keys(overrides).length > 0) payload.options = overrides;
                 this.eventBus.emit(Events.UI.GridChange, payload);
                 if (this.ui.topbar && s.grid.type) {
                     this.ui.topbar.setActive(s.grid.type);
@@ -62,7 +69,7 @@ export class SettingsApplier {
         }
 
         // 3) Зум
-        if (s.zoom && (typeof s.zoom.current === 'number')) {
+        if (partial.zoom && s.zoom && (typeof s.zoom.current === 'number')) {
             const world = this.pixi?.worldLayer || this.pixi?.app?.stage;
             if (world) {
                 const z = Math.max(0.1, Math.min(5, s.zoom.current));
@@ -72,7 +79,7 @@ export class SettingsApplier {
         }
 
         // 4) Панорамирование (позиция мира)
-        if (s.pan && typeof s.pan.x === 'number' && typeof s.pan.y === 'number') {
+        if (partial.pan && s.pan && typeof s.pan.x === 'number' && typeof s.pan.y === 'number') {
             const world = this.pixi?.worldLayer || this.pixi?.app?.stage;
             if (world) {
                 world.x = s.pan.x;

@@ -7,10 +7,12 @@ export class BaseGrid {
     constructor(options = {}) {
         this.type = 'base';
         this.enabled = options.enabled ?? false;
-        this.size = options.size || 20;
-        this.color = options.color || 0xE0E0E0;
-        this.opacity = options.opacity || 0.5;
-        this.lineWidth = options.lineWidth || 1;
+        // Значения параметров визуала не задаём по умолчанию здесь.
+        // Они должны приходить из GridFactory.getDefaultOptions(type).
+        this.size = options.size;
+        this.color = options.color;
+        this.opacity = options.opacity;
+        this.lineWidth = options.lineWidth;
         
         // Размеры области отрисовки
         this.width = options.width || 1920;
@@ -18,7 +20,9 @@ export class BaseGrid {
         
         // PIXI графика
         this.graphics = new PIXI.Graphics();
-        this.graphics.alpha = this.opacity;
+        if (typeof this.opacity === 'number') {
+            this.graphics.alpha = this.opacity;
+        }
         
         // Настройки привязки
         this.snapEnabled = options.snapEnabled ?? true;

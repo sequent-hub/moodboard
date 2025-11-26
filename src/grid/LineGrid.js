@@ -9,14 +9,14 @@ export class LineGrid extends BaseGrid {
         this.type = 'line';
         
         // Дополнительные настройки для линейной сетки
-        this.showSubGrid = options.showSubGrid ?? false;
-        this.subGridDivisions = options.subGridDivisions || 4;
-        this.subGridColor = options.subGridColor || 0xE3E3E3;
-        this.subGridOpacity = options.subGridOpacity || 0.45;
-        // Более тонкие основные линии и более контрастные
-        this.lineWidth = Math.max(0.5, (options.lineWidth || this.lineWidth) / 2);
-        this.color = options.color || 0xB0B0B0;
-        this.opacity = options.opacity || 0.9;
+        // Параметры не задаём по умолчанию здесь — их поставляет GridFactory.
+        this.showSubGrid = options.showSubGrid;
+        this.subGridDivisions = options.subGridDivisions;
+        this.subGridColor = options.subGridColor;
+        this.subGridOpacity = options.subGridOpacity;
+        this.lineWidth = options.lineWidth;
+        this.color = options.color;
+        this.opacity = options.opacity;
     }
     
     /**
@@ -24,7 +24,9 @@ export class LineGrid extends BaseGrid {
      */
     createVisual() {
         // Применяем непрозрачность на графику (умножится на alpha линий)
-        this.graphics.alpha = this.opacity;
+        if (typeof this.opacity === 'number') {
+            this.graphics.alpha = this.opacity;
+        }
         try {
             // В новых версиях можно указать alignment для большей чёткости
             this.graphics.lineStyle({ width: this.lineWidth, color: this.color, alpha: 1, alignment: 0.5 });

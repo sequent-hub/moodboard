@@ -19,6 +19,7 @@ import { FilePropertiesPanel } from '../ui/FilePropertiesPanel.js';
 import { AlignmentGuides } from '../tools/AlignmentGuides.js';
 import { ImageUploadService } from '../services/ImageUploadService.js';
 import { SettingsApplier } from '../services/SettingsApplier.js';
+import { GridFactory } from '../grid/GridFactory.js';
 
 /**
  * Готовый MoodBoard с UI - главный класс пакета
@@ -101,11 +102,13 @@ export class MoodBoard {
             // Инициализируем UI
             this.initToolbar();
             this.initTopbar();
-            // Включаем дефолтную сетку (вариант 1 — line), если у доски нет сохранённой
+            // Включаем дефолтную сетку — первый тип из фабрики — если у доски нет сохранённой
             try {
                 const savedGridType = this.coreMoodboard?.state?.state?.board?.grid?.type;
                 if (!savedGridType && this.settingsApplier) {
-                    this.settingsApplier.apply({ grid: { type: 'line' } });
+                    const types = (GridFactory.getAvailableTypes && GridFactory.getAvailableTypes()) || ['line', 'dot', 'cross'];
+                    const firstType = Array.isArray(types) && types.length > 0 ? types[0] : 'line';
+                    this.settingsApplier.apply({ grid: { type: firstType } });
                 }
             } catch (_) {}
             this.initZoombar();
