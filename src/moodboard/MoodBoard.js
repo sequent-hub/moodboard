@@ -102,15 +102,6 @@ export class MoodBoard {
             // Инициализируем UI
             this.initToolbar();
             this.initTopbar();
-            // Включаем дефолтную сетку — первый тип из фабрики — если у доски нет сохранённой
-            try {
-                const savedGridType = this.coreMoodboard?.state?.state?.board?.grid?.type;
-                if (!savedGridType && this.settingsApplier) {
-                    const types = (GridFactory.getAvailableTypes && GridFactory.getAvailableTypes()) || ['line', 'dot', 'cross'];
-                    const firstType = Array.isArray(types) && types.length > 0 ? types[0] : 'line';
-                    this.settingsApplier.apply({ grid: { type: firstType } });
-                }
-            } catch (_) {}
             this.initZoombar();
             this.initMapbar();
             this.initContextMenu();
