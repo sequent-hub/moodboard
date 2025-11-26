@@ -224,14 +224,14 @@ export class HtmlHandlesLayer {
             isFrameTarget = mbType === 'frame';
         }
 
-        // Вычисляем позицию и размер через математику сцены (toGlobal) и переводим в CSS px
+        // Вычисляем позицию и размер через математику сцены (toGlobal) и переводим в CSS px.
+        // toGlobal() возвращает координаты в device-пикселях, поэтому делим на rendererRes.
         const tl = world.toGlobal(new PIXI.Point(worldBounds.x, worldBounds.y));
         const br = world.toGlobal(new PIXI.Point(worldBounds.x + worldBounds.width, worldBounds.y + worldBounds.height));
-        // Используем координаты в CSS-пикселях напрямую (Pixi toGlobal выдаёт экранные px)
-        const cssX = offsetLeft + tl.x;
-        const cssY = offsetTop + tl.y;
-        const cssWidth = Math.max(1, (br.x - tl.x));
-        const cssHeight = Math.max(1, (br.y - tl.y));
+        const cssX = offsetLeft + tl.x / rendererRes;
+        const cssY = offsetTop + tl.y / rendererRes;
+        const cssWidth = Math.max(1, (br.x - tl.x) / rendererRes);
+        const cssHeight = Math.max(1, (br.y - tl.y) / rendererRes);
 
         const left = Math.round(cssX);
         const top = Math.round(cssY);
@@ -405,6 +405,7 @@ export class HtmlHandlesLayer {
         const s = world?.scale?.x || 1;
         const tx = world?.x || 0;
         const ty = world?.y || 0;
+        const rendererRes = (this.core.pixi.app.renderer?.resolution) || 1;
         const containerRect = this.container.getBoundingClientRect();
         const view = this.core.pixi.app.view;
         const viewRect = view.getBoundingClientRect();
@@ -423,11 +424,12 @@ export class HtmlHandlesLayer {
             w: startCSS.width,
             h: startCSS.height,
         };
+        // Экранные координаты (CSS) → device-пиксели → world
         const startWorld = {
-            x: (startScreen.x - tx) / s,
-            y: (startScreen.y - ty) / s,
-            width: startScreen.w / s,
-            height: startScreen.h / s,
+            x: ((startScreen.x * rendererRes) - tx) / s,
+            y: ((startScreen.y * rendererRes) - ty) / s,
+            width: (startScreen.w * rendererRes) / s,
+            height: (startScreen.h * rendererRes) / s,
         };
 
         let objects = [id];
@@ -568,10 +570,10 @@ export class HtmlHandlesLayer {
             const screenY = (newTop - offsetTop);
             const screenW = newW;
             const screenH = newH;
-            const worldX = (screenX - tx) / s;
-            const worldY = (screenY - ty) / s;
-            const worldW = screenW / s;
-            const worldH = screenH / s;
+            const worldX = ((screenX * rendererRes) - tx) / s;
+            const worldY = ((screenY * rendererRes) - ty) / s;
+            const worldW = (screenW * rendererRes) / s;
+            const worldH = (screenH * rendererRes) / s;
 
             // Определяем, изменилась ли позиция (только для левых/верхних ручек)
             const positionChanged = (newLeft !== startCSS.left) || (newTop !== startCSS.top);
@@ -616,10 +618,10 @@ export class HtmlHandlesLayer {
             const screenY = (endCSS.top - offsetTop);
             const screenW = endCSS.width;
             const screenH = endCSS.height;
-            const worldX = (screenX - tx) / s;
-            const worldY = (screenY - ty) / s;
-            const worldW = screenW / s;
-            const worldH = screenH / s;
+            const worldX = ((screenX * rendererRes) - tx) / s;
+            const worldY = ((screenY * rendererRes) - ty) / s;
+            const worldW = (screenW * rendererRes) / s;
+            const worldH = (screenH * rendererRes) / s;
 
             if (isGroup) {
                 this.eventBus.emit(Events.Tool.GroupResizeEnd, { objects });
@@ -681,6 +683,7 @@ export class HtmlHandlesLayer {
         const s = world?.scale?.x || 1;
         const tx = world?.x || 0;
         const ty = world?.y || 0;
+        const rendererRes = (this.core.pixi.app.renderer?.resolution) || 1;
         const containerRect = this.container.getBoundingClientRect();
         const view = this.core.pixi.app.view;
         const viewRect = view.getBoundingClientRect();
@@ -701,10 +704,10 @@ export class HtmlHandlesLayer {
             h: startCSS.height,
         };
         const startWorld = {
-            x: (startScreen.x - tx) / s,
-            y: (startScreen.y - ty) / s,
-            width: startScreen.w / s,
-            height: startScreen.h / s,
+            x: ((startScreen.x * rendererRes) - tx) / s,
+            y: ((startScreen.y * rendererRes) - ty) / s,
+            width: (startScreen.w * rendererRes) / s,
+            height: (startScreen.h * rendererRes) / s,
         };
 
         let objects = [id];
@@ -830,10 +833,10 @@ export class HtmlHandlesLayer {
             const screenY = (newTop - offsetTop);
             const screenW = newW;
             const screenH = newH;
-            const worldX = (screenX - tx) / s;
-            const worldY = (screenY - ty) / s;
-            const worldW = screenW / s;
-            const worldH = screenH / s;
+            const worldX = ((screenX * rendererRes) - tx) / s;
+            const worldY = ((screenY * rendererRes) - ty) / s;
+            const worldW = (screenW * rendererRes) / s;
+            const worldH = (screenH * rendererRes) / s;
 
             // Определяем, изменилась ли позиция (только для левых/верхних граней)
             const edgePositionChanged = (newLeft !== startCSS.left) || (newTop !== startCSS.top);
@@ -867,10 +870,10 @@ export class HtmlHandlesLayer {
             const screenY = (endCSS.top - offsetTop);
             const screenW = endCSS.width;
             const screenH = endCSS.height;
-            const worldX = (screenX - tx) / s;
-            const worldY = (screenY - ty) / s;
-            const worldW = screenW / s;
-            const worldH = screenH / s;
+            const worldX = ((screenX * rendererRes) - tx) / s;
+            const worldY = ((screenY * rendererRes) - ty) / s;
+            const worldW = (screenW * rendererRes) / s;
+            const worldH = (screenH * rendererRes) / s;
 
             if (isGroup) {
                 this.eventBus.emit(Events.Tool.GroupResizeEnd, { objects });
@@ -888,7 +891,7 @@ export class HtmlHandlesLayer {
                             el.style.width = `${Math.max(1, Math.round(endCSS.width))}px`;
                             el.style.height = 'auto';
                             const measured = Math.max(1, Math.round(el.scrollHeight));
-                            finalWorldH = (measured) / s;
+                            finalWorldH = (measured * rendererRes) / s;
                         }
                     } catch (_) {}
                 }
