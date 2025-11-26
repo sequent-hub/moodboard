@@ -101,6 +101,13 @@ export class MoodBoard {
             // Инициализируем UI
             this.initToolbar();
             this.initTopbar();
+            // Включаем дефолтную сетку (вариант 1 — line), если у доски нет сохранённой
+            try {
+                const savedGridType = this.coreMoodboard?.state?.state?.board?.grid?.type;
+                if (!savedGridType && this.settingsApplier) {
+                    this.settingsApplier.apply({ grid: { type: 'line' } });
+                }
+            } catch (_) {}
             this.initZoombar();
             this.initMapbar();
             this.initContextMenu();
