@@ -324,12 +324,13 @@ export class HtmlTextLayer {
             // Преобразуем мировые координаты в экранные через toGlobal
             const tl = worldLayer.toGlobal(new PIXI.Point(x, y));
             const br = worldLayer.toGlobal(new PIXI.Point(x + w, y + h));
-            
-            // CSS координаты с учетом offset
-            const left = offsetLeft + tl.x;
-            const top = offsetTop + tl.y;
-            const width = Math.max(1, br.x - tl.x);
-            const height = Math.max(1, br.y - tl.y);
+
+            // toGlobal() возвращает координаты в device-пикселях с учётом resolution.
+            // Для CSS нам нужны логические пиксели, поэтому делим на res.
+            const left = offsetLeft + tl.x / res;
+            const top = offsetTop + tl.y / res;
+            const width = Math.max(1, (br.x - tl.x) / res);
+            const height = Math.max(1, (br.y - tl.y) / res);
 
             // Применяем к элементу
             el.style.left = `${left}px`;
