@@ -305,14 +305,42 @@ export class HtmlTextLayer {
             el.style.lineHeight = newLH;
         }
 
-        // Позиция и габариты в экранных координатах
-        const left = (tx + s * x) / res;
-        const top = (ty + s * y) / res;
-        el.style.left = `${left}px`;
-        el.style.top = `${top}px`;
-        if (w && h) {
-            el.style.width = `${Math.max(1, (w * s) / res)}px`;
-            el.style.height = `${Math.max(1, (h * s) / res)}px`;
+        // Позиция и габариты в CSS координатах - используем тот же подход что в HtmlHandlesLayer
+        const worldLayer = this.core.pixi.worldLayer || this.core.pixi.app.stage;
+        const view = this.core.pixi.app.view;
+        
+        if (worldLayer && view && view.parentElement) {
+            const containerRect = view.parentElement.getBoundingClientRect();
+            const viewRect = view.getBoundingClientRect();
+            const offsetLeft = viewRect.left - containerRect.left;
+            const offsetTop = viewRect.top - containerRect.top;
+            
+            // Преобразуем мировые координаты в экранные через toGlobal
+            const tl = worldLayer.toGlobal(new PIXI.Point(x, y));
+            const br = worldLayer.toGlobal(new PIXI.Point(x + w, y + h));
+            
+            // CSS координаты с учетом offset
+            const left = offsetLeft + tl.x;
+            const top = offsetTop + tl.y;
+            const width = Math.max(1, br.x - tl.x);
+            const height = Math.max(1, br.y - tl.y);
+            
+            el.style.left = `${left}px`;
+            el.style.top = `${top}px`;
+            if (w && h) {
+                el.style.width = `${width}px`;
+                el.style.height = `${height}px`;
+            }
+        } else {
+            // Fallback к старому методу
+            const left = (tx + s * x) / res;
+            const top = (ty + s * y) / res;
+            el.style.left = `${left}px`;
+            el.style.top = `${top}px`;
+            if (w && h) {
+                el.style.width = `${Math.max(1, (w * s) / res)}px`;
+                el.style.height = `${Math.max(1, (h * s) / res)}px`;
+            }
         }
         // Поворот вокруг центра (как у PIXI и HTML-ручек)
         el.style.transformOrigin = 'center center';

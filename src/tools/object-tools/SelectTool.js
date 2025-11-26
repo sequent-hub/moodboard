@@ -1847,9 +1847,21 @@ export class SelectTool extends BaseTool {
         const toScreen = (wx, wy) => {
             const worldLayer = this.textEditor.world || (this.app?.stage);
             if (!worldLayer) return { x: wx, y: wy };
+            
+            // Используем тот же подход, что в HtmlHandlesLayer для рамки выделения
+            const containerRect = view.parentElement.getBoundingClientRect();
+            const viewRect = view.getBoundingClientRect();
+            const offsetLeft = viewRect.left - containerRect.left;
+            const offsetTop = viewRect.top - containerRect.top;
+            
+            // Преобразуем мировые координаты в экранные через toGlobal
             const global = worldLayer.toGlobal(new PIXI.Point(wx, wy));
-            const viewRes = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
-            return { x: global.x / viewRes, y: global.y / viewRes };
+            
+            // Возвращаем CSS координаты с учетом offset
+            return { 
+                x: offsetLeft + global.x, 
+                y: offsetTop + global.y 
+            };
         };
         const screenPos = toScreen(position.x, position.y);
         
