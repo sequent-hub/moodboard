@@ -2067,23 +2067,49 @@ export class SelectTool extends BaseTool {
             } catch (_) {}
 
             // Для новых текстов: синхронизируем мировую позицию объекта с фактической позицией wrapper,
-            // чтобы после закрытия редактора статичный текст встал ровно туда же без сдвига
+            // чтобы после закрытия редактора статичный текст встал ровно туда же без сдвига.
+            // Используем ту же систему координат, что и HtmlTextLayer/HtmlHandlesLayer:
+            // CSS ←→ world через toGlobal/toLocal БЕЗ умножения/деления на resolution.
             try {
                 if (create && objectId) {
                     const worldLayerRef = this.textEditor.world || (this.app?.stage);
-                    const viewRes = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
-                    // Статичный HTML-текст не имеет верхнего внутреннего отступа (HtmlTextLayer ставит padding: 0),
-                    // поэтому добавляем padTop к topPx при расчёте мировых координат
-                    const yCssStaticTop = Math.round(topPx + padTop);
-                    const globalPoint = new PIXI.Point(Math.round(leftPx * viewRes), Math.round(yCssStaticTop * viewRes));
-                    const worldPoint = worldLayerRef && worldLayerRef.toLocal ? worldLayerRef.toLocal(globalPoint) : { x: position.x, y: position.y };
-                    const newWorldPos = { x: Math.round(worldPoint.x), y: Math.round(worldPoint.y) };
-                    this.eventBus.emit(Events.Object.StateChanged, {
-                        objectId: objectId,
-                        updates: { position: newWorldPos }
-                    });
-                    // Диагностика
-                    console.log('🧭 Text position sync', { objectId, newWorldPos, leftPx, topPx, yCssStaticTop, padTop, viewRes });
+                    const viewEl = this.app?.view;
+                    if (worldLayerRef && viewEl && viewEl.parentElement) {
+                        const containerRect = viewEl.parentElement.getBoundingClientRect();
+                        const viewRect = viewEl.getBoundingClientRect();
+                        const offsetLeft = viewRect.left - containerRect.left;
+                        const offsetTop = viewRect.top - containerRect.top;
+
+                        // Статичный HTML-текст не имеет верхнего внутреннего отступа (HtmlTextLayer ставит padding: 0),
+                        // поэтому добавляем padTop к topPx при расчёте мировой позиции верхнего края текста.
+                        const yCssStaticTop = Math.round(topPx + padTop);
+                        // Переводим CSS-координаты wrapper в экранные координаты относительно view
+                        const screenX = Math.round(leftPx - offsetLeft);
+                        const screenY = Math.round(yCssStaticTop - offsetTop);
+                        const globalPoint = new PIXI.Point(screenX, screenY);
+                        const worldPoint = worldLayerRef.toLocal
+                            ? worldLayerRef.toLocal(globalPoint)
+                            : { x: position.x, y: position.y };
+                        const newWorldPos = {
+                            x: Math.round(worldPoint.x),
+                            y: Math.round(worldPoint.y)
+                        };
+                        this.eventBus.emit(Events.Object.StateChanged, {
+                            objectId: objectId,
+                            updates: { position: newWorldPos }
+                        });
+                        // Диагностика
+                        console.log('🧭 Text position sync', {
+                            objectId,
+                            newWorldPos,
+                            leftPx,
+                            topPx,
+                            yCssStaticTop,
+                            padTop,
+                            offsetLeft,
+                            offsetTop
+                        });
+                    }
                 }
             } catch (_) {}
         }
