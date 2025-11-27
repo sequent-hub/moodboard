@@ -38,7 +38,7 @@ export class PlacementTool extends BaseTool {
         // Состояние выбранного изображения
         this.selectedImage = null; // { file, fileName, fileSize, mimeType, properties }
         this.ghostContainer = null; // Контейнер для "призрака" файла, изображения, текста, записки, эмоджи, фрейма или фигур
-        // Оригинальные стили курсора PIXI, чтобы можно было временно переопределить pointer для текстового инструмента
+        // Оригинальные стили курсора PIXI, чтобы можно было временно переопределить pointer/default для текстового инструмента
         this._origCursorStyles = null;
 
         if (this.eventBus) {
@@ -575,8 +575,8 @@ export class PlacementTool extends BaseTool {
     }
 
     /**
-     * Включает/выключает временное переопределение cursorStyles.pointer в PIXI,
-     * чтобы во время работы с текстом курсор оставался текстовым даже при наведении на объекты.
+     * Включает/выключает временное переопределение cursorStyles.pointer/default в PIXI,
+     * чтобы во время работы с текстом курсор оставался системным 'text' даже при наведении на объекты.
      * @param {boolean} forceReset - если true, всегда восстанавливает оригинальные стили
      */
     _updateCursorOverride(forceReset = false) {
@@ -593,14 +593,21 @@ export class PlacementTool extends BaseTool {
                 // Сохраняем оригинальные стили только один раз
                 if (!this._origCursorStyles) {
                     this._origCursorStyles = {
-                        pointer: cursorStyles.pointer
+                        pointer: cursorStyles.pointer,
+                        default: cursorStyles.default
                     };
                 }
-                cursorStyles.pointer = TEXT_CURSOR;
+                // И pointer, и default делаем системным текстовым курсором,
+                // чтобы при наведении/уходе с объектов тип курсора не менялся.
+                cursorStyles.pointer = 'text';
+                cursorStyles.default = 'text';
             } else if (this._origCursorStyles) {
-                // Восстанавливаем оригинальный pointer
+                // Восстанавливаем оригинальные значения
                 if (Object.prototype.hasOwnProperty.call(this._origCursorStyles, 'pointer')) {
                     cursorStyles.pointer = this._origCursorStyles.pointer;
+                }
+                if (Object.prototype.hasOwnProperty.call(this._origCursorStyles, 'default')) {
+                    cursorStyles.default = this._origCursorStyles.default;
                 }
                 this._origCursorStyles = null;
             }
