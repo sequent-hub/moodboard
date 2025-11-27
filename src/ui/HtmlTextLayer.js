@@ -325,12 +325,15 @@ export class HtmlTextLayer {
             const tl = worldLayer.toGlobal(new PIXI.Point(x, y));
             const br = worldLayer.toGlobal(new PIXI.Point(x + w, y + h));
 
-            // toGlobal() возвращает координаты в device-пикселях с учётом resolution.
-            // Для CSS нам нужны логические пиксели, поэтому делим на res.
-            const left = offsetLeft + tl.x / res;
-            const top = offsetTop + tl.y / res;
-            const width = Math.max(1, (br.x - tl.x) / res);
-            const height = Math.max(1, (br.y - tl.y) / res);
+            // ВАЖНО: toGlobal() уже возвращает координаты в логических экранных пикселях
+            // (как и для HtmlHandlesLayer), поэтому делить их на renderer.resolution
+            // при вычислении CSS-позиции и размеров не нужно. Деление приводило к тому,
+            // что при res < 1 (масштаб браузера ≠ 100%) HTML-текст уезжал относительно
+            // собственных рамок и PIXI-объекта.
+            const left = offsetLeft + tl.x;
+            const top = offsetTop + tl.y;
+            const width = Math.max(1, (br.x - tl.x));
+            const height = Math.max(1, (br.y - tl.y));
 
             // Применяем к элементу
             el.style.left = `${left}px`;
