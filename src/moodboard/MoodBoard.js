@@ -477,6 +477,14 @@ export class MoodBoard {
         
         this._safeDestroy(this.alignmentGuides, 'alignmentGuides');
         this.alignmentGuides = null;
+
+        // HTML-слои (текст и ручки) также нужно корректно уничтожать,
+        // чтобы удалить DOM и отписаться от глобальных слушателей resize/DPR
+        this._safeDestroy(this.htmlTextLayer, 'htmlTextLayer');
+        this.htmlTextLayer = null;
+
+        this._safeDestroy(this.htmlHandlesLayer, 'htmlHandlesLayer');
+        this.htmlHandlesLayer = null;
         
         this._safeDestroy(this.commentPopover, 'commentPopover');
         this.commentPopover = null;
@@ -507,6 +515,16 @@ export class MoodBoard {
             this.container.classList.remove('moodboard-root');
         }
         this.container = null;
+
+        // Сбрасываем глобальные ссылки на слои, если они устанавливались
+        if (typeof window !== 'undefined') {
+            if (window.moodboardHtmlTextLayer === this.htmlTextLayer) {
+                window.moodboardHtmlTextLayer = null;
+            }
+            if (window.moodboardHtmlHandlesLayer === this.htmlHandlesLayer) {
+                window.moodboardHtmlHandlesLayer = null;
+            }
+        }
         
         // Вызываем коллбек onDestroy
         if (typeof this.options.onDestroy === 'function') {

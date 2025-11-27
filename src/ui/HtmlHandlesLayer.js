@@ -22,7 +22,12 @@ export class HtmlHandlesLayer {
         this.target = { type: 'none', id: null, bounds: null };
         this.handles = {};
         this._drag = null;
-        this._handlesSuppressed = false; // скрывать ручки во время перетаскивания/трансформаций
+      this._handlesSuppressed = false; // скрывать ручки во время перетаскивания/трансформаций
+
+      // Ссылки на обработчики, чтобы корректно отписаться при destroy()
+      this._onWindowResize = null;
+      this._onDprChange = null;
+      this._dprMediaQuery = null;
     }
 
     attach() {
@@ -31,16 +36,19 @@ export class HtmlHandlesLayer {
         this.container.appendChild(this.layer);
 
         // Обновление при изменении размеров окна/масштаба (DPR)
-        window.addEventListener('resize', () => this.update(), { passive: true });
+      this._onWindowResize = () => this.update();
+      window.addEventListener('resize', this._onWindowResize, { passive: true });
         // Некоторые браузеры меняют devicePixelRatio без resize — страхуемся
         if (typeof window !== 'undefined' && 'matchMedia' in window) {
             try {
                 // media-query, реагирующая на изменение DPR
-                const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
-                if (mq && mq.addEventListener) {
-                    mq.addEventListener('change', () => this.update());
-                } else if (mq && mq.addListener) {
-                    mq.addListener(() => this.update());
+          const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+          this._dprMediaQuery = mq;
+          this._onDprChange = () => this.update();
+          if (mq && mq.addEventListener) {
+            mq.addEventListener('change', this._onDprChange);
+          } else if (mq && mq.addListener) {
+            mq.addListener(this._onDprChange);
                 }
             } catch (_) {}
         }
@@ -102,12 +110,34 @@ export class HtmlHandlesLayer {
     }
 
     destroy() {
-        if (this.layer) this.layer.remove();
-        this.layer = null;
+      // Отписываемся от глобальных событий окна/DPR,
+      // чтобы старые инстансы не продолжали реагировать после destroy()
+      if (this._onWindowResize) {
+        window.removeEventListener('resize', this._onWindowResize);
+        this._onWindowResize = null;
+      }
+      if (this._dprMediaQuery && this._onDprChange) {
+        try {
+          if (this._dprMediaQuery.removeEventListener) {
+            this._dprMediaQuery.removeEventListener('change', this._onDprChange);
+          } else if (this._dprMediaQuery.removeListener) {
+            this._dprMediaQuery.removeListener(this._onDprChange);
+          }
+        } catch (_) {}
+        this._dprMediaQuery = null;
+        this._onDprChange = null;
+      }
+
+      if (this.layer) {
+        this.layer.remove();
+      }
+      this.layer = null;
     }
 
     update() {
-        if (!this.core) return;
+      // Дополнительная защита: если слой или core уже уничтожены,
+      // выходим, чтобы не получить ошибок при resize/смене DPR
+      if (!this.core || !this.core.pixi || !this.core.pixi.app || !this.layer) return;
         const selectTool = this.core?.selectTool;
         const ids = selectTool ? Array.from(selectTool.selectedObjects || []) : [];
         if (!ids || ids.length === 0) { this.hide(); return; }
@@ -225,13 +255,16 @@ export class HtmlHandlesLayer {
         }
 
         // Вычисляем позицию и размер через математику сцены (toGlobal) и переводим в CSS px.
-        // toGlobal() возвращает координаты в device-пикселях, поэтому делим на rendererRes.
+        // Важно: toGlobal() уже возвращает координаты в логических экранных пикселях
+        // (учитывая позицию/масштаб world), поэтому ДЕЛИТЬ их на renderer.resolution не нужно.
+        // Деление приводило к эффекту 1 / resolution (например, при res = 0.8 рамка
+        // становилась больше и съезжала относительно объекта).
         const tl = world.toGlobal(new PIXI.Point(worldBounds.x, worldBounds.y));
         const br = world.toGlobal(new PIXI.Point(worldBounds.x + worldBounds.width, worldBounds.y + worldBounds.height));
-        const cssX = offsetLeft + tl.x / rendererRes;
-        const cssY = offsetTop + tl.y / rendererRes;
-        const cssWidth = Math.max(1, (br.x - tl.x) / rendererRes);
-        const cssHeight = Math.max(1, (br.y - tl.y) / rendererRes);
+        const cssX = offsetLeft + tl.x;
+        const cssY = offsetTop + tl.y;
+        const cssWidth = Math.max(1, (br.x - tl.x));
+        const cssHeight = Math.max(1, (br.y - tl.y));
 
         const left = Math.round(cssX);
         const top = Math.round(cssY);
