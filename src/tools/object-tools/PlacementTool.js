@@ -38,6 +38,8 @@ export class PlacementTool extends BaseTool {
         // Состояние выбранного изображения
         this.selectedImage = null; // { file, fileName, fileSize, mimeType, properties }
         this.ghostContainer = null; // Контейнер для "призрака" файла, изображения, текста, записки, эмоджи, фрейма или фигур
+        // Оригинальные стили курсора PIXI, чтобы можно было временно переопределить pointer для текстового инструмента
+        this._origCursorStyles = null;
 
         if (this.eventBus) {
             this.eventBus.on(Events.Place.Set, (cfg) => {
@@ -47,6 +49,8 @@ export class PlacementTool extends BaseTool {
                     const cur = this._getPendingCursor();
                     this.app.view.style.cursor = (cur === 'default') ? '' : cur;
                 }
+                // При выборе текста заставляем pointer вести себя как текстовый курсор
+                this._updateCursorOverride();
                 
                 // Показываем призрак для записки, эмоджи, фрейма или фигур, если они активны
                 if (this.pending && this.app && this.world) {
@@ -96,6 +100,8 @@ export class PlacementTool extends BaseTool {
                     this.selectedFile = null;
                     this.selectedImage = null;
                     this.hideGhost();
+                    // Возвращаем стандартное поведение курсора, когда уходим с PlacementTool
+                    this._updateCursorOverride();
                 }
             });
 
@@ -145,6 +151,8 @@ export class PlacementTool extends BaseTool {
             // Добавляем обработчик движения мыши для "призрака"
             this.app.view.addEventListener('mousemove', this._onMouseMove.bind(this));
         }
+        // При активации синхронизируем переопределение курсора pointer для текста
+        this._updateCursorOverride();
         
         // Если есть выбранный файл или изображение, показываем призрак
         if (this.selectedFile) {
@@ -171,6 +179,8 @@ export class PlacementTool extends BaseTool {
             // Убираем обработчик движения мыши
             this.app.view.removeEventListener('mousemove', this._onMouseMove.bind(this));
         }
+        // Восстанавливаем стандартные стили курсора при выходе из инструмента
+        this._updateCursorOverride(true);
         this.hideGhost();
         this.app = null;
         this.world = null;
@@ -561,6 +571,41 @@ export class PlacementTool extends BaseTool {
             }
             const worldPoint = this._toWorld(event.offsetX, event.offsetY);
             this.updateGhostPosition(worldPoint.x, worldPoint.y);
+        }
+    }
+
+    /**
+     * Включает/выключает временное переопределение cursorStyles.pointer в PIXI,
+     * чтобы во время работы с текстом курсор оставался текстовым даже при наведении на объекты.
+     * @param {boolean} forceReset - если true, всегда восстанавливает оригинальные стили
+     */
+    _updateCursorOverride(forceReset = false) {
+        try {
+            const renderer = this.app && this.app.renderer;
+            if (!renderer) return;
+            const events = renderer.events || (renderer.plugins && renderer.plugins.interaction);
+            const cursorStyles = events && events.cursorStyles;
+            if (!cursorStyles) return;
+
+            const needTextOverride = !forceReset && this.pending && this.pending.type === 'text';
+
+            if (needTextOverride) {
+                // Сохраняем оригинальные стили только один раз
+                if (!this._origCursorStyles) {
+                    this._origCursorStyles = {
+                        pointer: cursorStyles.pointer
+                    };
+                }
+                cursorStyles.pointer = TEXT_CURSOR;
+            } else if (this._origCursorStyles) {
+                // Восстанавливаем оригинальный pointer
+                if (Object.prototype.hasOwnProperty.call(this._origCursorStyles, 'pointer')) {
+                    cursorStyles.pointer = this._origCursorStyles.pointer;
+                }
+                this._origCursorStyles = null;
+            }
+        } catch (_) {
+            // Если что-то пошло не так, не ломаем остальной функционал
         }
     }
 
