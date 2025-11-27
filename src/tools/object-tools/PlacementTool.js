@@ -252,17 +252,35 @@ export class PlacementTool extends BaseTool {
         };
 
         if (isTextWithEditing) {
-            // Для текста позиция должна совпадать с точкой клика без смещений
-            // Диагностика: логируем позицию курсора и мировые координаты в момент клика
+            // Для текста позиция должна совпадать с точкой клика без смещений.
+            // Используем ту же систему координат, что HtmlTextLayer/HtmlHandlesLayer:
+            // CSS ←→ world через toGlobal/toLocal БЕЗ дополнительных поправок на resolution.
+            let worldForText = worldPoint;
             try {
+                const app = this.app;
+                const view = app?.view;
+                const worldLayer = this.world || this._getWorldLayer();
+                if (view && view.parentElement && worldLayer && worldLayer.toLocal) {
+                    const containerRect = view.parentElement.getBoundingClientRect();
+                    const viewRect = view.getBoundingClientRect();
+                    const offsetLeft = viewRect.left - containerRect.left;
+                    const offsetTop = viewRect.top - containerRect.top;
+                    // event.x / event.y заданы в координатах контейнера ToolManager,
+                    // поэтому приводим их к экранным координатам относительно view
+                    const screenX = event.x - offsetLeft;
+                    const screenY = event.y - offsetTop;
+                    const globalPoint = new PIXI.Point(screenX, screenY);
+                    const local = worldLayer.toLocal(globalPoint);
+                    worldForText = { x: local.x, y: local.y };
+                }
                 console.log('🧭 Text click', {
                     cursor: { x: event.x, y: event.y },
-                    world: { x: Math.round(worldPoint.x), y: Math.round(worldPoint.y) }
+                    world: { x: Math.round(worldForText.x), y: Math.round(worldForText.y) }
                 });
             } catch (_) {}
             position = {
-                x: Math.round(worldPoint.x),
-                y: Math.round(worldPoint.y)
+                x: Math.round(worldForText.x),
+                y: Math.round(worldForText.y)
             };
             // Слушаем событие создания объекта, чтобы получить его ID
             const handleObjectCreated = (objectData) => {
