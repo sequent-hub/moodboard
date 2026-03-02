@@ -93,7 +93,7 @@
 
 ### `tests/core/rendering/PixiRenderer.test.js` — 41 тестов (ранее)
 
-### `tests/core/rendering/LayerManager.test.js` — 32/40 тестов (8 падают — ранее)
+### `tests/core/rendering/LayerManager.test.js` — 40 тестов (исправлены)
 
 ---
 
@@ -101,9 +101,9 @@
 
 ### Обнаруженные проблемы
 
-- [ ] **Текст записки не сохраняется** — `SelectTool.finalize` отправляет `StateChanged` с `updates: { content: value }` (верхний уровень), а обработчик в `core/index.js` кладёт это в `object.content` вместо `object.properties.content`. PIXI-отображение обновляется корректно (через `UpdateObjectContent`), но state для сохранения содержит старый текст. **Подтверждено тестом** `tests/integration/NoteContentSave.test.js`. Исправление: в `SelectTool` строки 2422–2427 и 2774–2779 отправлять `updates: { properties: { content: value } }`.
+- [x] ~~**Текст записки не сохраняется**~~ — исправлено. `SelectTool.finalize` отправлял `updates: { content: value }` (верхний уровень) вместо `updates: { properties: { content: value } }`. Исправлено в 4 местах SelectTool.js.
 - [ ] **`_toggleColorPalette` не работает как toggle** — `NotePropertiesPanel._toggleColorPalette()` вызывает `_hideAllColorPalettes()` ДО проверки `isVisible`, из-за чего палитра всегда считается скрытой и открывается заново. Реального закрытия по повторному клику на кнопку не происходит.
-- [ ] **`LayerManager.test.js` — 8 падающих тестов** — существующие тесты LayerManager не соответствуют текущему коду: addChild/removeChild вызываются не так как ожидают тесты, null/undefined аргументы не валидируются, конструктор не защищён от null app.
+- [x] ~~**`LayerManager.test.js` — 8 падающих тестов**~~ — исправлено. Код: добавлена защита `_createLayers()` от null app/stage, валидация null в `addToWorldLayer()`. Тесты: исправлены ожидания для addChild (mockClear сбрасывал счётчик), removeFromWorldLayer (children.includes проверка).
 
 ### Следующие тесты
 

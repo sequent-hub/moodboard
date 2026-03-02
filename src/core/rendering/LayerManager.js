@@ -16,6 +16,8 @@ export class LayerManager {
      * @private
      */
     _createLayers() {
+        if (!this.app || !this.app.stage) return;
+
         // Слой сетки (не двигается)
         this.gridLayer = new PIXI.Container();
         this.gridLayer.name = 'gridLayer';
@@ -83,7 +85,7 @@ export class LayerManager {
      * @param {PIXI.DisplayObject} pixiObject - PIXI объект
      */
     addToWorldLayer(pixiObject) {
-        if (this.worldLayer) {
+        if (this.worldLayer && pixiObject) {
             this.worldLayer.addChild(pixiObject);
         }
     }

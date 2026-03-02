@@ -87,10 +87,13 @@ describe('LayerManager', () => {
             });
 
             it('должен добавить слои в главную сцену', () => {
-                // Конструктор уже добавил оба слоя
-                expect(mockStage.addChild).toHaveBeenCalledWith(mockGridLayer);
-                expect(mockStage.addChild).toHaveBeenCalledWith(mockWorldLayer);
-                expect(mockStage.addChild).toHaveBeenCalledTimes(2);
+                // beforeEach сбрасывает mockStage.addChild, поэтому создаём заново
+                const stage = { addChild: vi.fn() };
+                const app = { stage };
+                const lm = new LayerManager(app);
+                expect(stage.addChild).toHaveBeenCalledWith(lm.gridLayer);
+                expect(stage.addChild).toHaveBeenCalledWith(lm.worldLayer);
+                expect(stage.addChild).toHaveBeenCalledTimes(2);
             });
 
             it('должен сохранить ссылки на слои в Map', () => {
@@ -222,13 +225,15 @@ describe('LayerManager', () => {
 
         describe('removeFromWorldLayer()', () => {
             it('должен удалить объект из слоя мира', () => {
+                mockWorldLayer.children = [mockPixiObject];
                 layerManager.removeFromWorldLayer(mockPixiObject);
                 expect(mockWorldLayer.removeChild).toHaveBeenCalledWith(mockPixiObject);
             });
 
             it('должен корректно обрабатывать объект, которого нет в слое', () => {
+                mockWorldLayer.children = [];
                 expect(() => layerManager.removeFromWorldLayer(mockPixiObject)).not.toThrow();
-                expect(mockWorldLayer.removeChild).toHaveBeenCalledWith(mockPixiObject);
+                expect(mockWorldLayer.removeChild).not.toHaveBeenCalled();
             });
 
             it('должен корректно обрабатывать null объект', () => {
@@ -339,8 +344,11 @@ describe('LayerManager', () => {
         });
 
         it('должен корректно добавлять слои в stage', () => {
-            expect(mockStage.addChild).toHaveBeenCalledWith(mockGridLayer);
-            expect(mockStage.addChild).toHaveBeenCalledWith(mockWorldLayer);
+            const stage = { addChild: vi.fn() };
+            const app = { stage };
+            const lm = new LayerManager(app);
+            expect(stage.addChild).toHaveBeenCalledWith(lm.gridLayer);
+            expect(stage.addChild).toHaveBeenCalledWith(lm.worldLayer);
         });
 
         it('должен корректно устанавливать свойства слоев', () => {
