@@ -2422,7 +2422,7 @@ export class SelectTool extends BaseTool {
                     this.eventBus.emit(Events.Object.StateChanged, {
                         objectId: objectId,
                         updates: {
-                            content: value
+                            properties: { content: value }
                         }
                     });
                 } else {
@@ -2436,7 +2436,7 @@ export class SelectTool extends BaseTool {
                     this.eventBus.emit(Events.Object.StateChanged, {
                         objectId: objectId,
                         updates: {
-                            content: value
+                            properties: { content: value }
                         }
                     });
                 }
@@ -2774,7 +2774,7 @@ export class SelectTool extends BaseTool {
                 this.eventBus.emit(Events.Object.StateChanged, {
                     objectId: objectId,
                     updates: {
-                        content: value
+                        properties: { content: value }
                     }
                 });
             } else {
@@ -2789,7 +2789,7 @@ export class SelectTool extends BaseTool {
                 this.eventBus.emit(Events.Object.StateChanged, {
                     objectId: objectId,
                     updates: {
-                        content: value
+                        properties: { content: value }
                     }
                 });
             }
