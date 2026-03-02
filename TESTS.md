@@ -87,6 +87,14 @@
 - **Корректный формат `{ properties: { content: value } }`** — content попадает в properties.content, остальные свойства сохраняются.
 - **Полный цикл** — после finalize с текущим форматом, serialize возвращает старый content.
 
+### `tests/integration/NoteRotationSave.test.js` — 7 тестов
+
+Диагностический тест: цепочка сохранения поворота записки.
+
+- **updateObjectRotationDirect** — записывает в `transform.rotation`, создаёт объект `transform` при отсутствии, не перезатирает другие поля transform
+- **_setupObjectTransform** — читает из `transform.rotation`, возвращает 0 при отсутствии
+- **Полный цикл** — запись → чтение, несколько поворотов подряд
+
 ### `tests/EventBus.test.js` — 38 тестов (ранее)
 
 ### `tests/core/rendering/GeometryUtils.test.js` — 113 тестов (ранее)
@@ -102,6 +110,7 @@
 ### Обнаруженные проблемы
 
 - [x] ~~**Текст записки не сохраняется**~~ — исправлено. `SelectTool.finalize` отправлял `updates: { content: value }` (верхний уровень) вместо `updates: { properties: { content: value } }`. Исправлено в 4 местах SelectTool.js.
+- [x] ~~**Поворот записки не сохраняется**~~ — исправлено. `updateObjectRotationDirect()` записывал в `object.rotation`, а `_setupObjectTransform()` читал из `object.transform.rotation`. Исправлено: запись теперь в `object.transform.rotation`.
 - [ ] **`_toggleColorPalette` не работает как toggle** — `NotePropertiesPanel._toggleColorPalette()` вызывает `_hideAllColorPalettes()` ДО проверки `isVisible`, из-за чего палитра всегда считается скрытой и открывается заново. Реального закрытия по повторному клику на кнопку не происходит.
 - [x] ~~**`LayerManager.test.js` — 8 падающих тестов**~~ — исправлено. Код: добавлена защита `_createLayers()` от null app/stage, валидация null в `addToWorldLayer()`. Тесты: исправлены ожидания для addChild (mockClear сбрасывал счётчик), removeFromWorldLayer (children.includes проверка).
 

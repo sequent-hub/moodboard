@@ -1998,7 +1998,10 @@ export class CoreMoodBoard {
         const objects = this.state.getObjects();
         const object = objects.find(obj => obj.id === objectId);
         if (object) {
-            object.rotation = angle;
+            if (!object.transform) {
+                object.transform = {};
+            }
+            object.transform.rotation = angle;
             this.state.markDirty();
         }
     }
