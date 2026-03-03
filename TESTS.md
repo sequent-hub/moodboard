@@ -9,6 +9,8 @@
 
 ## Покрытие тестами
 
+**Обновление:** добавлено `27` новых тестов в `9` файлах (сеть, загрузка изображений, сохранение, retry, SaveStatus, unload flush).
+
 ### `tests/objects/NoteObject.test.js` — 63 теста
 
 Модель записки (`src/objects/NoteObject.js`).
@@ -106,6 +108,18 @@
 - **updateObjectRotationDirect** — записывает в `transform.rotation`, создаёт объект `transform` при отсутствии, не перезатирает другие поля transform
 - **_setupObjectTransform** — читает из `transform.rotation`, возвращает 0 при отсутствии
 - **Полный цикл** — запись → чтение, несколько поворотов подряд
+
+### Новый блок: сеть / загрузка изображений / сохранение
+
+- `tests/services/ImageUploadService.timeout.test.js` — 4 теста: timeout `uploadImage`, серверная ошибка, CSRF-check, success с `imageId`.
+- `tests/core/SaveManager.timeout.test.js` — 4 теста: поведение при timeout save, success-путь, отсутствие лишнего save при неизменных данных, `pending`-статус.
+- `tests/integration/ImagePersistence.network-fail.test.js` — 2 теста: «локально видно, после reopen пропало» при timeout и контрольный success-кейс.
+- `tests/core/SaveManager.retry.test.js` — 2 теста: retry/backoff и остановка после `maxRetries`.
+- `tests/core/KeyboardManager.image-upload.test.js` — 2 теста: вставка изображения через клавиатурный канал (success + fallback `data:`).
+- `tests/tools/ToolManager.image-drop.test.js` — 2 теста: drag-and-drop канал (success + fallback `data:`).
+- `tests/ui/SaveStatus.test.js` — 5 тестов: `pending/saving/saved/error`, auto-hide, обработка `save:error`.
+- `tests/integration/SaveStatus.network-state.test.js` — 2 теста: связка `SaveManager + SaveStatus` при success/timeout.
+- `tests/core/SaveManager.unload-flush.test.js` — 4 теста: `beforeunload/pagehide/visibilitychange`, `sendBeacon`, sync XHR fallback.
 
 ### `tests/EventBus.test.js` — 38 тестов (ранее)
 
