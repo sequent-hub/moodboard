@@ -52,6 +52,18 @@
 - **destroy()** — удаление из DOM, обнуление, повторные вызовы
 - **Граничные случаи** — отсутствие selectTool, отсутствие pixi, полный цикл
 
+### `tests/ui/ContextMenu.test.js` — 1 тест
+
+Диагностический тест для контекстного меню (`src/ui/ContextMenu.js`).
+
+- **hide() при `element = null`** — проверяет, что скрытие не падает с `Cannot read properties of null (reading 'style')` и корректно сбрасывает `isVisible`.
+
+### `tests/ui/HtmlHandlesLayer.rotation.test.js` — 1 тест
+
+Диагностический тест завершения поворота (`src/ui/HtmlHandlesLayer.js`).
+
+- **mouseup после rotate-start** — проверяет, что `RotateEnd` эмитится даже если `currentTarget` исходного события больше недоступен; страхует от падения в конце rotate-flow.
+
 ### `tests/tools/PlacementTool.test.js` — 51 тест
 
 Инструмент размещения записки на холсте (`src/tools/object-tools/PlacementTool.js`).
@@ -78,7 +90,7 @@
 - **selectedObjects** — доступен через getter
 - **Граничные случаи** — pixiObject = null, отсутствие _mb, _mb без type
 
-### `tests/integration/NoteContentSave.test.js` — 7 тестов
+### `tests/integration/NoteContentSave.test.js` — 8 тестов
 
 Диагностический тест: цепочка сохранения текста записки.
 
@@ -87,7 +99,7 @@
 - **Корректный формат `{ properties: { content: value } }`** — content попадает в properties.content, остальные свойства сохраняются.
 - **Полный цикл** — после finalize с текущим форматом, serialize возвращает старый content.
 
-### `tests/integration/NoteRotationSave.test.js` — 7 тестов
+### `tests/integration/NoteRotationSave.test.js` — 16 тестов
 
 Диагностический тест: цепочка сохранения поворота записки.
 
@@ -110,7 +122,7 @@
 ### Обнаруженные проблемы
 
 - [x] ~~**Текст записки не сохраняется**~~ — исправлено. `SelectTool.finalize` отправлял `updates: { content: value }` (верхний уровень) вместо `updates: { properties: { content: value } }`. Исправлено в 4 местах SelectTool.js.
-- [x] ~~**Поворот записки не сохраняется**~~ — исправлено. `updateObjectRotationDirect()` записывал в `object.rotation`, а `_setupObjectTransform()` читал из `object.transform.rotation`. Исправлено: запись теперь в `object.transform.rotation`.
+- [x] ~~**Поворот записки не сохраняется**~~ — исправлено в два этапа: (1) `updateObjectRotationDirect()` теперь пишет в `object.transform.rotation`; (2) устранены runtime-падения в rotate/UI-flow (`HtmlHandlesLayer._onRotateHandleDown` и `ContextMenu.hide`), добавлены регрессионные тесты `tests/ui/HtmlHandlesLayer.rotation.test.js` и `tests/ui/ContextMenu.test.js`.
 - [ ] **`_toggleColorPalette` не работает как toggle** — `NotePropertiesPanel._toggleColorPalette()` вызывает `_hideAllColorPalettes()` ДО проверки `isVisible`, из-за чего палитра всегда считается скрытой и открывается заново. Реального закрытия по повторному клику на кнопку не происходит.
 - [x] ~~**`LayerManager.test.js` — 8 падающих тестов**~~ — исправлено. Код: добавлена защита `_createLayers()` от null app/stage, валидация null в `addToWorldLayer()`. Тесты: исправлены ожидания для addChild (mockClear сбрасывал счётчик), removeFromWorldLayer (children.includes проверка).
 
