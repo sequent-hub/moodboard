@@ -9,7 +9,7 @@
 
 ## Покрытие тестами
 
-**Обновление:** добавлено `27` новых тестов в `9` файлах (сеть, загрузка изображений, сохранение, retry, SaveStatus, unload flush).
+**Обновление:** добавлено `32` новых теста в `10` файлах (сеть, загрузка изображений, сохранение, retry, SaveStatus, unload flush, image persistence в ApiClient).
 
 ### `tests/objects/NoteObject.test.js` — 63 теста
 
@@ -120,6 +120,7 @@
 - `tests/ui/SaveStatus.test.js` — 5 тестов: `pending/saving/saved/error`, auto-hide, обработка `save:error`.
 - `tests/integration/SaveStatus.network-state.test.js` — 2 теста: связка `SaveManager + SaveStatus` при success/timeout.
 - `tests/core/SaveManager.unload-flush.test.js` — 4 теста: `beforeunload/pagehide/visibilitychange`, `sendBeacon`, sync XHR fallback.
+- `tests/core/ApiClient.image-persistence.test.js` — 5 тестов: очистка image-данных при save, сохранение `imageId`, восстановление `src` при load, защита от перезаписи существующего `src`.
 
 ### `tests/EventBus.test.js` — 38 тестов (ранее)
 

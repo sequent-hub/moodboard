@@ -118,6 +118,11 @@ export class FrameService {
 						const halfH = childPixi ? (childPixi.height || 0) / 2 : 0;
 						stObj.position.x = newCenterX - halfW;
 						stObj.position.y = newCenterY - halfH;
+						this.eventBus.emit(Events.Object.TransformUpdated, {
+							objectId: childId,
+							type: 'position',
+							position: { x: stObj.position.x, y: stObj.position.y }
+						});
 					}
 				}
 				// Во время перетаскивания тоже гарантируем порядок

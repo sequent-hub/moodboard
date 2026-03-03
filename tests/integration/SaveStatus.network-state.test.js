@@ -93,4 +93,49 @@ describe('Integration: SaveManager + SaveStatus при сетевых сцена
         expect(last.status).toBe('error');
         expect(last.hasUnsavedChanges).toBe(true);
     });
+
+    it('в success-потоке UI проходит через "Изменения..." -> "Сохранение..." -> "Сохранено"', async () => {
+        apiClient.saveBoard.mockResolvedValue({ success: true, data: { ok: true } });
+        const textSequence = [];
+        eventBus.on(Events.Save.StatusChanged, () => {
+            textSequence.push(container.querySelector('.save-text')?.textContent || '');
+        });
+
+        manager.markAsChanged();
+        expect(container.querySelector('.save-text')?.textContent).toBe('Изменения...');
+
+        await manager.saveImmediately();
+
+        expect(container.querySelector('.save-text')?.textContent).toBe('Сохранено');
+
+        const statusSequence = eventBus.emit.mock.calls
+            .filter((call) => call[0] === Events.Save.StatusChanged)
+            .map((call) => call[1].status);
+        expect(statusSequence.slice(-3)).toEqual(['pending', 'saving', 'saved']);
+        expect(textSequence.slice(-3)).toEqual(['Изменения...', 'Сохранение...', 'Сохранено']);
+    });
+
+    it('в error-потоке UI проходит через "Изменения..." -> "Сохранение..." -> текст ошибки', async () => {
+        apiClient.saveBoard.mockRejectedValue(new Error('network-down'));
+        manager.options.maxRetries = 1;
+        const textSequence = [];
+        eventBus.on(Events.Save.StatusChanged, () => {
+            textSequence.push(container.querySelector('.save-text')?.textContent || '');
+        });
+
+        manager.markAsChanged();
+        expect(container.querySelector('.save-text')?.textContent).toBe('Изменения...');
+
+        await manager.saveImmediately();
+
+        expect(container.querySelector('.save-text')?.textContent).toContain('network-down');
+
+        const statusSequence = eventBus.emit.mock.calls
+            .filter((call) => call[0] === Events.Save.StatusChanged)
+            .map((call) => call[1].status);
+        expect(statusSequence.slice(-3)).toEqual(['pending', 'saving', 'error']);
+        expect(textSequence[0]).toBe('Изменения...');
+        expect(textSequence[1]).toBe('Сохранение...');
+        expect(textSequence[2]).toContain('network-down');
+    });
 });
