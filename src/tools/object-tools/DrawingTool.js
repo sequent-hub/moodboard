@@ -322,6 +322,12 @@ export class DrawingTool extends BaseTool {
         return { x: local.x, y: local.y };
     }
 
+    _worldToGlobal(x, y) {
+        if (!this.world || typeof this.world.toGlobal !== 'function') return { x, y };
+        const global = this.world.toGlobal(new PIXI.Point(x, y));
+        return { x: global.x, y: global.y };
+    }
+
     _getWorldLayer() {
         if (!this.app || !this.app.stage) return null;
         const world = this.app.stage.getChildByName && this.app.stage.getChildByName('worldLayer');
@@ -333,12 +339,14 @@ export class DrawingTool extends BaseTool {
         const req = { objects: [] };
         this.emit('get:all:objects', req);
         const objects = req.objects || [];
+        const prevGlobal = this._worldToGlobal(prev.x, prev.y);
+        const currGlobal = this._worldToGlobal(p.x, p.y);
         // Радиус воздействия ластика (связан с отображаемой толщиной)
         const radius = 8;
-        const segMinX = Math.min(prev.x, p.x) - radius;
-        const segMaxX = Math.max(prev.x, p.x) + radius;
-        const segMinY = Math.min(prev.y, p.y) - radius;
-        const segMaxY = Math.max(prev.y, p.y) + radius;
+        const segMinX = Math.min(prevGlobal.x, currGlobal.x) - radius;
+        const segMaxX = Math.max(prevGlobal.x, currGlobal.x) + radius;
+        const segMinY = Math.min(prevGlobal.y, currGlobal.y) - radius;
+        const segMaxY = Math.max(prevGlobal.y, currGlobal.y) + radius;
 
         for (const item of objects) {
             const id = item.id;
@@ -368,8 +376,8 @@ export class DrawingTool extends BaseTool {
                     const scaleY = baseH ? (b.height / baseH) : 1;
                     const eraserThresh = Math.max(6, (props.strokeWidth || 2) / 2 + radius);
                     // трансформируем сегмент ластика в локальные координаты фигуры
-                    const localPrev = pixi.toLocal(new PIXI.Point(prev.x, prev.y));
-                    const localCurr = pixi.toLocal(new PIXI.Point(p.x, p.y));
+                    const localPrev = pixi.toLocal(new PIXI.Point(prevGlobal.x, prevGlobal.y));
+                    const localCurr = pixi.toLocal(new PIXI.Point(currGlobal.x, currGlobal.y));
                     // Проверяем пересечение с каждым отрезком рисунка
                     for (let i = 0; i < pts.length - 1 && !intersects; i++) {
                         const ax = pts[i].x * scaleX;
