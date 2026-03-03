@@ -946,8 +946,10 @@ export class HtmlHandlesLayer {
 
     _onRotateHandleDown(e, box) {
         e.preventDefault(); e.stopPropagation();
-        
-        const id = e.currentTarget.dataset.id;
+
+        const handleElement = e.currentTarget;
+        const id = handleElement?.dataset?.id;
+        if (!id) return;
         const isGroup = id === '__group__';
         
         // Получаем центр объекта в CSS координатах
@@ -970,7 +972,9 @@ export class HtmlHandlesLayer {
         }
         
         // Изменяем курсор на grabbing
-        e.currentTarget.style.cursor = 'grabbing';
+        if (handleElement) {
+            handleElement.style.cursor = 'grabbing';
+        }
         
         // Уведомляем о начале поворота
         if (isGroup) {
@@ -1006,8 +1010,10 @@ export class HtmlHandlesLayer {
             document.removeEventListener('mousemove', onRotateMove);
             document.removeEventListener('mouseup', onRotateUp);
             
-            // Возвращаем курсор
-            e.currentTarget.style.cursor = 'grab';
+            // Возвращаем курсор ручки, если она всё ещё доступна
+            if (handleElement) {
+                handleElement.style.cursor = 'grab';
+            }
             
             // Вычисляем финальный угол
             const finalAngle = Math.atan2(ev.clientY - centerY, ev.clientX - centerX);

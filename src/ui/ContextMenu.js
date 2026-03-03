@@ -76,7 +76,9 @@ export class ContextMenu {
     }
 
     hide() {
-        this.element.style.display = 'none';
+        if (this.element) {
+            this.element.style.display = 'none';
+        }
         this.isVisible = false;
     }
 
