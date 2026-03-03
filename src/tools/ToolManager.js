@@ -34,6 +34,7 @@ export class ToolManager {
         // Последняя позиция курсора относительно контейнера (CSS-пиксели)
         this.lastMousePos = null;
         this.isMouseOverContainer = false;
+        this._originalPixiCursorStyles = null;
         
         // Устанавливаем курсор по умолчанию на контейнер, если инструмент ещё не активирован
         if (this.container) {
@@ -77,6 +78,7 @@ export class ToolManager {
         if (typeof this.activeTool.activate === 'function') {
             this.activeTool.activate(this.pixiApp);
         }
+        this.syncActiveToolCursor();
         
         return true;
     }
@@ -148,7 +150,9 @@ export class ToolManager {
             this.isMouseOverContainer = true; 
             if (!this.activeTool) {
                 this.container.style.cursor = DEFAULT_CURSOR;
+                return;
             }
+            this.syncActiveToolCursor();
         });
         this.container.addEventListener('mouseleave', () => { this.isMouseOverContainer = false; });
         // Убираем отдельные слушатели aux-pan на контейнере, чтобы не дублировать mousedown/mouseup
@@ -305,9 +309,55 @@ export class ToolManager {
         // Если временно активирован pan, проксируем движение именно ему
         if (this.temporaryTool === 'pan' && this.activeTool?.name === 'pan') {
             this.activeTool.onMouseMove(event);
+            this.syncActiveToolCursor();
             return;
         }
         this.activeTool.onMouseMove(event);
+        this.syncActiveToolCursor();
+    }
+
+    isCursorLockedToActiveTool() {
+        return !!this.activeTool && this.activeTool.name !== 'select';
+    }
+
+    getPixiCursorStyles() {
+        const renderer = this.pixiApp && this.pixiApp.renderer;
+        if (!renderer) return null;
+        const events = renderer.events || (renderer.plugins && renderer.plugins.interaction);
+        return events && events.cursorStyles ? events.cursorStyles : null;
+    }
+
+    getActiveToolCursor() {
+        const cursor = this.activeTool && this.activeTool.cursor;
+        if (typeof cursor === 'string' && cursor.length > 0) return cursor;
+        return DEFAULT_CURSOR;
+    }
+
+    syncActiveToolCursor() {
+        const cursorStyles = this.getPixiCursorStyles();
+        const lockCursor = this.isCursorLockedToActiveTool();
+        const activeCursor = this.getActiveToolCursor();
+
+        if (cursorStyles && !this._originalPixiCursorStyles) {
+            this._originalPixiCursorStyles = {
+                pointer: cursorStyles.pointer,
+                default: cursorStyles.default
+            };
+        }
+
+        if (cursorStyles) {
+            if (lockCursor) {
+                cursorStyles.pointer = activeCursor;
+                cursorStyles.default = activeCursor;
+            } else if (this._originalPixiCursorStyles) {
+                cursorStyles.pointer = this._originalPixiCursorStyles.pointer;
+                cursorStyles.default = this._originalPixiCursorStyles.default;
+            }
+        }
+
+        if (lockCursor && this.pixiApp && this.pixiApp.view) {
+            this.pixiApp.view.style.cursor = activeCursor;
+        }
     }
     
     handleMouseUp(e) {
@@ -329,6 +379,7 @@ export class ToolManager {
             return;
         }
         this.activeTool.onMouseUp(event);
+        this.syncActiveToolCursor();
     }
     
     handleDoubleClick(e) {
@@ -614,5 +665,12 @@ export class ToolManager {
             try { window.removeEventListener('wheel', this._onWindowWheel); } catch (_) {}
             this._onWindowWheel = null;
         }
+
+        const cursorStyles = this.getPixiCursorStyles();
+        if (cursorStyles && this._originalPixiCursorStyles) {
+            cursorStyles.pointer = this._originalPixiCursorStyles.pointer;
+            cursorStyles.default = this._originalPixiCursorStyles.default;
+        }
+        this._originalPixiCursorStyles = null;
     }
 }

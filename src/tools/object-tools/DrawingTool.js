@@ -8,8 +8,9 @@ import * as PIXI from 'pixi.js';
 export class DrawingTool extends BaseTool {
     constructor(eventBus) {
         super('draw', eventBus);
-        this.cursor = 'crosshair';
         this.hotkey = 'd';
+        const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><path d='M4 20 L20 4 L28 12 L12 28 L4 28 Z' fill='black'/></svg>`;
+        this.cursor = `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") 4 28, crosshair`;
 
         // Состояние рисования
         this.isDrawing = false;
@@ -50,12 +51,7 @@ export class DrawingTool extends BaseTool {
         super.activate();
         this.app = app;
         this.world = this._getWorldLayer();
-        // Кастомный курсор-карандаш (SVG)
-        const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><path d='M4 20 L20 4 L28 12 L12 28 L4 28 Z' fill='black'/></svg>`;
-        // Горячая точка ставим в реальный нижний левый угол фигуры (x=4, y=28),
-        // чтобы линия выходила прямо из карандаша без зазора.
-        const url = `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") 4 28, crosshair`;
-        if (this.app && this.app.view) this.app.view.style.cursor = url;
+        this.setCursor();
     }
 
     deactivate() {
@@ -68,6 +64,12 @@ export class DrawingTool extends BaseTool {
         }
         this.app = null;
         this.world = null;
+    }
+
+    setCursor() {
+        if (this.app && this.app.view) {
+            this.app.view.style.cursor = this.cursor;
+        }
     }
 
     onMouseDown(event) {

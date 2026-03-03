@@ -47,6 +47,7 @@ export class PlacementTool extends BaseTool {
                 // Обновляем курсор в зависимости от pending
                 if (this.app && this.app.view) {
                     const cur = this._getPendingCursor();
+                    this.cursor = cur;
                     this.app.view.style.cursor = (cur === 'default') ? '' : cur;
                 }
                 // При выборе текста заставляем pointer вести себя как текстовый курсор
@@ -147,7 +148,8 @@ export class PlacementTool extends BaseTool {
         this.world = this._getWorldLayer();
         // Курсор в зависимости от типа размещаемого объекта
         if (this.app && this.app.view) {
-            this.app.view.style.cursor = this._getPendingCursor();
+            this.cursor = this._getPendingCursor();
+            this.app.view.style.cursor = this.cursor;
             // Добавляем обработчик движения мыши для "призрака"
             this.app.view.addEventListener('mousemove', this._onMouseMove.bind(this));
         }
@@ -492,7 +494,8 @@ export class PlacementTool extends BaseTool {
 
     startFrameDrawMode() {
         // Курсор при рисовании фрейма
-        if (this.app && this.app.view) this.app.view.style.cursor = 'crosshair';
+        this.cursor = 'crosshair';
+        if (this.app && this.app.view) this.app.view.style.cursor = this.cursor;
     }
 
     _onFrameDrawMove(event) {
@@ -941,13 +944,15 @@ export class PlacementTool extends BaseTool {
                     const cursorSize = 24;
                     const url = encodeURI(src);
                     // Используем CSS cursor с изображением, если поддерживается
-                    this.app.view.style.cursor = `url(${url}) ${Math.floor(cursorSize/2)} ${Math.floor(cursorSize/2)}, default`;
+                    this.cursor = `url(${url}) ${Math.floor(cursorSize/2)} ${Math.floor(cursorSize/2)}, default`;
+                    this.app.view.style.cursor = this.cursor;
                 }
             } catch (_) {}
         } else {
             // Для эмоджи используем стандартный курсор
             if (this.app && this.app.view) {
-                this.app.view.style.cursor = 'crosshair';
+                this.cursor = 'crosshair';
+                this.app.view.style.cursor = this.cursor;
             }
         }
     }
