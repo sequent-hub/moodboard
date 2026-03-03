@@ -484,6 +484,60 @@ export class ToolManager {
             return;
         }
 
+        const nonImageFiles = files.filter(f => !f.type || !f.type.startsWith('image/'));
+        if (nonImageFiles.length > 0) {
+            let index = 0;
+            for (const file of nonImageFiles) {
+                const offset = 25 * index++;
+                const position = { x: x + offset, y: y + offset };
+                const fallbackProps = {
+                    fileName: file.name || 'file',
+                    fileSize: file.size || 0,
+                    mimeType: file.type || 'application/octet-stream',
+                    formattedSize: null,
+                    url: null,
+                    width: 120,
+                    height: 140
+                };
+                try {
+                    if (this.core && this.core.fileUploadService) {
+                        const uploadResult = await this.core.fileUploadService.uploadFile(file, file.name || 'file');
+                        this.eventBus.emit(Events.UI.ToolbarAction, {
+                            type: 'file',
+                            id: 'file',
+                            position,
+                            properties: {
+                                fileName: uploadResult.name,
+                                fileSize: uploadResult.size,
+                                mimeType: uploadResult.mimeType,
+                                formattedSize: uploadResult.formattedSize,
+                                url: uploadResult.url,
+                                width: 120,
+                                height: 140
+                            },
+                            fileId: uploadResult.fileId || uploadResult.id || null
+                        });
+                    } else {
+                        this.eventBus.emit(Events.UI.ToolbarAction, {
+                            type: 'file',
+                            id: 'file',
+                            position,
+                            properties: fallbackProps
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Ошибка загрузки файла через drag-and-drop:', error);
+                    this.eventBus.emit(Events.UI.ToolbarAction, {
+                        type: 'file',
+                        id: 'file',
+                        position,
+                        properties: fallbackProps
+                    });
+                }
+            }
+            return;
+        }
+
         // 2) Перетаскивание с другой вкладки: HTML/URI/PLAIN
         const html = dt.getData('text/html');
         if (html && html.includes('<img')) {

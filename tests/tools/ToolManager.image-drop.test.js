@@ -97,4 +97,43 @@ describe('ToolManager - drag and drop image upload', () => {
             imageId: null,
         });
     });
+
+    it('при drop обычного файла эмитит ToolbarAction type="file"', async () => {
+        core.fileUploadService = { uploadFile: vi.fn().mockResolvedValue({
+            id: 'file-1',
+            fileId: 'file-1',
+            name: 'report.pdf',
+            size: 12345,
+            mimeType: 'application/pdf',
+            formattedSize: '12 KB',
+            url: '/api/files/file-1/download',
+        }) };
+
+        const file = new Blob(['pdf-content'], { type: 'application/pdf' });
+        file.name = 'report.pdf';
+
+        const event = {
+            preventDefault: vi.fn(),
+            clientX: 70,
+            clientY: 90,
+            dataTransfer: {
+                files: [file],
+                getData: vi.fn(() => ''),
+            },
+        };
+
+        await manager.handleDrop(event);
+
+        expect(eventBus.emit).toHaveBeenCalledWith(Events.UI.ToolbarAction, expect.objectContaining({
+            type: 'file',
+            id: 'file',
+            fileId: 'file-1',
+            position: { x: 70, y: 90 },
+            properties: expect.objectContaining({
+                fileName: 'report.pdf',
+                mimeType: 'application/pdf',
+                url: '/api/files/file-1/download',
+            }),
+        }));
+    });
 });
