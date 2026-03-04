@@ -1042,8 +1042,8 @@ export class CoreMoodBoard {
                 if (!obj || !pixiObj) continue;
                 this._groupResizeSnapshot.set(id, {
                     size: { width: obj.width, height: obj.height },
-                    // Позицию берем из PIXI (центр с учетом pivot), чтобы избежать смещения при первом ресайзе
-                    position: { x: pixiObj.x, y: pixiObj.y },
+                    // В snapshot фиксируем top-left как в state, чтобы не смешивать системы координат.
+                    position: { x: obj.position.x, y: obj.position.y },
                     type: obj.type || null
                 });
             }
@@ -1344,7 +1344,6 @@ export class CoreMoodBoard {
                     }
                     const command = new ResizeObjectCommand(
                         this, 
-                        this, 
                         data.object, 
                         data.oldSize, 
                         data.newSize,
@@ -1402,7 +1401,8 @@ export class CoreMoodBoard {
 
         this.eventBus.on(Events.Tool.GroupRotateUpdate, (data) => {
             // Поворачиваем каждый объект вокруг общего центра с сохранением относительного смещения
-            const center = this._groupRotateCenter || { x: 0, y: 0 };
+            const center = this._groupRotateCenter;
+            if (!center) return;
             const rad = (data.angle || 0) * Math.PI / 180;
             const cos = Math.cos(rad);
             const sin = Math.sin(rad);
@@ -1431,14 +1431,22 @@ export class CoreMoodBoard {
 
         this.eventBus.on(Events.Tool.GroupRotateEnd, (data) => {
             // Оформляем как батч-команду GroupRotateCommand
-            const center = this._groupRotateCenter || { x: 0, y: 0 };
+            const center = this._groupRotateCenter;
+            if (!center) return;
             const changes = [];
             for (const id of data.objects) {
                 const start = this._groupRotateStart?.get(id);
                 const pixiObject = this.pixi.objects.get(id);
                 if (!start || !pixiObject) continue;
                 const toAngle = pixiObject.rotation * 180 / Math.PI;
-                const toPos = { x: pixiObject.x, y: pixiObject.y };
+                const objState = this.state.state.objects.find(o => o.id === id);
+                const toPos = objState?.position
+                    ? { x: objState.position.x, y: objState.position.y }
+                    : (() => {
+                        const halfW = (pixiObject.width || 0) / 2;
+                        const halfH = (pixiObject.height || 0) / 2;
+                        return { x: pixiObject.x - halfW, y: pixiObject.y - halfH };
+                    })();
                 if (Math.abs(start.angle - toAngle) > 0.1 || Math.abs(start.position.x - toPos.x) > 0.1 || Math.abs(start.position.y - toPos.y) > 0.1) {
                     changes.push({ id, fromAngle: start.angle, toAngle, fromPos: start.position, toPos });
                 }

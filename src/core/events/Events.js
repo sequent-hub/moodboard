@@ -28,6 +28,7 @@ export const Events = {
 		GroupResizeStart: 'tool:group:resize:start',
 		GroupResizeUpdate: 'tool:group:resize:update',
 		GroupResizeEnd: 'tool:group:resize:end',
+		RotateStart: 'tool:rotate:start',
 		RotateUpdate: 'tool:rotate:update',
 		RotateEnd: 'tool:rotate:end',
 		GroupRotateStart: 'tool:group:rotate:start',

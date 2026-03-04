@@ -691,7 +691,7 @@ export class HtmlHandlesLayer {
                             el.style.width = `${Math.max(1, Math.round(endCSS.width))}px`;
                             el.style.height = 'auto';
                             const measured = Math.max(1, Math.round(el.scrollHeight));
-                            const worldH2 = (measured * res) / s;
+                            const worldH2 = (measured * rendererRes) / s;
                             const fixData = {
                                 object: id,
                                 size: { width: worldW, height: worldH2 },
@@ -981,7 +981,30 @@ export class HtmlHandlesLayer {
             const req = { selection: [] };
             this.eventBus.emit(Events.Tool.GetSelection, req);
             const objects = req.selection || [];
-            this.eventBus.emit(Events.Tool.GroupRotateStart, { objects });
+            // Центр поворота должен передаваться в world-координатах.
+            // При отсутствии core/pixi (например, в изолированных тестах) используем CSS-центр как fallback.
+            let centerWorldX = centerX;
+            let centerWorldY = centerY;
+            try {
+                const world = this.core?.pixi?.worldLayer || this.core?.pixi?.app?.stage;
+                const s = world?.scale?.x || 1;
+                const tx = world?.x || 0;
+                const ty = world?.y || 0;
+                const rendererRes = (this.core?.pixi?.app?.renderer?.resolution) || 1;
+                const containerRect = this.container?.getBoundingClientRect ? this.container.getBoundingClientRect() : { left: 0, top: 0 };
+                const view = this.core?.pixi?.app?.view || null;
+                const viewRect = view && view.getBoundingClientRect ? view.getBoundingClientRect() : { left: 0, top: 0 };
+                const offsetLeft = viewRect.left - containerRect.left;
+                const offsetTop = viewRect.top - containerRect.top;
+                const screenX = centerX - offsetLeft;
+                const screenY = centerY - offsetTop;
+                centerWorldX = ((screenX * rendererRes) - tx) / s;
+                centerWorldY = ((screenY * rendererRes) - ty) / s;
+            } catch (_) {}
+            this.eventBus.emit(Events.Tool.GroupRotateStart, {
+                objects,
+                center: { x: centerWorldX, y: centerWorldY },
+            });
         }
         
         const onRotateMove = (ev) => {
