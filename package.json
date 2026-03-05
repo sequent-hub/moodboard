@@ -21,6 +21,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
+    "test:core:index": "vitest run tests/core/CoreIndex.baseline.object-lifecycle.test.js tests/core/CoreIndex.baseline.transforms.test.js tests/core/CoreIndex.baseline.clipboard.test.js tests/core/CoreIndex.baseline.events-contracts.test.js",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "test:e2e": "playwright test",
