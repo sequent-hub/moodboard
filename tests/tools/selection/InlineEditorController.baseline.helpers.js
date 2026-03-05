@@ -34,6 +34,20 @@ export function createMockEventBus() {
         on,
         off,
         emit,
+        debugHandlersSnapshot() {
+            const snapshot = {};
+            handlers.forEach((set, eventName) => {
+                snapshot[eventName] = set.size;
+            });
+            return snapshot;
+        },
+        debugHandlersTotal() {
+            let total = 0;
+            handlers.forEach((set) => {
+                total += set.size;
+            });
+            return total;
+        },
         setResponder(eventName, responder) {
             responders.set(eventName, responder);
         },
