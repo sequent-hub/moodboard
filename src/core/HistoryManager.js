@@ -17,24 +17,23 @@ export class HistoryManager {
         this.currentIndex = -1;
         // Флаг для предотвращения зацикливания при undo/redo
         this.isExecutingCommand = false;
+        this._listenersAttached = false;
+        this._onUndo = () => this.undo();
+        this._onRedo = () => this.redo();
+        this._onDebug = () => this.debugHistory();
 
         this.initEventListeners();
     }
 
     initEventListeners() {
+        if (this._listenersAttached) return;
+        this._listenersAttached = true;
         // Слушаем события клавиатуры
-        this.eventBus.on(Events.Keyboard.Undo, () => {
-            this.undo();
-        });
-
-        this.eventBus.on(Events.Keyboard.Redo, () => {
-            this.redo();
-        });
+        this.eventBus.on(Events.Keyboard.Undo, this._onUndo);
+        this.eventBus.on(Events.Keyboard.Redo, this._onRedo);
 
         // Для отладки
-        this.eventBus.on(Events.History.Debug, () => {
-            this.debugHistory();
-        });
+        this.eventBus.on(Events.History.Debug, this._onDebug);
     }
 
     /**
@@ -254,8 +253,9 @@ export class HistoryManager {
      */
     destroy() {
         this.clear();
-        this.eventBus.removeAllListeners(Events.Keyboard.Undo);
-        this.eventBus.removeAllListeners(Events.Keyboard.Redo);
-        this.eventBus.removeAllListeners(Events.History.Debug);
+        this.eventBus.off(Events.Keyboard.Undo, this._onUndo);
+        this.eventBus.off(Events.Keyboard.Redo, this._onRedo);
+        this.eventBus.off(Events.History.Debug, this._onDebug);
+        this._listenersAttached = false;
     }
 }

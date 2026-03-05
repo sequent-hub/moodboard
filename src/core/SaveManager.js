@@ -30,6 +30,10 @@ export class SaveManager {
         this.retryCount = 0;
         this.lastSavedData = null;
         this.hasUnsavedChanges = false;
+        this.periodicSaveTimer = null;
+        this._listenersAttached = false;
+        this._handlers = {};
+        this._domHandlers = {};
         
         // Состояния сохранения
         this.saveStatus = 'idle'; // idle, saving, saved, error
@@ -48,40 +52,45 @@ export class SaveManager {
      * Настройка обработчиков событий
      */
     setupEventListeners() {
-        if (!this.options.autoSave) return;
+        if (!this.options.autoSave || this._listenersAttached) return;
+        this._listenersAttached = true;
+
+        this._handlers.onGridBoardDataChanged = () => {
+            this.markAsChanged();
+        };
+        this._handlers.onObjectCreated = () => {
+            this.markAsChanged();
+        };
+        this._handlers.onObjectUpdated = () => {
+            this.markAsChanged();
+        };
+        this._handlers.onObjectDeleted = () => {
+            this.markAsChanged();
+        };
+        this._handlers.onObjectStateChanged = () => {
+            this.markAsChanged();
+        };
         
         // Отслеживаем изменения сетки: не передаём частичные данные в сохранение,
         // чтобы собрать полный snapshot через getBoardData()
-        this.eventBus.on(Events.Grid.BoardDataChanged, () => {
-            this.markAsChanged();
-        });
+        this.eventBus.on(Events.Grid.BoardDataChanged, this._handlers.onGridBoardDataChanged);
         
         // Отслеживаем создание объектов
-        this.eventBus.on(Events.Object.Created, () => {
-            this.markAsChanged();
-        });
+        this.eventBus.on(Events.Object.Created, this._handlers.onObjectCreated);
         
         // Отслеживаем изменения объектов
-        this.eventBus.on(Events.Object.Updated, (data) => {
-
-            this.markAsChanged();
-        });
+        this.eventBus.on(Events.Object.Updated, this._handlers.onObjectUpdated);
         
         // Отслеживаем удаление объектов
-        this.eventBus.on(Events.Object.Deleted, () => {
-            this.markAsChanged();
-        });
+        this.eventBus.on(Events.Object.Deleted, this._handlers.onObjectDeleted);
         
         // Отслеживаем прямые изменения состояния (для Undo/Redo)
-        this.eventBus.on(Events.Object.StateChanged, (data) => {
-
-            this.markAsChanged();
-        });
+        this.eventBus.on(Events.Object.StateChanged, this._handlers.onObjectStateChanged);
         
         // Отслеживание перемещений теперь происходит через команды и state:changed
         
         // Сохранение при закрытии страницы (в том числе при резком закрытии окна)
-        window.addEventListener('beforeunload', (e) => {
+        this._domHandlers.beforeUnload = (e) => {
             if (!this.hasUnsavedChanges) return;
             try {
                 if (this.options.useBeaconOnUnload) {
@@ -97,10 +106,11 @@ export class SaveManager {
             e.returnedValue = '';
             e.returnValue = '';
             return '';
-        }, { capture: true });
+        };
+        window.addEventListener('beforeunload', this._domHandlers.beforeUnload, { capture: true });
 
         // Дополнительно: обработка быстрого ухода со страницы (pagehide надёжнее в части браузеров)
-        window.addEventListener('pagehide', () => {
+        this._domHandlers.pageHide = () => {
             if (!this.hasUnsavedChanges) return;
             try {
                 if (!this.options || this.options.useBeaconOnUnload) {
@@ -109,10 +119,11 @@ export class SaveManager {
                     this._flushSyncFallback();
                 }
             } catch (_) { /* игнорируем */ }
-        }, { capture: true });
+        };
+        window.addEventListener('pagehide', this._domHandlers.pageHide, { capture: true });
 
         // Подстраховка на случай, когда вкладка просто уходит в фон без beforeunload/pagehide
-        document.addEventListener('visibilitychange', () => {
+        this._domHandlers.visibilityChange = () => {
             if (document.visibilityState !== 'hidden') return;
             if (!this.hasUnsavedChanges) return;
             try {
@@ -122,11 +133,12 @@ export class SaveManager {
                     this._flushSyncFallback();
                 }
             } catch (_) { /* игнорируем */ }
-        });
+        };
+        document.addEventListener('visibilitychange', this._domHandlers.visibilityChange);
         
         // Периодическое автосохранение
         if (this.options.autoSave) {
-            setInterval(() => {
+            this.periodicSaveTimer = setInterval(() => {
                 if (this.hasUnsavedChanges && !this.isRequestInProgress) {
                     this.saveImmediately();
                 }
@@ -489,6 +501,11 @@ export class SaveManager {
     destroy() {
         if (this.saveTimer) {
             clearTimeout(this.saveTimer);
+            this.saveTimer = null;
+        }
+        if (this.periodicSaveTimer) {
+            clearInterval(this.periodicSaveTimer);
+            this.periodicSaveTimer = null;
         }
         
         // Финальное сохранение перед уничтожением
@@ -496,11 +513,19 @@ export class SaveManager {
             this.saveImmediately();
         }
         
-        // Удаляем обработчики событий (константы)
-        this.eventBus.off(Events.Grid.BoardDataChanged);
-        this.eventBus.off(Events.Object.Created);
-        this.eventBus.off(Events.Object.Updated);
-        this.eventBus.off(Events.Object.Deleted);
-        this.eventBus.off(Events.Tool.DragEnd);
+        // Удаляем обработчики событий, передавая исходные callback-ссылки.
+        if (this._handlers.onGridBoardDataChanged) this.eventBus.off(Events.Grid.BoardDataChanged, this._handlers.onGridBoardDataChanged);
+        if (this._handlers.onObjectCreated) this.eventBus.off(Events.Object.Created, this._handlers.onObjectCreated);
+        if (this._handlers.onObjectUpdated) this.eventBus.off(Events.Object.Updated, this._handlers.onObjectUpdated);
+        if (this._handlers.onObjectDeleted) this.eventBus.off(Events.Object.Deleted, this._handlers.onObjectDeleted);
+        if (this._handlers.onObjectStateChanged) this.eventBus.off(Events.Object.StateChanged, this._handlers.onObjectStateChanged);
+
+        if (this._domHandlers.beforeUnload) window.removeEventListener('beforeunload', this._domHandlers.beforeUnload, { capture: true });
+        if (this._domHandlers.pageHide) window.removeEventListener('pagehide', this._domHandlers.pageHide, { capture: true });
+        if (this._domHandlers.visibilityChange) document.removeEventListener('visibilitychange', this._domHandlers.visibilityChange);
+
+        this._listenersAttached = false;
+        this._handlers = {};
+        this._domHandlers = {};
     }
 }

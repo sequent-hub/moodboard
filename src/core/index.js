@@ -72,6 +72,12 @@ export class CoreMoodBoard {
         
         // Буфер обмена для копирования/вставки
         this.clipboard = null;
+        
+        // Защита от повторной регистрации обработчиков при повторном initTools().
+        this._toolEventsInitialized = false;
+        this._keyboardEventsInitialized = false;
+        this._saveEventsInitialized = false;
+        this._historyEventsInitialized = false;
 
         // Убираем автоматический вызов init() - будет вызываться вручную
     }
@@ -91,6 +97,8 @@ export class CoreMoodBoard {
      * Настройка обработчиков событий инструментов
      */
     setupToolEvents() {
+        if (this._toolEventsInitialized) return;
+        this._toolEventsInitialized = true;
         // События выделения
         this.eventBus.on(Events.Tool.SelectionAdd, (data) => {
 
@@ -121,6 +129,8 @@ export class CoreMoodBoard {
      * Настройка обработчиков клавиатурных событий
      */
     setupKeyboardEvents() {
+        if (this._keyboardEventsInitialized) return;
+        this._keyboardEventsInitialized = true;
         // Выделение всех объектов
         this.eventBus.on(Events.Keyboard.SelectAll, () => {
             if (this.toolManager.getActiveTool()?.name === 'select') {
@@ -188,6 +198,8 @@ export class CoreMoodBoard {
      * Настройка обработчиков событий сохранения
      */
     setupSaveEvents() {
+        if (this._saveEventsInitialized) return;
+        this._saveEventsInitialized = true;
         setupSaveFlow(this);
     }
 
@@ -195,6 +207,8 @@ export class CoreMoodBoard {
      * Настройка обработчиков событий истории (undo/redo)
      */
     setupHistoryEvents() {
+        if (this._historyEventsInitialized) return;
+        this._historyEventsInitialized = true;
         // Следим за изменениями истории для обновления UI
         this.eventBus.on(Events.History.Changed, (data) => {
 
@@ -605,13 +619,14 @@ export class CoreMoodBoard {
         }
         
         // Очищаем EventBus
-        if (this.eventBus) {
-            this.eventBus.removeAllListeners();
+        const eventBusRef = this.eventBus;
+        if (eventBusRef) {
+            eventBusRef.removeAllListeners();
             this.eventBus = null;
         }
         
         // Очищаем глобальную ссылку
-        if (typeof window !== 'undefined' && window.moodboardEventBus === this.eventBus) {
+        if (typeof window !== 'undefined' && window.moodboardEventBus === eventBusRef) {
             window.moodboardEventBus = null;
         }
         
