@@ -137,6 +137,8 @@ export const Events = {
 		FileCanceled: 'place:file:canceled',
 		ImageSelected: 'place:image:selected',
 		ImageCanceled: 'place:image:canceled',
+		ImageObject2Selected: 'place:image-object2:selected',
+		ImageObject2Canceled: 'place:image-object2:canceled',
 		GhostShow: 'place:ghost:show',
 		GhostHide: 'place:ghost:hide',
 		GhostUpdate: 'place:ghost:update',

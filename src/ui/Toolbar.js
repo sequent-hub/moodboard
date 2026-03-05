@@ -55,7 +55,7 @@ export class Toolbar {
                          { id: 'text-add', iconName: 'text-add', title: 'Добавить текст', type: 'text-add' },
             { id: 'note', iconName: 'note', title: 'Добавить записку', type: 'note-add' },
             { id: 'image', iconName: 'image', title: 'Добавить картинку', type: 'image-add' },
-            { id: 'image2', iconName: 'image', title: 'ImageObject2', type: 'image2-add' },
+            { id: 'image2', iconName: 'image', title: 'Добавить картинку', type: 'image2-add' },
             { id: 'shapes', iconName: 'shapes', title: 'Фигуры', type: 'custom-shapes' },
             { id: 'pencil', iconName: 'pencil', title: 'Рисование', type: 'custom-draw' },
             // { id: 'comments', iconName: 'comments', title: 'Комментарии', type: 'custom-comments' }, // Временно скрыто
@@ -453,6 +453,16 @@ export class Toolbar {
                 this.closeEmojiPopup();
                 // Открываем диалог выбора изображения
                 this.openImageDialog();
+                return;
+            }
+
+            // ImageObject2: отдельная новая цепочка выбора файла
+            if (toolType === 'image2-add') {
+                this.animateButton(button);
+                this.closeShapesPopup();
+                this.closeDrawPopup();
+                this.closeEmojiPopup();
+                this.openImageObject2Dialog();
                 return;
             }
 
@@ -1404,6 +1414,67 @@ export class Toolbar {
         
         window.addEventListener('focus', handleCancel, { once: true });
         input.click();
+    }
+
+    /**
+     * Открывает диалог выбора изображения для ImageObject2 (новая изолированная цепочка)
+     */
+    async openImageObject2Dialog() {
+        const picker = document.createElement('input');
+        picker.type = 'file';
+        picker.accept = 'image/*';
+        picker.style.position = 'fixed';
+        picker.style.left = '-10000px';
+        picker.style.top = '-10000px';
+        document.body.appendChild(picker);
+
+        const cleanupPicker = () => {
+            if (picker.parentNode) {
+                picker.parentNode.removeChild(picker);
+            }
+        };
+
+        const emitCancel = () => {
+            this.eventBus.emit(Events.Place.ImageObject2Canceled, {
+                source: 'toolbar:image2'
+            });
+        };
+
+        picker.addEventListener('change', () => {
+            const chosen = picker.files && picker.files[0];
+            if (!chosen) {
+                emitCancel();
+                cleanupPicker();
+                return;
+            }
+
+            this.eventBus.emit(Events.Place.ImageObject2Selected, {
+                file: chosen,
+                fileName: chosen.name,
+                fileSize: chosen.size,
+                mimeType: chosen.type,
+                source: 'toolbar:image2',
+                defaults: {
+                    width: 320,
+                    height: 220
+                }
+            });
+
+            cleanupPicker();
+        }, { once: true });
+
+        const onWindowFocus = () => {
+            setTimeout(() => {
+                const hasChosenFile = !!(picker.files && picker.files.length > 0);
+                if (!hasChosenFile) {
+                    emitCancel();
+                    cleanupPicker();
+                }
+            }, 120);
+        };
+
+        window.addEventListener('focus', onWindowFocus, { once: true });
+        picker.click();
     }
     
     /**
