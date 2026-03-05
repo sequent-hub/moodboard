@@ -55,6 +55,7 @@ export class Toolbar {
                          { id: 'text-add', iconName: 'text-add', title: 'Добавить текст', type: 'text-add' },
             { id: 'note', iconName: 'note', title: 'Добавить записку', type: 'note-add' },
             { id: 'image', iconName: 'image', title: 'Добавить картинку', type: 'image-add' },
+            { id: 'image2', iconName: 'image', title: 'ImageObject2', type: 'image2-add' },
             { id: 'shapes', iconName: 'shapes', title: 'Фигуры', type: 'custom-shapes' },
             { id: 'pencil', iconName: 'pencil', title: 'Рисование', type: 'custom-draw' },
             // { id: 'comments', iconName: 'comments', title: 'Комментарии', type: 'custom-comments' }, // Временно скрыто

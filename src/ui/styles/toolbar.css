@@ -49,6 +49,7 @@
 .moodboard-toolbar__button--text-add svg { height: 16px; width: auto; }
 .moodboard-toolbar__button--text-add:hover svg { transform: none; }
 .moodboard-toolbar__button:hover svg { transform: none; }
+.moodboard-toolbar__button--image2 svg { color: #7c3aed; }
 
 /* Hover palette for all toolbar buttons */
 .moodboard-toolbar__button--select:hover,
@@ -56,6 +57,7 @@
 .moodboard-toolbar__button--text-add:hover,
 .moodboard-toolbar__button--note:hover,
 .moodboard-toolbar__button--image:hover,
+.moodboard-toolbar__button--image2:hover,
 .moodboard-toolbar__button--shapes:hover,
 .moodboard-toolbar__button--pencil:hover,
 .moodboard-toolbar__button--comments:hover,
