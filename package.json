@@ -24,6 +24,7 @@
     "test:placement:baseline": "vitest run tests/tools/PlacementTool.baseline.core-flow.test.js tests/tools/PlacementTool.baseline.ghost.test.js tests/tools/PlacementTool.baseline.events-contracts.test.js tests/tools/PlacementTool.baseline.file-image-paths.test.js",
     "test:core:index": "vitest run tests/core/CoreIndex.baseline.object-lifecycle.test.js tests/core/CoreIndex.baseline.transforms.test.js tests/core/CoreIndex.baseline.clipboard.test.js tests/core/CoreIndex.baseline.events-contracts.test.js",
     "test:toolbar:baseline": "vitest run tests/ui/Toolbar.baseline.render.test.js tests/ui/Toolbar.baseline.actions.test.js tests/ui/Toolbar.baseline.popups.test.js tests/ui/Toolbar.baseline.dialogs.test.js tests/ui/Toolbar.baseline.events-contracts.test.js",
+    "test:html-handles:baseline": "vitest run tests/ui/HtmlHandlesLayer.baseline.single-selection.test.js tests/ui/HtmlHandlesLayer.baseline.group-selection.test.js tests/ui/HtmlHandlesLayer.baseline.transforms.test.js tests/ui/HtmlHandlesLayer.baseline.events-contracts.test.js tests/ui/HtmlHandlesLayer.baseline.lifecycle.test.js",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "test:e2e": "playwright test",
