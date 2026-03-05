@@ -3,7 +3,12 @@
  */
 import { Events } from '../core/events/Events.js';
 import { IconLoader } from '../utils/iconLoader.js';
-import { getInlinePngEmojiUrl, hasInlinePngEmoji } from '../utils/inlinePngEmojis.js';
+import { ToolbarDialogsController } from './toolbar/ToolbarDialogsController.js';
+import { ToolbarPopupsController } from './toolbar/ToolbarPopupsController.js';
+import { ToolbarActionRouter } from './toolbar/ToolbarActionRouter.js';
+import { ToolbarTooltipController } from './toolbar/ToolbarTooltipController.js';
+import { ToolbarStateController } from './toolbar/ToolbarStateController.js';
+import { ToolbarRenderer } from './toolbar/ToolbarRenderer.js';
 
 export class Toolbar {
     constructor(container, eventBus, theme = 'light', options = {}) {
@@ -19,6 +24,13 @@ export class Toolbar {
         
         // Кэш для SVG иконок
         this.icons = {};
+
+        this.dialogsController = new ToolbarDialogsController(this);
+        this.popupsController = new ToolbarPopupsController(this);
+        this.actionRouter = new ToolbarActionRouter(this);
+        this.tooltipController = new ToolbarTooltipController(this);
+        this.stateController = new ToolbarStateController(this);
+        this.renderer = new ToolbarRenderer(this);
         
         this.init();
     }
@@ -44,298 +56,54 @@ export class Toolbar {
      * Создает HTML структуру тулбара
      */
     createToolbar() {
-        this.element = document.createElement('div');
-        this.element.className = `moodboard-toolbar moodboard-toolbar--${this.theme}`;
-        
-        // Новые элементы интерфейса (без функционала)
-        const newTools = [
-            { id: 'select', iconName: 'select', title: 'Инструмент выделения (V)', type: 'activate-select' },
-            { id: 'pan', iconName: 'pan', title: 'Панорамирование (Пробел)', type: 'activate-pan' },
-            { id: 'divider', type: 'divider' },
-                         { id: 'text-add', iconName: 'text-add', title: 'Добавить текст', type: 'text-add' },
-            { id: 'note', iconName: 'note', title: 'Добавить записку', type: 'note-add' },
-            { id: 'image', iconName: 'image', title: 'Добавить картинку', type: 'image-add' },
-            { id: 'image2', iconName: 'image', title: 'Добавить картинку', type: 'image2-add' },
-            { id: 'shapes', iconName: 'shapes', title: 'Фигуры', type: 'custom-shapes' },
-            { id: 'pencil', iconName: 'pencil', title: 'Рисование', type: 'custom-draw' },
-            // { id: 'comments', iconName: 'comments', title: 'Комментарии', type: 'custom-comments' }, // Временно скрыто
-            { id: 'attachments', iconName: 'attachments', title: 'Файлы', type: 'custom-attachments' },
-            { id: 'emoji', iconName: 'emoji', title: 'Эмоджи', type: 'custom-emoji' }
-        ];
-
-        // Существующие элементы ниже новых
-        // убрал { id: 'clear', iconName: 'clear', title: 'Очистить холст', type: 'clear' },
-        const existingTools = [
-            { id: 'frame', iconName: 'frame', title: 'Добавить фрейм', type: 'frame' },  
-            { id: 'divider', type: 'divider' },
-            { id: 'undo', iconName: 'undo', title: 'Отменить (Ctrl+Z)', type: 'undo', disabled: true },
-            { id: 'redo', iconName: 'redo', title: 'Повторить (Ctrl+Y)', type: 'redo', disabled: true }
-        ];
-        
-        [...newTools, ...existingTools].forEach(tool => {
-            if (tool.type === 'divider') {
-                const divider = document.createElement('div');
-                divider.className = 'moodboard-toolbar__divider';
-                this.element.appendChild(divider);
-            } else {
-                const button = this.createButton(tool);
-                this.element.appendChild(button);
-            }
-        });
-        
-        this.container.appendChild(this.element);
-
-        // Создаем всплывающие панели (фигуры, рисование, эмоджи)
-        this.createShapesPopup();
-        this.createDrawPopup();
-        this.createEmojiPopup();
-        this.createFramePopup();
-
-        // Подсветка активной кнопки на тулбаре по активному инструменту
-        this.eventBus.on(Events.Tool.Activated, ({ tool }) => {
-            this.setActiveToolbarButton(tool);
-        });
-
-        // Текущее состояние попапа рисования
-        this.currentDrawTool = 'pencil';
+        return this.renderer.createToolbar();
     }
 
     createFramePopup() {
-        this.framePopupEl = document.createElement('div');
-        this.framePopupEl.className = 'moodboard-toolbar__popup frame-popup';
-        this.framePopupEl.style.display = 'none';
-
-        const makeBtn = (label, id, enabled, aspect, options = {}) => {
-            const btn = document.createElement('button');
-            btn.className = 'frame-popup__btn' + (enabled ? '' : ' is-disabled') + (options.header ? ' frame-popup__btn--header' : '');
-            if (options.header) {
-                // handled by CSS class
-            }
-            btn.dataset.id = id;
-            // Внутри кнопки — превью (слева) и подпись (справа/ниже)
-            const holder = document.createElement('div');
-            holder.className = 'frame-popup__holder';
-            let preview = document.createElement('div');
-            if (options.header) {
-                // Для «Произвольный» — горизонтальный пунктирный прямоугольник
-                preview.className = 'frame-popup__preview frame-popup__preview--custom';
-            } else {
-                // Для пресетов — мини-превью с нужными пропорциями, слева от текста
-                preview.className = 'frame-popup__preview';
-                preview.style.aspectRatio = aspect || '1 / 1';
-            }
-            const caption = document.createElement('div');
-            caption.textContent = label;
-            caption.className = 'frame-popup__caption';
-            holder.appendChild(preview);
-            holder.appendChild(caption);
-            btn.appendChild(holder);
-            if (enabled) {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    // Активируем place, устанавливаем pending для frame (А4)
-                    this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                    this.placeSelectedButtonId = 'frame';
-                    this.setActiveToolbarButton('place');
-                    if (id === 'custom') {
-                        // Рисовать фрейм вручную прямоугольником
-                        this.eventBus.emit(Events.Place.Set, { type: 'frame-draw', properties: {} });
-                    } else {
-                        // Подбираем размеры по пресету и увеличиваем площадь в 2 раза (масштаб по корню из 2)
-                        let width = 210, height = 297, titleText = 'A4';
-                        if (id === '1x1') { width = 300; height = 300; titleText = '1:1'; }
-                        else if (id === '4x3') { width = 320; height = 240; titleText = '4:3'; }
-                        else if (id === '16x9') { width = 320; height = 180; titleText = '16:9'; }
-                        const scale = 2; // х2 по сторонам = х4 по площади
-                        width = Math.round(width * scale);
-                        height = Math.round(height * scale);
-                        // Устанавливаем pending для размещения фрейма указанного размера
-                        this.eventBus.emit(Events.Place.Set, {
-                            type: 'frame',
-                            properties: {
-                                width,
-                                height,
-                                borderColor: 0x333333,
-                                fillColor: 0xFFFFFF,
-                                title: titleText,
-                                lockedAspect: true,
-                                type: id
-                            }
-                        });
-                    }
-                    this.closeFramePopup();
-                });
-            }
-            this.framePopupEl.appendChild(btn);
-        };
-
-        // Верхний ряд: одна кнопка «Произвольный» (включаем рисование фрейма)
-        makeBtn('Произвольный', 'custom', true, 'none', { header: true });
-
-        makeBtn('A4', 'a4', true, '210 / 297');
-        makeBtn('1:1', '1x1', true, '1 / 1');
-        makeBtn('4:3', '4x3', true, '4 / 3');
-        makeBtn('16:9', '16x9', true, '16 / 9');
-
-        this.container.appendChild(this.framePopupEl);
+        return this.popupsController.createFramePopup();
     }
 
     toggleFramePopup(anchorBtn) {
-        if (!this.framePopupEl) return;
-        const visible = this.framePopupEl.style.display !== 'none';
-        if (visible) {
-            this.closeFramePopup();
-            return;
-        }
-        const buttonRect = anchorBtn.getBoundingClientRect();
-        const toolbarRect = this.container.getBoundingClientRect();
-        // Сначала показываем невидимо, чтобы измерить размеры
-        this.framePopupEl.style.display = 'grid';
-        this.framePopupEl.style.visibility = 'hidden';
-        const panelW = this.framePopupEl.offsetWidth || 120;
-        const panelH = this.framePopupEl.offsetHeight || 120;
-        // Горизонтально: как у панели фигур — от правого края тулбара + 8px
-        const targetLeft = this.element.offsetWidth + 8;
-        // Вертикально: центр панели на уровне центра кнопки, с тем же лёгким смещением -4px как у фигур
-        const btnCenterY = buttonRect.top + buttonRect.height / 2;
-        const targetTop = Math.max(0, Math.round(btnCenterY - toolbarRect.top - panelH / 2 - 4));
-        this.framePopupEl.style.left = `${Math.round(targetLeft)}px`;
-        this.framePopupEl.style.top = `${targetTop}px`;
-        // Делаем видимой
-        this.framePopupEl.style.visibility = '';
+        return this.popupsController.toggleFramePopup(anchorBtn);
     }
 
     closeFramePopup() {
-        if (this.framePopupEl) this.framePopupEl.style.display = 'none';
+        return this.popupsController.closeFramePopup();
     }
     
     /**
      * Создает кнопку инструмента
      */
     createButton(tool) {
-        const button = document.createElement('button');
-        button.className = `moodboard-toolbar__button moodboard-toolbar__button--${tool.id}`;
-        button.dataset.tool = tool.type;
-        button.dataset.toolId = tool.id;
-        
-        // Устанавливаем disabled состояние если указано
-        if (tool.disabled) {
-            button.disabled = true;
-            button.classList.add('moodboard-toolbar__button--disabled');
-        }
-        
-        // Создаем tooltip если есть title
-        if (tool.title) {
-            this.createTooltip(button, tool.title);
-        }
-        
-        // Создаем SVG иконку
-        if (tool.iconName) {
-            this.createSvgIcon(button, tool.iconName);
-        }
-
-        return button;
+        return this.renderer.createButton(tool);
     }
 
     /**
      * Создает SVG иконку для кнопки
      */
     createSvgIcon(button, iconName) {
-        if (this.icons[iconName]) {
-            // Создаем SVG элемент из загруженного содержимого
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = this.icons[iconName];
-            const svg = tempDiv.querySelector('svg');
-            
-            if (svg) {
-                // Убираем inline размеры, чтобы CSS мог их контролировать
-                svg.removeAttribute('width');
-                svg.removeAttribute('height');
-                svg.style.display = 'block';
-                
-                // Добавляем SVG в кнопку
-                button.appendChild(svg);
-            }
-        } else {
-            // Fallback: создаем простую текстовую иконку
-            const fallbackIcon = document.createElement('span');
-            fallbackIcon.textContent = iconName.charAt(0).toUpperCase();
-            fallbackIcon.style.fontSize = '14px';
-            fallbackIcon.style.fontWeight = 'bold';
-            button.appendChild(fallbackIcon);
-        }
+        return this.renderer.createSvgIcon(button, iconName);
     }
     
     /**
      * Создает tooltip для кнопки
      */
     createTooltip(button, text) {
-        // Создаем элемент tooltip
-        const tooltip = document.createElement('div');
-        tooltip.className = 'moodboard-tooltip';
-        tooltip.textContent = text;
-        
-        // Добавляем tooltip в DOM
-        document.body.appendChild(tooltip);
-        
-        // Переменные для управления tooltip
-        let showTimeout;
-        let hideTimeout;
-        
-        // Показываем tooltip при наведении
-        button.addEventListener('mouseenter', () => {
-            clearTimeout(hideTimeout);
-            showTimeout = setTimeout(() => {
-                this.showTooltip(tooltip, button);
-            }, 300); // Задержка 300ms перед показом
-        });
-        
-        // Скрываем tooltip при уходе мыши
-        button.addEventListener('mouseleave', () => {
-            clearTimeout(showTimeout);
-            hideTimeout = setTimeout(() => {
-                this.hideTooltip(tooltip);
-            }, 100); // Задержка 100ms перед скрытием
-        });
-        
-        // Скрываем tooltip при клике
-        button.addEventListener('click', () => {
-            clearTimeout(showTimeout);
-            this.hideTooltip(tooltip);
-        });
-        
-        // Сохраняем ссылку на tooltip в кнопке для очистки
-        button._tooltip = tooltip;
+        return this.tooltipController.createTooltip(button, text);
     }
     
     /**
      * Показывает tooltip
      */
     showTooltip(tooltip, button) {
-        // Получаем позицию кнопки
-        const buttonRect = button.getBoundingClientRect();
-        const toolbarRect = this.element.getBoundingClientRect();
-        
-        // Позиционируем tooltip справа от кнопки
-        const left = buttonRect.right + 8; // 8px отступ справа от кнопки
-        const top = buttonRect.top + (buttonRect.height / 2) - (tooltip.offsetHeight / 2); // центрируем по вертикали
-        
-        // Проверяем, чтобы tooltip не выходил за правую границу экрана
-        const maxLeft = window.innerWidth - tooltip.offsetWidth - 8;
-        const adjustedLeft = Math.min(left, maxLeft);
-        
-        tooltip.style.left = `${adjustedLeft}px`;
-        tooltip.style.top = `${top}px`;
-        
-        // Показываем tooltip
-        tooltip.classList.add('moodboard-tooltip--show');
+        return this.tooltipController.showTooltip(tooltip, button);
     }
     
     /**
      * Скрывает tooltip
      */
     hideTooltip(tooltip) {
-        tooltip.classList.remove('moodboard-tooltip--show');
+        return this.tooltipController.hideTooltip(tooltip);
     }
     
     /**
@@ -348,219 +116,8 @@ export class Toolbar {
             
             const toolType = button.dataset.tool;
             const toolId = button.dataset.toolId;
-            
-            // Обрабатываем undo/redo отдельно
-            if (toolType === 'undo') {
-                this.eventBus.emit(Events.Keyboard.Undo);
-                this.animateButton(button);
-                return;
-            }
-            
-            if (toolType === 'redo') {
-                this.eventBus.emit(Events.Keyboard.Redo);
-                this.animateButton(button);
-                return;
-            }
 
-            // Выбор инструмента выделения — отменяем режимы размещения и возвращаемся к select
-            if (toolType === 'activate-select') {
-                this.animateButton(button);
-                this.closeShapesPopup();
-                this.closeDrawPopup();
-                this.closeEmojiPopup();
-                // Сбрасываем отложенное размещение, активируем select
-                this.eventBus.emit(Events.Place.Set, null);
-                this.placeSelectedButtonId = null;
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
-                this.setActiveToolbarButton('select');
-                return;
-            }
-
-            // Временная активация панорамирования с панели
-            if (toolType === 'activate-pan') {
-                this.animateButton(button);
-                this.closeShapesPopup();
-                this.closeDrawPopup();
-                this.closeEmojiPopup();
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'pan' });
-                this.setActiveToolbarButton('pan');
-                return;
-            }
-
-
-
-            // Добавление текста: включаем placement и ждём клика для выбора позиции
-            if (toolType === 'text-add') {
-                this.animateButton(button);
-                this.closeShapesPopup();
-                this.closeDrawPopup();
-                this.closeEmojiPopup();
-                // Переходим в универсальный placement tool и задаем pending конфигурацию
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                this.placeSelectedButtonId = 'text';
-                this.setActiveToolbarButton('place');
-                this.eventBus.emit(Events.Place.Set, {
-                    type: 'text',
-                    // Специальный флаг: не создавать сразу объект, а открыть форму ввода на холсте
-                    properties: { editOnCreate: true, fontSize: 18 }
-                });
-                return;
-            }
-
-            // Добавление записки: включаем placement и ждём клика для выбора позиции
-            if (toolType === 'note-add') {
-                this.animateButton(button);
-                this.closeShapesPopup();
-                this.closeDrawPopup();
-                this.closeEmojiPopup();
-                // Активируем place, устанавливаем pending для note
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                this.placeSelectedButtonId = 'note';
-                this.setActiveToolbarButton('place');
-                // Устанавливаем свойства записки по умолчанию
-                this.eventBus.emit(Events.Place.Set, { 
-                    type: 'note', 
-                    properties: { 
-                        content: 'Новая записка',
-                        fontFamily: 'Caveat, Arial, cursive',
-                        fontSize: 32,
-                        width: 250,
-                        height: 250
-                    }
-                });
-                return;
-            }
-
-            // Фрейм: показываем всплывающую панель с пресетами
-            if (toolType === 'frame') {
-                this.animateButton(button);
-                this.toggleFramePopup(button);
-                this.closeShapesPopup();
-                this.closeDrawPopup();
-                this.closeEmojiPopup();
-                // Активируем place и подсвечиваем кнопку Frame
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                this.placeSelectedButtonId = 'frame';
-                this.setActiveToolbarButton('place');
-                return;
-            }
-
-            // Добавление картинки — сразу открываем диалог выбора изображения
-            if (toolType === 'image-add') {
-                this.animateButton(button);
-                this.closeShapesPopup();
-                this.closeDrawPopup();
-                this.closeEmojiPopup();
-                // Открываем диалог выбора изображения
-                this.openImageDialog();
-                return;
-            }
-
-            // ImageObject2: отдельная новая цепочка выбора файла
-            if (toolType === 'image2-add') {
-                this.animateButton(button);
-                this.closeShapesPopup();
-                this.closeDrawPopup();
-                this.closeEmojiPopup();
-                this.openImageObject2Dialog();
-                return;
-            }
-
-            // Комментарии — включаем режим размещения comment
-            if (toolType === 'custom-comments') {
-                this.animateButton(button);
-                this.closeShapesPopup();
-                this.closeDrawPopup();
-                this.closeEmojiPopup();
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                this.placeSelectedButtonId = 'comments';
-                this.setActiveToolbarButton('place');
-                // Увеличенный размер по умолчанию
-                this.eventBus.emit(Events.Place.Set, { type: 'comment', properties: { width: 72, height: 72 } });
-                return;
-            }
-
-            // Файлы — сразу открываем диалог выбора файла
-            if (toolType === 'custom-attachments') {
-                this.animateButton(button);
-                this.closeShapesPopup();
-                this.closeDrawPopup();
-                this.closeEmojiPopup();
-                // Открываем диалог выбора файла
-                this.openFileDialog();
-                return;
-            }
-
-            // Инструмент «Фрейм» — создаём через универсальный place-поток с размерами 200x300
-            if (toolType === 'custom-frame') {
-                this.animateButton(button);
-                this.closeShapesPopup();
-                this.closeDrawPopup();
-                this.closeEmojiPopup();
-                // Активируем режим размещения и устанавливаем pending
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                this.placeSelectedButtonId = 'frame-tool';
-                this.setActiveToolbarButton('place');
-                this.eventBus.emit(Events.Place.Set, {
-                    type: 'frame',
-                    properties: { width: 200, height: 300 }
-                });
-                return;
-            }
-
-            // Тоггл всплывающей панели фигур
-            if (toolType === 'custom-shapes') {
-                this.animateButton(button);
-                this.toggleShapesPopup(button);
-                this.closeDrawPopup();
-                this.closeEmojiPopup();
-                // Активируем универсальный place tool для дальнейшего размещения
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                this.placeSelectedButtonId = 'shapes';
-                this.setActiveToolbarButton('place');
-                return;
-            }
-
-            // Тоггл всплывающей панели рисования
-            if (toolType === 'custom-draw') {
-                this.animateButton(button);
-                this.toggleDrawPopup(button);
-                this.closeShapesPopup();
-                this.closeEmojiPopup();
-                // Выбираем инструмент рисования (последующее действие — на холсте)
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'draw' });
-                this.setActiveToolbarButton('draw');
-                return;
-            }
-
-            // Тоггл всплывающей панели эмоджи
-            if (toolType === 'custom-emoji') {
-                this.animateButton(button);
-                this.toggleEmojiPopup(button);
-                this.closeShapesPopup();
-                this.closeDrawPopup();
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                this.placeSelectedButtonId = 'emoji';
-                this.setActiveToolbarButton('place'); // ← Исправление: подсвечиваем кнопку эмоджи
-                return;
-            }
-
-            // Очистка холста - требует подтверждения
-            if (toolType === 'clear') {
-                this.animateButton(button);
-                this.showClearConfirmation();
-                return;
-            }
-            
-            // Эмитим событие для других инструментов
-            this.eventBus.emit(Events.UI.ToolbarAction, {
-                type: toolType,
-                id: toolId,
-                position: this.getRandomPosition()
-            });
-            
-            // Визуальная обратная связь
-            this.animateButton(button);
+            this.actionRouter.routeToolbarAction(button, toolType, toolId);
         });
 
         // Клик вне попапов — закрыть
@@ -590,50 +147,7 @@ export class Toolbar {
      * Подсвечивает активную кнопку на тулбаре в зависимости от активного инструмента
      */
     setActiveToolbarButton(toolName) {
-        if (!this.element) return;
-        
-        
-        // Сбрасываем активные классы
-        this.element.querySelectorAll('.moodboard-toolbar__button--active').forEach(el => {
-            el.classList.remove('moodboard-toolbar__button--active');
-        });
-        
-        // Соответствие инструмент → кнопка
-        const map = {
-            select: 'select',
-            pan: 'pan',
-            draw: 'pencil',
-            text: 'text-add'  // Добавляем маппинг для text инструмента
-        };
-        
-        let btnId = map[toolName];
-        
-        if (!btnId && toolName === 'place') {
-            // Подсвечиваем тот источник place, который активен
-            const placeButtonMap = {
-                'text': 'text-add',
-                'note': 'note',
-                'frame': 'frame',
-                'frame-tool': 'frame',
-                'comments': 'comments',
-                'attachments': 'attachments',
-                'shapes': 'shapes',
-                'emoji': 'emoji',
-                null: 'image'  // для изображений placeSelectedButtonId = null
-            };
-            
-            btnId = placeButtonMap[this.placeSelectedButtonId] || 'shapes';
-        }
-        
-        if (!btnId) {
-            return;
-        }
-        
-        const btn = this.element.querySelector(`.moodboard-toolbar__button--${btnId}`);
-        if (btn) {
-            btn.classList.add('moodboard-toolbar__button--active');
-        } else {
-        }
+        return this.stateController.setActiveToolbarButton(toolName);
     }
     
     /**
@@ -660,592 +174,71 @@ export class Toolbar {
      * Всплывающая панель с фигурами (UI)
      */
     createShapesPopup() {
-        this.shapesPopupEl = document.createElement('div');
-        this.shapesPopupEl.className = 'moodboard-toolbar__popup moodboard-toolbar__popup--shapes';
-        this.shapesPopupEl.style.display = 'none';
-
-        const grid = document.createElement('div');
-        grid.className = 'moodboard-shapes__grid';
-
-        const shapes = [
-            // Перенесли кнопку "Добавить фигуру" сюда как первый элемент
-            { id: 'shape', title: 'Добавить фигуру', isToolbarAction: true },
-            { id: 'rounded-square', title: 'Скругленный квадрат' },
-            { id: 'circle', title: 'Круг' },
-            { id: 'triangle', title: 'Треугольник' },
-            { id: 'diamond', title: 'Ромб' },
-            { id: 'parallelogram', title: 'Параллелограмм' },
-            { id: 'arrow', title: 'Стрелка' }
-        ];
-
-            shapes.forEach(s => {
-            const btn = document.createElement('button');
-            btn.className = `moodboard-shapes__btn moodboard-shapes__btn--${s.id}`;
-            btn.title = s.title;
-            const icon = document.createElement('span');
-            if (s.isToolbarAction) {
-                // Визуально как квадрат, действие — как старая кнопка "Добавить фигуру"
-                icon.className = 'moodboard-shapes__icon shape-square';
-            } else {
-                icon.className = `moodboard-shapes__icon shape-${s.id}`;
-                if (s.id === 'arrow') {
-                    // Залитая стрелка в стиле U+21E8 (прямоугольник + треугольник)
-                    icon.innerHTML = '<svg width="18" height="12" viewBox="0 0 18 12" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="0" y="5" width="12" height="2" rx="1" fill="#1d4ed8"/><path d="M12 0 L18 6 L12 12 Z" fill="#1d4ed8"/></svg>';
-                }
-            }
-            btn.appendChild(icon);
-            btn.addEventListener('click', () => {
-                this.animateButton(btn);
-                if (s.isToolbarAction) {
-                    // Режим: добавить дефолтную фигуру по клику на холсте
-                    this.eventBus.emit(Events.Place.Set, { type: 'shape', properties: { kind: 'square' } });
-                    this.closeShapesPopup();
-                    return;
-                }
-                // Для остальных фигур — запоминаем выбранную форму и ждём клика по холсту
-                const propsMap = {
-                    'rounded-square': { kind: 'rounded', cornerRadius: 10 },
-                    'circle': { kind: 'circle' },
-                    'triangle': { kind: 'triangle' },
-                    'diamond': { kind: 'diamond' },
-                    'parallelogram': { kind: 'parallelogram' },
-                    'arrow': { kind: 'arrow' }
-                };
-                const props = propsMap[s.id] || { kind: 'square' };
-                this.eventBus.emit(Events.Place.Set, { type: 'shape', properties: props });
-                this.closeShapesPopup();
-            });
-            grid.appendChild(btn);
-        });
-
-        this.shapesPopupEl.appendChild(grid);
-        // Добавляем попап внутрь контейнера тулбара
-        this.container.appendChild(this.shapesPopupEl);
+        return this.popupsController.createShapesPopup();
     }
 
     toggleShapesPopup(anchorButton) {
-        if (!this.shapesPopupEl) return;
-        if (this.shapesPopupEl.style.display === 'none') {
-            this.openShapesPopup(anchorButton);
-        } else {
-            this.closeShapesPopup();
-        }
+        return this.popupsController.toggleShapesPopup(anchorButton);
     }
 
     openShapesPopup(anchorButton) {
-        if (!this.shapesPopupEl) return;
-        // Позиционируем справа от тулбара, по вертикали — напротив кнопки
-        const toolbarRect = this.container.getBoundingClientRect();
-        const buttonRect = anchorButton.getBoundingClientRect();
-        const top = buttonRect.top - toolbarRect.top - 4; // легкое выравнивание
-        const left = this.element.offsetWidth + 8; // отступ от тулбара
-        this.shapesPopupEl.style.top = `${top}px`;
-        this.shapesPopupEl.style.left = `${left}px`;
-        this.shapesPopupEl.style.display = 'block';
+        return this.popupsController.openShapesPopup(anchorButton);
     }
 
     closeShapesPopup() {
-        if (this.shapesPopupEl) {
-            this.shapesPopupEl.style.display = 'none';
-        }
+        return this.popupsController.closeShapesPopup();
     }
 
     /**
      * Всплывающая панель рисования (UI)
      */
     createDrawPopup() {
-        this.drawPopupEl = document.createElement('div');
-        this.drawPopupEl.className = 'moodboard-toolbar__popup moodboard-toolbar__popup--draw';
-        this.drawPopupEl.style.display = 'none';
-
-        const grid = document.createElement('div');
-        grid.className = 'moodboard-draw__grid';
-
-        // Первый ряд: карандаш, маркер, ластик (иконки SVG)
-        const tools = [
-            { id: 'pencil-tool', tool: 'pencil', title: 'Карандаш', svg: '<svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M14.492 3.414 8.921 8.985a4.312 4.312 0 0 0 6.105 6.09l5.564-5.562 1.414 1.414-5.664 5.664a6.002 6.002 0 0 1-2.182 1.392L3.344 21.94 2.06 20.656 6.02 9.845c.3-.82.774-1.563 1.391-2.18l.093-.092.01-.01L13.077 2l1.415 1.414ZM4.68 19.32l4.486-1.64a6.305 6.305 0 0 1-1.651-1.19 6.306 6.306 0 0 1-1.192-1.655L4.68 19.32Z" clip-rule="evenodd"/></svg>' },
-            { id: 'marker-tool', tool: 'marker', title: 'Маркер', svg: '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" width="20" height="20" class="c-bxOhME c-bxOhME-dvzWZT-size-medium"><path fill="currentColor" fill-rule="evenodd" d="M12.737 2.676 8.531 7.264a1 1 0 0 0 .03 1.382l7.674 7.675a1 1 0 0 0 1.442-.029l4.589-4.97 1.468 1.357-4.588 4.97a3 3 0 0 1-3.46.689l-1.917 2.303-1.454.087-.63-.593-.828 1.38L10 22v-1l-.001-.001L10 22H1v-3l.18-.573 3.452-4.93-.817-.77.045-1.496 2.621-2.184a2.999 2.999 0 0 1 .577-3.134l4.205-4.589 1.474 1.352ZM3 19.315v.684h6.434l.76-1.268-4.09-3.85L3 19.314Zm3.007-7.27 6.904 6.498 1.217-1.46-6.667-6.25-1.454 1.212Z" clip-rule="evenodd"></path></svg>' },
-            { id: 'eraser-tool', tool: 'eraser', title: 'Ластик', svg: '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" width="20" height="20" class="c-bxOhME c-bxOhME-dvzWZT-size-medium"><path fill="currentColor" fill-rule="evenodd" d="M12.63 3.957 4.319 12.27a3 3 0 0 0 0 4.242L7.905 20.1 8.612 20.394H21v-2h-5.6l6.629-6.63a3 3 0 0 0 0-4.242L17.858 3.42a3 3 0 0 0-4.242 0ZM5.12 14.293a1 1 0 0 0 0 1.414L8.414 19h3.172l3-3L9 10.414l-3.879 3.88Zm10.336-8.922a1 1 0 0 0-1.414 0l-3.629 3.63L16 14.585l3.63-3.629a1 1 0 0 0 0-1.414L15.457 5.37Z" clip-rule="evenodd"></path></svg>' }
-        ];
-        const row1 = document.createElement('div');
-        row1.className = 'moodboard-draw__row';
-        this.drawRow1 = row1;
-        tools.forEach(t => {
-            const btn = document.createElement('button');
-            btn.className = `moodboard-draw__btn moodboard-draw__btn--${t.id}`;
-            btn.title = t.title;
-            const icon = document.createElement('span');
-            icon.className = 'draw-icon';
-            icon.innerHTML = t.svg;
-            btn.appendChild(icon);
-            btn.addEventListener('click', () => {
-                this.animateButton(btn);
-                // Активируем инструмент рисования
-                row1.querySelectorAll('.moodboard-draw__btn--active').forEach(el => el.classList.remove('moodboard-draw__btn--active'));
-                btn.classList.add('moodboard-draw__btn--active');
-                this.currentDrawTool = t.tool;
-                // Сообщаем текущий мод
-                this.eventBus.emit(Events.Draw.BrushSet, { mode: t.tool });
-                // Перестраиваем нижний ряд пресетов
-                this.buildDrawPresets(row2);
-            });
-            row1.appendChild(btn);
-        });
-
-        // Второй ряд: толщина/цвет — круг + центральная точка
-        const row2 = document.createElement('div');
-        row2.className = 'moodboard-draw__row';
-        this.drawRow2 = row2;
-        this.buildDrawPresets = (container) => {
-            container.innerHTML = '';
-            if (this.currentDrawTool === 'pencil') {
-                const sizes = [
-                    { id: 'size-thin-black', title: 'Тонкий черный', color: '#111827', dot: 4, width: 2 },
-                    { id: 'size-medium-red', title: 'Средний красный', color: '#ef4444', dot: 8, width: 4 },
-                    { id: 'size-thick-green', title: 'Толстый зеленый', color: '#16a34a', dot: 10, width: 6 }
-                ];
-                sizes.forEach(s => {
-                    const btn = document.createElement('button');
-                    btn.className = `moodboard-draw__btn moodboard-draw__btn--${s.id}`;
-                    btn.title = s.title;
-                    btn.dataset.brushWidth = String(s.width);
-                    btn.dataset.brushColor = s.color;
-                    const holder = document.createElement('span');
-                    holder.className = 'draw-size';
-                    const dot = document.createElement('span');
-                    dot.className = 'draw-dot';
-                    dot.style.background = s.color;
-                    dot.style.width = `${s.dot}px`;
-                    dot.style.height = `${s.dot}px`;
-                    holder.appendChild(dot);
-                    btn.appendChild(holder);
-                    btn.addEventListener('click', () => {
-                        this.animateButton(btn);
-                        container.querySelectorAll('.moodboard-draw__btn--active').forEach(el => el.classList.remove('moodboard-draw__btn--active'));
-                        btn.classList.add('moodboard-draw__btn--active');
-                        const width = s.width;
-                        const color = parseInt(s.color.replace('#',''), 16);
-                        this.eventBus.emit(Events.Draw.BrushSet, { mode: 'pencil', width, color });
-                    });
-                    container.appendChild(btn);
-                });
-                // Выставляем дефолт
-                const first = container.querySelector('.moodboard-draw__btn');
-                if (first) {
-                    first.classList.add('moodboard-draw__btn--active');
-                    const width = parseInt(first.dataset.brushWidth, 10) || 2;
-                    const color = parseInt((first.dataset.brushColor || '#111827').replace('#',''), 16);
-                    this.eventBus.emit(Events.Draw.BrushSet, { mode: 'pencil', width, color });
-                }
-            } else if (this.currentDrawTool === 'marker') {
-                const swatches = [
-                    { id: 'marker-yellow', title: 'Жёлтый', color: '#facc15' },
-                    { id: 'marker-green', title: 'Светло-зелёный', color: '#22c55e' },
-                    { id: 'marker-pink', title: 'Розовый', color: '#ec4899' }
-                ];
-                swatches.forEach(s => {
-                    const btn = document.createElement('button');
-                    btn.className = `moodboard-draw__btn moodboard-draw__btn--${s.id}`;
-                    btn.title = s.title;
-                    const sw = document.createElement('span');
-                    sw.className = 'draw-swatch';
-                    sw.style.background = s.color;
-                    btn.appendChild(sw);
-                    btn.addEventListener('click', () => {
-                        this.animateButton(btn);
-                        container.querySelectorAll('.moodboard-draw__btn--active').forEach(el => el.classList.remove('moodboard-draw__btn--active'));
-                        btn.classList.add('moodboard-draw__btn--active');
-                        const color = parseInt(s.color.replace('#',''), 16);
-                        this.eventBus.emit(Events.Draw.BrushSet, { mode: 'marker', color, width: 8 });
-                    });
-                    container.appendChild(btn);
-                });
-                // Дефолт — первый цвет
-                const first = container.querySelector('.moodboard-draw__btn');
-                if (first) {
-                    first.classList.add('moodboard-draw__btn--active');
-                    const color = parseInt(swatches[0].color.replace('#',''), 16);
-                    this.eventBus.emit(Events.Draw.BrushSet, { mode: 'marker', color, width: 8 });
-                }
-            } else if (this.currentDrawTool === 'eraser') {
-                // Ластик — без пресетов
-                this.eventBus.emit(Events.Draw.BrushSet, { mode: 'eraser' });
-            }
-        };
-
-        grid.appendChild(row1);
-        grid.appendChild(row2);
-        this.drawPopupEl.appendChild(grid);
-        this.container.appendChild(this.drawPopupEl);
-        // Инициализируем верх/низ по умолчанию: активен карандаш и первый пресет
-        const pencilBtn = row1.querySelector('.moodboard-draw__btn--pencil-tool');
-        if (pencilBtn) pencilBtn.classList.add('moodboard-draw__btn--active');
-        this.currentDrawTool = 'pencil';
-        this.eventBus.emit(Events.Draw.BrushSet, { mode: 'pencil' });
-        this.buildDrawPresets(row2);
+        return this.popupsController.createDrawPopup();
     }
 
     toggleDrawPopup(anchorButton) {
-        if (!this.drawPopupEl) return;
-        if (this.drawPopupEl.style.display === 'none') {
-            this.openDrawPopup(anchorButton);
-        } else {
-            this.closeDrawPopup();
-        }
+        return this.popupsController.toggleDrawPopup(anchorButton);
     }
 
     openDrawPopup(anchorButton) {
-        if (!this.drawPopupEl) return;
-        const toolbarRect = this.container.getBoundingClientRect();
-        const buttonRect = anchorButton.getBoundingClientRect();
-        const top = buttonRect.top - toolbarRect.top - 4;
-        const left = this.element.offsetWidth + 8;
-        this.drawPopupEl.style.top = `${top}px`;
-        this.drawPopupEl.style.left = `${left}px`;
-        this.drawPopupEl.style.display = 'block';
+        return this.popupsController.openDrawPopup(anchorButton);
     }
 
     closeDrawPopup() {
-        if (this.drawPopupEl) {
-            this.drawPopupEl.style.display = 'none';
-        }
+        return this.popupsController.closeDrawPopup();
     }
 
     /**
      * Всплывающая панель эмоджи (UI)
      */
     createEmojiPopup() {
-        this.emojiPopupEl = document.createElement('div');
-        this.emojiPopupEl.className = 'moodboard-toolbar__popup moodboard-toolbar__popup--emoji';
-        this.emojiPopupEl.style.display = 'none';
-
-        // Загружаем файловые эмоджи и заменяем их на встроенные PNG data URL
-        let groups = new Map();
-        let convertedCount = 0;
-        
-        console.log('🎯 Создание EmojiPopup: заменяем файловые эмоджи на встроенные PNG...');
-        if (typeof import.meta !== 'undefined' && import.meta.glob) {
-            // Режим с bundler (Vite) - используем import.meta.glob
-            const modules = import.meta.glob('../assets/emodji/**/*.{png,PNG,svg,SVG}', { eager: true, as: 'url' });
-            
-            // Группируем по подпапкам внутри emodji (категории)
-            const entries = Object.entries(modules).sort(([a], [b]) => a.localeCompare(b));
-            entries.forEach(([path, url]) => {
-                const marker = '/emodji/';
-                const idx = path.indexOf(marker);
-                let category = 'Разное';
-                if (idx >= 0) {
-                    const after = path.slice(idx + marker.length);
-                    const parts = after.split('/');
-                    category = parts.length > 1 ? parts[0] : 'Разное';
-                }
-                
-                // Извлекаем код эмоджи из имени файла (например, "1f600.png" -> "1f600")
-                const fileName = path.split('/').pop();
-                const emojiCode = fileName.split('.')[0];
-                
-                // Заменяем на встроенный PNG data URL
-                const inlineUrl = getInlinePngEmojiUrl(emojiCode);
-                
-                if (inlineUrl) {
-                    // Используем встроенный PNG
-                    if (!groups.has(category)) groups.set(category, []);
-                    groups.get(category).push({ 
-                        path: `inline:${emojiCode}`, 
-                        url: inlineUrl, 
-                        isInline: true,
-                        emojiCode: emojiCode
-                    });
-                    convertedCount++;
-                } else {
-                    // Fallback на файловый URL (если встроенного нет)
-                    if (!groups.has(category)) groups.set(category, []);
-                    groups.get(category).push({ path, url, isInline: false });
-                    console.warn(`⚠️ Нет встроенного PNG для ${emojiCode}, используем файл`);
-                }
-            });
-        } else {
-            // Режим без bundler - используем статичный список
-            const fallbackGroups = this.getFallbackEmojiGroups();
-            fallbackGroups.forEach((items, category) => {
-                if (!groups.has(category)) groups.set(category, []);
-                groups.get(category).push(...items); // items уже содержат правильные isInline флаги
-                convertedCount += items.filter(item => item.isInline).length;
-            });
-        }
-
-        // Задаем желаемый порядок категорий (используем ваши оригинальные разделы)
-        const ORDER = ['Смайлики', 'Жесты', 'Женские эмоции', 'Котики', 'Обезьянка', 'Разное'];
-        
-        console.log(`✅ Заменено ${convertedCount} файловых эмоджи на встроенные PNG`);
-        const present = [...groups.keys()];
-        const orderedFirst = ORDER.filter(name => groups.has(name));
-        const theRest = present.filter(name => !ORDER.includes(name)).sort((a, b) => a.localeCompare(b));
-        const orderedCategories = [...orderedFirst, ...theRest];
-
-        // Рендерим секции по категориям в нужном порядке
-        orderedCategories.forEach((cat) => {
-            const section = document.createElement('div');
-            section.className = 'moodboard-emoji__section';
-
-            const title = document.createElement('div');
-            title.className = 'moodboard-emoji__title';
-            title.textContent = cat;
-            section.appendChild(title);
-
-            const grid = document.createElement('div');
-            grid.className = 'moodboard-emoji__grid';
-
-            groups.get(cat).forEach(({ url, isInline, emojiCode }) => {
-                const btn = document.createElement('button');
-                btn.className = 'moodboard-emoji__btn';
-                btn.title = isInline ? `Встроенный PNG: ${emojiCode}` : 'Добавить изображение';
-                const img = document.createElement('img');
-                img.className = 'moodboard-emoji__img';
-                img.src = url;
-                img.alt = emojiCode || '';
-                btn.appendChild(img);
-
-                // Перетаскивание: начинаем только если был реальный drag (движение > 4px)
-                btn.addEventListener('mousedown', (e) => {
-                    // Блокируем одновременную обработку
-                    if (btn.__clickProcessing || btn.__dragActive) return;
-                    
-                    const startX = e.clientX;
-                    const startY = e.clientY;
-                    let startedDrag = false;
-                    
-                    const onMove = (ev) => {
-                        if (startedDrag) return;
-                        const dx = Math.abs(ev.clientX - startX);
-                        const dy = Math.abs(ev.clientY - startY);
-                        if (dx > 4 || dy > 4) {
-                            startedDrag = true;
-                            btn.__dragActive = true;
-                            
-                            // Блокируем click handler
-                            btn.__clickProcessing = true;
-                            
-                            const target = 64;
-                            const targetW = target;
-                            const targetH = target;
-                            // Активируем инструмент размещения и включаем режим placeOnMouseUp
-                            this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                            this.eventBus.emit(Events.Place.Set, {
-                                type: 'image',
-                                properties: { src: url, width: targetW, height: targetH, isEmojiIcon: true },
-                                size: { width: targetW, height: targetH },
-                                placeOnMouseUp: true
-                            });
-                            // Закрываем поповер, чтобы не мешал курсору над холстом
-                            this.closeEmojiPopup();
-                            cleanup();
-                        }
-                    };
-                    const onUp = () => {
-                        cleanup();
-                        // Снимаем флаги с задержкой
-                        setTimeout(() => { 
-                            btn.__dragActive = false;
-                            btn.__clickProcessing = false;
-                        }, 50);
-                    };
-                    const cleanup = () => {
-                        document.removeEventListener('mousemove', onMove);
-                        document.removeEventListener('mouseup', onUp);
-                    };
-                    document.addEventListener('mousemove', onMove);
-                    document.addEventListener('mouseup', onUp, { once: true });
-                });
-
-                btn.addEventListener('click', (e) => {
-                    // Блокируем обработку клика если был drag или если уже обрабатывается
-                    if (btn.__dragActive || btn.__clickProcessing) return;
-                    
-                    btn.__clickProcessing = true;
-                    setTimeout(() => { btn.__clickProcessing = false; }, 100);
-                    
-                    this.animateButton(btn);
-                    const target = 64; // кратно 128 для лучшей четкости при даунскейле
-                    const targetW = target;
-                    const targetH = target;
-                    
-                    console.log(`🎯 Создаем эмоджи: ${isInline ? 'встроенный PNG' : 'файл'} (${emojiCode})`);
-                    
-                    this.eventBus.emit(Events.Place.Set, {
-                        type: 'image',
-                        properties: { 
-                            src: url, 
-                            width: targetW, 
-                            height: targetH, 
-                            isEmojiIcon: true,
-                            isInlinePng: isInline || false,
-                            emojiCode: emojiCode || null
-                        },
-                        size: { width: targetW, height: targetH }
-                    });
-                    this.closeEmojiPopup();
-                });
-
-                grid.appendChild(btn);
-            });
-
-            section.appendChild(grid);
-            this.emojiPopupEl.appendChild(section);
-        });
-        this.container.appendChild(this.emojiPopupEl);
+        return this.popupsController.createEmojiPopup();
     }
 
     /**
      * Возвращает fallback группы эмоджи для работы без bundler
      */
     getFallbackEmojiGroups() {
-        const groups = new Map();
-        let convertedCount = 0;
-        
-        console.log('🎯 Fallback режим: заменяем файловые эмоджи на встроенные PNG...');
-        
-        // Статичный список эмоджи с реальными именами файлов
-        const fallbackEmojis = {
-            'Смайлики': [
-                '1f600', '1f601', '1f602', '1f603', '1f604', '1f605', '1f606', '1f607', 
-                '1f609', '1f60a', '1f60b', '1f60c', '1f60d', '1f60e', '1f60f', '1f610', 
-                '1f611', '1f612', '1f613', '1f614', '1f615', '1f616', '1f617', '1f618', 
-                '1f619', '1f61a', '1f61b', '1f61c', '1f61d', '1f61e', '1f61f', '1f620',
-                '1f621', '1f622', '1f623', '1f624', '1f625', '1f626', '1f627', '1f628',
-                '1f629', '1f62a', '1f62b', '1f62c', '1f62d', '1f62e', '1f62f', '1f630',
-                '1f631', '1f632', '1f633', '1f635', '1f636', '1f641', '1f642', '2639', '263a'
-            ],
-            'Жесты': [
-                '1f446', '1f447', '1f448', '1f449', '1f44a', '1f44b', '1f44c', '1f450', 
-                '1f4aa', '1f590', '1f596', '1f64c', '1f64f', '261d', '270a', '270b', '270c', '270d'
-            ],
-            'Женские эмоции': [
-                '1f645', '1f646', '1f64b', '1f64d', '1f64e'
-            ],
-            'Котики': [
-                '1f638', '1f639', '1f63a', '1f63b', '1f63c', '1f63d', '1f63e', '1f63f', '1f640'
-            ],
-            'Обезьянка': [
-                '1f435', '1f648', '1f649', '1f64a'
-            ],
-            'Разное': [
-                '1f440', '1f441', '1f499', '1f4a1', '1f4a3', '1f4a9', '1f4ac', '1f4af', '203c', '26d4', '2764'
-            ]
-        };
-
-        Object.entries(fallbackEmojis).forEach(([category, emojis]) => {
-            const emojiList = [];
-            
-            emojis.forEach(emojiCode => {
-                // Заменяем на встроенный PNG data URL
-                const inlineUrl = getInlinePngEmojiUrl(emojiCode);
-                
-                if (inlineUrl) {
-                    emojiList.push({
-                        path: `inline:${emojiCode}`,
-                        url: inlineUrl,
-                        isInline: true,
-                        emojiCode: emojiCode
-                    });
-                    convertedCount++;
-                } else {
-                    // Fallback на файловый URL (если встроенного нет)
-                    const basePath = this.getEmojiBasePath();
-                    emojiList.push({
-                        path: `${basePath}${category}/${emojiCode}.png`,
-                        url: `${basePath}${category}/${emojiCode}.png`,
-                        isInline: false
-                    });
-                    console.warn(`⚠️ Нет встроенного PNG для ${emojiCode}, используем файл`);
-                }
-            });
-            
-            if (emojiList.length > 0) {
-                groups.set(category, emojiList);
-            }
-        });
-
-        console.log(`✅ Fallback: заменено ${convertedCount} файловых эмоджи на встроенные PNG`);
-        return groups;
+        return this.popupsController.getFallbackEmojiGroups();
     }
 
     /**
      * Определяет базовый путь для эмоджи в зависимости от режима
      */
     getEmojiBasePath() {
-        // 1. Приоритет: опция basePath из конструктора
-        if (this.emojiBasePath) {
-            return this.emojiBasePath.endsWith('/') ? this.emojiBasePath : this.emojiBasePath + '/';
-        }
-
-        // 2. Глобальная настройка (абсолютный URL)
-        if (window.MOODBOARD_BASE_PATH) {
-            const basePath = window.MOODBOARD_BASE_PATH.endsWith('/') ? window.MOODBOARD_BASE_PATH : window.MOODBOARD_BASE_PATH + '/';
-            return `${basePath}src/assets/emodji/`;
-        }
-        
-        // 3. Вычисление от URL текущего модуля (import.meta.url)
-        try {
-            // Используем import.meta.url для получения абсолютного пути к ассетам
-            const currentModuleUrl = import.meta.url;
-            // От текущего модуля (ui/Toolbar.js) поднимаемся к корню пакета и идем к assets
-            const emojiUrl = new URL('../assets/emodji/', currentModuleUrl).href;
-            return emojiUrl;
-        } catch (error) {
-            console.warn('⚠️ Не удалось определить путь через import.meta.url:', error);
-        }
-        
-        // 4. Fallback: поиск script тега для определения базового URL
-        try {
-            const currentScript = document.currentScript;
-            if (currentScript && currentScript.src) {
-                // Пытаемся определить от текущего скрипта
-                const scriptUrl = new URL(currentScript.src);
-                const baseUrl = new URL('../assets/emodji/', scriptUrl).href;
-                return baseUrl;
-            }
-        } catch (error) {
-            console.warn('⚠️ Не удалось определить путь через currentScript:', error);
-        }
-        
-        // 5. Последний fallback: абсолютный путь от корня домена
-        return '/src/assets/emodji/';
+        return this.popupsController.getEmojiBasePath();
     }
 
     toggleEmojiPopup(anchorButton) {
-        if (!this.emojiPopupEl) return;
-        if (this.emojiPopupEl.style.display === 'none') {
-            this.openEmojiPopup(anchorButton);
-        } else {
-            this.closeEmojiPopup();
-        }
+        return this.popupsController.toggleEmojiPopup(anchorButton);
     }
 
     openEmojiPopup(anchorButton) {
-        if (!this.emojiPopupEl) return;
-        const toolbarRect = this.container.getBoundingClientRect();
-        const buttonRect = anchorButton.getBoundingClientRect();
-        const left = this.element.offsetWidth + 8;
-        // Показать невидимо для вычисления размеров
-        this.emojiPopupEl.style.visibility = 'hidden';
-        this.emojiPopupEl.style.display = 'block';
-        // Рассчитать top так, чтобы попап не уходил за нижнюю границу
-        const desiredTop = buttonRect.top - toolbarRect.top - 4;
-        const popupHeight = this.emojiPopupEl.offsetHeight;
-        const containerHeight = this.container.clientHeight || toolbarRect.height;
-        const minTop = 8;
-        const maxTop = Math.max(minTop, containerHeight - popupHeight - 8);
-        const top = Math.min(Math.max(minTop, desiredTop), maxTop);
-        this.emojiPopupEl.style.top = `${top}px`;
-        this.emojiPopupEl.style.left = `${left}px`;
-        this.emojiPopupEl.style.visibility = 'visible';
+        return this.popupsController.openEmojiPopup(anchorButton);
     }
 
     closeEmojiPopup() {
-        if (this.emojiPopupEl) {
-            this.emojiPopupEl.style.display = 'none';
-        }
+        return this.popupsController.closeEmojiPopup();
     }
 
     /**
@@ -1292,219 +285,35 @@ export class Toolbar {
      * Настройка обработчиков событий истории
      */
     setupHistoryEvents() {
-        // Слушаем изменения истории для обновления кнопок undo/redo
-        this.eventBus.on(Events.UI.UpdateHistoryButtons, (data) => {
-            this.updateHistoryButtons(data.canUndo, data.canRedo);
-        });
+        return this.stateController.setupHistoryEvents();
     }
 
     /**
      * Открывает диалог выбора файла и запускает режим "призрака"
      */
     async openFileDialog() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '*/*'; // Принимаем любые файлы
-        input.style.display = 'none';
-        document.body.appendChild(input);
-
-        input.addEventListener('change', async () => {
-            try {
-                const file = input.files && input.files[0];
-                if (!file) {
-                    // Пользователь отменил выбор файла
-                    this.eventBus.emit(Events.Place.FileCanceled);
-                    return;
-                }
-
-                // Файл выбран - запускаем режим "призрака"
-                this.eventBus.emit(Events.Place.FileSelected, {
-                    file: file,
-                    fileName: file.name,
-                    fileSize: file.size,
-                    mimeType: file.type,
-                    properties: {
-                        width: 120,
-                        height: 140
-                    }
-                });
-
-                // Активируем инструмент размещения
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                this.placeSelectedButtonId = 'attachments';
-                this.setActiveToolbarButton('place');
-
-            } catch (error) {
-                console.error('Ошибка при выборе файла:', error);
-                alert('Ошибка при выборе файла: ' + error.message);
-            } finally {
-                input.remove();
-            }
-        }, { once: true });
-
-        // Обработка отмены диалога (клик вне диалога или ESC)
-        const handleCancel = () => {
-            setTimeout(() => {
-                if (input.files.length === 0) {
-                    this.eventBus.emit(Events.Place.FileCanceled);
-                    input.remove();
-                }
-                window.removeEventListener('focus', handleCancel);
-            }, 100);
-        };
-        
-        window.addEventListener('focus', handleCancel, { once: true });
-        input.click();
+        return this.dialogsController.openFileDialog();
     }
 
     /**
      * Открывает диалог выбора изображения и запускает режим "призрака"
      */
     async openImageDialog() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*'; // Принимаем только изображения
-        input.style.display = 'none';
-        document.body.appendChild(input);
-
-        input.addEventListener('change', async () => {
-            try {
-                const file = input.files && input.files[0];
-                if (!file) {
-                    // Пользователь отменил выбор изображения
-                    this.eventBus.emit(Events.Place.ImageCanceled);
-                    return;
-                }
-
-                // Изображение выбрано - запускаем режим "призрака"
-                this.eventBus.emit(Events.Place.ImageSelected, {
-                    file: file,
-                    fileName: file.name,
-                    fileSize: file.size,
-                    mimeType: file.type,
-                    properties: {
-                        width: 300,  // Дефолтная ширина для изображения
-                        height: 200  // Дефолтная высота для изображения (будет пересчитана по пропорциям)
-                    }
-                });
-
-                // Активируем инструмент размещения
-                this.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-                this.placeSelectedButtonId = 'image';
-                this.setActiveToolbarButton('place');
-
-            } catch (error) {
-                console.error('Ошибка при выборе изображения:', error);
-                alert('Ошибка при выборе изображения: ' + error.message);
-            } finally {
-                input.remove();
-            }
-        }, { once: true });
-
-        // Обработка отмены диалога (клик вне диалога или ESC)
-        const handleCancel = () => {
-            setTimeout(() => {
-                if (input.files.length === 0) {
-                    this.eventBus.emit(Events.Place.ImageCanceled);
-                    input.remove();
-                }
-                window.removeEventListener('focus', handleCancel);
-            }, 100);
-        };
-        
-        window.addEventListener('focus', handleCancel, { once: true });
-        input.click();
+        return this.dialogsController.openImageDialog();
     }
 
     /**
      * Открывает диалог выбора изображения для ImageObject2 (новая изолированная цепочка)
      */
     async openImageObject2Dialog() {
-        const picker = document.createElement('input');
-        picker.type = 'file';
-        picker.accept = 'image/*';
-        picker.style.position = 'fixed';
-        picker.style.left = '-10000px';
-        picker.style.top = '-10000px';
-        document.body.appendChild(picker);
-
-        const cleanupPicker = () => {
-            if (picker.parentNode) {
-                picker.parentNode.removeChild(picker);
-            }
-        };
-
-        const emitCancel = () => {
-            this.eventBus.emit(Events.Place.ImageObject2Canceled, {
-                source: 'toolbar:image2'
-            });
-        };
-
-        picker.addEventListener('change', () => {
-            const chosen = picker.files && picker.files[0];
-            if (!chosen) {
-                emitCancel();
-                cleanupPicker();
-                return;
-            }
-
-            this.eventBus.emit(Events.Place.ImageObject2Selected, {
-                file: chosen,
-                fileName: chosen.name,
-                fileSize: chosen.size,
-                mimeType: chosen.type,
-                source: 'toolbar:image2',
-                defaults: {
-                    width: 320,
-                    height: 220
-                }
-            });
-
-            cleanupPicker();
-        }, { once: true });
-
-        const onWindowFocus = () => {
-            setTimeout(() => {
-                const hasChosenFile = !!(picker.files && picker.files.length > 0);
-                if (!hasChosenFile) {
-                    emitCancel();
-                    cleanupPicker();
-                }
-            }, 120);
-        };
-
-        window.addEventListener('focus', onWindowFocus, { once: true });
-        picker.click();
+        return this.dialogsController.openImageObject2Dialog();
     }
     
     /**
      * Обновление состояния кнопок undo/redo
      */
     updateHistoryButtons(canUndo, canRedo) {
-        const undoButton = this.element.querySelector('[data-tool="undo"]');
-        const redoButton = this.element.querySelector('[data-tool="redo"]');
-        
-        if (undoButton) {
-            undoButton.disabled = !canUndo;
-            if (canUndo) {
-                undoButton.classList.remove('moodboard-toolbar__button--disabled');
-                undoButton.title = 'Отменить последнее действие (Ctrl+Z)';
-            } else {
-                undoButton.classList.add('moodboard-toolbar__button--disabled');
-                undoButton.title = 'Нет действий для отмены';
-            }
-        }
-        
-        if (redoButton) {
-            redoButton.disabled = !canRedo;
-            if (canRedo) {
-                redoButton.classList.remove('moodboard-toolbar__button--disabled');
-                redoButton.title = 'Повторить отмененное действие (Ctrl+Y)';
-            } else {
-                redoButton.classList.add('moodboard-toolbar__button--disabled');
-                redoButton.title = 'Нет действий для повтора';
-            }
-        }
+        return this.stateController.updateHistoryButtons(canUndo, canRedo);
     }
 
     /**
