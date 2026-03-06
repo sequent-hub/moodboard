@@ -1,5 +1,10 @@
 import { Events } from '../core/events/Events.js';
 import cursorDefaultSvg from '../assets/icons/cursor-default.svg?raw';
+import { ToolActivationController } from './manager/ToolActivationController.js';
+import { ToolEventRouter } from './manager/ToolEventRouter.js';
+import { ToolManagerGuards } from './manager/ToolManagerGuards.js';
+import { ToolManagerLifecycle } from './manager/ToolManagerLifecycle.js';
+import { ToolRegistry } from './manager/ToolRegistry.js';
 
 // Масштабируем курсор в 2 раза меньше
 const _scaledCursorSvg = (() => {
@@ -23,6 +28,8 @@ export class ToolManager {
         this.pixiApp = pixiApp; // PIXI Application для передачи в инструменты
         this.core = core; // Ссылка на core для доступа к imageUploadService
         this.tools = new Map();
+        this.registry = new ToolRegistry(this);
+        this.activation = new ToolActivationController(this);
         this.activeTool = null;
         this.defaultTool = null;
         
@@ -48,71 +55,35 @@ export class ToolManager {
      * Регистрирует инструмент
      */
     registerTool(tool) {
-        this.tools.set(tool.name, tool);
-        
-        // Устанавливаем первый инструмент как по умолчанию
-        if (!this.defaultTool) {
-            this.defaultTool = tool.name;
-        }
+        this.registry.register(tool);
     }
     
     /**
      * Активирует инструмент
      */
     activateTool(toolName) {
-        const tool = this.tools.get(toolName);
-        if (!tool) {
-            console.warn(`Tool "${toolName}" not found`);
-            return false;
-        }
-        
-        // Деактивируем текущий инструмент
-        if (this.activeTool) {
-            this.activeTool.deactivate();
-        }
-        
-        // Активируем новый инструмент
-        this.activeTool = tool;
-        
-        // Передаем PIXI app в метод activate, если он поддерживается
-        if (typeof this.activeTool.activate === 'function') {
-            this.activeTool.activate(this.pixiApp);
-        }
-        this.syncActiveToolCursor();
-        
-        return true;
+        return this.activation.activateTool(toolName);
     }
     
     /**
      * Временно активирует инструмент (с возвратом к предыдущему)
      */
     activateTemporaryTool(toolName) {
-        if (this.activeTool) {
-            this.previousTool = this.activeTool.name;
-        }
-        
-        this.activateTool(toolName);
-        this.temporaryTool = toolName;
+        this.activation.activateTemporaryTool(toolName);
     }
     
     /**
      * Возвращается к предыдущему инструменту
      */
     returnToPreviousTool() {
-        if (this.temporaryTool && this.previousTool) {
-            this.activateTool(this.previousTool);
-            this.temporaryTool = null;
-            this.previousTool = null;
-        }
+        this.activation.returnToPreviousTool();
     }
     
     /**
      * Возвращается к инструменту по умолчанию
      */
     activateDefaultTool() {
-        if (this.defaultTool) {
-            this.activateTool(this.defaultTool);
-        }
+        this.activation.activateDefaultTool();
     }
     
     /**
@@ -126,90 +97,21 @@ export class ToolManager {
      * Получает список всех инструментов
      */
     getAllTools() {
-        return Array.from(this.tools.values());
+        return this.registry.getAll();
     }
     
     /**
      * Проверяет, зарегистрирован ли инструмент
      */
     hasActiveTool(toolName) {
-        return this.tools.has(toolName);
+        return this.registry.has(toolName);
     }
     
     /**
      * Инициализирует обработчики событий DOM
      */
     initEventListeners() {
-        if (!this.container) return;
-        
-        // События мыши на контейнере
-        this.container.addEventListener('mousedown', (e) => this.handleMouseDown(e));
-        this.container.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-        this.container.addEventListener('mouseup', (e) => this.handleMouseUp(e));
-        this.container.addEventListener('mouseenter', () => { 
-            this.isMouseOverContainer = true; 
-            if (!this.activeTool) {
-                this.container.style.cursor = DEFAULT_CURSOR;
-                return;
-            }
-            this.syncActiveToolCursor();
-        });
-        this.container.addEventListener('mouseleave', () => { this.isMouseOverContainer = false; });
-        // Убираем отдельные слушатели aux-pan на контейнере, чтобы не дублировать mousedown/mouseup
-
-        // Drag & Drop — поддержка перетаскивания изображений на холст
-        this.container.addEventListener('dragenter', (e) => {
-            e.preventDefault();
-        });
-        this.container.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-        });
-        this.container.addEventListener('dragleave', (e) => {
-            // можно снимать подсветку, если добавим в будущем
-        });
-        this.container.addEventListener('drop', (e) => this.handleDrop(e));
-
-        // Глобальные события мыши — чтобы корректно завершать drag/resize при отпускании за пределами холста
-        document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-        document.addEventListener('mouseup', (e) => {
-            this.handleMouseUp(e);
-            // Гарантированно завершаем временный pan, даже если кнопка отпущена вне холста
-            if (this.temporaryTool === 'pan') {
-                this.handleAuxPanEnd(e);
-            }
-        });
-        this.container.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
-        // wheel должен быть non-passive, чтобы preventDefault работал корректно
-        this.container.addEventListener('wheel', (e) => this.handleMouseWheel(e), { passive: false });
-        // Блокируем системный зум браузера (Ctrl + колесо) над рабочей областью
-        this._onWindowWheel = (e) => {
-            try {
-                if (e && e.ctrlKey && this.isMouseOverContainer) {
-                    e.preventDefault();
-                }
-            } catch (_) {}
-        };
-        window.addEventListener('wheel', this._onWindowWheel, { passive: false });
-        
-        // События клавиатуры (на document)
-        document.addEventListener('keydown', (e) => this.handleKeyDown(e));
-        document.addEventListener('keyup', (e) => this.handleKeyUp(e));
-        
-        // Контекстное меню: предотвращаем дефолт и пересылаем событие активному инструменту
-        this.container.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            if (!this.activeTool) return;
-            const rect = this.container.getBoundingClientRect();
-            const event = {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top,
-                originalEvent: e
-            };
-            if (typeof this.activeTool.onContextMenu === 'function') {
-                this.activeTool.onContextMenu(event);
-            }
-        });
+        ToolManagerLifecycle.initEventListeners(this, DEFAULT_CURSOR);
     }
     
     /**
@@ -217,120 +119,32 @@ export class ToolManager {
      */
     
     handleMouseDown(e) {
-        if (!this.activeTool) return;
-        this.isMouseDown = true;
-
-        // Если удерживается пробел + левая кнопка — сразу запускаем pan и не дергаем активный инструмент
-        if (this.spacePressed && e.button === 0) {
-            this.handleAuxPanStart(e);
-            return;
-        }
-        // Средняя кнопка — тоже панорамирование без дергания активного инструмента
-        if (e.button === 1) {
-            this.handleAuxPanStart(e);
-            return;
-        }
-        
-        const rect = this.container.getBoundingClientRect();
-        const event = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-            button: e.button,
-            target: e.target,
-            originalEvent: e
-        };
-        
-        this.lastMousePos = { x: event.x, y: event.y };
-        this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
-        
-        this.activeTool.onMouseDown(event);
+        return ToolEventRouter.handleMouseDown(this, e);
     }
 
     // Поддержка панорамирования средней кнопкой мыши без переключения инструмента
     handleAuxPanStart(e) {
-        // Средняя кнопка (button === 1) или пробел зажат и левая кнопка
-        const isMiddle = e.button === 1;
-        const isSpaceLeft = e.button === 0 && this.spacePressed;
-        if (!isMiddle && !isSpaceLeft) return;
-
-        // Временная активация pan-инструмента
-        if (this.hasActiveTool('pan')) {
-            this.previousTool = this.activeTool?.name || null;
-            this.activateTemporaryTool('pan');
-            // Синтетический mousedown для запуска pan
-            const rect = this.container.getBoundingClientRect();
-            const event = {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top,
-                button: 0,
-                target: e.target,
-                originalEvent: e
-            };
-            this.lastMousePos = { x: event.x, y: event.y };
-            this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
-            this.activeTool.onMouseDown(event);
-        }
+        return ToolEventRouter.handleAuxPanStart(this, e);
     }
 
     handleAuxPanEnd(e) {
-        // Завершаем временное панорамирование при отпускании средней/левой (с пробелом)
-        if (this.temporaryTool === 'pan') {
-            const rect = this.container.getBoundingClientRect();
-            const event = {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top,
-                button: 0,
-                target: e.target,
-                originalEvent: e
-            };
-            this.lastMousePos = { x: event.x, y: event.y };
-            this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
-            this.activeTool.onMouseUp(event);
-            this.returnToPreviousTool();
-            return;
-        }
+        return ToolEventRouter.handleAuxPanEnd(this, e);
     }
     
     handleMouseMove(e) {
-        if (!this.activeTool) return;
-        
-        const rect = this.container.getBoundingClientRect();
-        const event = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-            target: e.target,
-            originalEvent: e
-        };
-        
-        // Запоминаем и рассылаем позицию курсора для использования другими подсистемами
-        this.lastMousePos = { x: event.x, y: event.y };
-        this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
-        
-        // Если временно активирован pan, проксируем движение именно ему
-        if (this.temporaryTool === 'pan' && this.activeTool?.name === 'pan') {
-            this.activeTool.onMouseMove(event);
-            this.syncActiveToolCursor();
-            return;
-        }
-        this.activeTool.onMouseMove(event);
-        this.syncActiveToolCursor();
+        return ToolEventRouter.handleMouseMove(this, e);
     }
 
     isCursorLockedToActiveTool() {
-        return !!this.activeTool && this.activeTool.name !== 'select';
+        return ToolManagerGuards.isCursorLockedToActiveTool(this);
     }
 
     getPixiCursorStyles() {
-        const renderer = this.pixiApp && this.pixiApp.renderer;
-        if (!renderer) return null;
-        const events = renderer.events || (renderer.plugins && renderer.plugins.interaction);
-        return events && events.cursorStyles ? events.cursorStyles : null;
+        return ToolManagerGuards.getPixiCursorStyles(this);
     }
 
     getActiveToolCursor() {
-        const cursor = this.activeTool && this.activeTool.cursor;
-        if (typeof cursor === 'string' && cursor.length > 0) return cursor;
-        return DEFAULT_CURSOR;
+        return ToolManagerGuards.getActiveToolCursor(this, DEFAULT_CURSOR);
     }
 
     syncActiveToolCursor() {
@@ -361,318 +175,34 @@ export class ToolManager {
     }
     
     handleMouseUp(e) {
-        if (!this.activeTool) return;
-        this.isMouseDown = false;
-        
-        const rect = this.container.getBoundingClientRect();
-        const event = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-            button: e.button,
-            target: e.target,
-            originalEvent: e
-        };
-        this.lastMousePos = { x: event.x, y: event.y };
-        this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
-        if (this.temporaryTool === 'pan') {
-            this.handleAuxPanEnd(e);
-            return;
-        }
-        this.activeTool.onMouseUp(event);
-        this.syncActiveToolCursor();
+        return ToolEventRouter.handleMouseUp(this, e);
     }
     
     handleDoubleClick(e) {
-        if (!this.activeTool) return;
-        
-        const rect = this.container.getBoundingClientRect();
-        const event = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-            target: e.target,
-            originalEvent: e
-        };
-        this.lastMousePos = { x: event.x, y: event.y };
-        this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
-        
-        console.log('🔧 ToolManager: Double click event, active tool:', this.activeTool.constructor.name);
-        this.activeTool.onDoubleClick(event);
+        return ToolEventRouter.handleDoubleClick(this, e);
     }
     
     handleMouseWheel(e) {
-        if (!this.activeTool) return;
-        
-        const rect = this.container.getBoundingClientRect();
-        const event = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-            delta: e.deltaY,
-            ctrlKey: e.ctrlKey,
-            shiftKey: e.shiftKey,
-            originalEvent: e
-        };
-        this.lastMousePos = { x: event.x, y: event.y };
-        this.eventBus.emit(Events.UI.CursorMove, { x: event.x, y: event.y });
-        
-        // Глобальный зум колесиком (без Ctrl) — предотвращаем дефолтный скролл страницы
-        this.eventBus.emit(Events.Tool.WheelZoom, { x: event.x, y: event.y, delta: e.deltaY });
-        e.preventDefault();
-        
-        // Предотвращаем скроллинг страницы при зуме
-        if (e.ctrlKey) {
-            e.preventDefault();
-        }
+        return ToolEventRouter.handleMouseWheel(this, e);
     }
 
     async handleDrop(e) {
-        e.preventDefault();
-        const rect = this.container.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        this.lastMousePos = { x, y };
-        this.eventBus.emit(Events.UI.CursorMove, { x, y });
-
-        const dt = e.dataTransfer;
-        if (!dt) return;
-
-        const emitAt = (src, name, imageId = null, offsetIndex = 0) => {
-            const offset = 25 * offsetIndex;
-            this.eventBus.emit(Events.UI.PasteImageAt, { 
-                x: x + offset, 
-                y: y + offset, 
-                src, 
-                name,
-                imageId 
-            });
-        };
-
-        // 1) Файлы с рабочего стола
-        const files = dt.files ? Array.from(dt.files) : [];
-        const imageFiles = files.filter(f => f.type && f.type.startsWith('image/'));
-        if (imageFiles.length > 0) {
-            let index = 0;
-            for (const file of imageFiles) {
-                try {
-                    // Пытаемся загрузить изображение на сервер
-                    if (this.core && this.core.imageUploadService) {
-                        const uploadResult = await this.core.imageUploadService.uploadImage(file, file.name || 'image');
-                        emitAt(uploadResult.url, uploadResult.name, uploadResult.imageId || uploadResult.id, index++);
-                    } else {
-                        // Fallback к старому способу (base64)
-                        await new Promise((resolve) => {
-                            const reader = new FileReader();
-                            reader.onload = () => { 
-                                emitAt(reader.result, file.name || 'image', null, index++); 
-                                resolve(); 
-                            };
-                            reader.readAsDataURL(file);
-                        });
-                    }
-                } catch (error) {
-                    console.warn('Ошибка загрузки изображения через drag-and-drop:', error);
-                    // Fallback к base64 при ошибке
-                    await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onload = () => { 
-                            emitAt(reader.result, file.name || 'image', null, index++); 
-                            resolve(); 
-                        };
-                        reader.readAsDataURL(file);
-                    });
-                }
-            }
-            return;
-        }
-
-        const nonImageFiles = files.filter(f => !f.type || !f.type.startsWith('image/'));
-        if (nonImageFiles.length > 0) {
-            let index = 0;
-            for (const file of nonImageFiles) {
-                const offset = 25 * index++;
-                const position = { x: x + offset, y: y + offset };
-                const fallbackProps = {
-                    fileName: file.name || 'file',
-                    fileSize: file.size || 0,
-                    mimeType: file.type || 'application/octet-stream',
-                    formattedSize: null,
-                    url: null,
-                    width: 120,
-                    height: 140
-                };
-                try {
-                    if (this.core && this.core.fileUploadService) {
-                        const uploadResult = await this.core.fileUploadService.uploadFile(file, file.name || 'file');
-                        this.eventBus.emit(Events.UI.ToolbarAction, {
-                            type: 'file',
-                            id: 'file',
-                            position,
-                            properties: {
-                                fileName: uploadResult.name,
-                                fileSize: uploadResult.size,
-                                mimeType: uploadResult.mimeType,
-                                formattedSize: uploadResult.formattedSize,
-                                url: uploadResult.url,
-                                width: 120,
-                                height: 140
-                            },
-                            fileId: uploadResult.fileId || uploadResult.id || null
-                        });
-                    } else {
-                        this.eventBus.emit(Events.UI.ToolbarAction, {
-                            type: 'file',
-                            id: 'file',
-                            position,
-                            properties: fallbackProps
-                        });
-                    }
-                } catch (error) {
-                    console.warn('Ошибка загрузки файла через drag-and-drop:', error);
-                    this.eventBus.emit(Events.UI.ToolbarAction, {
-                        type: 'file',
-                        id: 'file',
-                        position,
-                        properties: fallbackProps
-                    });
-                }
-            }
-            return;
-        }
-
-        // 2) Перетаскивание с другой вкладки: HTML/URI/PLAIN
-        const html = dt.getData('text/html');
-        if (html && html.includes('<img')) {
-            const m = html.match(/<img[^>]*src\s*=\s*"([^"]+)"/i);
-            if (m && m[1]) {
-                const url = m[1];
-                if (/^data:image\//i.test(url)) { emitAt(url, 'clipboard-image.png'); return; }
-                if (/^https?:\/\//i.test(url)) {
-                    try {
-                        const resp = await fetch(url, { mode: 'cors' });
-                        const blob = await resp.blob();
-                        const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
-                        emitAt(dataUrl, url.split('/').pop() || 'image');
-                    } catch (_) {
-                        emitAt(url, url.split('/').pop() || 'image');
-                    }
-                    return;
-                }
-            }
-        }
-
-        const uriList = dt.getData('text/uri-list') || '';
-        if (uriList) {
-            const lines = uriList.split('\n').filter(l => !!l && !l.startsWith('#'));
-            const urls = lines.filter(l => /^https?:\/\//i.test(l));
-            let index = 0;
-            for (const url of urls) {
-                const isImage = /(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(url);
-                if (!isImage) continue;
-                try {
-                    const resp = await fetch(url, { mode: 'cors' });
-                    const blob = await resp.blob();
-                    const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
-                    emitAt(dataUrl, url.split('/').pop() || 'image', index++);
-                } catch (_) {
-                    emitAt(url, url.split('/').pop() || 'image', index++);
-                }
-            }
-            if (index > 0) return;
-        }
-
-        const text = dt.getData('text/plain') || '';
-        if (text) {
-            const trimmed = text.trim();
-            const isDataUrl = /^data:image\//i.test(trimmed);
-            const isHttpUrl = /^https?:\/\//i.test(trimmed);
-            const looksLikeImage = /(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(trimmed);
-            if (isDataUrl) { emitAt(trimmed, 'clipboard-image.png'); return; }
-            if (isHttpUrl && looksLikeImage) {
-                try {
-                    const resp = await fetch(trimmed, { mode: 'cors' });
-                    const blob = await resp.blob();
-                    const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
-                    emitAt(dataUrl, trimmed.split('/').pop() || 'image');
-                } catch (_) {
-                    emitAt(trimmed, trimmed.split('/').pop() || 'image');
-                }
-                return;
-            }
-        }
+        return ToolEventRouter.handleDrop(this, e);
     }
     
     handleKeyDown(e) {
-        // Обработка горячих клавиш для переключения инструментов
-        this.handleHotkeys(e);
-        
-        if (!this.activeTool) return;
-        
-        const event = {
-            key: e.key,
-            code: e.code,
-            ctrlKey: e.ctrlKey,
-            shiftKey: e.shiftKey,
-            altKey: e.altKey,
-            originalEvent: e
-        };
-        
-        this.activeTool.onKeyDown(event);
-
-        // Тоггл пробела для временного pan
-        if (e.key === ' ' && !e.repeat) {
-            this.spacePressed = true;
-        }
+        return ToolEventRouter.handleKeyDown(this, e);
     }
     
     handleKeyUp(e) {
-        if (!this.activeTool) return;
-        
-        const event = {
-            key: e.key,
-            code: e.code,
-            originalEvent: e
-        };
-        
-        this.activeTool.onKeyUp(event);
-
-        if (e.key === ' ') {
-            this.spacePressed = false;
-            // Если удерживали pan временно, вернуть инструмент
-            if (this.temporaryTool === 'pan') {
-                // Корректно завершим pan, если мышь ещё зажата
-                if (this.activeTool?.name === 'pan' && this.isMouseDown) {
-                    this.activeTool.onMouseUp({ x: 0, y: 0, button: 0, target: this.container, originalEvent: e });
-                }
-                this.returnToPreviousTool();
-                return;
-            }
-        }
+        return ToolEventRouter.handleKeyUp(this, e);
     }
     
     /**
      * Обработка горячих клавиш
      */
     handleHotkeys(e) {
-        // Игнорируем горячие клавиши если фокус в input/textarea
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            return;
-        }
-        
-        // Ищем инструмент с соответствующей горячей клавишей
-        for (const tool of this.tools.values()) {
-            if (tool.hotkey === e.key.toLowerCase()) {
-                this.activateTool(tool.name);
-                e.preventDefault();
-                break;
-            }
-        }
-        
-        // Специальные горячие клавиши
-        switch (e.key) {
-            case 'Escape': // Escape - возврат к default tool
-                this.activateDefaultTool();
-                e.preventDefault();
-                break;
-        }
+        return ToolEventRouter.handleHotkeys(this, e);
     }
     
     /**
@@ -688,43 +218,6 @@ export class ToolManager {
      * Очистка ресурсов
      */
     destroy() {
-        // Деактивируем все инструменты
-        for (const tool of this.tools.values()) {
-            tool.destroy();
-        }
-        
-        this.tools.clear();
-        this.activeTool = null;
-        
-        // Удаляем обработчики событий
-        if (this.container) {
-            this.container.removeEventListener('mousedown', this.handleMouseDown);
-            this.container.removeEventListener('mousemove', this.handleMouseMove);
-            this.container.removeEventListener('mouseup', this.handleMouseUp);
-            this.container.removeEventListener('dblclick', this.handleDoubleClick);
-            this.container.removeEventListener('wheel', this.handleMouseWheel);
-            this.container.removeEventListener('contextmenu', (e) => e.preventDefault());
-            this.container.removeEventListener('dragenter', (e) => e.preventDefault());
-            this.container.removeEventListener('dragover', (e) => e.preventDefault());
-            this.container.removeEventListener('dragleave', () => {});
-            this.container.removeEventListener('drop', this.handleDrop);
-        }
-        document.removeEventListener('mousemove', this.handleMouseMove);
-        document.removeEventListener('mouseup', this.handleMouseUp);
-        
-        document.removeEventListener('keydown', this.handleKeyDown);
-        document.removeEventListener('keyup', this.handleKeyUp);
-        // Снимаем глобальный блокировщик Ctrl+колесо
-        if (this._onWindowWheel) {
-            try { window.removeEventListener('wheel', this._onWindowWheel); } catch (_) {}
-            this._onWindowWheel = null;
-        }
-
-        const cursorStyles = this.getPixiCursorStyles();
-        if (cursorStyles && this._originalPixiCursorStyles) {
-            cursorStyles.pointer = this._originalPixiCursorStyles.pointer;
-            cursorStyles.default = this._originalPixiCursorStyles.default;
-        }
-        this._originalPixiCursorStyles = null;
+        ToolManagerLifecycle.destroy(this);
     }
 }
