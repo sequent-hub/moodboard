@@ -556,13 +556,17 @@ describe('EventBus', () => {
 
     it('should handle rapid fire operations', () => {
         const operationCount = 5000;
-        const callbacks = [];
         const eventName = 'rapid:fire:event';
+        let finalCallbackHits = 0;
 
-        // Создаем callback'и
+        // Используем легковесные callback'и, чтобы тест мерил EventBus,
+        // а не накладные расходы vi.fn() на сотнях тысяч вызовов.
         for (let i = 0; i < 100; i++) {
-            const callback = vi.fn();
-            callbacks.push(callback);
+            const callback = (payload) => {
+                if (payload?.final === 'test') {
+                    finalCallbackHits++;
+                }
+            };
             eventBus.on(eventName, callback);
         }
 
@@ -570,7 +574,7 @@ describe('EventBus', () => {
 
         // Быстрая последовательность: on, emit, off, on, emit
         for (let i = 0; i < operationCount; i++) {
-            const tempCallback = vi.fn();
+            const tempCallback = () => {};
             eventBus.on(eventName, tempCallback);
             eventBus.emit(eventName, { operation: i });
             eventBus.off(eventName, tempCallback);
@@ -583,9 +587,7 @@ describe('EventBus', () => {
 
         // Проверяем, что основные callback'и все еще работают
         eventBus.emit(eventName, { final: 'test' });
-        callbacks.forEach(callback => {
-            expect(callback).toHaveBeenCalledWith({ final: 'test' });
-        });
+        expect(finalCallbackHits).toBe(100);
     });
 
     it('should handle nested events in loop without stack overflow', () => {

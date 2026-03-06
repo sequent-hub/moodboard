@@ -301,11 +301,17 @@ describe('PlacementTool', () => {
 
         it('должен удалить предыдущий ghost перед созданием нового', () => {
             tool.pending = { type: 'note', properties: {} };
-            const spy = vi.spyOn(tool, 'hideGhost');
-
             tool.showNoteGhost();
+        const firstGhost = tool.ghostContainer;
 
-            expect(spy).toHaveBeenCalled();
+        tool.showNoteGhost();
+        const secondGhost = tool.ghostContainer;
+
+        expect(firstGhost).not.toBe(secondGhost);
+        expect(tool.world.removeChild).toHaveBeenCalledWith(firstGhost);
+        expect(firstGhost.destroy).toHaveBeenCalled();
+        expect(tool.world.addChild).toHaveBeenNthCalledWith(1, firstGhost);
+        expect(tool.world.addChild).toHaveBeenNthCalledWith(2, secondGhost);
         });
 
         it('не должен создавать ghost если pending.type !== "note"', () => {

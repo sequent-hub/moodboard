@@ -12,8 +12,9 @@ import { resolve } from 'node:path';
 describe('HtmlHandlesLayer source coordinate contracts', () => {
     it('GroupRotateStart payload should include center field', () => {
         // В коде core использует центр группового поворота.
+        // После рефакторинга emit живет в HandlesInteractionController.
         // Контракт: в событии start должен передаваться `center`.
-        const source = readFileSync(resolve('src/ui/HtmlHandlesLayer.js'), 'utf8');
+        const source = readFileSync(resolve('src/ui/handles/HandlesInteractionController.js'), 'utf8');
         const hasCenterInGroupRotateStart = /GroupRotateStart,\s*\{\s*objects,\s*center\s*:\s*\{/.test(source);
         expect(hasCenterInGroupRotateStart).toBe(true);
     });

@@ -1,5 +1,8 @@
 import { Events } from '../../../core/events/Events.js';
-import { registerEditorListeners } from './InlineEditorListenersRegistry.js';
+import {
+    createNoteEditorUpdater,
+    registerNoteEditorSync,
+} from './TextEditorSyncService.js';
 
 export function setupNoteInlineEditor(controller, params) {
     const {
@@ -91,60 +94,20 @@ export function setupNoteInlineEditor(controller, params) {
     autoSizeNote();
 
     // Динамическое обновление позиции/размера редактора при зуме/панорамировании/трансформациях
-    const updateNoteEditor = () => {
-        try {
-            // Актуальная позиция и размер объекта в мире
-            const posDataNow = { objectId, position: null };
-            const sizeDataNow = { objectId, size: null };
-            controller.eventBus.emit(Events.Tool.GetObjectPosition, posDataNow);
-            controller.eventBus.emit(Events.Tool.GetObjectSize, sizeDataNow);
-            const posNow = posDataNow.position || position;
-            const sizeNow = sizeDataNow.size || { width: noteWidth, height: noteHeight };
-            const screenNow = toScreen(posNow.x, posNow.y);
-            // Пересчитываем масштаб в CSS пикселях
-            const vr = (controller.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
-            const wl = controller.textEditor.world || (controller.app?.stage);
-            const sc = wl?.scale?.x || 1;
-            const sCss = sc / vr;
-            const maxWpx = Math.max(1, Math.round((sizeNow.width - (horizontalPadding * 2)) * sCss));
-            const maxHpx = Math.max(1, Math.round((sizeNow.height - (horizontalPadding * 2)) * sCss));
-            // Измеряем естественный размер по контенту
-            textarea.style.width = 'auto';
-            textarea.style.height = 'auto';
-            const naturalW = Math.ceil(textarea.scrollWidth + 1);
-            const naturalH = Math.ceil(textarea.scrollHeight);
-            const wPx = Math.min(maxWpx, Math.max(MIN_NOTE_EDITOR_W, naturalW));
-            const hPx = Math.min(maxHpx, Math.max(MIN_NOTE_EDITOR_H, naturalH));
-            // Применяем размеры редактора
-            textarea.style.width = `${wPx}px`;
-            wrapper.style.width = `${wPx}px`;
-            textarea.style.height = `${hPx}px`;
-            wrapper.style.height = `${hPx}px`;
-            // Центрируем в пределах записки
-            const left = Math.round(screenNow.x + (sizeNow.width * sCss) / 2 - (wPx / 2));
-            const top = Math.round(screenNow.y + (sizeNow.height * sCss) / 2 - (hPx / 2));
-            wrapper.style.left = `${left}px`;
-            wrapper.style.top = `${top}px`;
-            // Восстанавливаем прошлые значения, чтобы избежать мигания в стилях при следующем измерении
-            textarea.style.width = `${wPx}px`;
-            textarea.style.height = `${hPx}px`;
-        } catch (_) {}
-    };
-    const onZoom = () => updateNoteEditor();
-    const onPan = () => updateNoteEditor();
-    const onDrag = (e) => { if (e && e.object === objectId) updateNoteEditor(); };
-    const onResize = (e) => { if (e && e.object === objectId) updateNoteEditor(); };
-    const onRotate = (e) => { if (e && e.object === objectId) updateNoteEditor(); };
-    const listeners = [
-        [Events.UI.ZoomPercent, onZoom],
-        [Events.Tool.PanUpdate, onPan],
-        [Events.Tool.DragUpdate, onDrag],
-        [Events.Tool.ResizeUpdate, onResize],
-        [Events.Tool.RotateUpdate, onRotate],
-    ];
-    registerEditorListeners(controller.eventBus, listeners);
-    // Сохраняем слушателей для снятия при закрытии редактора
-    controller.textEditor._listeners = listeners;
+    const updateNoteEditor = createNoteEditorUpdater(controller, {
+        objectId,
+        position,
+        noteWidth,
+        noteHeight,
+        view,
+        textarea,
+        wrapper,
+        horizontalPadding,
+        computeLineHeightPx,
+        effectiveFontPx,
+        toScreen,
+    });
+    registerNoteEditorSync(controller, { objectId, updateNoteEditor });
 
     return { updateNoteEditor };
 }

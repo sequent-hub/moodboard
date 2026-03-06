@@ -6,11 +6,9 @@ import { resolve } from 'node:path';
  * Source-контракты для getter-событий координат в CoreMoodBoard.
  *
  * ВАЖНО:
- * Эти тесты проверяют наличие конкретных строк ИМЕННО в src/core/index.js.
- * После рефакторинга (вынос логики в flows/*) такие тесты могут падать,
- * даже если runtime-поведение не изменилось.
- * Поэтому падение этого файла нужно интерпретировать как сигнал
- * "возможно устарел source-check", а не как прямое доказательство регрессии.
+ * После рефакторинга логика getter-обработчиков живет в
+ * src/core/flows/ObjectLifecycleFlow.js. Эти тесты проверяют именно
+ * актуальное место регистрации событий, а не старую структуру index.js.
  *
  * Эти тесты не чинят поведение, а фиксируют текущую модель:
  * - GetObjectPosition рассчитывается через центр PIXI и half-size;
@@ -20,17 +18,14 @@ import { resolve } from 'node:path';
  */
 describe('Core getter source coordinate contracts', () => {
     it('GetObjectPosition path uses halfW/halfH conversion from PIXI center', () => {
-        // Legacy source-check: жестко привязан к файлу index.js.
-        // При переносе логики в flows может стать неактуальным.
-        const source = readFileSync(resolve('src/core/index.js'), 'utf8');
+        const source = readFileSync(resolve('src/core/flows/ObjectLifecycleFlow.js'), 'utf8');
         expect(source).toContain('const halfW = (pixiObject.width || 0) / 2;');
         expect(source).toContain('const halfH = (pixiObject.height || 0) / 2;');
         expect(source).toContain('data.position = { x: pixiObject.x - halfW, y: pixiObject.y - halfH };');
     });
 
     it('GetAllObjects path uses pixiObject.getBounds()', () => {
-        // Legacy source-check: не проверяет runtime, а только текст в index.js.
-        const source = readFileSync(resolve('src/core/index.js'), 'utf8');
+        const source = readFileSync(resolve('src/core/flows/ObjectLifecycleFlow.js'), 'utf8');
         expect(source).toContain('const bounds = pixiObject.getBounds();');
         expect(source).toContain('bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }');
     });

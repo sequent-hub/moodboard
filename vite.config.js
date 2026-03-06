@@ -41,7 +41,12 @@ export default defineConfig({
         include: ['tests/**/*.{test,spec}.{js,ts}'],
 
         // Исключения
-        exclude: ['node_modules', 'dist', 'tests/setup.js'],
+        exclude: [
+            'node_modules',
+            'dist',
+            'tests/setup.js',
+            'tests/**/*.e2e.spec.{js,ts}'
+        ],
 
         // Настройка покрытия
         coverage: {
