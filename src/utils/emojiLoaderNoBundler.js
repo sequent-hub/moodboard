@@ -99,7 +99,7 @@ export class EmojiLoaderNoBundler {
     async generateEmojiIndex() {
         // Эта функция может быть вызвана только в dev среде с bundler
         if (typeof import.meta !== 'undefined' && import.meta.glob) {
-            const modules = import.meta.glob('../assets/emodji/**/*.{png,PNG}', { eager: true, as: 'url' });
+            const modules = import.meta.glob('../assets/emodji/**/*.{png,PNG}', { eager: true, query: '?url', import: 'default' });
             const index = {};
             
             Object.keys(modules).forEach(path => {

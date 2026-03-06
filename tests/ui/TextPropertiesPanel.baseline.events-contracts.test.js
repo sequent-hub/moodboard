@@ -51,6 +51,41 @@ describe('TextPropertiesPanel baseline: event contracts', () => {
         expect(panel.panel.style.display).toBe('none');
     });
 
+    it('re-hydrates controls when selection switches between different text objects', () => {
+        ctx.setObject('text-1', {
+            properties: {
+                fontFamily: 'Roboto, Arial, sans-serif',
+                fontSize: 18,
+                color: '#000000',
+                backgroundColor: 'transparent',
+            },
+        });
+        ctx.setObject('text-2', {
+            properties: {
+                fontFamily: '"Playfair Display", Georgia, serif',
+                fontSize: 32,
+                color: '#34C759',
+                backgroundColor: '#ff9999',
+            },
+        });
+
+        ctx.setSelected(['text-1']);
+        panel.updateFromSelection();
+        expect(panel.currentId).toBe('text-1');
+        expect(panel.fontSelect.value).toBe('Roboto, Arial, sans-serif');
+        expect(panel.fontSizeSelect.value).toBe('18');
+
+        ctx.setSelected(['text-2']);
+        ctx.eventBus.emit(Events.Tool.SelectionAdd);
+
+        expect(panel.currentId).toBe('text-2');
+        expect(panel.panel.style.display).toBe('flex');
+        expect(panel.fontSelect.value).toBe('"Playfair Display", Georgia, serif');
+        expect(panel.fontSizeSelect.value).toBe('32');
+        expect(panel.currentColorButton.title).toBe('Текущий цвет: #34C759');
+        expect(panel.currentBgColorButton.title).toBe('Цвет выделения: #ff9999');
+    });
+
     it('hides on selection clear and on deletion of the currently shown object only', () => {
         ctx.setObject('text-1');
         ctx.setObject('text-2');

@@ -353,7 +353,7 @@ export class ToolbarPopupsController {
 
         console.log('🎯 Создание EmojiPopup: заменяем файловые эмоджи на встроенные PNG...');
         if (typeof import.meta !== 'undefined' && import.meta.glob) {
-            const modules = import.meta.glob('../assets/emodji/**/*.{png,PNG,svg,SVG}', { eager: true, as: 'url' });
+            const modules = import.meta.glob('../assets/emodji/**/*.{png,PNG,svg,SVG}', { eager: true, query: '?url', import: 'default' });
             const entries = Object.entries(modules).sort(([a], [b]) => a.localeCompare(b));
             entries.forEach(([path, url]) => {
                 const marker = '/emodji/';

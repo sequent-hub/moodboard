@@ -64,6 +64,22 @@ describe('TextPropertiesPanel baseline: lifecycle contracts', () => {
         expect(removeSpy).toHaveBeenCalledWith('mousedown', panel._onDocMouseDown, true);
     });
 
+    it('does not duplicate capture-phase mousedown hook on repeated selection updates while visible', () => {
+        ctx.setObject('text-1');
+        ctx.setSelected(['text-1']);
+        panel.attach();
+
+        panel.updateFromSelection();
+        panel.updateFromSelection();
+        panel.updateFromSelection();
+
+        const mousedownAdds = addSpy.mock.calls.filter(([name, handler, options]) =>
+            name === 'mousedown' && handler === panel._onDocMouseDown && options === true
+        );
+
+        expect(mousedownAdds).toHaveLength(1);
+    });
+
     it('destroy removes root DOM, hides panel state, and repeated destroy is safe', () => {
         ctx.setObject('text-1');
         ctx.setSelected(['text-1']);
@@ -81,6 +97,32 @@ describe('TextPropertiesPanel baseline: lifecycle contracts', () => {
         expect(removeSpy).toHaveBeenCalledWith('mousedown', panel._onDocMouseDown, true);
 
         expect(() => panel.destroy()).not.toThrow();
+    });
+
+    it('destroy unsubscribes the same EventBus channels that attach subscribed', () => {
+        panel.attach();
+
+        const subscribedEvents = ctx.eventBus.on.mock.calls.map(([eventName]) => eventName);
+        expect(subscribedEvents).toEqual([
+            Events.Tool.SelectionAdd,
+            Events.Tool.SelectionRemove,
+            Events.Tool.SelectionClear,
+            Events.Tool.DragUpdate,
+            Events.Tool.GroupDragUpdate,
+            Events.Tool.ResizeUpdate,
+            Events.Tool.RotateUpdate,
+            Events.UI.ZoomPercent,
+            Events.Tool.PanUpdate,
+            Events.Object.Deleted,
+            Events.UI.TextEditStart,
+            Events.UI.TextEditEnd,
+        ]);
+
+        panel.destroy();
+
+        const unsubscribedEvents = ctx.eventBus.off.mock.calls.map(([eventName]) => eventName);
+        expect(unsubscribedEvents).toEqual(subscribedEvents);
+        expect(unsubscribedEvents).toHaveLength(12);
     });
 
     it('destroyed instance can be replaced without duplicating root layer nodes', () => {
