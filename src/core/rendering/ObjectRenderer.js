@@ -327,14 +327,10 @@ export class ObjectRenderer {
      */
     setFrameFill(objectId, width, height, fillColor = 0xFFFFFF) {
         const pixiObject = this.objects.get(objectId);
-        if (!pixiObject || !(pixiObject instanceof PIXI.Graphics)) return;
-        
+        if (!pixiObject) return;
         const meta = pixiObject._mb || {};
-        if (meta.type !== 'frame') return;
-        
-        if (meta.instance) {
-            meta.instance.setFill(fillColor);
-        }
+        if (meta.type !== 'frame' || !meta.instance) return;
+        meta.instance.setFill(fillColor);
     }
 
     /**

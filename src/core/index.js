@@ -613,6 +613,11 @@ export class CoreMoodBoard {
             this.history = null;
         }
         
+        if (this.frameService) {
+            this.frameService.detach();
+            this.frameService = null;
+        }
+        
         if (this.pixi) {
             this.pixi.destroy();
             this.pixi = null;

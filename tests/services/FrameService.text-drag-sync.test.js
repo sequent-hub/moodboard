@@ -9,6 +9,11 @@ function createMockEventBus() {
             if (!handlers[event]) handlers[event] = [];
             handlers[event].push(handler);
         }),
+        off: vi.fn((event, handler) => {
+            if (!handlers[event]) return;
+            if (handler) handlers[event] = handlers[event].filter((h) => h !== handler);
+            else handlers[event] = [];
+        }),
         emit: vi.fn((event, payload) => {
             const list = handlers[event] || [];
             list.forEach((h) => h(payload));
@@ -112,6 +117,19 @@ describe('FrameService text sync during frame drag', () => {
                 position: { x: 70, y: 70 }
             })
         );
+    });
+
+    it('after detach, DragStart/DragUpdate do not trigger frame logic', () => {
+        frameService.detach();
+
+        eventBus.emit(Events.Tool.DragStart, { object: 'frame-1' });
+        const framePixi = pixi.objects.get('frame-1');
+        framePixi.x = 200;
+        framePixi.y = 200;
+        eventBus.emit(Events.Tool.DragUpdate, { object: 'frame-1' });
+
+        expect(state.state.objects[1].position).toEqual({ x: 40, y: 30 });
+        expect(pixi.setFrameFill).not.toHaveBeenCalled();
     });
 });
 

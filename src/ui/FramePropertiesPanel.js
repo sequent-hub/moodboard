@@ -117,6 +117,7 @@ export class FramePropertiesPanel {
 
         this.panel = panel;
         this.container.appendChild(panel);
+        this._boundDocumentClickHandler = this._documentClickHandler.bind(this);
     }
 
     _updateControlsFromObject() {
@@ -200,11 +201,16 @@ export class FramePropertiesPanel {
             outline: 'none'
         });
 
-        // Обработчик изменения названия
+        // Обработчик изменения названия (debounce 200ms)
+        this._titleDebounceTimer = null;
         titleInput.addEventListener('input', () => {
-            if (this.currentId) {
-                this._changeFrameTitle(titleInput.value);
-            }
+            if (!this.currentId) return;
+            if (this._titleDebounceTimer) clearTimeout(this._titleDebounceTimer);
+            const value = titleInput.value;
+            this._titleDebounceTimer = setTimeout(() => {
+                this._titleDebounceTimer = null;
+                this._changeFrameTitle(value);
+            }, 200);
         });
 
         // Блокируем Delete/Backspace от всплытия, чтобы не удалялся весь фрейм при фокусе в поле
@@ -434,7 +440,7 @@ export class FramePropertiesPanel {
 
         // Добавляем обработчик клика по документу для закрытия палитры
         setTimeout(() => {
-            document.addEventListener('click', this._documentClickHandler.bind(this));
+            document.addEventListener('click', this._boundDocumentClickHandler);
         }, 0);
     }
 
@@ -442,7 +448,9 @@ export class FramePropertiesPanel {
         if (this.colorPalette) {
             this.colorPalette.style.display = 'none';
         }
-        document.removeEventListener('click', this._documentClickHandler.bind(this));
+        if (this._boundDocumentClickHandler) {
+            document.removeEventListener('click', this._boundDocumentClickHandler);
+        }
     }
 
     _documentClickHandler(e) {
@@ -595,9 +603,15 @@ export class FramePropertiesPanel {
     }
 
     destroy() {
-        // Удаляем обработчик клика по документу
-        document.removeEventListener('click', this._documentClickHandler.bind(this));
-        
+        this._hideColorPalette();
+        if (this._boundDocumentClickHandler) {
+            document.removeEventListener('click', this._boundDocumentClickHandler);
+            this._boundDocumentClickHandler = null;
+        }
+        if (this._titleDebounceTimer) {
+            clearTimeout(this._titleDebounceTimer);
+            this._titleDebounceTimer = null;
+        }
         if (this.panel && this.panel.parentNode) {
             this.panel.parentNode.removeChild(this.panel);
         }

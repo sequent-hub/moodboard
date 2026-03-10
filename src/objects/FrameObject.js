@@ -58,7 +58,8 @@ export class FrameObject {
         
         // Подписываемся на события зума для компенсации масштабирования заголовка
         if (this.eventBus) {
-            this.eventBus.on(Events.UI.ZoomPercent, this._onZoomChange.bind(this));
+            this._boundOnZoomChange = this._onZoomChange.bind(this);
+            this.eventBus.on(Events.UI.ZoomPercent, this._boundOnZoomChange);
         }
         
         this._draw(this.width, this.height, this.fillColor);
@@ -281,8 +282,9 @@ export class FrameObject {
      * Метод для отписки от событий при уничтожении объекта
      */
     destroy() {
-        if (this.eventBus) {
-            this.eventBus.off(Events.UI.ZoomPercent, this._onZoomChange.bind(this));
+        if (this.eventBus && this._boundOnZoomChange) {
+            this.eventBus.off(Events.UI.ZoomPercent, this._boundOnZoomChange);
+            this._boundOnZoomChange = null;
         }
         if (this.container) {
             this.container.destroy({ children: true });

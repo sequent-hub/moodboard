@@ -50,8 +50,10 @@ export class FrameService {
 	}
 
 	attach() {
-		// Автоприкрепление объектов при создании произвольного фрейма
-		this.eventBus.on(Events.Object.Created, ({ objectId, objectData }) => {
+		if (this._attached) return;
+		this._attached = true;
+
+		this._onObjectCreated = ({ objectId, objectData }) => {
 			try {
 				if (!objectData || objectData.type !== 'frame') return;
 				const isArbitrary = (objectData.properties && objectData.properties.lockedAspect === false)
@@ -66,10 +68,10 @@ export class FrameService {
 				// И оповестим общий менеджер на всякий случай
 				this.eventBus.emit(Events.Object.Reordered, { reason: 'attach_arbitrary_frame_children' });
 			} catch (_) { /* no-op */ }
-		});
+		};
+		this.eventBus.on(Events.Object.Created, this._onObjectCreated);
 
-		// Визуал подсветки при drag над фреймом и перенос детей на drag
-		this.eventBus.on(Events.Tool.DragStart, (data) => {
+		this._onDragStart = (data) => {
 			const moved = this.state.state.objects.find(o => o.id === data.object);
 			if (moved && moved.type === 'frame') {
 				// Серый фон
@@ -84,9 +86,10 @@ export class FrameService {
 					if (childPixi) this._frameDragChildStart.set(childId, { x: childPixi.x, y: childPixi.y });
 				}
 			}
-		});
+		};
+		this.eventBus.on(Events.Tool.DragStart, this._onDragStart);
 
-		this.eventBus.on(Events.Tool.DragUpdate, (data) => {
+		this._onDragUpdate = (data) => {
 			const moved = this.state.state.objects.find(o => o.id === data.object);
 			if (!moved) return;
 			if (moved.type === 'frame') {
@@ -125,8 +128,6 @@ export class FrameService {
 						});
 					}
 				}
-				// Во время перетаскивания тоже гарантируем порядок
-				this._forceFramesBelow();
 			} else {
 				// Hover-эффект: подсветка фрейма, если центр объекта внутри
 				const centerX = moved.position.x + (moved.width || 0) / 2;
@@ -156,9 +157,10 @@ export class FrameService {
 					this._frameHoverId = hoverId || null;
 				}
 			}
-		});
+		};
+		this.eventBus.on(Events.Tool.DragUpdate, this._onDragUpdate);
 
-		this.eventBus.on(Events.Tool.DragEnd, (data) => {
+		this._onDragEnd = (data) => {
 			const movedObj = this.state.state.objects.find(o => o.id === data.object);
 			if (!movedObj) return;
 			if (movedObj.type === 'frame') {
@@ -172,9 +174,26 @@ export class FrameService {
 				const frames = (this.state.state.objects || []).filter(o => o.type === 'frame');
 				const prev = frames.find(fr => fr.id === this._frameHoverId);
 				if (prev) this.pixi.setFrameFill(prev.id, prev.width, prev.height, 0xFFFFFF);
-				this._frameHoverId = null;
-			}
-		});
+			this._frameHoverId = null;
+		}
+		};
+		this.eventBus.on(Events.Tool.DragEnd, this._onDragEnd);
+	}
+
+	detach() {
+		if (!this._attached) return;
+		this._attached = false;
+		if (this._onObjectCreated) this.eventBus.off(Events.Object.Created, this._onObjectCreated);
+		if (this._onDragStart) this.eventBus.off(Events.Tool.DragStart, this._onDragStart);
+		if (this._onDragUpdate) this.eventBus.off(Events.Tool.DragUpdate, this._onDragUpdate);
+		if (this._onDragEnd) this.eventBus.off(Events.Tool.DragEnd, this._onDragEnd);
+		this._onObjectCreated = null;
+		this._onDragStart = null;
+		this._onDragUpdate = null;
+		this._onDragEnd = null;
+		this._frameDragFrameStart = null;
+		this._frameDragChildStart = null;
+		this._frameHoverId = null;
 	}
 
 	_getFrameChildren(frameId) {

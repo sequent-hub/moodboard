@@ -268,6 +268,38 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 
 **Рамка по контуру:** Визуальная проверка (строго по границам, без пересечений) — через unit/чек-лист при необходимости; E2E проверяет наличие рамки и ручек.
 
+### `tests/image-object2/FrameTool.e2e.spec.js` — 16 E2E-тестов
+
+Инструмент «Фрейм» (frame, `.moodboard-toolbar__button--frame`). Playwright E2E.
+
+**Покрытие:**
+
+- **Панель** — клик по кнопке фрейма открывает popup `.frame-popup`, содержит «Произвольный» (`.frame-popup__btn--header`, data-id="custom"), пресеты A4, 1:1, 4:3, 16:9 (`.frame-popup__btn[data-id="a4"]` и т.д.).
+- **Пресеты** — для каждого (a4, 1x1, 4x3, 16x9): выбор в popup → ghost → клик на холст → объект `type: 'frame'` с ожидаемыми размерами и properties.type.
+- **Произвольный фрейм** — выбор «Произвольный» → режим frame-draw → mousedown → mousemove → mouseup → объект frame с isArbitrary.
+- **Перемещение** — createObject(frame) + drag → position обновляется.
+- **Масштабирование** — ручка SE меняет width/height.
+- **Объекты на фрейме** — note, созданная с центром внутри frame, получает properties.frameId.
+- **Объекты с фреймом** — note с frameId перемещается вместе с frame при drag.
+- **Захват произвольным** — note на доске → нарисовать произвольный фрейм поверх → note получает frameId.
+- **Панель свойств** — `.frame-properties-panel`: переименование (`.fpp-input`), смена типа (`.fpp-select`), фон (`.fpp-color-button`, палитра `[data-color-hex]`).
+- **Рамка и ручки** — при выделении frame: `.mb-handles-box`, `.mb-handle[data-dir="se"]` видимы; `.mb-rotate-handle` скрыт для frame.
+- **Выделение** — клик по фрейму → selectedObjects содержит id, рамка видна.
+- **Палитра закрывается** — клик вне палитры закрывает её.
+- **Title после зума** — title сохраняется после ZoomPercent.
+
+### `tests/objects/FrameObject.lifecycle.test.js` — 5 unit-тестов
+
+Жизненный цикл FrameObject: подписка на ZoomPercent, корректная отписка в destroy (без утечки).
+
+### `tests/ui/FramePropertiesPanel.baseline.lifecycle.test.js` — 5 unit-тестов
+
+Жизненный цикл FramePropertiesPanel: document click handler для палитры с той же ссылкой при add/remove, destroy очищает.
+
+### `tests/core/PixiEngine.setFrameFill.test.js` — 3 unit-теста
+
+setFrameFill для frame (Container): вызывает instance.setFill; не трогает не-frame; не падает при отсутствующем объекте.
+
 ### `tests/tools/DrawingTool.lifecycle.test.js` — 6 unit-тестов
 
 Жизненный цикл DrawingTool: destroy отписывается от EventBus (BrushSet), не подписывается на HitTest, очищает tempGraphics и _eraserIdleTimer.
