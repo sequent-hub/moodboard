@@ -45,6 +45,7 @@ describe('TextPropertiesPanel baseline: lifecycle contracts', () => {
         expect(counts.get(Events.Object.Deleted)).toBe(1);
         expect(counts.get(Events.UI.TextEditStart)).toBe(1);
         expect(counts.get(Events.UI.TextEditEnd)).toBe(1);
+        expect(counts.get(Events.Object.StateChanged)).toBe(1);
     });
 
     it('show/hide pair installs and removes capture-phase mousedown hook', () => {
@@ -116,13 +117,14 @@ describe('TextPropertiesPanel baseline: lifecycle contracts', () => {
             Events.Object.Deleted,
             Events.UI.TextEditStart,
             Events.UI.TextEditEnd,
+            Events.Object.StateChanged,
         ]);
 
         panel.destroy();
 
         const unsubscribedEvents = ctx.eventBus.off.mock.calls.map(([eventName]) => eventName);
         expect(unsubscribedEvents).toEqual(subscribedEvents);
-        expect(unsubscribedEvents).toHaveLength(12);
+        expect(unsubscribedEvents).toHaveLength(13);
     });
 
     it('destroyed instance can be replaced without duplicating root layer nodes', () => {

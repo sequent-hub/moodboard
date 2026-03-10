@@ -61,6 +61,14 @@ export class DeleteObjectCommand extends BaseCommand {
         this.coreMoodboard.pixi.removeObject(this.objectId);
         
         console.log('🗑️ DeleteObjectCommand: объект удален из state и PIXI');
+
+        // Освобождаем blob URL у изображений (утечка памяти при fallback без upload)
+        const blobSrc = this.objectData?.properties?.src || this.objectData?.src;
+        if (typeof blobSrc === 'string' && blobSrc.startsWith('blob:')) {
+            try {
+                URL.revokeObjectURL(blobSrc);
+            } catch (_) {}
+        }
         
         // Если это файловый объект с fileId, удаляем файл с сервера
         if (this.fileIdToDelete && this.coreMoodboard.fileUploadService) {

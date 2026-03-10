@@ -211,12 +211,14 @@ export class PixiEngine {
             if (pixiObject instanceof PIXI.Sprite) {
                 console.log('🗑️ PixiEngine: очищаем ресурсы изображения/эмоджи');
                 
-                // Очищаем текстуру (особенно важно для data URL)
+                // Очищаем текстуру (data URL, blob URL — освобождаем память)
                 if (pixiObject.texture && pixiObject.texture !== PIXI.Texture.WHITE) {
-                    // Не уничтожаем базовые текстуры PIXI
                     const textureSource = pixiObject.texture.baseTexture?.resource?.src;
-                    if (textureSource && (textureSource.startsWith('data:') || textureSource.includes('emodji'))) {
-                        pixiObject.texture.destroy(false); // Уничтожаем только созданную текстуру
+                    if (textureSource && (textureSource.startsWith('data:') || textureSource.startsWith('blob:') || textureSource.includes('emodji'))) {
+                        if (textureSource.startsWith('blob:')) {
+                            try { URL.revokeObjectURL(textureSource); } catch (_) {}
+                        }
+                        pixiObject.texture.destroy(false);
                     }
                 }
                 

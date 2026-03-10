@@ -13,7 +13,7 @@ const FIXTURE_IMAGE = path.join(__dirname, '..', 'fixtures', 'test-image.png');
 const TOOL_GET_SELECTION = 'tool:get:selection';
 const EVENTS_KEYBOARD_UNDO = 'keyboard:undo';
 const EVENTS_KEYBOARD_REDO = 'keyboard:redo';
-const EVENTS_UI_PASTE_IMAGE = 'ui:paste-image';
+const EVENTS_KEYBOARD_DELETE = 'keyboard:delete';
 
 // Data URL для 1x1 PNG (для paste/drop без файла)
 const TINY_PNG_DATA_URL =
@@ -72,6 +72,12 @@ async function triggerRedo(page) {
   await page.evaluate((eventName) => {
     window.moodboard.coreMoodboard.eventBus.emit(eventName);
   }, EVENTS_KEYBOARD_REDO);
+}
+
+async function triggerDelete(page) {
+  await page.evaluate((eventName) => {
+    window.moodboard.coreMoodboard.eventBus.emit(eventName);
+  }, EVENTS_KEYBOARD_DELETE);
 }
 
 async function getObjectCount(page) {
@@ -392,5 +398,45 @@ test.describe('ImageTool E2E (image-add instrument)', () => {
         return Math.abs((obj?.transform?.rotation ?? 0) - afterRot) < 0.01;
       })
       .toBe(true);
+  });
+
+  test('delete: image is removed from board', async ({ page }) => {
+    const imageId = await createObject(page, 'image', { x: 300, y: 200 }, {
+      src: TINY_PNG_DATA_URL,
+      width: 180,
+      height: 120
+    });
+    await page.click('.moodboard-toolbar__button--select');
+    await setSelection(page, [imageId]);
+    await expect.poll(() => getSelection(page)).toEqual([imageId]);
+
+    await triggerDelete(page);
+
+    await expect.poll(() => getObjectById(page, imageId)).toBeNull();
+    await expect.poll(() => getObjectCount(page)).toBe(0);
+  });
+
+  test('undo/redo: delete image can be undone and redone', async ({ page }) => {
+    const imageId = await createObject(page, 'image', { x: 300, y: 200 }, {
+      src: TINY_PNG_DATA_URL,
+      width: 180,
+      height: 120
+    });
+    await page.click('.moodboard-toolbar__button--select');
+    await setSelection(page, [imageId]);
+
+    const countBefore = await getObjectCount(page);
+    await triggerDelete(page);
+    await expect.poll(() => getObjectCount(page)).toBe(countBefore - 1);
+
+    await triggerUndo(page);
+    await expect.poll(() => getObjectCount(page)).toBe(countBefore);
+    const restored = await getObjectById(page, imageId);
+    expect(restored).toBeTruthy();
+    expect(restored?.type).toBe('image');
+
+    await triggerRedo(page);
+    await expect.poll(() => getObjectCount(page)).toBe(countBefore - 1);
+    await expect.poll(() => getObjectById(page, imageId)).toBeNull();
   });
 });

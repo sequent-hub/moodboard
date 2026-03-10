@@ -196,7 +196,7 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 - Добавление записки, редактирование (двойной клик), ресайз, панель свойств (шрифты, размер, цвет текста, фон), поворот.
 - Undo/redo: добавление, редактирование, ресайз, поворот, шрифт, размер шрифта, цвет текста, фон.
 
-### `tests/image-object2/ImageTool.e2e.spec.js` — 10 E2E-тестов
+### `tests/image-object2/ImageTool.e2e.spec.js` — 12 E2E-тестов
 
 Инструмент «Добавить картинку» (основная кнопка image-add, `.moodboard-toolbar__button--image`). Кнопка image2 вне scope — см. TASK_IMAGE_TOOL.md.
 
@@ -205,9 +205,19 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 - Добавление через панель — file chooser → призрак → клик на холст. Тестовый файл: `tests/fixtures/test-image.png`.
 - Добавление через paste — `Events.UI.PasteImage` с data URL (без реального clipboard).
 - Перемещение, масштабирование, вращение — createObject(type: 'image') + ручки ресайза/поворота.
-- Undo/redo: добавление, перемещение, ресайз, поворот.
+- Удаление — Delete удаляет image с доски.
+- Undo/redo: добавление, перемещение, ресайз, поворот, удаление.
 
 **Скип:** Drop с устройства — ограничения Playwright (dataTransfer.files защищён).
+
+### `tests/core/DeleteObjectCommand.blob-revoke.test.js` — 5 unit-тестов
+
+Очистка blob URL при удалении изображения (утечка памяти).
+
+- revokeObjectURL вызывается для image с `properties.src` blob
+- revokeObjectURL для `src` на верхнем уровне объекта
+- не вызывается для http/data URL и не-image типов
+- эмитируется Object.Deleted
 
 ### `tests/tools/PlacementTool.baseline.ghost.test.js` — 4 теста (было 3)
 
