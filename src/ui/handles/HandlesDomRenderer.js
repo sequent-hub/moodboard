@@ -56,20 +56,6 @@ export class HandlesDomRenderer {
             rotation = rotationData.rotation || 0;
         }
 
-        if (id === '__group__') {
-            console.info('HtmlHandlesLayer group box diagnostics:', {
-                targetId: id,
-                worldBounds: { ...worldBounds },
-                cssRect: {
-                    left: cssRect.left,
-                    top: cssRect.top,
-                    width: cssRect.width,
-                    height: cssRect.height,
-                },
-                rotation,
-            });
-        }
-
         Object.assign(box.style, {
             position: 'absolute', left: `${left}px`, top: `${top}px`,
             width: `${width}px`, height: `${height}px`,
