@@ -27,6 +27,7 @@ export class HtmlHandlesLayer {
         this.handles = {};
         this._drag = null;
       this._handlesSuppressed = false; // скрывать ручки во время перетаскивания/трансформаций
+        this._groupRotationPreview = null;
 
       // Ссылки на обработчики, чтобы корректно отписаться при destroy()
       this._onWindowResize = null;
@@ -118,8 +119,8 @@ export class HtmlHandlesLayer {
         this.domRenderer.setHandlesVisibility(show);
     }
 
-    _showBounds(worldBounds, id) {
-        this.domRenderer.showBounds(worldBounds, id);
+    _showBounds(worldBounds, id, options = {}) {
+        this.domRenderer.showBounds(worldBounds, id, options);
     }
 
     _toWorldScreenInverse(dx, dy) {
@@ -140,6 +141,87 @@ export class HtmlHandlesLayer {
 
     _repositionBoxChildren(box) {
         this.domRenderer.repositionBoxChildren(box);
+    }
+
+    _startGroupRotationPreview(payload = {}) {
+        const selectTool = this.core?.selectTool;
+        const ids = Array.from(selectTool?.selectedObjects || []);
+        if (ids.length <= 1) {
+            this._groupRotationPreview = null;
+            return;
+        }
+        const prevPreview = this._groupRotationPreview;
+        const hasSameSelection = Boolean(
+            prevPreview &&
+            Array.isArray(prevPreview.ids) &&
+            prevPreview.ids.length === ids.length &&
+            ids.every((id) => prevPreview.ids.includes(id))
+        );
+        const measuredBounds = this.positioningService.getGroupSelectionWorldBounds(ids);
+        const startBounds = hasSameSelection
+            ? prevPreview.startBounds
+            : measuredBounds;
+        if (!startBounds) {
+            this._groupRotationPreview = null;
+            return;
+        }
+        const baseAngle = hasSameSelection ? (prevPreview.angle || 0) : 0;
+        const previewCenter = payload.center
+            ? { ...payload.center }
+            : hasSameSelection && prevPreview.center
+                ? { ...prevPreview.center }
+                : {
+                    x: startBounds.x + startBounds.width / 2,
+                    y: startBounds.y + startBounds.height / 2,
+                };
+        this._groupRotationPreview = {
+            ids,
+            center: previewCenter,
+            startBounds,
+            angle: baseAngle,
+            baseAngle,
+            isActive: true,
+            lastMeasuredCenter: {
+                x: measuredBounds ? measuredBounds.x + measuredBounds.width / 2 : previewCenter.x,
+                y: measuredBounds ? measuredBounds.y + measuredBounds.height / 2 : previewCenter.y,
+            },
+        };
+    }
+
+    _updateGroupRotationPreview(payload = {}) {
+        if (!this._groupRotationPreview) return;
+        this._groupRotationPreview.angle = (this._groupRotationPreview.baseAngle || 0) + (payload.angle || 0);
+    }
+
+    _finishGroupRotationPreview() {
+        if (!this._groupRotationPreview) return;
+        this._groupRotationPreview.isActive = false;
+        const liveBounds = this.positioningService.getGroupSelectionWorldBounds(this._groupRotationPreview.ids);
+        if (!liveBounds) return;
+        this._groupRotationPreview.lastMeasuredCenter = {
+            x: liveBounds.x + liveBounds.width / 2,
+            y: liveBounds.y + liveBounds.height / 2,
+        };
+    }
+
+    _syncGroupRotationPreviewTranslation() {
+        if (!this._groupRotationPreview || this._groupRotationPreview.isActive) return;
+        const liveBounds = this.positioningService.getGroupSelectionWorldBounds(this._groupRotationPreview.ids);
+        if (!liveBounds) return;
+        const liveCenter = {
+            x: liveBounds.x + liveBounds.width / 2,
+            y: liveBounds.y + liveBounds.height / 2,
+        };
+        const prevCenter = this._groupRotationPreview.lastMeasuredCenter;
+        if (prevCenter) {
+            this._groupRotationPreview.center.x += liveCenter.x - prevCenter.x;
+            this._groupRotationPreview.center.y += liveCenter.y - prevCenter.y;
+        }
+        this._groupRotationPreview.lastMeasuredCenter = liveCenter;
+    }
+
+    _endGroupRotationPreview() {
+        this._groupRotationPreview = null;
     }
 }
 

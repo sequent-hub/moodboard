@@ -14,7 +14,10 @@ export class HandlesEventBridge {
         const bindings = [
             [Events.Tool.SelectionAdd, () => this.host.update()],
             [Events.Tool.SelectionRemove, () => this.host.update()],
-            [Events.Tool.SelectionClear, () => this.host.hide()],
+            [Events.Tool.SelectionClear, () => {
+                this.host._endGroupRotationPreview();
+                this.host.hide();
+            }],
             [Events.Tool.DragUpdate, () => this.host.update()],
             [Events.Object.Deleted, (data) => {
                 const objectId = data?.objectId || data;
@@ -33,15 +36,33 @@ export class HandlesEventBridge {
             [Events.Tool.RotateUpdate, () => this.host.update()],
             [Events.Tool.RotateStart, () => { this.host._handlesSuppressed = true; this.host._setHandlesVisibility(false); }],
             [Events.Tool.RotateEnd, () => { this.host._handlesSuppressed = false; this.host._setHandlesVisibility(true); }],
-            [Events.Tool.GroupDragUpdate, () => this.host.update()],
+            [Events.Tool.GroupDragUpdate, () => {
+                this.host._syncGroupRotationPreviewTranslation();
+                this.host.update();
+            }],
             [Events.Tool.GroupDragStart, () => { this.host._handlesSuppressed = true; this.host._setHandlesVisibility(false); }],
             [Events.Tool.GroupDragEnd, () => { this.host._handlesSuppressed = false; this.host._setHandlesVisibility(true); }],
             [Events.Tool.GroupResizeUpdate, () => this.host.update()],
-            [Events.Tool.GroupResizeStart, () => { this.host._handlesSuppressed = true; this.host._setHandlesVisibility(false); }],
+            [Events.Tool.GroupResizeStart, () => {
+                this.host._endGroupRotationPreview();
+                this.host._handlesSuppressed = true;
+                this.host._setHandlesVisibility(false);
+            }],
             [Events.Tool.GroupResizeEnd, () => { this.host._handlesSuppressed = false; this.host._setHandlesVisibility(true); }],
-            [Events.Tool.GroupRotateUpdate, () => this.host.update()],
-            [Events.Tool.GroupRotateStart, () => { this.host._handlesSuppressed = true; this.host._setHandlesVisibility(false); }],
-            [Events.Tool.GroupRotateEnd, () => { this.host._handlesSuppressed = false; this.host._setHandlesVisibility(true); }],
+            [Events.Tool.GroupRotateUpdate, (data) => {
+                this.host._updateGroupRotationPreview(data);
+                this.host.update();
+            }],
+            [Events.Tool.GroupRotateStart, (data) => {
+                this.host._startGroupRotationPreview(data);
+                this.host._handlesSuppressed = true;
+                this.host._setHandlesVisibility(false);
+            }],
+            [Events.Tool.GroupRotateEnd, () => {
+                this.host._finishGroupRotationPreview();
+                this.host._handlesSuppressed = false;
+                this.host._setHandlesVisibility(true);
+            }],
             [Events.UI.ZoomPercent, () => this.host.update()],
             [Events.Tool.PanUpdate, () => this.host.update()],
             [Events.Object.TransformUpdated, (data) => {

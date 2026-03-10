@@ -93,4 +93,103 @@ describe('HtmlHandlesLayer baseline: transform sync contracts', () => {
         const afterRotate = ctx.container.querySelector('.mb-handles-box');
         expect(parseFloat(afterRotate.style.left)).toBeLessThan(parseFloat(afterResize.style.left));
     });
+
+    it('keeps the group box rotated after group rotation ends', () => {
+        ctx.setObject('obj-a', { x: 10, y: 10, width: 80, height: 50, type: 'note' });
+        ctx.setObject('obj-b', { x: 120, y: 30, width: 90, height: 60, type: 'note' });
+        ctx.core.selectTool.selectedObjects.add('obj-a');
+        ctx.core.selectTool.selectedObjects.add('obj-b');
+        ctx.eventBus.emit(Events.Tool.SelectionAdd, { tool: 'select', object: 'obj-a' });
+
+        const initialBox = ctx.container.querySelector('.mb-handles-box');
+        expect(initialBox.style.transform).toBe('rotate(0deg)');
+
+        ctx.eventBus.emit(Events.Tool.GroupRotateStart, {
+            objects: ['obj-a', 'obj-b'],
+            center: { x: 110, y: 50 },
+        });
+        ctx.eventBus.emit(Events.Tool.GroupRotateUpdate, {
+            objects: ['obj-a', 'obj-b'],
+            angle: 20,
+        });
+
+        const rotatingBox = ctx.container.querySelector('.mb-handles-box');
+        expect(rotatingBox.style.transform).toBe('rotate(20deg)');
+
+        ctx.eventBus.emit(Events.Tool.GroupRotateEnd, {
+            objects: ['obj-a', 'obj-b'],
+        });
+
+        const finalBox = ctx.container.querySelector('.mb-handles-box');
+        expect(finalBox.style.transform).toBe('rotate(20deg)');
+    });
+
+    it('keeps rotated group box aligned with group center during subsequent drag updates', () => {
+        ctx.setObject('obj-a', { x: 10, y: 10, width: 80, height: 50, type: 'note' });
+        ctx.setObject('obj-b', { x: 120, y: 30, width: 90, height: 60, type: 'note' });
+        ctx.core.selectTool.selectedObjects.add('obj-a');
+        ctx.core.selectTool.selectedObjects.add('obj-b');
+        ctx.eventBus.emit(Events.Tool.SelectionAdd, { tool: 'select', object: 'obj-a' });
+
+        ctx.eventBus.emit(Events.Tool.GroupRotateStart, {
+            objects: ['obj-a', 'obj-b'],
+            center: { x: 110, y: 50 },
+        });
+        ctx.eventBus.emit(Events.Tool.GroupRotateUpdate, {
+            objects: ['obj-a', 'obj-b'],
+            angle: 20,
+        });
+        ctx.eventBus.emit(Events.Tool.GroupRotateEnd, {
+            objects: ['obj-a', 'obj-b'],
+        });
+
+        const beforeDrag = ctx.container.querySelector('.mb-handles-box');
+        const beforeLeft = parseFloat(beforeDrag.style.left);
+        const beforeTop = parseFloat(beforeDrag.style.top);
+        expect(beforeDrag.style.transform).toBe('rotate(20deg)');
+
+        ctx.setObject('obj-a', { x: 50, y: 40, width: 80, height: 50, type: 'note' });
+        ctx.setObject('obj-b', { x: 160, y: 60, width: 90, height: 60, type: 'note' });
+        ctx.eventBus.emit(Events.Tool.GroupDragUpdate, { objects: ['obj-a', 'obj-b'] });
+
+        const afterDrag = ctx.container.querySelector('.mb-handles-box');
+        expect(afterDrag.style.transform).toBe('rotate(20deg)');
+        expect(parseFloat(afterDrag.style.left)).toBeGreaterThan(beforeLeft);
+        expect(parseFloat(afterDrag.style.top)).toBeGreaterThan(beforeTop);
+    });
+
+    it('continues group box rotation smoothly on repeated rotate gestures', () => {
+        ctx.setObject('obj-a', { x: 10, y: 10, width: 80, height: 50, type: 'note' });
+        ctx.setObject('obj-b', { x: 120, y: 30, width: 90, height: 60, type: 'note' });
+        ctx.core.selectTool.selectedObjects.add('obj-a');
+        ctx.core.selectTool.selectedObjects.add('obj-b');
+        ctx.eventBus.emit(Events.Tool.SelectionAdd, { tool: 'select', object: 'obj-a' });
+
+        ctx.eventBus.emit(Events.Tool.GroupRotateStart, {
+            objects: ['obj-a', 'obj-b'],
+            center: { x: 110, y: 50 },
+        });
+        ctx.eventBus.emit(Events.Tool.GroupRotateUpdate, {
+            objects: ['obj-a', 'obj-b'],
+            angle: 20,
+        });
+        ctx.eventBus.emit(Events.Tool.GroupRotateEnd, {
+            objects: ['obj-a', 'obj-b'],
+        });
+
+        const afterFirstGesture = ctx.container.querySelector('.mb-handles-box');
+        expect(afterFirstGesture.style.transform).toBe('rotate(20deg)');
+
+        ctx.eventBus.emit(Events.Tool.GroupRotateStart, {
+            objects: ['obj-a', 'obj-b'],
+            center: { x: 110, y: 50 },
+        });
+        ctx.eventBus.emit(Events.Tool.GroupRotateUpdate, {
+            objects: ['obj-a', 'obj-b'],
+            angle: 5,
+        });
+
+        const secondGestureBox = ctx.container.querySelector('.mb-handles-box');
+        expect(secondGestureBox.style.transform).toBe('rotate(25deg)');
+    });
 });

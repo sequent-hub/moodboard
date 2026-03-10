@@ -175,6 +175,7 @@ export function setupTransformFlow(core) {
         const rad = (data.angle || 0) * Math.PI / 180;
         const cos = Math.cos(rad);
         const sin = Math.sin(rad);
+        const diagnostics = [];
         for (const id of data.objects) {
             const start = core._groupRotateStart?.get(id);
             if (!start) continue;
@@ -190,7 +191,19 @@ export function setupTransformFlow(core) {
             core.updateObjectPositionDirect(id, { x: newX - halfW, y: newY - halfH });
             core.pixi.updateObjectRotation(id, newAngle);
             core.updateObjectRotationDirect(id, newAngle);
+            diagnostics.push({
+                id,
+                startAngle,
+                newAngle,
+                startCenter: { x: start.position.x, y: start.position.y },
+                newCenter: { x: newX, y: newY },
+            });
         }
+        console.info('TransformFlow group rotate diagnostics:', {
+            angleDelta: data.angle || 0,
+            center: { ...center },
+            objects: diagnostics,
+        });
         core.eventBus.emit(Events.Object.TransformUpdated, { objectId: '__group__', type: 'rotation' });
     });
 

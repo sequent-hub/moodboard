@@ -25,7 +25,7 @@ export class HandlesDomRenderer {
         }
     }
 
-    showBounds(worldBounds, id) {
+    showBounds(worldBounds, id, options = {}) {
         if (!this.host.layer) return;
 
         const cssRect = this.host.positioningService.worldBoundsToCssRect(worldBounds);
@@ -49,11 +49,25 @@ export class HandlesDomRenderer {
         const box = document.createElement('div');
         box.className = 'mb-handles-box';
 
-        let rotation = 0;
+        let rotation = options.rotation ?? 0;
         if (id !== '__group__') {
             const rotationData = { objectId: id, rotation: 0 };
             this.host.eventBus.emit(Events.Tool.GetObjectRotation, rotationData);
             rotation = rotationData.rotation || 0;
+        }
+
+        if (id === '__group__') {
+            console.info('HtmlHandlesLayer group box diagnostics:', {
+                targetId: id,
+                worldBounds: { ...worldBounds },
+                cssRect: {
+                    left: cssRect.left,
+                    top: cssRect.top,
+                    width: cssRect.width,
+                    height: cssRect.height,
+                },
+                rotation,
+            });
         }
 
         Object.assign(box.style, {
