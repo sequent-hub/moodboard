@@ -224,6 +224,27 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 
 **Рамка по контуру:** Визуальная проверка (строго по границам, без пересечений) — через unit/чек-лист при необходимости; E2E проверяет наличие рамки и ручек.
 
+### `tests/tools/DrawingTool.lifecycle.test.js` — 6 unit-тестов
+
+Жизненный цикл DrawingTool: destroy отписывается от EventBus (BrushSet), не подписывается на HitTest, очищает tempGraphics и _eraserIdleTimer.
+
+### `tests/tools/DrawingTool.points-limit.test.js` — 2 unit-тестов
+
+Лимит точек: штрих с малым числом точек без изменений; штрих с >5000 точек децимируется до MAX_POINTS.
+
+### `tests/image-object2/DrawingTool.e2e.spec.js` — 8 E2E-тестов
+
+Инструмент «Рисование» (draw, `.moodboard-toolbar__button--pencil`). Playwright E2E.
+
+**Покрытие:**
+
+- **Панель** — клик по кнопке рисования открывает popup `.moodboard-toolbar__popup--draw`, содержит карандаш, маркер, ластик (ряд 1) и presets (ряд 2).
+- **Курсор** — при активном карандаше курсор меняется (data URL SVG или crosshair).
+- **Карандаш: 3 варианта** — thin-black (2px, #111827), medium-red (4px, #ef4444), thick-green (6px, #16a34a); проверка strokeWidth и strokeColor в объекте.
+- **Маркер: 3 варианта** — yellow (#facc15), green (#22c55e), pink (#ec4899); проверка strokeColor.
+- **Ластик** — выбор ластика, активная кнопка, иконка видна.
+- **Ластик стирает** — нарисованный карандашом и маркером drawing удаляется при проведении ластиком по линии.
+
 ### `tests/core/DeleteObjectCommand.blob-revoke.test.js` — 5 unit-тестов
 
 Очистка blob URL при удалении изображения (утечка памяти).

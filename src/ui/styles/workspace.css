@@ -645,8 +645,14 @@
     gap: 8px;
 }
 
-/* Draw popup layout */
-.moodboard-draw__grid { display: grid; gap: 8px; }
+/* Draw popup layout: 2×3 grid, верхний и нижний ряд выровнены по колонкам */
+.moodboard-draw__grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+.moodboard-draw__grid > .moodboard-draw__row { display: contents; }
+.moodboard-draw__placeholder { min-width: 30px; min-height: 30px; }
 .moodboard-emoji__section { margin-bottom: 8px; }
 .moodboard-emoji__title {
     font-size: 12px;

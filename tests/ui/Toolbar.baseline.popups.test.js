@@ -88,6 +88,18 @@ describe('Toolbar baseline: popup contracts', () => {
         expect(toolbar.drawPopupEl.style.display).toBe('none');
     });
 
+    it('draw popup: pencil shows size presets, marker shows color swatches', () => {
+        container.querySelector('.moodboard-toolbar__button--pencil').click();
+        const popup = container.querySelector('.moodboard-toolbar__popup--draw');
+        expect(popup).toBeTruthy();
+        expect(popup.querySelector('.moodboard-draw__btn--size-thin-black')).toBeInTheDocument();
+        expect(popup.querySelector('.moodboard-draw__btn--marker-yellow')).not.toBeInTheDocument();
+
+        popup.querySelector('.moodboard-draw__btn--marker-tool').click();
+        expect(popup.querySelector('.moodboard-draw__btn--marker-yellow')).toBeInTheDocument();
+        expect(popup.querySelector('.moodboard-draw__btn--size-thin-black')).not.toBeInTheDocument();
+    });
+
     it('emoji popup toggles on repeated button clicks', () => {
         const button = container.querySelector('.moodboard-toolbar__button--emoji');
         expect(toolbar.emojiPopupEl.style.display).toBe('none');

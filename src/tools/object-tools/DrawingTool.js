@@ -2,6 +2,9 @@ import { BaseTool } from '../BaseTool.js';
 import { Events } from '../../core/events/Events.js';
 import * as PIXI from 'pixi.js';
 
+/** Максимум точек в одном штрихе (decimation при превышении). */
+const MAX_POINTS = 5000;
+
 /**
  * Инструмент рисования (карандаш)
  */
@@ -30,20 +33,16 @@ export class DrawingTool extends BaseTool {
         this._eraserDeleted = new Set();
         this._eraserIdleTimer = null;
 
-        // Подписка на изменения кисти (резерв на будущее)
+        this._onBrushSet = (data) => {
+            if (!data || this.destroyed) return;
+            const patch = {};
+            if (typeof data.width === 'number') patch.width = data.width;
+            if (typeof data.color === 'number') patch.color = data.color;
+            if (typeof data.mode === 'string') patch.mode = data.mode;
+            this.brush = { ...this.brush, ...patch };
+        };
         if (this.eventBus) {
-            this.eventBus.on(Events.Draw.BrushSet, (data) => {
-                if (!data) return;
-                const patch = {};
-                if (typeof data.width === 'number') patch.width = data.width;
-                if (typeof data.color === 'number') patch.color = data.color;
-                if (typeof data.mode === 'string') patch.mode = data.mode;
-                this.brush = { ...this.brush, ...patch };
-            });
-            // Удаление объектов ластиком: кликаем по объекту — если попали, удаляем
-            this.eventBus.on(Events.Tool.HitTest, (data) => {
-                // Прокси для совместимости, не используем здесь
-            });
+            this.eventBus.on(Events.Draw.BrushSet, this._onBrushSet);
         }
     }
 
@@ -64,6 +63,23 @@ export class DrawingTool extends BaseTool {
         }
         this.app = null;
         this.world = null;
+    }
+
+    destroy() {
+        if (this.destroyed) return;
+        if (this.eventBus) {
+            this.eventBus.off(Events.Draw.BrushSet, this._onBrushSet);
+        }
+        if (this._eraserIdleTimer) {
+            clearTimeout(this._eraserIdleTimer);
+            this._eraserIdleTimer = null;
+        }
+        if (this.tempGraphics) {
+            if (this.tempGraphics.parent) this.tempGraphics.parent.removeChild(this.tempGraphics);
+            this.tempGraphics.destroy();
+            this.tempGraphics = null;
+        }
+        super.destroy();
     }
 
     setCursor() {
@@ -176,8 +192,12 @@ export class DrawingTool extends BaseTool {
         const width = Math.max(1, Math.round(maxX - minX));
         const height = Math.max(1, Math.round(maxY - minY));
 
+        let pointsToUse = this.points;
+        if (pointsToUse.length > MAX_POINTS) {
+            pointsToUse = this._decimatePoints(pointsToUse, MAX_POINTS);
+        }
         // Нормализуем точки относительно левого-верхнего угла
-        const normPoints = this.points.map(pt => ({ x: pt.x - minX, y: pt.y - minY }));
+        const normPoints = pointsToUse.map(pt => ({ x: pt.x - minX, y: pt.y - minY }));
 
         // Создаем объект типа drawing через существующий пайплайн
         const position = { x: Math.round(minX), y: Math.round(minY) };
@@ -396,6 +416,20 @@ export class DrawingTool extends BaseTool {
                 this.eventBus.emit(Events.UI.ToolbarAction, { type: 'delete-object', id });
             }
         }
+    }
+
+    _decimatePoints(points, maxLen) {
+        if (!points || points.length <= maxLen) return points;
+        if (maxLen <= 2) return [points[0], points[points.length - 1]].filter(Boolean);
+        const result = [];
+        result.push(points[0]);
+        for (let i = 1; i < maxLen - 1; i++) {
+            const t = i / (maxLen - 1);
+            const idx = Math.floor(t * (points.length - 1));
+            result.push(points[idx]);
+        }
+        result.push(points[points.length - 1]);
+        return result;
     }
 
     _distancePointToSegment(px, py, ax, ay, bx, by) {
