@@ -442,7 +442,7 @@ export function openTextEditor(object, create = false) {
         isNewCreation,
         initialContent: content,
     });
-    bindTextEditorInteractions({
+    bindTextEditorInteractions(this, {
         textarea,
         isNewCreation,
         isNote,

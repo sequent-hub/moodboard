@@ -17,7 +17,15 @@ function createMockEventBus() {
                 handlers[event].forEach(h => h(data));
             }
         }),
-        off: vi.fn(),
+        off: vi.fn((event, handler) => {
+            if (!event) return;
+            if (!handlers[event]) return;
+            if (handler) {
+                handlers[event] = handlers[event].filter(h => h !== handler);
+            } else {
+                handlers[event] = [];
+            }
+        }),
         _handlers: handlers,
     };
 }
@@ -199,6 +207,23 @@ describe('NotePropertiesPanel', () => {
         it('палитра цветов текста должна содержать 6 цветов', () => {
             const swatches = panel.textColorPalette.querySelectorAll('div');
             expect(swatches.length).toBe(6);
+        });
+
+        it('fontSelect имеет класс font-select для E2E-селекторов', () => {
+            expect(panel.fontSelect.className).toContain('font-select');
+        });
+
+        it('fontSizeInput имеет класс font-size-input для E2E-селекторов', () => {
+            expect(panel.fontSizeInput.className).toContain('font-size-input');
+        });
+
+        it('swatch-элементы палитр имеют data-color-value для E2E', () => {
+            const bgSwatch = panel.backgroundColorPalette.querySelector('[data-color-value]');
+            const textSwatch = panel.textColorPalette.querySelector('[data-color-value]');
+            expect(bgSwatch).toBeTruthy();
+            expect(bgSwatch.dataset.colorValue).toMatch(/^#[0-9A-Fa-f]{6}$/);
+            expect(textSwatch).toBeTruthy();
+            expect(textSwatch.dataset.colorValue).toMatch(/^#[0-9A-Fa-f]{6}$/);
         });
     });
 
@@ -384,6 +409,31 @@ describe('NotePropertiesPanel', () => {
             eventBus.emit(Events.Tool.Activated, { tool: 'select' });
 
             expect(panel.panel.style.display).toBe('flex');
+        });
+
+        it('StateChanged для currentId обновляет контролы панели (синхронизация undo/redo)', () => {
+            const noteId = 'note-1';
+            panel.destroy();
+            core = createMockCore([noteId], noteId);
+            panel = new NotePropertiesPanel(eventBus, container, core);
+            panel.showFor(noteId);
+            expect(panel.fontSizeInput.value).toBe('24');
+
+            core.pixi.objects.get(noteId)._mb.properties.fontSize = 18;
+            eventBus.emit(Events.Object.StateChanged, { objectId: noteId, updates: { properties: { fontSize: 18 } } });
+            expect(panel.fontSizeInput.value).toBe('18');
+        });
+
+        it('StateChanged для другого objectId не обновляет контролы', () => {
+            const noteId = 'note-1';
+            panel.destroy();
+            core = createMockCore([noteId], noteId);
+            panel = new NotePropertiesPanel(eventBus, container, core);
+            panel.showFor(noteId);
+            expect(panel.fontSizeInput.value).toBe('24');
+
+            eventBus.emit(Events.Object.StateChanged, { objectId: 'other-id', updates: { properties: { fontSize: 99 } } });
+            expect(panel.fontSizeInput.value).toBe('24');
         });
     });
 

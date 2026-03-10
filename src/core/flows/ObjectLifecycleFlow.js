@@ -1,5 +1,10 @@
 import { Events } from '../events/Events.js';
-import { EditFileNameCommand, UpdateContentCommand, UpdateTextStyleCommand } from '../commands/index.js';
+import {
+    EditFileNameCommand,
+    UpdateContentCommand,
+    UpdateTextStyleCommand,
+    UpdateNoteStyleCommand,
+} from '../commands/index.js';
 
 const TEXT_STYLE_PROPS = ['fontFamily', 'fontSize', 'color', 'backgroundColor'];
 const TEXT_STYLE_DEFAULTS = {
@@ -8,6 +13,36 @@ const TEXT_STYLE_DEFAULTS = {
     color: '#000000',
     backgroundColor: 'transparent',
 };
+
+const NOTE_STYLE_PROPS = ['fontFamily', 'fontSize', 'textColor', 'backgroundColor'];
+const NOTE_STYLE_DEFAULTS = {
+    fontFamily: 'Caveat, Arial, cursive',
+    fontSize: 32,
+    textColor: 0x1a1a1a,
+    backgroundColor: 0xfff9c4,
+};
+
+/**
+ * Если updates.properties содержит ровно одно свойство стиля записки — создаёт UpdateNoteStyleCommand.
+ * @returns {boolean} true, если команда создана и применена
+ */
+function tryCreateNoteStyleCommand(core, object, objectId, updates) {
+    if (object.type !== 'note') return false;
+    if (!updates.properties || Object.keys(updates).length !== 1) return false;
+
+    const propKeys = Object.keys(updates.properties);
+    if (propKeys.length !== 1 || !NOTE_STYLE_PROPS.includes(propKeys[0])) return false;
+
+    const property = propKeys[0];
+    const newValue = updates.properties[property];
+
+    const oldValue = object.properties?.[property] ?? NOTE_STYLE_DEFAULTS[property];
+    if (oldValue === newValue) return false;
+
+    const command = new UpdateNoteStyleCommand(core, objectId, property, oldValue, newValue);
+    core.history.executeCommand(command);
+    return true;
+}
 
 /**
  * Если updates содержит ровно одно свойство стиля текста — создаёт UpdateTextStyleCommand и выполняет её.
@@ -136,6 +171,9 @@ export function setupObjectLifecycleFlow(core) {
         const objects = core.state.getObjects();
         const object = objects.find(obj => obj.id === objectId);
         if (!object) return;
+
+        const noteStyleChange = tryCreateNoteStyleCommand(core, object, objectId, updates);
+        if (noteStyleChange) return;
 
         const textStyleChange = tryCreateTextStyleCommand(core, object, objectId, updates);
         if (textStyleChange) return;

@@ -52,6 +52,15 @@ export class NotePropertiesPanel {
                 this.hide();
             }
         });
+
+        // Синхронизируем контролы при изменении объекта (undo/redo, команды)
+        this._onStateChanged = (data) => {
+            const { objectId } = data;
+            if (this.currentId && objectId === this.currentId && this.panel && this.panel.style.display !== 'none') {
+                this._updateControlsFromObject();
+            }
+        };
+        this.eventBus.on(Events.Object.StateChanged, this._onStateChanged);
     }
 
     updateFromSelection() {
@@ -207,6 +216,7 @@ export class NotePropertiesPanel {
         });
 
         const fontSelect = document.createElement('select');
+        fontSelect.className = 'font-select';
         Object.assign(fontSelect.style, {
             border: '1px solid #ddd',
             borderRadius: '4px',
@@ -299,6 +309,7 @@ export class NotePropertiesPanel {
 
         const fontSizeInput = document.createElement('input');
         fontSizeInput.type = 'number';
+        fontSizeInput.className = 'font-size-input';
         fontSizeInput.min = '8';
         fontSizeInput.max = '32';
         fontSizeInput.value = '16';
@@ -396,6 +407,7 @@ export class NotePropertiesPanel {
 
         colors.forEach(color => {
             const colorSwatch = document.createElement('div');
+            colorSwatch.dataset.colorValue = color.hex;
             Object.assign(colorSwatch.style, {
                 width: '22px',
                 height: '22px',
@@ -584,9 +596,12 @@ export class NotePropertiesPanel {
     }
 
     destroy() {
-        // Удаляем обработчик клика по документу
+        if (this._onStateChanged && this.eventBus?.off) {
+            this.eventBus.off(Events.Object.StateChanged, this._onStateChanged);
+            this._onStateChanged = null;
+        }
         document.removeEventListener('click', this._documentClickHandler.bind(this));
-        
+
         if (this.panel && this.panel.parentNode) {
             this.panel.parentNode.removeChild(this.panel);
         }

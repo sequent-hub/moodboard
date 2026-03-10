@@ -28,6 +28,11 @@ export function attachTextPropertiesPanelEventBridge(panel) {
             panel.isTextEditing = false;
             setTimeout(() => panel.updateFromSelection(), 100);
         },
+        onStateChanged: ({ objectId }) => {
+            if (panel.currentId && objectId === panel.currentId && panel.panel && panel.panel.style.display !== 'none') {
+                panel._updateControlsFromObject();
+            }
+        },
     };
 
     panel.eventBus.on(Events.Tool.SelectionAdd, panel._eventBridgeHandlers.onSelectionAdd);
@@ -42,6 +47,7 @@ export function attachTextPropertiesPanelEventBridge(panel) {
     panel.eventBus.on(Events.Object.Deleted, panel._eventBridgeHandlers.onDeleted);
     panel.eventBus.on(Events.UI.TextEditStart, panel._eventBridgeHandlers.onTextEditStart);
     panel.eventBus.on(Events.UI.TextEditEnd, panel._eventBridgeHandlers.onTextEditEnd);
+    panel.eventBus.on(Events.Object.StateChanged, panel._eventBridgeHandlers.onStateChanged);
 
     panel._eventBridgeAttached = true;
 }
@@ -64,6 +70,7 @@ export function detachTextPropertiesPanelEventBridge(panel) {
     panel.eventBus.off(Events.Object.Deleted, panel._eventBridgeHandlers.onDeleted);
     panel.eventBus.off(Events.UI.TextEditStart, panel._eventBridgeHandlers.onTextEditStart);
     panel.eventBus.off(Events.UI.TextEditEnd, panel._eventBridgeHandlers.onTextEditEnd);
+    panel.eventBus.off(Events.Object.StateChanged, panel._eventBridgeHandlers.onStateChanged);
 
     panel._eventBridgeHandlers = null;
     panel._eventBridgeAttached = false;

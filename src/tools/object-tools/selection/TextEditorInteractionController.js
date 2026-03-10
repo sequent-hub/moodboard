@@ -72,6 +72,11 @@ export function createTextEditorFinalize(controller, {
     initialContent = '',
 }) {
     return (commit) => {
+        if (controller.textEditor?._removeDomListeners) {
+            controller.textEditor._removeDomListeners();
+            controller.textEditor._removeDomListeners = null;
+        }
+
         const value = textarea.value.trim();
         const commitValue = commit && value.length > 0;
 
@@ -154,7 +159,7 @@ export function createTextEditorFinalize(controller, {
     };
 }
 
-export function bindTextEditorInteractions({
+export function bindTextEditorInteractions(controller, {
     textarea,
     isNewCreation,
     isNote,
@@ -162,16 +167,16 @@ export function bindTextEditorInteractions({
     updateNoteEditor,
     finalize,
 }) {
-    textarea.addEventListener('blur', () => {
+    const blurHandler = () => {
         const value = (textarea.value || '').trim();
         if (isNewCreation && value.length === 0) {
             finalize(false);
             return;
         }
         finalize(true);
-    });
+    };
 
-    textarea.addEventListener('keydown', (e) => {
+    const keydownHandler = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             finalize(true);
@@ -179,12 +184,24 @@ export function bindTextEditorInteractions({
             e.preventDefault();
             finalize(false);
         }
-    });
+    };
 
-    if (!isNote) {
-        textarea.addEventListener('input', autoSize);
-    } else {
-        textarea.addEventListener('input', () => { try { if (updateNoteEditor) updateNoteEditor(); } catch (_) {} });
+    const inputHandler = !isNote
+        ? autoSize
+        : () => { try { if (updateNoteEditor) updateNoteEditor(); } catch (_) {} };
+
+    textarea.addEventListener('blur', blurHandler);
+    textarea.addEventListener('keydown', keydownHandler);
+    textarea.addEventListener('input', inputHandler);
+
+    const removeDomListeners = () => {
+        textarea.removeEventListener('blur', blurHandler);
+        textarea.removeEventListener('keydown', keydownHandler);
+        textarea.removeEventListener('input', inputHandler);
+    };
+
+    if (controller.textEditor) {
+        controller.textEditor._removeDomListeners = removeDomListeners;
     }
 }
 

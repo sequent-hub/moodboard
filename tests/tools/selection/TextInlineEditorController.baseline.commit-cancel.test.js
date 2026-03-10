@@ -11,6 +11,7 @@ import {
     createMockEventBus,
     installDefaultGlobals,
     installDeterministicComputedStyle,
+    setupNoteResponders,
 } from './InlineEditorController.baseline.helpers.js';
 
 installDefaultGlobals();
@@ -130,6 +131,37 @@ describe('TextInlineEditorController baseline: commit/cancel', () => {
         });
         expect(collectEventPayloads(eventBus, Events.Tool.ShowObjectText)).toContainEqual({
             objectId: 'text-cancel-existing',
+        });
+    });
+
+    it('commit existing note emits ContentChange (undo/redo)', () => {
+        setupNoteResponders(eventBus, {
+            objectId: 'note-commit-1',
+            position: { x: 20, y: 40 },
+            size: { width: 200, height: 150 },
+        });
+
+        openTextEditor.call(
+            ctx,
+            {
+                id: 'note-commit-1',
+                type: 'note',
+                position: { x: 20, y: 40 },
+                properties: { content: 'Note before', fontSize: 18 },
+            },
+            false
+        );
+
+        ctx.textEditor.textarea.value = 'Note after edit';
+        ctx.textEditor.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+        expect(collectEventPayloads(eventBus, Events.UI.NoteEditEnd)).toContainEqual({
+            objectId: 'note-commit-1',
+        });
+        expect(collectEventPayloads(eventBus, Events.Object.ContentChange)).toContainEqual({
+            objectId: 'note-commit-1',
+            oldContent: 'Note before',
+            newContent: 'Note after edit',
         });
     });
 

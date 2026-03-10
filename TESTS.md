@@ -36,12 +36,12 @@
 - **register()** — новый тип, создание объектов, защита от пустых аргументов, перезапись типа
 - **Интеграция** — цикл создания записки, eventBus не передаётся для note
 
-### `tests/ui/NotePropertiesPanel.test.js` — 70 тестов
+### `tests/ui/NotePropertiesPanel.test.js` — 73 теста
 
 Панель свойств записки (`src/ui/NotePropertiesPanel.js`).
 
 - **Конструктор** — сохранение зависимостей, инициализация, подписка на EventBus, core = null
-- **DOM-структура** — класс/id панели, селектор шрифтов (12 шрифтов, Caveat первый), кнопки цветов фона/текста, палитры (по 6 цветов), поле размера шрифта (min=8, max=32)
+- **DOM-структура** — класс/id панели, селектор шрифтов (12 шрифтов, Caveat первый), кнопки цветов фона/текста, палитры (по 6 цветов), поле размера шрифта (min=8, max=32); font-select, font-size-input, data-color-value на swatch для E2E
 - **show/hide** — showFor() показывает, hide() скрывает, скрытие палитр, вызов _updateControlsFromObject
 - **updateFromSelection()** — пустая выборка, множественная выборка, одиночная записка, не-записка, несуществующий объект, дублирование
 - **Реакция на события** — SelectionClear, Object.Deleted (свой/чужой), DragStart, GroupDragStart, Tool.Activated (select / другой)
@@ -175,6 +175,42 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 
 - Добавление текста, редактирование (двойной клик), ресайз, панель свойств (все шрифты, все размеры, цвет, фон), поворот.
 - Undo/redo: добавление, редактирование, ресайз, шрифт, размер шрифта, цвет, фон, поворот.
+
+### `tests/image-object2/NoteTool.e2e.spec.js` — 19 E2E-тестов
+
+Инструмент «Записка» (note-add). Playwright E2E.
+
+**История изменений:**
+
+- **Было:** E2E-тестов для записки не было. Изменения свойств (шрифт, размер, цвет, фон) через `NotePropertiesPanel` шли через `Object.StateChanged` без команд — undo/redo не работали.
+- **Сделано:**
+  - Добавлены E2E-тесты: добавление записки через note-add, редактирование (двойной клик), ресайз ручками, панель свойств (.note-properties-panel: шрифт, размер, цвет текста, фон), поворот.
+  - Введена команда `UpdateNoteStyleCommand` — undo/redo для fontFamily, fontSize, textColor, backgroundColor. Перехват `StateChanged` в `ObjectLifecycleFlow` для `object.type === 'note'`.
+  - `Object.ContentChange` при закрытии редактора записки уже эмитился (проверено unit-тестом в TextInlineEditorController.baseline.commit-cancel).
+  - В `NotePropertiesPanel` добавлены классы `.font-select`, `.font-size-input` и `data-color-value` на swatch-элементах для надёжных E2E-селекторов.
+- **Результат:** 19 тестов (18 passed, 1 skipped). Skipped: «note edit cancel (Escape)» — возможная гонка blur/Escape, требуется диагностика.
+- **Особенности:** Записка создаётся сразу с дефолтным текстом «Новая записка» (без editOnCreate в отличие от текста).
+
+**Покрытие:**
+
+- Добавление записки, редактирование (двойной клик), ресайз, панель свойств (шрифты, размер, цвет текста, фон), поворот.
+- Undo/redo: добавление, редактирование, ресайз, поворот, шрифт, размер шрифта, цвет текста, фон.
+
+### `tests/core/UpdateNoteStyleCommand.test.js` — 15 unit-тестов
+
+Команда `UpdateNoteStyleCommand` (`src/core/commands/UpdateNoteStyleCommand.js`).
+
+- **execute** — применение fontFamily, fontSize, textColor, backgroundColor в object.properties и вызов instance.setStyle; создание properties при отсутствии.
+- **undo** — восстановление каждого свойства.
+- **canMergeWith** — true для той же objectId+property; false для другого objectId/property/типа команды.
+- **mergeWith** — обновление newValue и timestamp; выброс при несовместимой команде.
+
+### `tests/core/ObjectLifecycleFlow.note-style.test.js` — 5 тестов
+
+Перехват `StateChanged` для записки в `ObjectLifecycleFlow`.
+
+- StateChanged с properties.fontFamily/fontSize/textColor/backgroundColor для note → history.executeCommand(UpdateNoteStyleCommand).
+- StateChanged для text по-прежнему создаёт UpdateTextStyleCommand (не перехватывается note).
 
 ### `tests/core/HistoryManager.baseline.test.js` — 24 теста
 
