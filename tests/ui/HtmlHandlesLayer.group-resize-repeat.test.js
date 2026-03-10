@@ -4,6 +4,8 @@ import { setupTransformFlow } from '../../src/core/flows/TransformFlow.js';
 import { Events } from '../../src/core/events/Events.js';
 import { HtmlHandlesLayer } from '../../src/ui/HtmlHandlesLayer.js';
 
+// Тестовая геометрия ручек повторяет пользовательское взаимодействие:
+// реальная точка захвата находится на уже повернутой рамке, а не в осевых координатах.
 function rotatePoint(point, center, angleDeg) {
     const angleRad = angleDeg * Math.PI / 180;
     const cos = Math.cos(angleRad);
@@ -16,6 +18,8 @@ function rotatePoint(point, center, angleDeg) {
     };
 }
 
+// Возвращаем экранную координату угла рамки с учетом ее текущего CSS-rotation.
+// Это позволяет моделировать drag так, как его делает пользователь мышью.
 function getBoxCornerPoint(box, handleType) {
     const left = parseFloat(box.style.left);
     const top = parseFloat(box.style.top);
@@ -32,6 +36,8 @@ function getBoxCornerPoint(box, handleType) {
     return rotatePoint(localPoint, center, rotation);
 }
 
+// Снимок текущей геометрии объектов нужен, чтобы проверять не только рамку,
+// но и отсутствие скачка у самих объектов внутри группы.
 function snapshotObjects(core) {
     return core.state.state.objects.map((object) => ({
         id: object.id,
@@ -41,6 +47,9 @@ function snapshotObjects(core) {
     }));
 }
 
+// Быстрый helper для приведения двух объектов к одному и тому же
+// исходному сценарию "группа уже повернута". Это уменьшает шум в кейсах
+// и делает смысл каждого теста проще для чтения.
 function resetToRotatedGroup(ctx) {
     ctx.core.state.state.objects[0].position = { x: 10, y: 20 };
     ctx.core.state.state.objects[0].width = 100;
@@ -75,6 +84,7 @@ function resetToRotatedGroup(ctx) {
     });
 }
 
+// Изолированный EventBus для UI-level жестов resize/rotate.
 function createEventBus() {
     const handlers = new Map();
     return {
@@ -96,6 +106,9 @@ function createEventBus() {
     };
 }
 
+// Контекст для тестов повторного группового resize.
+// Здесь нам важно не полное приложение, а воспроизводимая связка:
+// HTML-рамка -> eventBus -> TransformFlow -> state/pixi.
 function createResizePipelineContext() {
     const eventBus = createEventBus();
     const container = document.createElement('div');
@@ -278,6 +291,8 @@ describe('HtmlHandlesLayer group resize repeat gesture', () => {
     });
 
     it('continues group resize smoothly on repeated handle grabs', () => {
+        // Базовый regression: второй жест resize должен стартовать
+        // от уже обновленной рамки, а не прыгать к старой геометрии группы.
         const startEvents = [];
         const originalEmit = ctx.core.eventBus.emit;
         ctx.core.eventBus.emit = vi.fn((event, payload) => {
@@ -338,6 +353,9 @@ describe('HtmlHandlesLayer group resize repeat gesture', () => {
     });
 
     it('keeps rotated group frame angle during resize after rotation', () => {
+        // Страхуем переход rotate -> resize:
+        // рамка не должна выпрямляться в момент, когда пользователь
+        // начинает тянуть угловую ручку уже повернутой группы.
         ctx.core.eventBus.emit(Events.Tool.GroupRotateStart, {
             objects: ['obj-a', 'obj-b'],
             center: { x: 125, y: 55 },
@@ -369,6 +387,8 @@ describe('HtmlHandlesLayer group resize repeat gesture', () => {
     });
 
     it('keeps group resize proportional while shift is pressed after rotation', () => {
+        // Пропорции должны фиксироваться и у повернутой группы,
+        // а не только у обычного осевого прямоугольника.
         ctx.core.eventBus.emit(Events.Tool.GroupRotateStart, {
             objects: ['obj-a', 'obj-b'],
             center: { x: 125, y: 55 },
@@ -405,6 +425,8 @@ describe('HtmlHandlesLayer group resize repeat gesture', () => {
     });
 
     it('continues proportional group resize smoothly on repeated handle grabs with shift', () => {
+        // Повторный жест с уже включенным Shift не должен сбрасывать
+        // ни базу пропорций, ни текущий угол рамки.
         ctx.core.eventBus.emit(Events.Tool.GroupRotateStart, {
             objects: ['obj-a', 'obj-b'],
             center: { x: 125, y: 55 },
@@ -470,6 +492,9 @@ describe('HtmlHandlesLayer group resize repeat gesture', () => {
     });
 
     it('does not jump when shift proportional resize starts from inside a rotated corner handle', () => {
+        // Пользователь почти никогда не попадает мышью в "идеальную"
+        // математическую вершину угла. Этот тест страхует реальный UX:
+        // захват внутри самой ручки не должен порождать скачок.
         resetToRotatedGroup(ctx);
 
         let box = ctx.container.querySelector('.mb-handles-box');
@@ -519,6 +544,9 @@ describe('HtmlHandlesLayer group resize repeat gesture', () => {
     });
 
     it('enables proportional resize smoothly when shift is pressed during an active rotated group resize', () => {
+        // Включение Shift посреди активного drag - отдельный режимный переход.
+        // В этот момент нельзя допускать скачка: сначала происходит rebase,
+        // а уже следующее движение должно продолжить resize плавно.
         ctx.core.eventBus.emit(Events.Tool.GroupRotateStart, {
             objects: ['obj-a', 'obj-b'],
             center: { x: 125, y: 55 },
@@ -585,6 +613,9 @@ describe('HtmlHandlesLayer group resize repeat gesture', () => {
     });
 
     it('keeps shift-resize continuous for all rotated corner handles', () => {
+        // Один и тот же дефект легко починить только для `se`,
+        // но забыть про остальные углы. Поэтому проверяем все 4 ручки
+        // маленькими движениями и контролируем непрерывность для рамки и объектов.
         const handles = ['nw', 'ne', 'se', 'sw'];
 
         for (const handleType of handles) {
@@ -668,6 +699,10 @@ describe('HtmlHandlesLayer group resize repeat gesture', () => {
     });
 
     it('does not produce a large proportional jump across tiny pointer moves at steep rotation', () => {
+        // Это regression на реальный баг из чата:
+        // при крутом угле поворота и Shift ветка aspect-lock могла
+        // резко перескочить на другую "ведущую ось" от микросдвига мыши.
+        // Здесь фиксируем, что соседние mousemove меняют размеры постепенно.
         ctx.core.eventBus.emit(Events.Tool.GroupRotateStart, {
             objects: ['obj-a', 'obj-b'],
             center: { x: 125, y: 55 },

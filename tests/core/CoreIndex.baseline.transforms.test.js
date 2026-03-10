@@ -235,6 +235,9 @@ describe('Core index baseline: transform contracts', () => {
     });
 
     it('GroupResizeUpdate scales each object around the group center using object centers', () => {
+        // Критичный контракт group resize:
+        // ядро должно масштабировать объекты относительно их центров,
+        // иначе при первом же увеличении группа "разъезжается".
         const ctx = prepareTransformContext([
             {
                 id: 'obj-a',
@@ -280,6 +283,8 @@ describe('Core index baseline: transform contracts', () => {
     });
 
     it('GroupResizeStart after previous gesture continues from current geometry without jump', () => {
+        // Второй resize-жест обязан стартовать от текущей геометрии,
+        // а не от исходного снимка первого resize. Иначе возникает скачок.
         const ctx = prepareTransformContext([
             {
                 id: 'obj-a',

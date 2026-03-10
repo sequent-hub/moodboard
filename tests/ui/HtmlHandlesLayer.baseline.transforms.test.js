@@ -74,6 +74,8 @@ describe('HtmlHandlesLayer baseline: transform sync contracts', () => {
     });
 
     it('recalculates group geometry on group transform events', () => {
+        // Базовая страховка: слой HTML-рамки должен реагировать
+        // на групповые трансформации, а не только на одиночные объекты.
         ctx.setObject('obj-a', { x: 10, y: 10, width: 80, height: 50, type: 'note' });
         ctx.setObject('obj-b', { x: 120, y: 30, width: 90, height: 60, type: 'note' });
         ctx.core.selectTool.selectedObjects.add('obj-a');
@@ -95,6 +97,8 @@ describe('HtmlHandlesLayer baseline: transform sync contracts', () => {
     });
 
     it('keeps the group box rotated after group rotation ends', () => {
+        // После завершения rotate-жеста рамка не должна "выпрямляться" обратно.
+        // Иначе следующий жест начинается уже из неверной визуальной геометрии.
         ctx.setObject('obj-a', { x: 10, y: 10, width: 80, height: 50, type: 'note' });
         ctx.setObject('obj-b', { x: 120, y: 30, width: 90, height: 60, type: 'note' });
         ctx.core.selectTool.selectedObjects.add('obj-a');
@@ -125,6 +129,8 @@ describe('HtmlHandlesLayer baseline: transform sync contracts', () => {
     });
 
     it('keeps rotated group box aligned with group center during subsequent drag updates', () => {
+        // Этот кейс фиксирует связку rotate -> drag.
+        // Повернутая рамка должна продолжать ехать за группой без потери угла.
         ctx.setObject('obj-a', { x: 10, y: 10, width: 80, height: 50, type: 'note' });
         ctx.setObject('obj-b', { x: 120, y: 30, width: 90, height: 60, type: 'note' });
         ctx.core.selectTool.selectedObjects.add('obj-a');
@@ -159,6 +165,8 @@ describe('HtmlHandlesLayer baseline: transform sync contracts', () => {
     });
 
     it('continues group box rotation smoothly on repeated rotate gestures', () => {
+        // Повторный захват rotate-handle не должен сбрасывать угол в ноль.
+        // Новый жест обязан продолжаться от уже накопленного поворота.
         ctx.setObject('obj-a', { x: 10, y: 10, width: 80, height: 50, type: 'note' });
         ctx.setObject('obj-b', { x: 120, y: 30, width: 90, height: 60, type: 'note' });
         ctx.core.selectTool.selectedObjects.add('obj-a');

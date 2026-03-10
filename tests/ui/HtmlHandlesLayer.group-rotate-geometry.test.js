@@ -4,10 +4,15 @@ import { setupTransformFlow } from '../../src/core/flows/TransformFlow.js';
 import { Events } from '../../src/core/events/Events.js';
 import { HtmlHandlesLayer } from '../../src/ui/HtmlHandlesLayer.js';
 
+// Локальная математика поворота нужна тесту не для дублирования production-кода,
+// а чтобы проверять главный внешний инвариант:
+// углы объектов должны оставаться внутри повернутой рамки группы.
 function degToRad(angle) {
     return angle * Math.PI / 180;
 }
 
+// Вспомогательный поворот точки вокруг центра.
+// Используется только как тестовый oracle для геометрических проверок.
 function rotatePoint(point, center, angleDeg) {
     const rad = degToRad(angleDeg);
     const cos = Math.cos(rad);
@@ -20,6 +25,8 @@ function rotatePoint(point, center, angleDeg) {
     };
 }
 
+// Строим 4 угла объекта после его собственного поворота.
+// Именно эти точки затем проверяются на попадание внутрь групповой рамки.
 function getObjectCorners({ x, y, width, height, rotation }) {
     const center = { x: x + width / 2, y: y + height / 2 };
     const corners = [
@@ -31,6 +38,8 @@ function getObjectCorners({ x, y, width, height, rotation }) {
     return corners.map((corner) => rotatePoint(corner, center, rotation || 0));
 }
 
+// Упрощенный AABB над уже повернутыми углами объекта.
+// Нужен для тестового mock `pixiObject.getBounds()`.
 function getAxisAlignedBounds(corners) {
     const xs = corners.map((point) => point.x);
     const ys = corners.map((point) => point.y);
@@ -46,6 +55,7 @@ function getAxisAlignedBounds(corners) {
     };
 }
 
+// Минимальный EventBus для изолированного геометрического теста.
 function createEventBus() {
     const handlers = new Map();
     return {
@@ -67,6 +77,9 @@ function createEventBus() {
     };
 }
 
+// Поднимаем маленькое "ядро" из трех квадратов.
+// Такая конфигурация специально чувствительна к ошибкам групповой математики:
+// если рамка или центры считаются неверно, углы быстро вылезают наружу.
 function createRotationGeometryContext() {
     const eventBus = createEventBus();
     const container = document.createElement('div');
@@ -225,6 +238,8 @@ function createRotationGeometryContext() {
     };
 }
 
+// Проверка идет в локальных координатах повернутой рамки:
+// сначала "разворачиваем" точку обратно, затем сравниваем с прямоугольником.
 function pointInsideRotatedFrame(point, frame) {
     const center = {
         x: frame.left + frame.width / 2,
@@ -268,6 +283,8 @@ describe('HtmlHandlesLayer group rotate geometry', () => {
     });
 
     it('keeps all selected square corners inside the rotated group frame during and after rotation', () => {
+        // Выбираем три квадрата, чтобы тестировать не только пару объектов,
+        // но и случай, когда у группы есть "сложная" конфигурация углов.
         const ids = ['sq-a', 'sq-b', 'sq-c'];
         ids.forEach((id) => {
             ctx.core.selectTool.selectedObjects.add(id);
@@ -284,6 +301,8 @@ describe('HtmlHandlesLayer group rotate geometry', () => {
             angle: 30,
         });
 
+        // Во время активного поворота рамка должна оставаться
+        // минимальной повернутой оболочкой группы.
         let box = ctx.container.querySelector('.mb-handles-box');
         let frame = {
             left: parseFloat(box.style.left),
@@ -308,6 +327,8 @@ describe('HtmlHandlesLayer group rotate geometry', () => {
 
         ctx.core.eventBus.emit(Events.Tool.GroupRotateEnd, { objects: ids });
 
+        // После завершения поворота контракт тот же:
+        // рамка остается под тем же углом и не должна "терять" углы объектов.
         box = ctx.container.querySelector('.mb-handles-box');
         frame = {
             left: parseFloat(box.style.left),
@@ -332,6 +353,8 @@ describe('HtmlHandlesLayer group rotate geometry', () => {
     });
 
     it('keeps all selected square corners inside the rotated group frame during resize after rotation', () => {
+        // Этот кейс страхует наиболее хрупкий переход:
+        // сначала поворот, затем resize той же группы без снятия выделения.
         const ids = ['sq-a', 'sq-b', 'sq-c'];
         ids.forEach((id) => {
             ctx.core.selectTool.selectedObjects.add(id);
@@ -349,6 +372,8 @@ describe('HtmlHandlesLayer group rotate geometry', () => {
         });
         ctx.core.eventBus.emit(Events.Tool.GroupRotateEnd, { objects: ids });
 
+        // Стартуем resize не по координатам экрана "примерно",
+        // а по реальной геометрии повернутой ручки `se`.
         let box = ctx.container.querySelector('.mb-handles-box');
         const frameBefore = {
             left: parseFloat(box.style.left),
@@ -395,6 +420,8 @@ describe('HtmlHandlesLayer group rotate geometry', () => {
             clientY: endPointer.y,
         });
 
+        // После resize главный инвариант не меняется:
+        // рамка все еще обязана покрывать все углы выбранных объектов.
         box = ctx.container.querySelector('.mb-handles-box');
         const frame = {
             left: parseFloat(box.style.left),

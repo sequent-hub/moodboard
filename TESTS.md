@@ -66,6 +66,40 @@
 
 - **mouseup после rotate-start** — проверяет, что `RotateEnd` эмитится даже если `currentTarget` исходного события больше недоступен; страхует от падения в конце rotate-flow.
 
+### `tests/ui/HtmlHandlesLayer.baseline.transforms.test.js` — baseline-regressions групповых трансформаций
+
+Базовые контракты синхронизации HTML-рамки и выделения (`src/ui/HtmlHandlesLayer.js`).
+
+- **GroupRotateEnd сохраняет угол рамки** — рамка не должна самопроизвольно выпрямляться после завершения группового поворота.
+- **GroupDragUpdate после поворота** — повернутая рамка должна продолжать ехать вместе с группой, не теряя угол.
+- **Повторный group rotate** — новый жест поворота должен продолжаться от уже накопленного угла, без скачка назад к `0deg`.
+
+### `tests/ui/HtmlHandlesLayer.group-rotate-geometry.test.js` — геометрия повернутой рамки группы
+
+Геометрические регрессии для `rotate -> resize` у группы (`src/ui/HtmlHandlesLayer.js`, `src/ui/handles/HandlesInteractionController.js`, `src/core/flows/TransformFlow.js`).
+
+- **Поворот группы из нескольких квадратов** — все углы выбранных объектов должны оставаться внутри повернутой рамки во время поворота и после `GroupRotateEnd`.
+- **Resize уже повернутой группы** — после перехода `rotate -> resize` рамка должна оставаться по контурам объектов, а не пропускать углы наружу.
+
+### `tests/ui/HtmlHandlesLayer.group-resize-repeat.test.js` — regressions повторного group resize
+
+UI-level regressions для `group resize` и `Shift`-режима (`src/ui/handles/HandlesInteractionController.js`, `src/core/flows/TransformFlow.js`).
+
+- **Повторный захват ручки** — второй `group resize` должен стартовать от текущей рамки, без скачка к старой геометрии.
+- **`rotate -> resize`** — повернутая рамка не должна выпрямляться в момент входа в resize.
+- **`Shift` после поворота** — пропорции рамки должны фиксироваться и оставаться стабильными.
+- **Повторный пропорциональный resize** — второй жест с `Shift` должен продолжаться плавно от текущего размера.
+- **Нажатие `Shift` во время активного жеста** — включение фиксации пропорций не должно вызывать скачок базы.
+- **Все четыре угловые ручки** — маленькое движение курсора с `Shift` не должно давать крупный скачок рамки или объектов.
+- **Крутой угол поворота** — на последовательности соседних `mousemove` пропорциональный resize не должен менять доминирующую ось скачкообразно.
+
+### `tests/core/CoreIndex.baseline.transforms.test.js` — core-regressions группового resize
+
+Базовые контракты ядра для `TransformFlow` (`src/core/flows/TransformFlow.js`).
+
+- **GroupResizeUpdate использует центры объектов** — групповое масштабирование должно считаться от центров, а не от `top-left`.
+- **Повторный GroupResizeStart** — новый resize-жест должен продолжаться от текущей геометрии группы, без скачка.
+
 ### `tests/tools/PlacementTool.test.js` — 51 тест
 
 Инструмент размещения записки на холсте (`src/tools/object-tools/PlacementTool.js`).
