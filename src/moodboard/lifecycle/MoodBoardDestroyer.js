@@ -35,6 +35,9 @@ export function destroyMoodBoard(board) {
     safeDestroy(board.notePropertiesPanel, 'notePropertiesPanel');
     board.notePropertiesPanel = null;
 
+    safeDestroy(board.filePropertiesPanel, 'filePropertiesPanel');
+    board.filePropertiesPanel = null;
+
     safeDestroy(board.alignmentGuides, 'alignmentGuides');
     board.alignmentGuides = null;
 

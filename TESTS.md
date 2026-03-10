@@ -210,6 +210,37 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 
 **Скип:** Drop с устройства — ограничения Playwright (dataTransfer.files защищён).
 
+### `tests/image-object2/FileTool.e2e.spec.js` — 15 E2E-тестов
+
+Инструмент «Добавить файл» (attachments, `.moodboard-toolbar__button--attachments`). Playwright E2E.
+
+**Покрытие:**
+
+- Диалог выбора файла — клик по кнопке открывает filechooser, setFiles с фикстурой `tests/fixtures/test-file.txt`.
+- Призрак — после выбора файла ghostContainer появляется, следует за курсором.
+- FileCanceled — Place.FileCanceled скрывает призрак.
+- Добавление на доску — file chooser → ghost → клик на холст (upload fallback без бэкенда) → объект `type: 'file'` в exportBoard.
+- Fallback-файл имеет размеры 120×140.
+- Длинное имя файла — не ломает объект, рамка видна.
+- Рамка и ручки — при выделении файла `.mb-handles-box` виден; ручки ресайза скрыты для file (`isFileTarget`).
+- Панель свойств — `.moodboard-file-properties-panel`, кнопка `.moodboard-file-panel-download` («Скачать»).
+- Кнопка «Скачать» disabled при отсутствии fileId; при fileId — клик вызывает fetch (проверка через page.route).
+- Перемещение — createObject(type: 'file') + drag.
+- Удаление — Delete удаляет file с доски.
+- Undo/redo — удаление можно отменить и восстановить, redo снова удаляет.
+
+### `tests/ui/FilePropertiesPanel.test.js` — 14 unit-тестов
+
+Панель свойств файла (`src/ui/FilePropertiesPanel.js`).
+
+**Покрытие:** конструктор, DOM-структура, updateFromSelection (пустая/множественная/одиночная выборка, не-файл), destroy (удаление из DOM, отписка от EventBus).
+
+### `tests/objects/FileObject.test.js` — 3 unit-теста
+
+Объект файла (`src/objects/FileObject.js`).
+
+**Покрытие:** _redraw не накапливает extensionText (утечка), _formatFileSize, _getIconColor.
+
 ### `tests/image-object2/ShapesTool.e2e.spec.js` — 16 E2E-тестов
 
 Инструмент «Фигуры» (shapes, `.moodboard-toolbar__button--shapes`). Playwright E2E.
@@ -254,9 +285,11 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 - не вызывается для http/data URL и не-image типов
 - эмитируется Object.Deleted
 
-### `tests/tools/PlacementTool.baseline.ghost.test.js` — 4 теста (было 3)
+### `tests/tools/PlacementTool.baseline.ghost.test.js` — 5 тестов
 
-Добавлен тест для image: `Place.ImageSelected` → `showImageGhost` → ghost в world, `updateGhostPosition` обновляет координаты. Учтена асинхронность `showImageGhost` (PIXI.Texture.fromURL).
+- Note, shape, frame: ghost show/hide/update, zoom/pan mapping, deactivate/destroy.
+- Image: `Place.ImageSelected` → `showImageGhost` → ghost в world (async).
+- File: `Place.FileSelected` → `showFileGhost` → ghost 120×140 в world.
 
 ### `tests/core/UpdateNoteStyleCommand.test.js` — 15 unit-тестов
 

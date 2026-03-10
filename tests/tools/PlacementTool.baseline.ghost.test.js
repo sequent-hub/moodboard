@@ -101,4 +101,24 @@ describe('PlacementTool baseline: ghost behavior', () => {
         expect(tool.ghostContainer.x).toBe(50);
         expect(tool.ghostContainer.y).toBe(75);
     });
+
+    it('Place.FileSelected → showFileGhost adds ghost to world with 120×140', () => {
+        const file = new File(['doc content'], 'document.pdf', { type: 'application/pdf' });
+        eventBus.emit(Events.Place.FileSelected, {
+            file,
+            fileName: 'document.pdf',
+            fileSize: 100,
+            mimeType: 'application/pdf',
+            properties: { width: 120, height: 140 }
+        });
+
+        expect(tool.ghostContainer).not.toBeNull();
+        expect(world.addChild).toHaveBeenCalledWith(tool.ghostContainer);
+        expect(tool.ghostContainer.pivot.x).toBe(60);
+        expect(tool.ghostContainer.pivot.y).toBe(70);
+
+        tool.updateGhostPosition(80, 90);
+        expect(tool.ghostContainer.x).toBe(80);
+        expect(tool.ghostContainer.y).toBe(90);
+    });
 });

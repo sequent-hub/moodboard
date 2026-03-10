@@ -221,19 +221,30 @@ export class FileObject {
         g.lineTo(x + size * 0.8 - cornerSize, y);
         g.endFill();
         
-        // Текст расширения на иконке
+        // Текст расширения на иконке — удаляем старый перед созданием нового (предотвращает утечку при _redraw)
+        if (this._extensionText) {
+            try {
+                this.container.removeChild(this._extensionText);
+            } catch (_) {}
+            try {
+                this._extensionText.destroy();
+            } catch (_) {}
+            this._extensionText = null;
+        }
         if (extension && extension.length <= 4) {
-            const extensionText = new PIXI.Text(extension.toUpperCase(), {
+            this._extensionText = new PIXI.Text(extension.toUpperCase(), {
                 fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
                 fontSize: Math.max(8, size * 0.2),
                 fill: 0xFFFFFF,
                 align: 'center',
                 fontWeight: 'bold'
             });
-            extensionText.anchor.set(0.5, 0.5);
-            extensionText.x = x + size * 0.4;
-            extensionText.y = y + size * 0.7;
-            this.container.addChild(extensionText);
+            this._extensionText.anchor.set(0.5, 0.5);
+            this._extensionText.x = x + size * 0.4;
+            this._extensionText.y = y + size * 0.7;
+            this.container.addChild(this._extensionText);
+        } else {
+            this._extensionText = null;
         }
     }
 

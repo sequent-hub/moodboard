@@ -17,42 +17,47 @@ export class FilePropertiesPanel {
     }
 
     _attachEvents() {
-        // Показываем панель при изменении выделения
-        this.eventBus.on(Events.Tool.SelectionAdd, () => this.updateFromSelection());
-        this.eventBus.on(Events.Tool.SelectionRemove, () => this.updateFromSelection());
-        this.eventBus.on(Events.Tool.SelectionClear, () => this.hide());
-
-        // Скрываем панель при удалении объекта
-        this.eventBus.on(Events.Object.Deleted, (data) => {
+        this._handlers = {};
+        this._handlers.onSelectionAdd = () => this.updateFromSelection();
+        this._handlers.onSelectionRemove = () => this.updateFromSelection();
+        this._handlers.onSelectionClear = () => this.hide();
+        this._handlers.onDeleted = (data) => {
             const objectId = data?.objectId || data;
             if (this.currentId && objectId === this.currentId) this.hide();
-        });
-
-        // Обновляем позицию / скрываем во время перетаскивания
-        this.eventBus.on(Events.Tool.DragStart, () => this.hide());
-        this.eventBus.on(Events.Tool.DragUpdate, () => this.reposition());
-        this.eventBus.on(Events.Tool.DragEnd, () => this.updateFromSelection());
-        this.eventBus.on(Events.Tool.GroupDragUpdate, () => this.reposition());
-        this.eventBus.on(Events.Tool.GroupDragStart, () => this.hide());
-        this.eventBus.on(Events.Tool.GroupDragEnd, () => this.updateFromSelection());
-        this.eventBus.on(Events.Tool.ResizeUpdate, () => this.reposition());
-        this.eventBus.on(Events.Tool.RotateUpdate, () => this.reposition());
-
-        // Обновляем позицию при зуме/пане
-        this.eventBus.on(Events.UI.ZoomPercent, () => {
+        };
+        this._handlers.onDragStart = () => this.hide();
+        this._handlers.onDragUpdate = () => this.reposition();
+        this._handlers.onDragEnd = () => this.updateFromSelection();
+        this._handlers.onGroupDragUpdate = () => this.reposition();
+        this._handlers.onGroupDragStart = () => this.hide();
+        this._handlers.onGroupDragEnd = () => this.updateFromSelection();
+        this._handlers.onResizeUpdate = () => this.reposition();
+        this._handlers.onRotateUpdate = () => this.reposition();
+        this._handlers.onZoomPercent = () => {
             if (this.currentId) this.reposition();
-        });
-
-        this.eventBus.on(Events.Tool.PanUpdate, () => {
+        };
+        this._handlers.onPanUpdate = () => {
             if (this.currentId) this.reposition();
-        });
+        };
+        this._handlers.onActivated = ({ tool }) => {
+            if (tool !== 'select') this.hide();
+        };
 
-        // Скрываем панель при активации других инструментов
-        this.eventBus.on(Events.Tool.Activated, ({ tool }) => {
-            if (tool !== 'select') {
-                this.hide();
-            }
-        });
+        this.eventBus.on(Events.Tool.SelectionAdd, this._handlers.onSelectionAdd);
+        this.eventBus.on(Events.Tool.SelectionRemove, this._handlers.onSelectionRemove);
+        this.eventBus.on(Events.Tool.SelectionClear, this._handlers.onSelectionClear);
+        this.eventBus.on(Events.Object.Deleted, this._handlers.onDeleted);
+        this.eventBus.on(Events.Tool.DragStart, this._handlers.onDragStart);
+        this.eventBus.on(Events.Tool.DragUpdate, this._handlers.onDragUpdate);
+        this.eventBus.on(Events.Tool.DragEnd, this._handlers.onDragEnd);
+        this.eventBus.on(Events.Tool.GroupDragUpdate, this._handlers.onGroupDragUpdate);
+        this.eventBus.on(Events.Tool.GroupDragStart, this._handlers.onGroupDragStart);
+        this.eventBus.on(Events.Tool.GroupDragEnd, this._handlers.onGroupDragEnd);
+        this.eventBus.on(Events.Tool.ResizeUpdate, this._handlers.onResizeUpdate);
+        this.eventBus.on(Events.Tool.RotateUpdate, this._handlers.onRotateUpdate);
+        this.eventBus.on(Events.UI.ZoomPercent, this._handlers.onZoomPercent);
+        this.eventBus.on(Events.Tool.PanUpdate, this._handlers.onPanUpdate);
+        this.eventBus.on(Events.Tool.Activated, this._handlers.onActivated);
     }
 
     updateFromSelection() {
@@ -317,6 +322,25 @@ export class FilePropertiesPanel {
     }
 
     destroy() {
+        if (!this.eventBus || !this._handlers) return;
+
+        this.eventBus.off(Events.Tool.SelectionAdd, this._handlers.onSelectionAdd);
+        this.eventBus.off(Events.Tool.SelectionRemove, this._handlers.onSelectionRemove);
+        this.eventBus.off(Events.Tool.SelectionClear, this._handlers.onSelectionClear);
+        this.eventBus.off(Events.Object.Deleted, this._handlers.onDeleted);
+        this.eventBus.off(Events.Tool.DragStart, this._handlers.onDragStart);
+        this.eventBus.off(Events.Tool.DragUpdate, this._handlers.onDragUpdate);
+        this.eventBus.off(Events.Tool.DragEnd, this._handlers.onDragEnd);
+        this.eventBus.off(Events.Tool.GroupDragUpdate, this._handlers.onGroupDragUpdate);
+        this.eventBus.off(Events.Tool.GroupDragStart, this._handlers.onGroupDragStart);
+        this.eventBus.off(Events.Tool.GroupDragEnd, this._handlers.onGroupDragEnd);
+        this.eventBus.off(Events.Tool.ResizeUpdate, this._handlers.onResizeUpdate);
+        this.eventBus.off(Events.Tool.RotateUpdate, this._handlers.onRotateUpdate);
+        this.eventBus.off(Events.UI.ZoomPercent, this._handlers.onZoomPercent);
+        this.eventBus.off(Events.Tool.PanUpdate, this._handlers.onPanUpdate);
+        this.eventBus.off(Events.Tool.Activated, this._handlers.onActivated);
+        this._handlers = null;
+
         if (this.panel && this.panel.parentNode) {
             this.panel.parentNode.removeChild(this.panel);
         }

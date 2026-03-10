@@ -45,6 +45,7 @@ describe('MoodBoard baseline: destroy lifecycle contracts', () => {
         expect(board.textPropertiesPanel).toBeNull();
         expect(board.framePropertiesPanel).toBeNull();
         expect(board.notePropertiesPanel).toBeNull();
+        expect(board.filePropertiesPanel).toBeNull();
         expect(board.alignmentGuides).toBeNull();
         expect(board.htmlTextLayer).toBeNull();
         expect(board.htmlHandlesLayer).toBeNull();
@@ -66,6 +67,7 @@ describe('MoodBoard baseline: destroy lifecycle contracts', () => {
         expect(mockState.textPropertiesPanelInstances[0].destroy).toHaveBeenCalledTimes(1);
         expect(mockState.framePropertiesPanelInstances[0].destroy).toHaveBeenCalledTimes(1);
         expect(mockState.notePropertiesPanelInstances[0].destroy).toHaveBeenCalledTimes(1);
+        expect(mockState.filePropertiesPanelInstances[0].destroy).toHaveBeenCalledTimes(1);
         expect(mockState.alignmentGuidesInstances[0].destroy).toHaveBeenCalledTimes(1);
         expect(initialTextLayer.destroy).toHaveBeenCalledTimes(1);
         expect(initialHandlesLayer.destroy).toHaveBeenCalledTimes(1);
