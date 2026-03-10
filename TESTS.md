@@ -210,6 +210,20 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 
 **Скип:** Drop с устройства — ограничения Playwright (dataTransfer.files защищён).
 
+### `tests/image-object2/ShapesTool.e2e.spec.js` — 16 E2E-тестов
+
+Инструмент «Фигуры» (shapes, `.moodboard-toolbar__button--shapes`). Playwright E2E.
+
+**Покрытие:**
+
+- **Меню** — клик по кнопке фигур открывает popup `.moodboard-toolbar__popup--shapes`, содержит кнопки `.moodboard-shapes__btn--circle`, `--triangle` и др.
+- **Добавление каждой фигуры** — для kind: square, rounded, circle, triangle, diamond, parallelogram, arrow: выбор в меню → призрак → клик на холст → объект shape с корректным kind.
+- **Трансформации** — move (drag по объекту), resize (ручка SE), rotate (ручка поворота) через createObject(type: 'shape').
+- **Рамки и ручки** — при выделении фигуры: `.mb-handles-box`, `.mb-handle[data-dir="se"]`, `.mb-rotate-handle` видимы.
+- **Undo/redo** — добавление, move, resize, rotate.
+
+**Рамка по контуру:** Визуальная проверка (строго по границам, без пересечений) — через unit/чек-лист при необходимости; E2E проверяет наличие рамки и ручек.
+
 ### `tests/core/DeleteObjectCommand.blob-revoke.test.js` — 5 unit-тестов
 
 Очистка blob URL при удалении изображения (утечка памяти).
