@@ -1,4 +1,5 @@
 import { Events } from '../../core/events/Events.js';
+import { createRotatedResizeCursor } from '../../tools/object-tools/selection/CursorController.js';
 
 const HANDLES_ACCENT_COLOR = '#80D8FF';
 
@@ -71,7 +72,8 @@ export class HandlesDomRenderer {
             return;
         }
 
-        const mkCorner = (dir, x, y, cursor) => {
+        const mkCorner = (dir, x, y) => {
+            const cursor = createRotatedResizeCursor(dir, rotation);
             const h = document.createElement('div');
             h.dataset.dir = dir;
             h.dataset.id = id;
@@ -107,13 +109,14 @@ export class HandlesDomRenderer {
         const y0 = 0;
         const x1 = width;
         const y1 = height;
-        mkCorner('nw', x0, y0, 'nwse-resize');
-        mkCorner('ne', x1, y0, 'nesw-resize');
-        mkCorner('se', x1, y1, 'nwse-resize');
-        mkCorner('sw', x0, y1, 'nesw-resize');
+        mkCorner('nw', x0, y0);
+        mkCorner('ne', x1, y0);
+        mkCorner('se', x1, y1);
+        mkCorner('sw', x0, y1);
 
         const edgeSize = 10;
-        const makeEdge = (name, style, cursor) => {
+        const makeEdge = (name, style, cursorHandleType) => {
+            const cursor = createRotatedResizeCursor(cursorHandleType, rotation);
             const e = document.createElement('div');
             e.dataset.edge = name;
             e.dataset.id = id;
@@ -135,28 +138,28 @@ export class HandlesDomRenderer {
             top: `-${edgeSize / 2}px`,
             width: `${Math.max(0, width - 2 * cornerGap)}px`,
             height: `${edgeSize}px`,
-        }, 'ns-resize');
+        }, 'n');
 
         makeEdge('bottom', {
             left: `${cornerGap}px`,
             top: `${height - edgeSize / 2}px`,
             width: `${Math.max(0, width - 2 * cornerGap)}px`,
             height: `${edgeSize}px`,
-        }, 'ns-resize');
+        }, 's');
 
         makeEdge('left', {
             left: `-${edgeSize / 2}px`,
             top: `${cornerGap}px`,
             width: `${edgeSize}px`,
             height: `${Math.max(0, height - 2 * cornerGap)}px`,
-        }, 'ew-resize');
+        }, 'w');
 
         makeEdge('right', {
             left: `${width - edgeSize / 2}px`,
             top: `${cornerGap}px`,
             width: `${edgeSize}px`,
             height: `${Math.max(0, height - 2 * cornerGap)}px`,
-        }, 'ew-resize');
+        }, 'e');
 
         const rotateHandle = document.createElement('div');
         rotateHandle.dataset.handle = 'rotate';

@@ -200,4 +200,50 @@ describe('HtmlHandlesLayer baseline: transform sync contracts', () => {
         const secondGestureBox = ctx.container.querySelector('.mb-handles-box');
         expect(secondGestureBox.style.transform).toBe('rotate(25deg)');
     });
+
+    it('uses rotated resize cursors for a rotated single selection', () => {
+        // Для повернутого объекта курсор на угловых ручках должен отражать
+        // фактическое направление resize, а не оставаться системным nwse/nesw.
+        ctx.setObject('obj-1', { x: 30, y: 40, width: 100, height: 60, rotation: 45, type: 'note' });
+        ctx.core.selectTool.selectedObjects.add('obj-1');
+        ctx.eventBus.emit(Events.Tool.SelectionAdd, { tool: 'select', object: 'obj-1' });
+
+        const box = ctx.container.querySelector('.mb-handles-box');
+        const nw = box.querySelector('[data-dir="nw"]');
+        const ne = box.querySelector('[data-dir="ne"]');
+
+        expect(nw.style.cursor.startsWith('url("data:image/svg+xml')).toBe(true);
+        expect(ne.style.cursor.startsWith('url("data:image/svg+xml')).toBe(true);
+        expect(nw.style.cursor).not.toBe(ne.style.cursor);
+    });
+
+    it('uses rotated resize cursors for a rotated group selection', () => {
+        // Группа после поворота должна давать те же повернутые курсоры,
+        // иначе направление диагонального resize визуально обманывает пользователя.
+        ctx.setObject('obj-a', { x: 10, y: 10, width: 80, height: 50, type: 'note' });
+        ctx.setObject('obj-b', { x: 120, y: 30, width: 90, height: 60, type: 'note' });
+        ctx.core.selectTool.selectedObjects.add('obj-a');
+        ctx.core.selectTool.selectedObjects.add('obj-b');
+        ctx.eventBus.emit(Events.Tool.SelectionAdd, { tool: 'select', object: 'obj-a' });
+
+        ctx.eventBus.emit(Events.Tool.GroupRotateStart, {
+            objects: ['obj-a', 'obj-b'],
+            center: { x: 110, y: 50 },
+        });
+        ctx.eventBus.emit(Events.Tool.GroupRotateUpdate, {
+            objects: ['obj-a', 'obj-b'],
+            angle: 20,
+        });
+        ctx.eventBus.emit(Events.Tool.GroupRotateEnd, {
+            objects: ['obj-a', 'obj-b'],
+        });
+
+        const box = ctx.container.querySelector('.mb-handles-box');
+        const nw = box.querySelector('[data-dir="nw"]');
+        const ne = box.querySelector('[data-dir="ne"]');
+
+        expect(nw.style.cursor.startsWith('url("data:image/svg+xml')).toBe(true);
+        expect(ne.style.cursor.startsWith('url("data:image/svg+xml')).toBe(true);
+        expect(nw.style.cursor).not.toBe(ne.style.cursor);
+    });
 });
