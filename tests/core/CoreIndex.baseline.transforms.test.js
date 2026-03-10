@@ -7,9 +7,9 @@ import { createCoreBaselineContext } from './CoreIndex.baseline.helpers.js';
 // подключаем реальные обработчики setupToolEvents и "direct"-методы,
 // чтобы тесты проверяли не отдельные команды в вакууме, а реальный поток
 // Resize/Rotate, которым пользуется приложение.
-function prepareTransformContext() {
+function prepareTransformContext(objects = null) {
     const ctx = createCoreBaselineContext({
-        objects: [
+        objects: objects || [
             {
                 id: 'obj-transform-1',
                 type: 'note',
@@ -94,6 +94,144 @@ describe('Core index baseline: transform contracts', () => {
         });
 
         expect(ctx.history.executeCommand).toHaveBeenCalledTimes(0);
+    });
+
+    it('ResizeUpdate normalizes image geometry with locked aspect and keeps left edge anchor', () => {
+        const ctx = prepareTransformContext([
+            {
+                id: 'img-1',
+                type: 'image',
+                position: { x: 10, y: 20 },
+                width: 200,
+                height: 100,
+                properties: {},
+                transform: { rotation: 0 },
+            },
+        ]);
+
+        ctx.eventBus.emit(Events.Tool.ResizeStart, {
+            object: 'img-1',
+            handle: 'e',
+        });
+
+        ctx.eventBus.emit(Events.Tool.ResizeUpdate, {
+            object: 'img-1',
+            size: { width: 260, height: 100 },
+            position: { x: 10, y: 20 },
+        });
+
+        const stateObj = ctx.state.state.objects.find((obj) => obj.id === 'img-1');
+        const pixiObj = ctx.pixi.objects.get('img-1');
+
+        expect(stateObj.width).toBe(260);
+        expect(stateObj.height).toBe(130);
+        expect(stateObj.position).toEqual({ x: 10, y: 5 });
+        expect(pixiObj.x).toBe(140);
+        expect(pixiObj.y).toBe(70);
+    });
+
+    it('ResizeUpdate normalizes locked frame geometry with handle anchor before applying state', () => {
+        const ctx = prepareTransformContext([
+            {
+                id: 'frame-1',
+                type: 'frame',
+                position: { x: 10, y: 20 },
+                width: 200,
+                height: 100,
+                properties: { lockedAspect: true },
+                transform: { rotation: 0 },
+            },
+        ]);
+
+        ctx.eventBus.emit(Events.Tool.ResizeStart, {
+            object: 'frame-1',
+            handle: 'w',
+        });
+
+        ctx.eventBus.emit(Events.Tool.ResizeUpdate, {
+            object: 'frame-1',
+            size: { width: 140, height: 100 },
+            position: { x: 70, y: 20 },
+        });
+
+        const stateObj = ctx.state.state.objects.find((obj) => obj.id === 'frame-1');
+        const pixiObj = ctx.pixi.objects.get('frame-1');
+
+        expect(stateObj.width).toBe(140);
+        expect(stateObj.height).toBe(70);
+        expect(stateObj.position).toEqual({ x: 70, y: 35 });
+        expect(pixiObj.x).toBe(140);
+        expect(pixiObj.y).toBe(70);
+    });
+
+    it('ResizeEnd commits normalized geometry instead of raw image payload', () => {
+        const ctx = prepareTransformContext([
+            {
+                id: 'img-1',
+                type: 'image',
+                position: { x: 10, y: 20 },
+                width: 200,
+                height: 100,
+                properties: {},
+                transform: { rotation: 0 },
+            },
+        ]);
+
+        ctx.eventBus.emit(Events.Tool.ResizeStart, {
+            object: 'img-1',
+            handle: 'w',
+        });
+
+        ctx.history.executeCommand.mockClear();
+        ctx.eventBus.emit(Events.Tool.ResizeEnd, {
+            object: 'img-1',
+            oldSize: { width: 200, height: 100 },
+            newSize: { width: 140, height: 100 },
+            oldPosition: { x: 10, y: 20 },
+            newPosition: { x: 70, y: 20 },
+        });
+
+        expect(ctx.history.executeCommand).toHaveBeenCalledTimes(1);
+        const command = ctx.history.executeCommand.mock.calls[0][0];
+        expect(command.newSize).toEqual({ width: 140, height: 70 });
+        expect(command.newPosition).toEqual({ x: 70, y: 35 });
+    });
+
+    it('ResizeUpdate keeps image dominant axis stable during one gesture', () => {
+        const ctx = prepareTransformContext([
+            {
+                id: 'img-gesture-1',
+                type: 'image',
+                position: { x: 10, y: 20 },
+                width: 500,
+                height: 300,
+                properties: {},
+                transform: { rotation: 0 },
+            },
+        ]);
+
+        ctx.eventBus.emit(Events.Tool.ResizeStart, {
+            object: 'img-gesture-1',
+            handle: 'se',
+        });
+
+        ctx.eventBus.emit(Events.Tool.ResizeUpdate, {
+            object: 'img-gesture-1',
+            size: { width: 560, height: 340 },
+            position: { x: 10, y: 20 },
+        });
+
+        ctx.eventBus.emit(Events.Tool.ResizeUpdate, {
+            object: 'img-gesture-1',
+            size: { width: 559, height: 361 },
+            position: { x: 10, y: 20 },
+        });
+
+        const stateObj = ctx.state.state.objects.find((obj) => obj.id === 'img-gesture-1');
+        expect(ctx._activeResize.dominantAxis).toBe('width');
+        expect(stateObj.width).toBe(559);
+        expect(stateObj.height).toBe(335);
+        expect(stateObj.position).toEqual({ x: 10, y: 20 });
     });
 
     it('RotateUpdate updates PIXI angle, RotateEnd creates command only on angle change', async () => {

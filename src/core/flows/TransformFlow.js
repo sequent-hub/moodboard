@@ -4,6 +4,12 @@ import {
     ResizeObjectCommand,
     GroupRotateCommand
 } from '../commands/index.js';
+import {
+    getActiveResize,
+    normalizeResizeEndPayload,
+    normalizeResizeUpdatePayload,
+    resolveResizePositionFallback,
+} from './TransformFlowResizeHelpers.js';
 
 export function setupTransformFlow(core) {
     core.eventBus.on(Events.Tool.ResizeStart, (data) => {
@@ -15,7 +21,8 @@ export function setupTransformFlow(core) {
                 objectId: data.object,
                 handle: data.handle,
                 startSize: { width: object.width, height: object.height },
-                startPosition: { x: object.position.x, y: object.position.y }
+                startPosition: { x: object.position.x, y: object.position.y },
+                dominantAxis: null,
             };
         }
     });
@@ -88,107 +95,11 @@ export function setupTransformFlow(core) {
         const objects = core.state.getObjects();
         const object = objects.find(obj => obj.id === data.object);
         const objectType = object ? object.type : null;
-
-        if (data.size && (objectType === 'image' || objectType === 'frame')) {
-            const isEmoji = (objectType === 'image' && object?.properties?.isEmojiIcon);
-            const isImage = (objectType === 'image');
-            const lockedAspect = objectType === 'frame'
-                ? !!(object?.properties && object.properties.lockedAspect === true)
-                : true;
-
-            if (lockedAspect || isImage || isEmoji) {
-                const start = core._activeResize?.startSize || { width: object.width, height: object.height };
-                const startW = Math.max(1, start.width);
-                const startH = Math.max(1, start.height);
-                const aspect = isEmoji ? 1 : (startW / startH);
-
-                let w = Math.max(1, data.size.width);
-                let h = Math.max(1, data.size.height);
-                const hndl = (core._activeResize?.handle || '').toLowerCase();
-
-                if (isEmoji) {
-                    const s = Math.max(w, h);
-                    if (!data.position && core._activeResize && core._activeResize.objectId === data.object) {
-                        const startPos = core._activeResize.startPosition;
-                        const sw = core._activeResize.startSize.width;
-                        const sh = core._activeResize.startSize.height;
-                        let x = startPos.x;
-                        let y = startPos.y;
-                        if (hndl.includes('w')) { x = startPos.x + (sw - s); }
-                        if (hndl.includes('n')) { y = startPos.y + (sh - s); }
-                        const isEdge = ['n', 's', 'e', 'w'].includes(hndl);
-                        if (isEdge) {
-                            if (hndl === 'n' || hndl === 's') x = startPos.x + Math.round((sw - s) / 2);
-                            if (hndl === 'e' || hndl === 'w') y = startPos.y + Math.round((sh - s) / 2);
-                        }
-                        data.position = { x: Math.round(x), y: Math.round(y) };
-                    }
-                    w = s;
-                    h = s;
-                } else {
-                    const dw = Math.abs(w - startW);
-                    const dh = Math.abs(h - startH);
-                    if (dw >= dh) { h = Math.round(w / aspect); } else { w = Math.round(h * aspect); }
-                }
-
-                if (objectType === 'frame') {
-                    const minArea = 1800;
-                    const area = Math.max(1, w * h);
-                    if (area < minArea) {
-                        const scale = Math.sqrt(minArea / area);
-                        w = Math.round(w * scale);
-                        h = Math.round(h * scale);
-                    }
-                }
-
-                data.size = { width: w, height: h };
-
-                if (!data.position && core._activeResize && core._activeResize.objectId === data.object) {
-                    const startPos = core._activeResize.startPosition;
-                    const sw = core._activeResize.startSize.width;
-                    const sh = core._activeResize.startSize.height;
-                    let x = startPos.x;
-                    let y = startPos.y;
-                    if (hndl.includes('w')) { x = startPos.x + (sw - data.size.width); }
-                    if (hndl.includes('n')) { y = startPos.y + (sh - data.size.height); }
-                    const isEdge = ['n', 's', 'e', 'w'].includes(hndl);
-                    if (isEdge) {
-                        if (hndl === 'n' || hndl === 's') {
-                            x = startPos.x + Math.round((sw - data.size.width) / 2);
-                        } else if (hndl === 'e' || hndl === 'w') {
-                            y = startPos.y + Math.round((sh - data.size.height) / 2);
-                        }
-                    }
-                    data.position = { x: Math.round(x), y: Math.round(y) };
-                }
-            }
-        }
+        const activeResize = normalizeResizeUpdatePayload(core, object, data);
 
         let position = data.position;
-        if (!position && core._activeResize && core._activeResize.objectId === data.object) {
-            const h = (core._activeResize.handle || '').toLowerCase();
-            const start = core._activeResize.startPosition;
-            const startSize = core._activeResize.startSize;
-            const dw = (data.size?.width || startSize.width) - startSize.width;
-            const dh = (data.size?.height || startSize.height) - startSize.height;
-            let nx = start.x;
-            let ny = start.y;
-            if (h.includes('w')) nx = start.x + dw;
-            if (h.includes('n')) ny = start.y + dh;
-            position = { x: nx, y: ny };
-        }
-
-        if (objectType === 'frame' && data.size) {
-            const minArea = 1800;
-            const w0 = Math.max(1, data.size.width);
-            const h0 = Math.max(1, data.size.height);
-            const area0 = w0 * h0;
-            if (area0 < minArea) {
-                const scale = Math.sqrt(minArea / Math.max(1, area0));
-                const w = Math.round(w0 * scale);
-                const h = Math.round(h0 * scale);
-                data.size = { width: w, height: h };
-            }
+        if (!position && activeResize) {
+            position = resolveResizePositionFallback(core, data.object, data.size);
         }
 
         core.updateObjectSizeAndPositionDirect(data.object, data.size, position, objectType);
@@ -198,103 +109,17 @@ export function setupTransformFlow(core) {
         if (core.resizeStartSize && data.oldSize && data.newSize) {
             const objects = core.state.getObjects();
             const object = objects.find(obj => obj.id === data.object);
-            if (object && object.type === 'frame' && object.properties && object.properties.lockedAspect === true) {
-                const start = core._activeResize?.startSize || { width: object.width, height: object.height };
-                const aspect = (start.width > 0 && start.height > 0) ? (start.width / start.height) : (object.width / Math.max(1, object.height));
-                let w = Math.max(1, data.newSize.width);
-                let h = Math.max(1, data.newSize.height);
-                const dw = Math.abs(w - start.width);
-                const dh = Math.abs(h - start.height);
-                if (dw >= dh) { h = Math.round(w / aspect); } else { w = Math.round(h * aspect); }
-                const minArea = 1800;
-                const area = Math.max(1, w * h);
-                if (area < minArea) {
-                    const scale = Math.sqrt(minArea / area);
-                    w = Math.round(w * scale);
-                    h = Math.round(h * scale);
-                }
-                data.newSize = { width: w, height: h };
-                if (!data.newPosition && core._activeResize && core._activeResize.objectId === data.object) {
-                    const hndl = (core._activeResize?.full || core._activeResize?.handle || '').toLowerCase();
-                    const startPos = core._activeResize.startPosition;
-                    const sw = core._activeResize.startSize.width;
-                    const sh = core._activeResize.startSize.height;
-                    let x = startPos.x;
-                    let y = startPos.y;
-                    if (hndl.includes('w')) { x = startPos.x + (sw - w); }
-                    if (hndl.includes('n')) { y = startPos.y + (sh - h); }
-                    const isEdge = ['n', 's', 'e', 'w'].includes(hndl);
-                    if (isEdge) {
-                        if (hndl === 'n' || hndl === 's') x = Math.round(startPos.x + (sw - w) / 2);
-                        if (hndl === 'e' || hndl === 'w') y = Math.round(startPos.y + (sh - h) / 2);
-                    }
-                    data.newPosition = { x: Math.round(x), y: Math.round(y) };
-                }
-            } else if (object && object.type === 'image') {
-                const start = core._activeResize?.startSize || { width: object.width, height: object.height };
-                const startW = Math.max(1, start.width);
-                const startH = Math.max(1, start.height);
-                const aspect = startW / startH;
-                let w = Math.max(1, data.newSize.width);
-                let h = Math.max(1, data.newSize.height);
-                const dw = Math.abs(w - startW);
-                const dh = Math.abs(h - startH);
-                if (dw >= dh) { h = Math.round(w / aspect); } else { w = Math.round(h * aspect); }
-                data.newSize = { width: w, height: h };
-                if (!data.newPosition && core._activeResize && core._activeResize.objectId === data.object) {
-                    const handle = (core._activeResize?.handle || '').toString().toLowerCase();
-                    const startPos = core._activeResize.startPosition || { x: 0, y: 0 };
-                    const sw = core._activeResize.startSize?.width || startW;
-                    const sh = core._activeResize.startSize?.height || startH;
-                    let x = startPos.x;
-                    let y = startPos.y;
-                    if (handle.includes('w')) { x = startPos.x + (sw - w); }
-                    if (handle.includes('n')) { y = startPos.y + (sh - h); }
-                    const edge = ['n', 's', 'e', 'w'].includes(handle);
-                    if (edge) {
-                        if (handle === 'n' || handle === 's') x = Math.round(startPos.x + (sw - w) / 2);
-                        if (handle === 'e' || handle === 'w') y = Math.round(startPos.y + (sh - h) / 2);
-                    }
-                    data.newPosition = { x: Math.floor(x), y: Math.floor(y) };
-                }
-            }
-
-            if (object && object.type === 'frame' && data.newSize && !(object.properties && object.properties === true)) {
-                const minArea = 1800;
-                const w0 = Math.max(1, data.newSize.width);
-                const h0 = Math.max(1, data.newSize.height);
-                const area0 = w0 * h0;
-                if (area0 < minArea) {
-                    const scale = Math.sqrt(minArea / Math.max(1, area0));
-                    const w = Math.round(w0 * scale);
-                    const h = Math.round(h0 * scale);
-                    data.newSize = { width: w, height: h };
-                    if (!data.newPosition && core._activeResize && core._activeResize.objectId === data.object) {
-                        const h2 = (core._activeResize?.handle || '').toLowerCase();
-                        const sPos2 = core._activeResize.startPosition;
-                        const sw2 = core._activeResize.startSize.width;
-                        const sh2 = core._activeResize.startSize.height;
-                        let x2 = sPos2.x;
-                        let y2 = sPos2.y;
-                        if (h2.includes('w')) { x2 = sPos2.x + (sw2 - w); }
-                        if (h2.includes('n')) { y2 = sPos2.y + (sh2 - h); }
-                        data.newPosition = { x: Math.round(x2), y: Math.round(y2) };
-                    }
-                }
-            }
+            const activeResize = normalizeResizeEndPayload(core, object, data);
 
             if (data.oldSize.width !== data.newSize.width || data.oldSize.height !== data.newSize.height) {
                 let oldPos = data.oldPosition;
                 let newPos = data.newPosition;
-                if ((!oldPos || !newPos) && core._activeResize && core._activeResize.objectId === data.object) {
-                    const h = (core._activeResize?.handle || '').toLowerCase();
-                    const start = core._activeResize.startPosition;
-                    const startSize = core.optimization?.startSize || core._activeResize.startSize;
-                    const dw = (data.newSize?.width || startSize.width) - startSize.width;
-                    const dh = (data.newSize?.height || startSize.height) - startSize.height;
-                    const calcNew = { x: start.x + (h.includes('w') ? dw : 0), y: start.y + (h.includes('n') ? dh : 0) };
-                    if (!oldPos) oldPos = { x: start.x, y: start.y };
-                    if (!newPos) newPos = calcNew;
+                const activeResize = getActiveResize(core, data.object);
+                if ((!oldPos || !newPos) && activeResize) {
+                    if (!oldPos) oldPos = { x: activeResize.startPosition.x, y: activeResize.startPosition.y };
+                    if (!newPos) {
+                        newPos = resolveResizePositionFallback(core, data.object, data.newSize);
+                    }
                 }
                 const command = new ResizeObjectCommand(
                     core,
