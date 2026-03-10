@@ -42,13 +42,20 @@ export class HandlesEventBridge {
             }],
             [Events.Tool.GroupDragStart, () => { this.host._handlesSuppressed = true; this.host._setHandlesVisibility(false); }],
             [Events.Tool.GroupDragEnd, () => { this.host._handlesSuppressed = false; this.host._setHandlesVisibility(true); }],
-            [Events.Tool.GroupResizeUpdate, () => this.host.update()],
-            [Events.Tool.GroupResizeStart, () => {
-                this.host._endGroupRotationPreview();
+            [Events.Tool.GroupResizeUpdate, (data) => {
+                this.host._updateGroupResizePreview(data);
+                this.host.update();
+            }],
+            [Events.Tool.GroupResizeStart, (data) => {
+                this.host._startGroupResizePreview(data);
                 this.host._handlesSuppressed = true;
                 this.host._setHandlesVisibility(false);
             }],
-            [Events.Tool.GroupResizeEnd, () => { this.host._handlesSuppressed = false; this.host._setHandlesVisibility(true); }],
+            [Events.Tool.GroupResizeEnd, () => {
+                this.host._finishGroupResizePreview();
+                this.host._handlesSuppressed = false;
+                this.host._setHandlesVisibility(true);
+            }],
             [Events.Tool.GroupRotateUpdate, (data) => {
                 this.host._updateGroupRotationPreview(data);
                 this.host.update();

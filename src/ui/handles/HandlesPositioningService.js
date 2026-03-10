@@ -37,10 +37,10 @@ export class HandlesPositioningService {
         const tl = world.toGlobal(new PIXI.Point(worldBounds.x, worldBounds.y));
         const br = world.toGlobal(new PIXI.Point(worldBounds.x + worldBounds.width, worldBounds.y + worldBounds.height));
         return {
-            left: Math.round(offsetLeft + tl.x),
-            top: Math.round(offsetTop + tl.y),
-            width: Math.round(Math.max(1, br.x - tl.x)),
-            height: Math.round(Math.max(1, br.y - tl.y)),
+            left: offsetLeft + tl.x,
+            top: offsetTop + tl.y,
+            width: Math.max(1, br.x - tl.x),
+            height: Math.max(1, br.y - tl.y),
             offsetLeft,
             offsetTop,
         };

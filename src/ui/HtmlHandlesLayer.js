@@ -220,6 +220,33 @@ export class HtmlHandlesLayer {
         this._groupRotationPreview.lastMeasuredCenter = liveCenter;
     }
 
+    _startGroupResizePreview(payload = {}) {
+        if (!this._groupRotationPreview) return;
+        if (payload.startBounds) {
+            this._groupRotationPreview.startBounds = { ...payload.startBounds };
+            this._groupRotationPreview.center = {
+                x: payload.startBounds.x + payload.startBounds.width / 2,
+                y: payload.startBounds.y + payload.startBounds.height / 2,
+            };
+            this._groupRotationPreview.lastMeasuredCenter = { ...this._groupRotationPreview.center };
+        }
+    }
+
+    _updateGroupResizePreview(payload = {}) {
+        if (!this._groupRotationPreview || !payload.newBounds) return;
+        this._groupRotationPreview.startBounds = { ...payload.newBounds };
+        this._groupRotationPreview.center = {
+            x: payload.newBounds.x + payload.newBounds.width / 2,
+            y: payload.newBounds.y + payload.newBounds.height / 2,
+        };
+        this._groupRotationPreview.lastMeasuredCenter = { ...this._groupRotationPreview.center };
+    }
+
+    _finishGroupResizePreview() {
+        if (!this._groupRotationPreview) return;
+        this._groupRotationPreview.lastMeasuredCenter = { ...this._groupRotationPreview.center };
+    }
+
     _endGroupRotationPreview() {
         this._groupRotationPreview = null;
     }

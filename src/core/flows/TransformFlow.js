@@ -11,6 +11,16 @@ import {
     resolveResizePositionFallback,
 } from './TransformFlowResizeHelpers.js';
 
+function rotateVector(vector, angleDegrees) {
+    const angleRad = angleDegrees * Math.PI / 180;
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+    return {
+        x: vector.x * cos - vector.y * sin,
+        y: vector.x * sin + vector.y * cos,
+    };
+}
+
 export function setupTransformFlow(core) {
     core.eventBus.on(Events.Tool.ResizeStart, (data) => {
         const objects = core.state.getObjects();
@@ -37,6 +47,10 @@ export function setupTransformFlow(core) {
             core._groupResizeSnapshot.set(id, {
                 size: { width: obj.width, height: obj.height },
                 position: { x: obj.position.x, y: obj.position.y },
+                center: {
+                    x: obj.position.x + obj.width / 2,
+                    y: obj.position.y + obj.height / 2,
+                },
                 type: obj.type || null
             });
         }
@@ -48,15 +62,33 @@ export function setupTransformFlow(core) {
         const sy = scale?.y ?? (newBounds.height / startBounds.height);
         const startLeft = startBounds.x;
         const startTop = startBounds.y;
+        const rotation = data.rotation || 0;
+        const startCenter = {
+            x: startLeft + startBounds.width / 2,
+            y: startTop + startBounds.height / 2,
+        };
+        const newBoundsCenter = {
+            x: newBounds.x + newBounds.width / 2,
+            y: newBounds.y + newBounds.height / 2,
+        };
         for (const id of data.objects) {
             const snap = core._groupResizeSnapshot?.get(id);
             if (!snap) continue;
-            const pixiAtStart = snap.position;
-            const relCenterX = pixiAtStart.x - (startLeft + startBounds.width / 2);
-            const relCenterY = pixiAtStart.y - (startTop + startBounds.height / 2);
+            const centerAtStart = snap.center || {
+                x: snap.position.x + snap.size.width / 2,
+                y: snap.position.y + snap.size.height / 2,
+            };
+            const relCenterLocal = rotateVector({
+                x: centerAtStart.x - startCenter.x,
+                y: centerAtStart.y - startCenter.y,
+            }, -rotation);
+            const scaledRelCenterWorld = rotateVector({
+                x: relCenterLocal.x * sx,
+                y: relCenterLocal.y * sy,
+            }, rotation);
             const newCenter = {
-                x: newBounds.x + newBounds.width / 2 + relCenterX * sx,
-                y: newBounds.y + newBounds.height / 2 + relCenterY * sy
+                x: newBoundsCenter.x + scaledRelCenterWorld.x,
+                y: newBoundsCenter.y + scaledRelCenterWorld.y
             };
             const newSize = {
                 width: Math.max(10, snap.size.width * sx),

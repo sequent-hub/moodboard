@@ -5,6 +5,150 @@ export class HandlesInteractionController {
         this.host = host;
     }
 
+    _parseBoxRotation(box) {
+        const transform = box?.style?.transform || '';
+        const match = transform.match(/rotate\(([-0-9.]+)deg\)/);
+        return match ? Number.parseFloat(match[1]) || 0 : 0;
+    }
+
+    _rotateVector(x, y, angleDegrees) {
+        const angleRad = angleDegrees * Math.PI / 180;
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
+        return {
+            x: x * cos - y * sin,
+            y: x * sin + y * cos,
+        };
+    }
+
+    _cssPointFromClient(clientX, clientY) {
+        const containerRect = this.host.container.getBoundingClientRect();
+        return {
+            x: clientX - containerRect.left,
+            y: clientY - containerRect.top,
+        };
+    }
+
+    _readBoxCss(box) {
+        return {
+            left: parseFloat(box.style.left),
+            top: parseFloat(box.style.top),
+            width: parseFloat(box.style.width),
+            height: parseFloat(box.style.height),
+        };
+    }
+
+    _cssRectToWorld(cssRect, offsetLeft, offsetTop, rendererRes, tx, ty, s) {
+        const screenX = cssRect.left - offsetLeft;
+        const screenY = cssRect.top - offsetTop;
+        return {
+            x: ((screenX * rendererRes) - tx) / s,
+            y: ((screenY * rendererRes) - ty) / s,
+            width: (cssRect.width * rendererRes) / s,
+            height: (cssRect.height * rendererRes) / s,
+        };
+    }
+
+    _computeRotatedResizeBox(startCSS, pointerCss, rotationDegrees, handleType, maintainAspectRatio = false, dominantAxis = null) {
+        const startWidth = startCSS.width;
+        const startHeight = startCSS.height;
+        const startCenter = {
+            x: startCSS.left + startWidth / 2,
+            y: startCSS.top + startHeight / 2,
+        };
+        const localPointer = this._rotateVector(
+            pointerCss.x - startCenter.x,
+            pointerCss.y - startCenter.y,
+            -rotationDegrees
+        );
+
+        const startBounds = {
+            x: -startWidth / 2,
+            y: -startHeight / 2,
+            width: startWidth,
+            height: startHeight,
+        };
+        const handlePoint = {
+            x: handleType.includes('w') ? startBounds.x : handleType.includes('e') ? startBounds.x + startBounds.width : 0,
+            y: handleType.includes('n') ? startBounds.y : handleType.includes('s') ? startBounds.y + startBounds.height : 0,
+        };
+        const deltaX = localPointer.x - handlePoint.x;
+        const deltaY = localPointer.y - handlePoint.y;
+
+        let x = startBounds.x;
+        let y = startBounds.y;
+        let width = startBounds.width;
+        let height = startBounds.height;
+
+        switch (handleType) {
+            case 'e': width = startBounds.width + deltaX; break;
+            case 'w': width = startBounds.width - deltaX; x = startBounds.x + deltaX; break;
+            case 's': height = startBounds.height + deltaY; break;
+            case 'n': height = startBounds.height - deltaY; y = startBounds.y + deltaY; break;
+            case 'se': width = startBounds.width + deltaX; height = startBounds.height + deltaY; break;
+            case 'ne': width = startBounds.width + deltaX; height = startBounds.height - deltaY; y = startBounds.y + deltaY; break;
+            case 'sw': width = startBounds.width - deltaX; x = startBounds.x + deltaX; height = startBounds.height + deltaY; break;
+            case 'nw': width = startBounds.width - deltaX; x = startBounds.x + deltaX; height = startBounds.height - deltaY; y = startBounds.y + deltaY; break;
+        }
+
+        let resolvedDominantAxis = dominantAxis;
+        if (maintainAspectRatio && startHeight !== 0) {
+            const aspectRatio = startWidth / startHeight;
+            if (['nw', 'ne', 'sw', 'se'].includes(handleType)) {
+                const widthChange = Math.abs(width - startWidth);
+                const heightChange = Math.abs(height - startHeight);
+                if (!resolvedDominantAxis) {
+                    resolvedDominantAxis = widthChange > heightChange ? 'width' : 'height';
+                }
+                if (resolvedDominantAxis === 'width') {
+                    height = width / aspectRatio;
+                    if (['n', 'ne', 'nw'].includes(handleType)) y = startBounds.y + (startHeight - height);
+                    else y = startBounds.y;
+                } else {
+                    width = height * aspectRatio;
+                    if (['w', 'sw', 'nw'].includes(handleType)) x = startBounds.x + (startWidth - width);
+                    else x = startBounds.x;
+                }
+            } else if (['e', 'w'].includes(handleType)) {
+                height = width / aspectRatio;
+                y = startBounds.y + (startHeight - height) / 2;
+                if (handleType === 'w') x = startBounds.x + (startWidth - width);
+            } else if (['n', 's'].includes(handleType)) {
+                width = height * aspectRatio;
+                x = startBounds.x + (startWidth - width) / 2;
+                if (handleType === 'n') y = startBounds.y + (startHeight - height);
+            }
+        }
+
+        if (width < 1) {
+            if (['w', 'sw', 'nw'].includes(handleType)) x += (width - 1);
+            width = 1;
+        }
+        if (height < 1) {
+            if (['n', 'ne', 'nw'].includes(handleType)) y += (height - 1);
+            height = 1;
+        }
+
+        const localCenter = {
+            x: x + width / 2,
+            y: y + height / 2,
+        };
+        const worldCenterOffset = this._rotateVector(localCenter.x, localCenter.y, rotationDegrees);
+        const worldCenter = {
+            x: startCenter.x + worldCenterOffset.x,
+            y: startCenter.y + worldCenterOffset.y,
+        };
+
+        return {
+            left: worldCenter.x - width / 2,
+            top: worldCenter.y - height / 2,
+            width,
+            height,
+            center: worldCenter,
+            dominantAxis: resolvedDominantAxis,
+        };
+    }
+
     onHandleDown(e, box) {
         e.preventDefault();
         e.stopPropagation();
@@ -22,24 +166,8 @@ export class HandlesInteractionController {
         const offsetLeft = viewRect.left - containerRect.left;
         const offsetTop = viewRect.top - containerRect.top;
 
-        const startCSS = {
-            left: parseFloat(box.style.left),
-            top: parseFloat(box.style.top),
-            width: parseFloat(box.style.width),
-            height: parseFloat(box.style.height),
-        };
-        const startScreen = {
-            x: (startCSS.left - offsetLeft),
-            y: (startCSS.top - offsetTop),
-            w: startCSS.width,
-            h: startCSS.height,
-        };
-        const startWorld = {
-            x: ((startScreen.x * rendererRes) - tx) / s,
-            y: ((startScreen.y * rendererRes) - ty) / s,
-            width: (startScreen.w * rendererRes) / s,
-            height: (startScreen.h * rendererRes) / s,
-        };
+        let startCSS = this._readBoxCss(box);
+        let startWorld = this._cssRectToWorld(startCSS, offsetLeft, offsetTop, rendererRes, tx, ty, s);
 
         let objects = [id];
         if (isGroup) {
@@ -51,7 +179,10 @@ export class HandlesInteractionController {
             this.host.eventBus.emit(Events.Tool.ResizeStart, { object: id, handle: dir });
         }
 
-        const startMouse = { x: e.clientX, y: e.clientY };
+        let startMouse = { x: e.clientX, y: e.clientY };
+        const startRotation = isGroup ? this._parseBoxRotation(box) : 0;
+        let previousMaintainAspectRatio = !!e.shiftKey;
+        let aspectLockDominantAxis = null;
         let isTextTarget = false;
         let isNoteTarget = false;
         {
@@ -63,6 +194,20 @@ export class HandlesInteractionController {
         }
 
         const onMove = (ev) => {
+            const maintainAspectRatio = !!ev.shiftKey;
+            if (isGroup && maintainAspectRatio !== previousMaintainAspectRatio) {
+                startCSS = this._readBoxCss(box);
+                startWorld = this._cssRectToWorld(startCSS, offsetLeft, offsetTop, rendererRes, tx, ty, s);
+                startMouse = { x: ev.clientX, y: ev.clientY };
+                previousMaintainAspectRatio = maintainAspectRatio;
+                aspectLockDominantAxis = null;
+                this.host.eventBus.emit(Events.Tool.GroupResizeStart, {
+                    objects,
+                    startBounds: { ...startWorld },
+                });
+                return;
+            }
+
             const dx = ev.clientX - startMouse.x;
             const dy = ev.clientY - startMouse.y;
             let newLeft = startCSS.left;
@@ -70,15 +215,33 @@ export class HandlesInteractionController {
             let newW = startCSS.width;
             let newH = startCSS.height;
 
-            if (dir.includes('e')) newW = Math.max(1, startCSS.width + dx);
-            if (dir.includes('s')) newH = Math.max(1, startCSS.height + dy);
-            if (dir.includes('w')) {
-                newW = Math.max(1, startCSS.width - dx);
-                newLeft = startCSS.left + dx;
-            }
-            if (dir.includes('n')) {
-                newH = Math.max(1, startCSS.height - dy);
-                newTop = startCSS.top + dy;
+            if (isGroup && Math.abs(startRotation) > 0.001) {
+                const rotatedBox = this._computeRotatedResizeBox(
+                    startCSS,
+                    this._cssPointFromClient(ev.clientX, ev.clientY),
+                    startRotation,
+                    dir,
+                    maintainAspectRatio,
+                    aspectLockDominantAxis
+                );
+                if (maintainAspectRatio && rotatedBox.dominantAxis) {
+                    aspectLockDominantAxis = rotatedBox.dominantAxis;
+                }
+                newLeft = rotatedBox.left;
+                newTop = rotatedBox.top;
+                newW = rotatedBox.width;
+                newH = rotatedBox.height;
+            } else {
+                if (dir.includes('e')) newW = Math.max(1, startCSS.width + dx);
+                if (dir.includes('s')) newH = Math.max(1, startCSS.height + dy);
+                if (dir.includes('w')) {
+                    newW = Math.max(1, startCSS.width - dx);
+                    newLeft = startCSS.left + dx;
+                }
+                if (dir.includes('n')) {
+                    newH = Math.max(1, startCSS.height - dy);
+                    newTop = startCSS.top + dy;
+                }
             }
 
             if (isNoteTarget) {
@@ -175,6 +338,7 @@ export class HandlesInteractionController {
                     objects,
                     startBounds: { ...startWorld },
                     newBounds: { x: worldX, y: worldY, width: worldW, height: worldH },
+                    rotation: startRotation,
                 });
             } else {
                 let isFrameTarget = false;
@@ -277,24 +441,8 @@ export class HandlesInteractionController {
         const offsetTop = viewRect.top - containerRect.top;
 
         const box = e.currentTarget.parentElement;
-        const startCSS = {
-            left: parseFloat(box.style.left),
-            top: parseFloat(box.style.top),
-            width: parseFloat(box.style.width),
-            height: parseFloat(box.style.height),
-        };
-        const startScreen = {
-            x: (startCSS.left - offsetLeft),
-            y: (startCSS.top - offsetTop),
-            w: startCSS.width,
-            h: startCSS.height,
-        };
-        const startWorld = {
-            x: ((startScreen.x * rendererRes) - tx) / s,
-            y: ((startScreen.y * rendererRes) - ty) / s,
-            width: (startScreen.w * rendererRes) / s,
-            height: (startScreen.h * rendererRes) / s,
-        };
+        let startCSS = this._readBoxCss(box);
+        let startWorld = this._cssRectToWorld(startCSS, offsetLeft, offsetTop, rendererRes, tx, ty, s);
 
         let objects = [id];
         if (isGroup) {
@@ -306,7 +454,11 @@ export class HandlesInteractionController {
             this.host.eventBus.emit(Events.Tool.ResizeStart, { object: id, handle: edge === 'top' ? 'n' : edge === 'bottom' ? 's' : edge === 'left' ? 'w' : 'e' });
         }
 
-        const startMouse = { x: e.clientX, y: e.clientY };
+        let startMouse = { x: e.clientX, y: e.clientY };
+        const startRotation = isGroup ? this._parseBoxRotation(box) : 0;
+        let previousMaintainAspectRatio = !!e.shiftKey;
+        let aspectLockDominantAxis = null;
+        const edgeHandleType = edge === 'top' ? 'n' : edge === 'bottom' ? 's' : edge === 'left' ? 'w' : 'e';
         let isTextTarget = false;
         let isNoteTarget = false;
         {
@@ -318,21 +470,53 @@ export class HandlesInteractionController {
         }
 
         const onMove = (ev) => {
+            const maintainAspectRatio = !!ev.shiftKey;
+            if (isGroup && maintainAspectRatio !== previousMaintainAspectRatio) {
+                startCSS = this._readBoxCss(box);
+                startWorld = this._cssRectToWorld(startCSS, offsetLeft, offsetTop, rendererRes, tx, ty, s);
+                startMouse = { x: ev.clientX, y: ev.clientY };
+                previousMaintainAspectRatio = maintainAspectRatio;
+                aspectLockDominantAxis = null;
+                this.host.eventBus.emit(Events.Tool.GroupResizeStart, {
+                    objects,
+                    startBounds: { ...startWorld },
+                });
+                return;
+            }
+
             const dxCSS = ev.clientX - startMouse.x;
             const dyCSS = ev.clientY - startMouse.y;
             let newLeft = startCSS.left;
             let newTop = startCSS.top;
             let newW = startCSS.width;
             let newH = startCSS.height;
-            if (edge === 'right') newW = Math.max(1, startCSS.width + dxCSS);
-            if (edge === 'bottom') newH = Math.max(1, startCSS.height + dyCSS);
-            if (edge === 'left') {
-                newW = Math.max(1, startCSS.width - dxCSS);
-                newLeft = startCSS.left + dxCSS;
-            }
-            if (edge === 'top') {
-                newH = Math.max(1, startCSS.height - dyCSS);
-                newTop = startCSS.top + dyCSS;
+            if (isGroup && Math.abs(startRotation) > 0.001) {
+                const rotatedBox = this._computeRotatedResizeBox(
+                    startCSS,
+                    this._cssPointFromClient(ev.clientX, ev.clientY),
+                    startRotation,
+                    edgeHandleType,
+                    maintainAspectRatio,
+                    aspectLockDominantAxis
+                );
+                if (maintainAspectRatio && rotatedBox.dominantAxis) {
+                    aspectLockDominantAxis = rotatedBox.dominantAxis;
+                }
+                newLeft = rotatedBox.left;
+                newTop = rotatedBox.top;
+                newW = rotatedBox.width;
+                newH = rotatedBox.height;
+            } else {
+                if (edge === 'right') newW = Math.max(1, startCSS.width + dxCSS);
+                if (edge === 'bottom') newH = Math.max(1, startCSS.height + dyCSS);
+                if (edge === 'left') {
+                    newW = Math.max(1, startCSS.width - dxCSS);
+                    newLeft = startCSS.left + dxCSS;
+                }
+                if (edge === 'top') {
+                    newH = Math.max(1, startCSS.height - dyCSS);
+                    newTop = startCSS.top + dyCSS;
+                }
             }
 
             if (isNoteTarget) {
@@ -427,6 +611,7 @@ export class HandlesInteractionController {
                     objects,
                     startBounds: { ...startWorld },
                     newBounds: { x: worldX, y: worldY, width: worldW, height: worldH },
+                    rotation: startRotation,
                 });
             } else {
                 const edgeResizeData = {

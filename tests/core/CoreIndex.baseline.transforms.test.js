@@ -234,6 +234,111 @@ describe('Core index baseline: transform contracts', () => {
         expect(stateObj.position).toEqual({ x: 10, y: 20 });
     });
 
+    it('GroupResizeUpdate scales each object around the group center using object centers', () => {
+        const ctx = prepareTransformContext([
+            {
+                id: 'obj-a',
+                type: 'note',
+                position: { x: 10, y: 20 },
+                width: 100,
+                height: 60,
+                properties: {},
+                transform: { rotation: 0 },
+            },
+            {
+                id: 'obj-b',
+                type: 'note',
+                position: { x: 160, y: 40 },
+                width: 80,
+                height: 50,
+                properties: {},
+                transform: { rotation: 0 },
+            },
+        ]);
+
+        ctx.eventBus.emit(Events.Tool.GroupResizeStart, {
+            objects: ['obj-a', 'obj-b'],
+            startBounds: { x: 10, y: 20, width: 230, height: 70 },
+        });
+
+        ctx.eventBus.emit(Events.Tool.GroupResizeUpdate, {
+            objects: ['obj-a', 'obj-b'],
+            startBounds: { x: 10, y: 20, width: 230, height: 70 },
+            newBounds: { x: 10, y: 20, width: 460, height: 140 },
+        });
+
+        const objA = ctx.state.state.objects.find((obj) => obj.id === 'obj-a');
+        const objB = ctx.state.state.objects.find((obj) => obj.id === 'obj-b');
+
+        expect(objA.width).toBe(200);
+        expect(objA.height).toBe(120);
+        expect(objA.position).toEqual({ x: 10, y: 20 });
+
+        expect(objB.width).toBe(160);
+        expect(objB.height).toBe(100);
+        expect(objB.position).toEqual({ x: 310, y: 60 });
+    });
+
+    it('GroupResizeStart after previous gesture continues from current geometry without jump', () => {
+        const ctx = prepareTransformContext([
+            {
+                id: 'obj-a',
+                type: 'note',
+                position: { x: 10, y: 20 },
+                width: 100,
+                height: 60,
+                properties: {},
+                transform: { rotation: 0 },
+            },
+            {
+                id: 'obj-b',
+                type: 'note',
+                position: { x: 160, y: 40 },
+                width: 80,
+                height: 50,
+                properties: {},
+                transform: { rotation: 0 },
+            },
+        ]);
+
+        ctx.eventBus.emit(Events.Tool.GroupResizeStart, {
+            objects: ['obj-a', 'obj-b'],
+            startBounds: { x: 10, y: 20, width: 230, height: 70 },
+        });
+        ctx.eventBus.emit(Events.Tool.GroupResizeUpdate, {
+            objects: ['obj-a', 'obj-b'],
+            startBounds: { x: 10, y: 20, width: 230, height: 70 },
+            newBounds: { x: 10, y: 20, width: 460, height: 140 },
+        });
+        ctx.eventBus.emit(Events.Tool.GroupResizeEnd, {
+            objects: ['obj-a', 'obj-b'],
+        });
+
+        ctx.history.executeCommand.mockClear();
+        ctx.eventBus.emit(Events.Tool.GroupResizeStart, {
+            objects: ['obj-a', 'obj-b'],
+            startBounds: { x: 10, y: 20, width: 460, height: 140 },
+        });
+        ctx.eventBus.emit(Events.Tool.GroupResizeUpdate, {
+            objects: ['obj-a', 'obj-b'],
+            startBounds: { x: 10, y: 20, width: 460, height: 140 },
+            newBounds: { x: 10, y: 20, width: 483, height: 147 },
+        });
+
+        const objA = ctx.state.state.objects.find((obj) => obj.id === 'obj-a');
+        const objB = ctx.state.state.objects.find((obj) => obj.id === 'obj-b');
+
+        expect(objA.width).toBe(210);
+        expect(objA.height).toBe(126);
+        expect(objA.position.x).toBeCloseTo(10, 5);
+        expect(objA.position.y).toBeCloseTo(20, 5);
+
+        expect(objB.width).toBe(168);
+        expect(objB.height).toBe(105);
+        expect(objB.position.x).toBeCloseTo(325, 5);
+        expect(objB.position.y).toBeCloseTo(62, 5);
+    });
+
     it('RotateUpdate updates PIXI angle, RotateEnd creates command only on angle change', async () => {
         const ctx = prepareTransformContext();
 

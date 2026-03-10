@@ -243,16 +243,25 @@ function pointInsideRotatedFrame(point, frame) {
 describe('HtmlHandlesLayer group rotate geometry', () => {
     let ctx;
     let layer;
+    let listeners;
+    let addSpy;
+    let removeSpy;
 
     beforeEach(() => {
+        listeners = {};
+        addSpy = vi.spyOn(document, 'addEventListener').mockImplementation((name, handler) => {
+            listeners[name] = handler;
+        });
+        removeSpy = vi.spyOn(document, 'removeEventListener').mockImplementation(() => {});
         ctx = createRotationGeometryContext();
         setupTransformFlow(ctx.core);
         layer = new HtmlHandlesLayer(ctx.container, ctx.core.eventBus, ctx.core);
-        vi.spyOn(console, 'info').mockImplementation(() => {});
         layer.attach();
     });
 
     afterEach(() => {
+        addSpy.mockRestore();
+        removeSpy.mockRestore();
         vi.restoreAllMocks();
         layer?.destroy();
         ctx?.cleanup();
@@ -301,6 +310,93 @@ describe('HtmlHandlesLayer group rotate geometry', () => {
 
         box = ctx.container.querySelector('.mb-handles-box');
         frame = {
+            left: parseFloat(box.style.left),
+            top: parseFloat(box.style.top),
+            width: parseFloat(box.style.width),
+            height: parseFloat(box.style.height),
+            rotation: 30,
+        };
+
+        for (const object of ctx.core.state.state.objects) {
+            const corners = getObjectCorners({
+                x: object.position.x,
+                y: object.position.y,
+                width: object.width,
+                height: object.height,
+                rotation: object.transform?.rotation || 0,
+            });
+            for (const corner of corners) {
+                expect(pointInsideRotatedFrame(corner, frame)).toBe(true);
+            }
+        }
+    });
+
+    it('keeps all selected square corners inside the rotated group frame during resize after rotation', () => {
+        const ids = ['sq-a', 'sq-b', 'sq-c'];
+        ids.forEach((id) => {
+            ctx.core.selectTool.selectedObjects.add(id);
+            ctx.core.selectTool.selection.add(id);
+        });
+
+        ctx.core.eventBus.emit(Events.Tool.SelectionAdd, { tool: 'select', object: 'sq-a' });
+        ctx.core.eventBus.emit(Events.Tool.GroupRotateStart, {
+            objects: ids,
+            center: { x: 55, y: 50 },
+        });
+        ctx.core.eventBus.emit(Events.Tool.GroupRotateUpdate, {
+            objects: ids,
+            angle: 30,
+        });
+        ctx.core.eventBus.emit(Events.Tool.GroupRotateEnd, { objects: ids });
+
+        let box = ctx.container.querySelector('.mb-handles-box');
+        const frameBefore = {
+            left: parseFloat(box.style.left),
+            top: parseFloat(box.style.top),
+            width: parseFloat(box.style.width),
+            height: parseFloat(box.style.height),
+            rotation: 30,
+        };
+
+        const handle = box.querySelector('[data-dir="se"]');
+        const startPointer = rotatePoint(
+            {
+                x: frameBefore.left + frameBefore.width,
+                y: frameBefore.top + frameBefore.height,
+            },
+            {
+                x: frameBefore.left + frameBefore.width / 2,
+                y: frameBefore.top + frameBefore.height / 2,
+            },
+            frameBefore.rotation
+        );
+        const endPointer = rotatePoint(
+            {
+                x: frameBefore.left + frameBefore.width + 20,
+                y: frameBefore.top + frameBefore.height + 10,
+            },
+            {
+                x: frameBefore.left + frameBefore.width / 2,
+                y: frameBefore.top + frameBefore.height / 2,
+            },
+            frameBefore.rotation
+        );
+
+        layer._onHandleDown({
+            currentTarget: handle,
+            clientX: startPointer.x,
+            clientY: startPointer.y,
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+        }, box);
+
+        listeners.mousemove({
+            clientX: endPointer.x,
+            clientY: endPointer.y,
+        });
+
+        box = ctx.container.querySelector('.mb-handles-box');
+        const frame = {
             left: parseFloat(box.style.left),
             top: parseFloat(box.style.top),
             width: parseFloat(box.style.width),
