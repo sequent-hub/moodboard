@@ -196,6 +196,23 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 - Добавление записки, редактирование (двойной клик), ресайз, панель свойств (шрифты, размер, цвет текста, фон), поворот.
 - Undo/redo: добавление, редактирование, ресайз, поворот, шрифт, размер шрифта, цвет текста, фон.
 
+### `tests/image-object2/ImageTool.e2e.spec.js` — 10 E2E-тестов
+
+Инструмент «Добавить картинку» (основная кнопка image-add, `.moodboard-toolbar__button--image`). Кнопка image2 вне scope — см. TASK_IMAGE_TOOL.md.
+
+**Покрытие:**
+
+- Добавление через панель — file chooser → призрак → клик на холст. Тестовый файл: `tests/fixtures/test-image.png`.
+- Добавление через paste — `Events.UI.PasteImage` с data URL (без реального clipboard).
+- Перемещение, масштабирование, вращение — createObject(type: 'image') + ручки ресайза/поворота.
+- Undo/redo: добавление, перемещение, ресайз, поворот.
+
+**Скип:** Drop с устройства — ограничения Playwright (dataTransfer.files защищён).
+
+### `tests/tools/PlacementTool.baseline.ghost.test.js` — 4 теста (было 3)
+
+Добавлен тест для image: `Place.ImageSelected` → `showImageGhost` → ghost в world, `updateGhostPosition` обновляет координаты. Учтена асинхронность `showImageGhost` (PIXI.Texture.fromURL).
+
 ### `tests/core/UpdateNoteStyleCommand.test.js` — 15 unit-тестов
 
 Команда `UpdateNoteStyleCommand` (`src/core/commands/UpdateNoteStyleCommand.js`).

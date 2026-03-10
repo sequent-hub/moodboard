@@ -80,4 +80,25 @@ describe('PlacementTool baseline: ghost behavior', () => {
         expect(tool.app).toBeNull();
         expect(tool.world).toBeNull();
     });
+
+    it('Place.ImageSelected → showImageGhost adds ghost to world (async)', async () => {
+        const file = new File(['x'], 'test-image.png', { type: 'image/png' });
+        eventBus.emit(Events.Place.ImageSelected, {
+            file,
+            fileName: 'test-image.png',
+            properties: { width: 300, height: 200 }
+        });
+
+        await vi.waitFor(
+            () => {
+                expect(tool.ghostContainer).not.toBeNull();
+                expect(world.addChild).toHaveBeenCalledWith(tool.ghostContainer);
+            },
+            { timeout: 500 }
+        );
+
+        tool.updateGhostPosition(50, 75);
+        expect(tool.ghostContainer.x).toBe(50);
+        expect(tool.ghostContainer.y).toBe(75);
+    });
 });
