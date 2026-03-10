@@ -45,6 +45,8 @@ export class PlacementTool extends BaseTool {
         this.sessionStore.initialize();
         // Оригинальные стили курсора PIXI, чтобы можно было временно переопределить pointer/default для текстового инструмента
         this._origCursorStyles = null;
+        // Сохраняем bound handler для корректного removeEventListener (избежание утечки памяти)
+        this._boundOnMouseMove = null;
 
         this.eventsBridge.attach();
     }
@@ -57,8 +59,8 @@ export class PlacementTool extends BaseTool {
         if (this.app && this.app.view) {
             this.cursor = this._getPendingCursor();
             this.app.view.style.cursor = this.cursor;
-            // Добавляем обработчик движения мыши для "призрака"
-            this.app.view.addEventListener('mousemove', this._onMouseMove.bind(this));
+            this._boundOnMouseMove = this._boundOnMouseMove || this._onMouseMove.bind(this);
+            this.app.view.addEventListener('mousemove', this._boundOnMouseMove);
         }
         // При активации синхронизируем переопределение курсора pointer для текста
         this._updateCursorOverride();
@@ -83,10 +85,9 @@ export class PlacementTool extends BaseTool {
 
     deactivate() {
         super.deactivate();
-        if (this.app && this.app.view) {
+        if (this.app && this.app.view && this._boundOnMouseMove) {
             this.app.view.style.cursor = '';
-            // Убираем обработчик движения мыши
-            this.app.view.removeEventListener('mousemove', this._onMouseMove.bind(this));
+            this.app.view.removeEventListener('mousemove', this._boundOnMouseMove);
         }
         // Восстанавливаем стандартные стили курсора при выходе из инструмента
         this._updateCursorOverride(true);

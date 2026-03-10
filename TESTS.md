@@ -210,6 +210,19 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 
 **Скип:** Drop с устройства — ограничения Playwright (dataTransfer.files защищён).
 
+### `tests/image-object2/EmojiTool.e2e.spec.js` — 13 E2E-тестов
+
+Инструмент «Эмоджи» (custom-emoji, `.moodboard-toolbar__button--emoji`). Объекты из popup: `type: 'image'`, `properties.isEmojiIcon: true` (отличается от EmojiObject type: 'emoji' в SelectTool.types-smoke).
+
+**Покрытие:**
+
+- **Меню** — клик по кнопке эмоджи открывает popup `.moodboard-toolbar__popup--emoji`, содержит секции (`.moodboard-emoji__section`) и кнопки (`.moodboard-emoji__btn`, `.moodboard-emoji__img` с src).
+- **Добавление через popup** — выбор эмоджи → призрак → клик на холст → объект `type: 'image'` с `isEmojiIcon: true` в exportBoard.
+- **Призрак** — после клика по эмоджи в popup ghostContainer появляется.
+- **Трансформации** — move, resize (lockedAspect), rotate через createObject(type: 'image', { isEmojiIcon: true }).
+- **Удаление** — Delete удаляет emoji с доски.
+- **Undo/redo** — добавление, move, resize, rotate, delete.
+
 ### `tests/image-object2/FileTool.e2e.spec.js` — 15 E2E-тестов
 
 Инструмент «Добавить файл» (attachments, `.moodboard-toolbar__button--attachments`). Playwright E2E.
@@ -284,6 +297,26 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 - revokeObjectURL для `src` на верхнем уровне объекта
 - не вызывается для http/data URL и не-image типов
 - эмитируется Object.Deleted
+
+### `tests/tools/PlacementTool.mousemove-cleanup.test.js` — 3 теста
+
+Корректное удаление mousemove-обработчика при deactivate (избежание утечки памяти).
+- activate/deactivate использует одну и ту же ссылку на handler для addEventListener/removeEventListener.
+- Повторный activate/deactivate не накапливает listeners.
+
+### `tests/ui/Toolbar.destroy.test.js` — 3 теста
+
+Корректная очистка Toolbar при destroy.
+- document.removeEventListener(click) с тем же handler, что addEventListener.
+- eventBus.removeAllListeners(UpdateHistoryButtons).
+- eventBus.off(Tool.Activated) для отписки от подписки в ToolbarRenderer.
+
+### `tests/ui/toolbar/ToolbarPopupsController.emoji.test.js` — 3 теста
+
+Эмоджи-popup: Place.Set payload, контракты.
+- Клик по эмоджи эмитит Place.Set с type image, isEmojiIcon true, size 64×64.
+- Popup содержит несколько кнопок с валидным src.
+- Place.Set payload содержит size для ghost.
 
 ### `tests/tools/PlacementTool.baseline.ghost.test.js` — 5 тестов
 

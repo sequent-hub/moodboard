@@ -379,7 +379,6 @@ export class ToolbarPopupsController {
         let groups = new Map();
         let convertedCount = 0;
 
-        console.log('🎯 Создание EmojiPopup: заменяем файловые эмоджи на встроенные PNG...');
         if (typeof import.meta !== 'undefined' && import.meta.glob) {
             const modules = import.meta.glob('../assets/emodji/**/*.{png,PNG,svg,SVG}', { eager: true, query: '?url', import: 'default' });
             const entries = Object.entries(modules).sort(([a], [b]) => a.localeCompare(b));
@@ -422,7 +421,6 @@ export class ToolbarPopupsController {
         }
 
         const ORDER = ['Смайлики', 'Жесты', 'Женские эмоции', 'Котики', 'Обезьянка', 'Разное'];
-        console.log(`✅ Заменено ${convertedCount} файловых эмоджи на встроенные PNG`);
         const present = [...groups.keys()];
         const orderedFirst = ORDER.filter((name) => groups.has(name));
         const theRest = present.filter((name) => !ORDER.includes(name)).sort((a, b) => a.localeCompare(b));
@@ -508,8 +506,6 @@ export class ToolbarPopupsController {
                     const targetW = target;
                     const targetH = target;
 
-                    console.log(`🎯 Создаем эмоджи: ${isInline ? 'встроенный PNG' : 'файл'} (${emojiCode})`);
-
                     this.toolbar.eventBus.emit(Events.Place.Set, {
                         type: 'image',
                         properties: {
@@ -537,8 +533,6 @@ export class ToolbarPopupsController {
     getFallbackEmojiGroups() {
         const groups = new Map();
         let convertedCount = 0;
-
-        console.log('🎯 Fallback режим: заменяем файловые эмоджи на встроенные PNG...');
 
         const fallbackEmojis = {
             'Смайлики': [
@@ -598,7 +592,6 @@ export class ToolbarPopupsController {
             }
         });
 
-        console.log(`✅ Fallback: заменено ${convertedCount} файловых эмоджи на встроенные PNG`);
         return groups;
     }
 

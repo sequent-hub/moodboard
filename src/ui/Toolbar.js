@@ -40,13 +40,13 @@ export class Toolbar {
      */
     async init() {
         try {
-            // Инициализируем IconLoader и загружаем все иконки
             await this.iconLoader.init();
             this.icons = await this.iconLoader.loadAllIcons();
         } catch (error) {
             console.error('❌ Ошибка загрузки иконок:', error);
         }
-        
+
+        this._toolActivatedHandler = ({ tool }) => this.setActiveToolbarButton(tool);
         this.createToolbar();
         this.attachEvents();
         this.setupHistoryEvents();
@@ -113,18 +113,17 @@ export class Toolbar {
         this.element.addEventListener('click', (e) => {
             const button = e.target.closest('.moodboard-toolbar__button');
             if (!button || button.disabled) return;
-            
+
             const toolType = button.dataset.tool;
             const toolId = button.dataset.toolId;
 
             this.actionRouter.routeToolbarAction(button, toolType, toolId);
         });
 
-        // Клик вне попапов — закрыть
-        document.addEventListener('click', (e) => {
-            // ИСПРАВЛЕНИЕ: Защита от null элементов
+        // Клик вне попапов — закрыть (сохраняем handler для корректного removeEventListener)
+        this._documentClickHandler = (e) => {
             if (!e.target) return;
-            
+
             const isInsideToolbar = this.element && this.element.contains(e.target);
             const isInsideShapesPopup = this.shapesPopupEl && this.shapesPopupEl.contains(e.target);
             const isInsideDrawPopup = this.drawPopupEl && this.drawPopupEl.contains(e.target);
@@ -140,7 +139,8 @@ export class Toolbar {
                 this.closeEmojiPopup();
                 this.closeFramePopup();
             }
-        });
+        };
+        document.addEventListener('click', this._documentClickHandler);
     }
 
     /**
@@ -320,21 +320,31 @@ export class Toolbar {
      * Очистка ресурсов
      */
     destroy() {
+        // Удаляем document-level listener (предотвращение утечки памяти)
+        if (this._documentClickHandler) {
+            document.removeEventListener('click', this._documentClickHandler);
+            this._documentClickHandler = null;
+        }
+
+        // Отписываемся от Events.Tool.Activated (подписка в ToolbarRenderer)
+        if (this._toolActivatedHandler) {
+            this.eventBus.off(Events.Tool.Activated, this._toolActivatedHandler);
+            this._toolActivatedHandler = null;
+        }
+
         if (this.element) {
-            // Очищаем все tooltips перед удалением элемента
             const buttons = this.element.querySelectorAll('.moodboard-toolbar__button');
-            buttons.forEach(button => {
+            buttons.forEach((button) => {
                 if (button._tooltip) {
                     button._tooltip.remove();
                     button._tooltip = null;
                 }
             });
-            
+
             this.element.remove();
             this.element = null;
         }
-        
-        // Отписываемся от событий
+
         this.eventBus.removeAllListeners(Events.UI.UpdateHistoryButtons);
     }
 

@@ -47,9 +47,7 @@ export class ToolbarRenderer {
         this.toolbar.createEmojiPopup();
         this.toolbar.createFramePopup();
 
-        this.toolbar.eventBus.on(Events.Tool.Activated, ({ tool }) => {
-            this.toolbar.setActiveToolbarButton(tool);
-        });
+        this.toolbar.eventBus.on(Events.Tool.Activated, this.toolbar._toolActivatedHandler);
 
         this.toolbar.currentDrawTool = 'pencil';
     }
