@@ -7,7 +7,14 @@ import { HistoryManager } from '../../src/core/HistoryManager.js';
 import { EventBus } from '../../src/core/EventBus.js';
 import { Events } from '../../src/core/events/Events.js';
 
-/** Мок-команда: execute/undo, без merge */
+/**
+ * Создаёт мок-команду для тестов.
+ * Имитирует контракт BaseCommand: execute, undo, canMergeWith.
+ * Не поддерживает слияние (canMergeWith всегда false).
+ * @param {string} id — идентификатор команды для отладки
+ * @param {Function} executeFn — шпион для execute()
+ * @param {Function} undoFn — шпион для undo()
+ */
 function createMockCommand(id, executeFn = vi.fn(), undoFn = vi.fn()) {
     return {
         type: 'mock',
@@ -21,7 +28,14 @@ function createMockCommand(id, executeFn = vi.fn(), undoFn = vi.fn()) {
     };
 }
 
-/** Мок-команда с поддержкой merge (для тестов слияния) */
+/**
+ * Создаёт мок-команду с поддержкой merge для тестов слияния.
+ * Используется при проверке логики canMergeWith и mergeTimeout.
+ * @param {string} id — идентификатор команды
+ * @param {object|null} mergeTarget — целевая команда для canMergeWith (или null для проверки по type)
+ * @param {Function} executeFn — шпион для execute()
+ * @param {Function} undoFn — шпион для undo()
+ */
 function createMergeableCommand(id, mergeTarget, executeFn = vi.fn(), undoFn = vi.fn()) {
     const cmd = {
         type: 'mergeable',
@@ -39,6 +53,10 @@ function createMergeableCommand(id, mergeTarget, executeFn = vi.fn(), undoFn = v
     return cmd;
 }
 
+/**
+ * Группа тестов: механизм добавления команд в историю.
+ * Проверяет executeCommand, накопление, отсечение redo-ветки, maxHistorySize, merge.
+ */
 describe('HistoryManager: добавление команд в историю', () => {
     let eventBus;
     let history;
@@ -52,6 +70,7 @@ describe('HistoryManager: добавление команд в историю', 
         history?.destroy();
     });
 
+    // Базовый сценарий: одна команда попадает в историю и currentIndex сдвигается на 0
     it('executeCommand добавляет команду и увеличивает currentIndex', () => {
         const cmd = createMockCommand('a');
         history.executeCommand(cmd);
@@ -61,6 +80,7 @@ describe('HistoryManager: добавление команд в историю', 
         expect(history.history[0]).toBe(cmd);
     });
 
+    // Команда должна быть выполнена до добавления в историю
     it('executeCommand вызывает command.execute()', () => {
         const execute = vi.fn();
         const cmd = createMockCommand('a', execute);
@@ -69,6 +89,7 @@ describe('HistoryManager: добавление команд в историю', 
         expect(execute).toHaveBeenCalledTimes(1);
     });
 
+    // UI подписан на History.Changed для обновления кнопок undo/redo
     it('executeCommand эмитит Events.History.Changed с корректными canUndo/canRedo/historySize', () => {
         const changed = vi.fn();
         eventBus.on(Events.History.Changed, changed);
@@ -86,6 +107,7 @@ describe('HistoryManager: добавление команд в историю', 
         );
     });
 
+    // canUndo/canRedo — предикаты для состояния кнопок (currentIndex >= 0 для undo)
     it('при пустой истории canUndo false, после execute canUndo true', () => {
         expect(history.canUndo()).toBe(false);
         expect(history.canRedo()).toBe(false);
@@ -95,6 +117,7 @@ describe('HistoryManager: добавление команд в историю', 
         expect(history.canRedo()).toBe(false);
     });
 
+    // Последовательные команды выстраиваются в линейную историю
     it('несколько executeCommand накапливают команды и двигают currentIndex', () => {
         const cmd1 = createMockCommand('1');
         const cmd2 = createMockCommand('2');
@@ -111,6 +134,8 @@ describe('HistoryManager: добавление команд в историю', 
         expect(history.history[2]).toBe(cmd3);
     });
 
+    // Важный контракт: после undo новая команда отсекает «будущее» (redo-ветку),
+    // чтобы история оставалась линейной
     it('новая команда после undo отсекает хвост (redo-ветка)', () => {
         const cmd1 = createMockCommand('1');
         const cmd2 = createMockCommand('2');
@@ -132,6 +157,7 @@ describe('HistoryManager: добавление команд в историю', 
         expect(history.currentIndex).toBe(1);
     });
 
+    // Защита от неограниченного роста истории: FIFO при превышении лимита
     it('ограничение maxHistorySize: при переполнении удаляется самая старая команда', () => {
         const opts = { maxHistorySize: 3 };
         const h = new HistoryManager(eventBus, opts);
@@ -151,6 +177,8 @@ describe('HistoryManager: добавление команд в историю', 
         h.destroy();
     });
 
+    // Merge: если lastCommand.canMergeWith(command) и разница timestamp < mergeTimeout,
+    // то вызывается lastCommand.mergeWith(command), входящая команда НЕ добавляется и НЕ выполняется
     it('merge: при canMergeWith и в mergeTimeout команда объединяется, новая не добавляется', () => {
         vi.useFakeTimers();
         const opts = { mergeTimeout: 2000 };
@@ -174,6 +202,7 @@ describe('HistoryManager: добавление команд в историю', 
         h.destroy();
     });
 
+    // За пределами mergeTimeout merge не применяется — добавляется новая запись в историю
     it('merge: за пределами mergeTimeout добавляется новая команда', () => {
         vi.useFakeTimers();
         const opts = { mergeTimeout: 500 };
@@ -194,6 +223,8 @@ describe('HistoryManager: добавление команд в историю', 
         h.destroy();
     });
 
+    // Во время undo/redo isExecutingCommand = true: вложенные executeCommand не добавляют в историю,
+    // иначе undo одной команды мог бы породить новую запись
     it('при isExecutingCommand команда выполняется, но не добавляется в историю', () => {
         const cmd = createMockCommand('during-undo');
         const undo = vi.fn(() => {
@@ -211,6 +242,10 @@ describe('HistoryManager: добавление команд в историю', 
     });
 });
 
+/**
+ * Группа тестов: перемещение по истории (undo/redo).
+ * Проверяет undo, redo, события, полные циклы, реакцию на keyboard:undo/redo.
+ */
 describe('HistoryManager: перемещение по истории (undo/redo)', () => {
     let eventBus;
     let history;
@@ -224,6 +259,7 @@ describe('HistoryManager: перемещение по истории (undo/redo)
         history?.destroy();
     });
 
+    // undo вызывает undo() текущей команды и сдвигает currentIndex назад
     it('undo вызывает command.undo и уменьшает currentIndex', () => {
         const undo = vi.fn();
         const cmd = createMockCommand('a', vi.fn(), undo);
@@ -236,11 +272,13 @@ describe('HistoryManager: перемещение по истории (undo/redo)
         expect(history.currentIndex).toBe(-1);
     });
 
+    // Безопасный вызов undo при пустой истории
     it('undo при пустой истории возвращает false', () => {
         const result = history.undo();
         expect(result).toBe(false);
     });
 
+    // После undo UI получает lastUndone для отображения (например, в тултипе)
     it('undo эмитит Events.History.Changed с lastUndone', () => {
         const changed = vi.fn();
         eventBus.on(Events.History.Changed, changed);
@@ -261,6 +299,7 @@ describe('HistoryManager: перемещение по истории (undo/redo)
         );
     });
 
+    // redo повторно выполняет команду и сдвигает currentIndex вперёд
     it('redo вызывает command.execute и увеличивает currentIndex', () => {
         const execute = vi.fn();
         const cmd = createMockCommand('a', execute);
@@ -275,6 +314,7 @@ describe('HistoryManager: перемещение по истории (undo/redo)
         expect(history.currentIndex).toBe(0);
     });
 
+    // redo возможен только когда currentIndex < length-1 (есть «будущее»)
     it('redo при невозможности возвращает false', () => {
         expect(history.redo()).toBe(false);
 
@@ -283,6 +323,7 @@ describe('HistoryManager: перемещение по истории (undo/redo)
         expect(history.redo()).toBe(false);
     });
 
+    // Аналогично undo — lastRedone для UI
     it('redo эмитит Events.History.Changed с lastRedone', () => {
         const changed = vi.fn();
         eventBus.on(Events.History.Changed, changed);
@@ -304,6 +345,7 @@ describe('HistoryManager: перемещение по истории (undo/redo)
         );
     });
 
+    // Двойной undo возвращает к состоянию до первой команды (currentIndex = -1)
     it('полный цикл: execute A, execute B, undo, undo — возврат к началу', () => {
         const u1 = vi.fn();
         const u2 = vi.fn();
@@ -322,6 +364,7 @@ describe('HistoryManager: перемещение по истории (undo/redo)
         expect(u1).toHaveBeenCalledTimes(1);
     });
 
+    // undo затем redo восстанавливает выполненное состояние; execute вызывается дважды
     it('полный цикл: execute A, undo, redo — восстановление', () => {
         const execute = vi.fn();
         const undo = vi.fn();
@@ -338,6 +381,7 @@ describe('HistoryManager: перемещение по истории (undo/redo)
         expect(history.currentIndex).toBe(0);
     });
 
+    // История подписана на keyboard:undo (Ctrl+Z) — интеграция с клавиатурой
     it('событие keyboard:undo вызывает undo', () => {
         const cmd = createMockCommand('a');
         history.executeCommand(cmd);
@@ -349,6 +393,7 @@ describe('HistoryManager: перемещение по истории (undo/redo)
         undoSpy.mockRestore();
     });
 
+    // Аналогично keyboard:redo (Ctrl+Shift+Z)
     it('событие keyboard:redo вызывает redo', () => {
         const cmd = createMockCommand('a');
         history.executeCommand(cmd);
@@ -362,6 +407,10 @@ describe('HistoryManager: перемещение по истории (undo/redo)
     });
 });
 
+/**
+ * Группа тестов: служебные методы HistoryManager.
+ * getLastCommand, getHistoryInfo, clear, destroy.
+ */
 describe('HistoryManager: служебные методы', () => {
     let eventBus;
     let history;
@@ -375,6 +424,7 @@ describe('HistoryManager: служебные методы', () => {
         history?.destroy();
     });
 
+    // getLastCommand нужен для проверки merge (последняя команда в истории)
     it('getLastCommand возвращает последнюю команду или null', () => {
         expect(history.getLastCommand()).toBeNull();
 
@@ -387,6 +437,7 @@ describe('HistoryManager: служебные методы', () => {
         expect(history.getLastCommand()).toBe(cmd2);
     });
 
+    // Используется для отладки (debugHistory) и диагностики
     it('getHistoryInfo возвращает totalCommands, currentIndex, canUndo, canRedo, commands', () => {
         const cmd = createMockCommand('a');
         history.executeCommand(cmd);
@@ -403,6 +454,7 @@ describe('HistoryManager: служебные методы', () => {
         expect(info.commands[0]).toMatchObject({ index: 0, isCurrent: true });
     });
 
+    // clear сбрасывает history и currentIndex, уведомляет UI
     it('clear очищает историю и эмитит Changed', () => {
         const cmd = createMockCommand('a');
         history.executeCommand(cmd);
@@ -421,6 +473,7 @@ describe('HistoryManager: служебные методы', () => {
         });
     });
 
+    // destroy снимает только свои подписки (keyboard:undo/redo, history:debug), не затрагивая другие
     it('destroy снимает подписки и не трогает сторонние слушатели', () => {
         const external = vi.fn();
         eventBus.on(Events.UI.ZoomIn, external);

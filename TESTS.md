@@ -9,7 +9,7 @@
 
 ## Покрытие тестами
 
-**Обновление:** добавлено `32` новых теста в `10` файлах (сеть, загрузка изображений, сохранение, retry, SaveStatus, unload flush, image persistence в ApiClient).
+**Обновление:** добавлены `24` теста для `HistoryManager` (`tests/core/HistoryManager.baseline.test.js`) — добавление команд в историю, undo/redo, merge, maxHistorySize, служебные методы.
 
 ### `tests/objects/NoteObject.test.js` — 63 теста
 
@@ -155,6 +155,14 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 - `tests/integration/SaveStatus.network-state.test.js` — 2 теста: связка `SaveManager + SaveStatus` при success/timeout.
 - `tests/core/SaveManager.unload-flush.test.js` — 4 теста: `beforeunload/pagehide/visibilitychange`, `sendBeacon`, sync XHR fallback.
 - `tests/core/ApiClient.image-persistence.test.js` — 5 тестов: очистка image-данных при save, сохранение `imageId`, восстановление `src` при load, защита от перезаписи существующего `src`.
+
+### `tests/core/HistoryManager.baseline.test.js` — 24 теста
+
+Механизм истории команд Undo/Redo (`src/core/HistoryManager.js`).
+
+- **Добавление команд** — executeCommand добавляет команду, увеличивает currentIndex, вызывает command.execute(), эмитит Events.History.Changed; при пустой истории canUndo/canRedo; накопление нескольких команд; новая команда после undo отсекает redo-ветку; ограничение maxHistorySize; merge при canMergeWith и в mergeTimeout (объединение без execute входящей команды); merge за пределами mergeTimeout; команда при isExecutingCommand выполняется, но не добавляется в историю.
+- **Перемещение по истории (undo/redo)** — undo вызывает command.undo и уменьшает currentIndex; undo при пустой истории возвращает false; undo эмитит Changed с lastUndone; redo вызывает command.execute и увеличивает currentIndex; redo при невозможности возвращает false; redo эмитит Changed с lastRedone; полный цикл A→B→undo→undo; полный цикл A→undo→redo; события keyboard:undo и keyboard:redo вызывают соответствующие методы.
+- **Служебные методы** — getLastCommand; getHistoryInfo (totalCommands, currentIndex, canUndo, canRedo, commands); clear очищает историю и эмитит Changed; destroy снимает только свои подписки.
 
 ### `tests/EventBus.test.js` — 38 тестов (ранее)
 
