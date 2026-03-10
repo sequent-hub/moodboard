@@ -1,5 +1,7 @@
 import { Events } from '../../core/events/Events.js';
 
+const HANDLES_ACCENT_COLOR = '#80D8FF';
+
 export class HandlesDomRenderer {
     constructor(host, rotateIconSvg) {
         this.host = host;
@@ -59,7 +61,7 @@ export class HandlesDomRenderer {
         Object.assign(box.style, {
             position: 'absolute', left: `${left}px`, top: `${top}px`,
             width: `${width}px`, height: `${height}px`,
-            border: '1px solid #1DE9B6', borderRadius: '3px', boxSizing: 'content-box', pointerEvents: 'none',
+            border: `1px solid ${HANDLES_ACCENT_COLOR}`, borderRadius: '3px', boxSizing: 'content-box', pointerEvents: 'none',
             transformOrigin: 'center center',
             transform: `rotate(${rotation}deg)`,
         });
@@ -85,13 +87,13 @@ export class HandlesDomRenderer {
             h.appendChild(inner);
 
             h.addEventListener('mouseenter', () => {
-                h.style.background = '#17C29A';
-                h.style.borderColor = '#17C29A';
+                h.style.background = HANDLES_ACCENT_COLOR;
+                h.style.borderColor = HANDLES_ACCENT_COLOR;
                 h.style.cursor = cursor;
             });
             h.addEventListener('mouseleave', () => {
-                h.style.background = '#1DE9B6';
-                h.style.borderColor = '#1DE9B6';
+                h.style.background = HANDLES_ACCENT_COLOR;
+                h.style.borderColor = HANDLES_ACCENT_COLOR;
             });
 
             if (!isFileTarget) {
