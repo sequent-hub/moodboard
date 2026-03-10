@@ -188,6 +188,7 @@ describe('FilePropertiesPanel', () => {
             expect(unsubscribedEvents).toContain(Events.Object.Deleted);
             expect(unsubscribedEvents).toContain(Events.Tool.DragStart);
             expect(unsubscribedEvents).toContain(Events.Tool.Activated);
+            expect(unsubscribedEvents).toContain(Events.Object.TransformUpdated);
         });
 
         it('повторный вызов destroy не падает', () => {

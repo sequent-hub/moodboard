@@ -42,6 +42,9 @@ export class FilePropertiesPanel {
         this._handlers.onActivated = ({ tool }) => {
             if (tool !== 'select') this.hide();
         };
+        this._handlers.onTransformUpdated = (data) => {
+            if (this.currentId && data?.objectId === this.currentId) this.reposition();
+        };
 
         this.eventBus.on(Events.Tool.SelectionAdd, this._handlers.onSelectionAdd);
         this.eventBus.on(Events.Tool.SelectionRemove, this._handlers.onSelectionRemove);
@@ -58,6 +61,7 @@ export class FilePropertiesPanel {
         this.eventBus.on(Events.UI.ZoomPercent, this._handlers.onZoomPercent);
         this.eventBus.on(Events.Tool.PanUpdate, this._handlers.onPanUpdate);
         this.eventBus.on(Events.Tool.Activated, this._handlers.onActivated);
+        this.eventBus.on(Events.Object.TransformUpdated, this._handlers.onTransformUpdated);
     }
 
     updateFromSelection() {
@@ -339,6 +343,7 @@ export class FilePropertiesPanel {
         this.eventBus.off(Events.UI.ZoomPercent, this._handlers.onZoomPercent);
         this.eventBus.off(Events.Tool.PanUpdate, this._handlers.onPanUpdate);
         this.eventBus.off(Events.Tool.Activated, this._handlers.onActivated);
+        this.eventBus.off(Events.Object.TransformUpdated, this._handlers.onTransformUpdated);
         this._handlers = null;
 
         if (this.panel && this.panel.parentNode) {

@@ -408,6 +408,31 @@ test.describe('FileTool E2E (attachments instrument)', () => {
     await expect(handlesBox).toBeVisible();
   });
 
+  test('undo move: download button repositions with file', async ({ page }) => {
+    const fileId = await createObject(page, 'file', { x: 300, y: 200 }, {
+      fileName: 'undo-move.pdf',
+      fileSize: 0,
+      width: 120,
+      height: 140
+    });
+    await page.click('.moodboard-toolbar__button--select');
+    await setSelection(page, [fileId]);
+
+    const center = await getObjectCanvasCenter(page, fileId);
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+
+    await page.mouse.move(canvasBox.x + center.x, canvasBox.y + center.y);
+    await page.mouse.down();
+    await page.mouse.move(canvasBox.x + center.x + 80, canvasBox.y + center.y + 50);
+    await page.mouse.up();
+
+    await triggerUndo(page);
+
+    const downloadBtn = page.locator('.moodboard-file-panel-download');
+    await expect(downloadBtn).toBeVisible({ timeout: 3000 });
+  });
+
   test('redo removes file again after undo', async ({ page }) => {
     const fileId = await createObject(page, 'file', { x: 300, y: 200 }, {
       fileName: 'redo-test.pdf',
