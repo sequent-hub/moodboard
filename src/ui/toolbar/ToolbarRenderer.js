@@ -16,7 +16,7 @@ export class ToolbarRenderer {
             { id: 'text-add', iconName: 'text-add', title: 'Добавить текст', type: 'text-add' },
             { id: 'note', iconName: 'note', title: 'Добавить записку', type: 'note-add' },
             { id: 'image', iconName: 'image', title: 'Добавить картинку', type: 'image-add' },
-            { id: 'image2', iconName: 'image', title: 'Добавить картинку', type: 'image2-add' },
+            // { id: 'image2', iconName: 'image', title: 'Добавить картинку', type: 'image2-add' },
             { id: 'shapes', iconName: 'shapes', title: 'Фигуры', type: 'custom-shapes' },
             { id: 'pencil', iconName: 'pencil', title: 'Рисование', type: 'custom-draw' },
             { id: 'attachments', iconName: 'attachments', title: 'Файлы', type: 'custom-attachments' },
