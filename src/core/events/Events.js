@@ -107,6 +107,7 @@ export const Events = {
 		Pasted: 'object:pasted',
 		StateChanged: 'state:changed',
 		FileNameChange: 'object:filename:change',
+		ContentChange: 'object:content:change',
 	},
 
 	History: {

@@ -12,3 +12,5 @@ export { GroupResizeCommand } from './GroupResizeCommand.js';
 export { ReorderZCommand } from './ReorderZCommand.js';
 export { GroupReorderZCommand } from './GroupReorderZCommand.js';
 export { EditFileNameCommand } from './EditFileNameCommand.js';
+export { UpdateContentCommand } from './UpdateContentCommand.js';
+export { UpdateTextStyleCommand } from './UpdateTextStyleCommand.js';

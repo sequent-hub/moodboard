@@ -69,6 +69,7 @@ export function createTextEditorFinalize(controller, {
     fontSize,
     objectId,
     isNewCreation,
+    initialContent = '',
 }) {
     return (commit) => {
         const value = textarea.value.trim();
@@ -135,27 +136,18 @@ export function createTextEditorFinalize(controller, {
                 properties: { content: value, fontSize, width: wWorld, height: hWorld },
             });
         } else {
-            if (currentObjectType === 'note') {
-                controller.eventBus.emit(Events.Tool.UpdateObjectContent, {
-                    objectId,
-                    content: value,
-                });
+            if (isNewCreation) {
+                controller.eventBus.emit(Events.Tool.UpdateObjectContent, { objectId, content: value });
                 controller.eventBus.emit(Events.Object.StateChanged, {
                     objectId,
-                    updates: {
-                        properties: { content: value },
-                    },
+                    updates: { properties: { content: value } },
                 });
             } else {
-                controller.eventBus.emit(Events.Tool.UpdateObjectContent, {
+                const oldContent = typeof initialContent === 'string' ? initialContent : '';
+                controller.eventBus.emit(Events.Object.ContentChange, {
                     objectId,
-                    content: value,
-                });
-                controller.eventBus.emit(Events.Object.StateChanged, {
-                    objectId,
-                    updates: {
-                        properties: { content: value },
-                    },
+                    oldContent,
+                    newContent: value,
                 });
             }
         }
@@ -205,6 +197,8 @@ export function closeTextEditorFromState(controller, commit) {
     const objectId = controller.textEditor.objectId;
     const position = controller.textEditor.position;
     const properties = controller.textEditor.properties;
+    const isNewCreation = controller.textEditor.isNewCreation;
+    const initialContent = controller.textEditor.initialContent ?? '';
 
     if (objectId) {
         if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
@@ -238,29 +232,17 @@ export function closeTextEditorFromState(controller, commit) {
             properties: { content: value, fontSize: properties.fontSize },
         });
     } else {
-        if (objectType === 'note') {
-            console.log('🔧 SelectTool: updating note content via UpdateObjectContent');
-            controller.eventBus.emit(Events.Tool.UpdateObjectContent, {
-                objectId,
-                content: value,
-            });
+        if (isNewCreation) {
+            controller.eventBus.emit(Events.Tool.UpdateObjectContent, { objectId, content: value });
             controller.eventBus.emit(Events.Object.StateChanged, {
                 objectId,
-                updates: {
-                    properties: { content: value },
-                },
+                updates: { properties: { content: value } },
             });
         } else {
-            console.log('🔧 SelectTool: updating text content via UpdateObjectContent');
-            controller.eventBus.emit(Events.Tool.UpdateObjectContent, {
+            controller.eventBus.emit(Events.Object.ContentChange, {
                 objectId,
-                content: value,
-            });
-            controller.eventBus.emit(Events.Object.StateChanged, {
-                objectId,
-                updates: {
-                    properties: { content: value },
-                },
+                oldContent: initialContent,
+                newContent: value,
             });
         }
     }

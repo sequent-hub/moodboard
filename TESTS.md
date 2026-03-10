@@ -156,11 +156,31 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 - `tests/core/SaveManager.unload-flush.test.js` — 4 теста: `beforeunload/pagehide/visibilitychange`, `sendBeacon`, sync XHR fallback.
 - `tests/core/ApiClient.image-persistence.test.js` — 5 тестов: очистка image-данных при save, сохранение `imageId`, восстановление `src` при load, защита от перезаписи существующего `src`.
 
+### `tests/image-object2/TextTool.e2e.spec.js` — 18 E2E-тестов
+
+Инструмент «Текст» (text-add). Playwright E2E.
+
+**История изменений (контекст для последующих агентов):**
+
+- **Было:** Тестов не было. Изменения свойств текста (шрифт, размер, цвет, фон) через панель свойств шли через `Object.StateChanged` без команд — undo/redo не работали.
+- **Сделано:**
+  - Добавлены E2E-тесты: добавление текста, редактирование, ресайз ручками, панель свойств (шрифт, размер, цвет, фон), поворот.
+  - Введена команда `UpdateContentCommand` — undo/redo для редактирования текста. Событие `Object.ContentChange` вместо `UpdateObjectContent` + `StateChanged`.
+  - Введена команда `UpdateTextStyleCommand` — undo/redo для fontFamily, fontSize, color, backgroundColor. Перехват `StateChanged` в `ObjectLifecycleFlow` для типа `text` с одним из этих свойств.
+  - В `HistoryManager` при merge вызывается `_executeCommandSafely(lastCommand)`, чтобы слитая команда применяла актуальное значение (fix для тестов «all fonts» / «all font sizes»).
+- **Результат:** 18 тестов, включая undo/redo для добавления, редактирования, ресайза, шрифта, размера шрифта, цвета, фона, поворота.
+- **Референс для Записки:** `TextTool.e2e.spec.js` — шаблон структуры, хелперы (`createObject`, `getObjectById`, `triggerUndo`, `triggerRedo`), тесты панели свойств и undo/redo.
+
+**Покрытие:**
+
+- Добавление текста, редактирование (двойной клик), ресайз, панель свойств (все шрифты, все размеры, цвет, фон), поворот.
+- Undo/redo: добавление, редактирование, ресайз, шрифт, размер шрифта, цвет, фон, поворот.
+
 ### `tests/core/HistoryManager.baseline.test.js` — 24 теста
 
 Механизм истории команд Undo/Redo (`src/core/HistoryManager.js`).
 
-- **Добавление команд** — executeCommand добавляет команду, увеличивает currentIndex, вызывает command.execute(), эмитит Events.History.Changed; при пустой истории canUndo/canRedo; накопление нескольких команд; новая команда после undo отсекает redo-ветку; ограничение maxHistorySize; merge при canMergeWith и в mergeTimeout (объединение без execute входящей команды); merge за пределами mergeTimeout; команда при isExecutingCommand выполняется, но не добавляется в историю.
+- **Добавление команд** — executeCommand добавляет команду, увеличивает currentIndex, вызывает command.execute(), эмитит Events.History.Changed; при пустой истории canUndo/canRedo; накопление нескольких команд; новая команда после undo отсекает redo-ветку; ограничение maxHistorySize; merge при canMergeWith и в mergeTimeout (объединение без execute входящей команды; после merge выполняется lastCommand для применения слитого значения); merge за пределами mergeTimeout; команда при isExecutingCommand выполняется, но не добавляется в историю.
 - **Перемещение по истории (undo/redo)** — undo вызывает command.undo и уменьшает currentIndex; undo при пустой истории возвращает false; undo эмитит Changed с lastUndone; redo вызывает command.execute и увеличивает currentIndex; redo при невозможности возвращает false; redo эмитит Changed с lastRedone; полный цикл A→B→undo→undo; полный цикл A→undo→redo; события keyboard:undo и keyboard:redo вызывают соответствующие методы.
 - **Служебные методы** — getLastCommand; getHistoryInfo (totalCommands, currentIndex, canUndo, canRedo, commands); clear очищает историю и эмитит Changed; destroy снимает только свои подписки.
 

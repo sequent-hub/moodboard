@@ -107,9 +107,10 @@ describe('TextInlineEditorController baseline: open/close flow', () => {
         expect(ctx.textEditor.objectId).toBe('text-second');
         expect(ctx.textEditor.textarea.value).toBe('second');
         expect(document.querySelectorAll('.moodboard-text-editor').length).toBeGreaterThan(wrappersBefore);
-        expect(collectEventPayloads(eventBus, Events.Tool.UpdateObjectContent)).toContainEqual({
+        expect(collectEventPayloads(eventBus, Events.Object.ContentChange)).toContainEqual({
             objectId: 'text-first',
-            content: 'first',
+            oldContent: 'first',
+            newContent: 'first',
         });
     });
 

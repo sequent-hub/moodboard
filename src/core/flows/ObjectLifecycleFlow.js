@@ -1,5 +1,50 @@
 import { Events } from '../events/Events.js';
-import { EditFileNameCommand } from '../commands/index.js';
+import { EditFileNameCommand, UpdateContentCommand, UpdateTextStyleCommand } from '../commands/index.js';
+
+const TEXT_STYLE_PROPS = ['fontFamily', 'fontSize', 'color', 'backgroundColor'];
+const TEXT_STYLE_DEFAULTS = {
+    fontFamily: 'Roboto, Arial, sans-serif',
+    fontSize: 18,
+    color: '#000000',
+    backgroundColor: 'transparent',
+};
+
+/**
+ * Если updates содержит ровно одно свойство стиля текста — создаёт UpdateTextStyleCommand и выполняет её.
+ * @returns {boolean} true, если команда создана и применена (дальнейшая обработка не нужна)
+ */
+function tryCreateTextStyleCommand(core, object, objectId, updates) {
+    if (object.type !== 'text' && object.type !== 'simple-text') return false;
+
+    let property = null;
+    let newValue = null;
+
+    if (updates.properties?.fontFamily !== undefined && Object.keys(updates).length === 1) {
+        property = 'fontFamily';
+        newValue = updates.properties.fontFamily;
+    } else if (updates.fontSize !== undefined && !updates.properties && Object.keys(updates).length === 1) {
+        property = 'fontSize';
+        newValue = typeof updates.fontSize === 'string' ? parseInt(updates.fontSize, 10) : updates.fontSize;
+    } else if (updates.color !== undefined && !updates.properties && Object.keys(updates).length === 1) {
+        property = 'color';
+        newValue = updates.color;
+    } else if (updates.backgroundColor !== undefined && !updates.properties && Object.keys(updates).length === 1) {
+        property = 'backgroundColor';
+        newValue = updates.backgroundColor;
+    }
+
+    if (!property || !TEXT_STYLE_PROPS.includes(property)) return false;
+
+    const oldValue = property === 'fontFamily'
+        ? (object.properties?.fontFamily ?? TEXT_STYLE_DEFAULTS.fontFamily)
+        : (object[property] ?? object.properties?.[property] ?? TEXT_STYLE_DEFAULTS[property]);
+
+    if (oldValue === newValue) return false;
+
+    const command = new UpdateTextStyleCommand(core, objectId, property, oldValue, newValue);
+    core.history.executeCommand(command);
+    return true;
+}
 
 export function setupObjectLifecycleFlow(core) {
     core.eventBus.on(Events.Tool.ObjectsDelete, ({ objects }) => {
@@ -86,69 +131,81 @@ export function setupObjectLifecycleFlow(core) {
 
     core.eventBus.on(Events.Object.StateChanged, (data) => {
         const { objectId, updates } = data;
-        if (objectId && updates && core.state) {
-            const objects = core.state.getObjects();
-            const object = objects.find(obj => obj.id === objectId);
-            if (object) {
-                if (updates.properties && object.properties) {
-                    Object.assign(object.properties, updates.properties);
+        if (!objectId || !updates || !core.state) return;
+
+        const objects = core.state.getObjects();
+        const object = objects.find(obj => obj.id === objectId);
+        if (!object) return;
+
+        const textStyleChange = tryCreateTextStyleCommand(core, object, objectId, updates);
+        if (textStyleChange) return;
+
+        if (updates.properties && object.properties) {
+            Object.assign(object.properties, updates.properties);
+        }
+
+        const topLevelUpdates = { ...updates };
+        delete topLevelUpdates.properties;
+        Object.assign(object, topLevelUpdates);
+
+        const pixiObject = core.pixi.objects.get(objectId);
+        if (pixiObject && pixiObject._mb && pixiObject._mb.instance) {
+            const instance = pixiObject._mb.instance;
+
+            if (object.type === 'frame' && updates.properties && updates.properties.title !== undefined) {
+                if (instance.setTitle) {
+                    instance.setTitle(updates.properties.title);
                 }
+            }
 
-                const topLevelUpdates = { ...updates };
-                delete topLevelUpdates.properties;
-                Object.assign(object, topLevelUpdates);
+            if (object.type === 'frame' && updates.backgroundColor !== undefined) {
+                if (instance.setBackgroundColor) {
+                    instance.setBackgroundColor(updates.backgroundColor);
+                }
+            }
 
-                const pixiObject = core.pixi.objects.get(objectId);
-                if (pixiObject && pixiObject._mb && pixiObject._mb.instance) {
-                    const instance = pixiObject._mb.instance;
-
-                    if (object.type === 'frame' && updates.properties && updates.properties.title !== undefined) {
-                        if (instance.setTitle) {
-                            instance.setTitle(updates.properties.title);
-                        }
+            if (object.type === 'note' && updates.properties) {
+                if (instance.setStyle) {
+                    const styleUpdates = {};
+                    if (updates.properties.backgroundColor !== undefined) {
+                        styleUpdates.backgroundColor = updates.properties.backgroundColor;
+                    }
+                    if (updates.properties.borderColor !== undefined) {
+                        styleUpdates.borderColor = updates.properties.borderColor;
+                    }
+                    if (updates.properties.textColor !== undefined) {
+                        styleUpdates.textColor = updates.properties.textColor;
+                    }
+                    if (updates.properties.fontSize !== undefined) {
+                        styleUpdates.fontSize = updates.properties.fontSize;
+                    }
+                    if (updates.properties.fontFamily !== undefined) {
+                        styleUpdates.fontFamily = updates.properties.fontFamily;
                     }
 
-                    if (object.type === 'frame' && updates.backgroundColor !== undefined) {
-                        if (instance.setBackgroundColor) {
-                            instance.setBackgroundColor(updates.backgroundColor);
-                        }
-                    }
-
-                    if (object.type === 'note' && updates.properties) {
-                        if (instance.setStyle) {
-                            const styleUpdates = {};
-                            if (updates.properties.backgroundColor !== undefined) {
-                                styleUpdates.backgroundColor = updates.properties.backgroundColor;
-                            }
-                            if (updates.properties.borderColor !== undefined) {
-                                styleUpdates.borderColor = updates.properties.borderColor;
-                            }
-                            if (updates.properties.textColor !== undefined) {
-                                styleUpdates.textColor = updates.properties.textColor;
-                            }
-                            if (updates.properties.fontSize !== undefined) {
-                                styleUpdates.fontSize = updates.properties.fontSize;
-                            }
-                            if (updates.properties.fontFamily !== undefined) {
-                                styleUpdates.fontFamily = updates.properties.fontFamily;
-                            }
-
-                            if (Object.keys(styleUpdates).length > 0) {
-                                instance.setStyle(styleUpdates);
-                            }
-                        }
+                    if (Object.keys(styleUpdates).length > 0) {
+                        instance.setStyle(styleUpdates);
                     }
                 }
-
-                core.state.markDirty();
             }
         }
+
+        core.state.markDirty();
     });
 
     core.eventBus.on(Events.Object.FileNameChange, (data) => {
         const { objectId, oldName, newName } = data;
         if (objectId && oldName !== undefined && newName !== undefined) {
             const command = new EditFileNameCommand(core, objectId, oldName, newName);
+            core.history.executeCommand(command);
+        }
+    });
+
+    core.eventBus.on(Events.Object.ContentChange, (data) => {
+        const { objectId, oldContent, newContent } = data;
+        if (objectId && oldContent !== undefined && newContent !== undefined && oldContent !== newContent) {
+            const command = new UpdateContentCommand(core, objectId, oldContent, newContent);
+            command.setEventBus(core.eventBus);
             core.history.executeCommand(command);
         }
     });

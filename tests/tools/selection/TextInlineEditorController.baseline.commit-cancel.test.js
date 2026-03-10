@@ -56,13 +56,10 @@ describe('TextInlineEditorController baseline: commit/cancel', () => {
         expect(collectEventPayloads(eventBus, Events.UI.TextEditEnd)).toContainEqual({
             objectId: 'text-enter-commit',
         });
-        expect(collectEventPayloads(eventBus, Events.Tool.UpdateObjectContent)).toContainEqual({
+        expect(collectEventPayloads(eventBus, Events.Object.ContentChange)).toContainEqual({
             objectId: 'text-enter-commit',
-            content: 'Committed by Enter',
-        });
-        expect(collectEventPayloads(eventBus, Events.Object.StateChanged)).toContainEqual({
-            objectId: 'text-enter-commit',
-            updates: { properties: { content: 'Committed by Enter' } },
+            oldContent: 'old',
+            newContent: 'Committed by Enter',
         });
     });
 
@@ -81,13 +78,10 @@ describe('TextInlineEditorController baseline: commit/cancel', () => {
         ctx.textEditor.textarea.value = 'Blur committed';
         ctx.textEditor.textarea.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
 
-        expect(collectEventPayloads(eventBus, Events.Tool.UpdateObjectContent)).toContainEqual({
+        expect(collectEventPayloads(eventBus, Events.Object.ContentChange)).toContainEqual({
             objectId: 'text-blur-commit',
-            content: 'Blur committed',
-        });
-        expect(collectEventPayloads(eventBus, Events.Object.StateChanged)).toContainEqual({
-            objectId: 'text-blur-commit',
-            updates: { properties: { content: 'Blur committed' } },
+            oldContent: 'old',
+            newContent: 'Blur committed',
         });
     });
 

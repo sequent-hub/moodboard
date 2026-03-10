@@ -70,7 +70,7 @@ describe('InlineEditorController baseline: text flow contracts', () => {
         });
     });
 
-    it('commit on blur for existing text preserves UpdateObjectContent and StateChanged payloads', () => {
+    it('commit on blur for existing text emits ContentChange (undo/redo)', () => {
         openTextEditor.call(
             ctx,
             {
@@ -85,13 +85,10 @@ describe('InlineEditorController baseline: text flow contracts', () => {
         ctx.textEditor.textarea.value = 'Blur committed text';
         ctx.textEditor.textarea.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
 
-        expect(collectEventPayloads(eventBus, Events.Tool.UpdateObjectContent)).toContainEqual({
+        expect(collectEventPayloads(eventBus, Events.Object.ContentChange)).toContainEqual({
             objectId: 'text-edit-1',
-            content: 'Blur committed text',
-        });
-        expect(collectEventPayloads(eventBus, Events.Object.StateChanged)).toContainEqual({
-            objectId: 'text-edit-1',
-            updates: { properties: { content: 'Blur committed text' } },
+            oldContent: 'old',
+            newContent: 'Blur committed text',
         });
     });
 

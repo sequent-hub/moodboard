@@ -397,7 +397,19 @@ export function openTextEditor(object, create = false) {
         effectiveFontPx,
         isNote,
     });
-    this.textEditor = { active: true, objectId, textarea, wrapper, world: this.textEditor.world, position, properties: { fontSize }, objectType, _phStyle: styleEl };
+    this.textEditor = {
+        active: true,
+        objectId,
+        textarea,
+        wrapper,
+        world: this.textEditor.world,
+        position,
+        properties: { fontSize },
+        objectType,
+        _phStyle: styleEl,
+        initialContent: content,
+        isNewCreation: !!create,
+    };
 
     // Если переходим в редактирование существующего текста по двойному клику,
     // устанавливаем каретку по координате клика между буквами
@@ -428,6 +440,7 @@ export function openTextEditor(object, create = false) {
         fontSize,
         objectId,
         isNewCreation,
+        initialContent: content,
     });
     bindTextEditorInteractions({
         textarea,

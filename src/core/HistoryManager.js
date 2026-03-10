@@ -50,12 +50,12 @@ export class HistoryManager {
 
         // Проверяем, можно ли объединить с последней командой
         const lastCommand = this.getLastCommand();
-        if (lastCommand && 
-            lastCommand.canMergeWith(command) && 
+        if (lastCommand &&
+            lastCommand.canMergeWith(command) &&
             (command.timestamp - lastCommand.timestamp) < this.options.mergeTimeout) {
-            
 
             lastCommand.mergeWith(command);
+            this._executeCommandSafely(lastCommand);
             this.eventBus.emit('history:changed', {
                 canUndo: this.canUndo(),
                 canRedo: this.canRedo(),
