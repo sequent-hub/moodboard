@@ -352,6 +352,54 @@ describe('HtmlHandlesLayer group resize repeat gesture', () => {
         expect(secondHeight).toBeCloseTo(firstHeight + 10, 0);
     });
 
+    it('keeps aspect ratio for an unrotated group when shift is held on a corner handle', () => {
+        const box = ctx.container.querySelector('.mb-handles-box');
+        const startRatio = parseFloat(box.style.width) / parseFloat(box.style.height);
+        const handle = box.querySelector('[data-dir="se"]');
+
+        layer._onHandleDown({
+            currentTarget: handle,
+            clientX: 240,
+            clientY: 90,
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+        }, box);
+
+        listeners.mousemove({
+            clientX: 300,
+            clientY: 100,
+            shiftKey: true,
+        });
+
+        const resizedBox = ctx.container.querySelector('.mb-handles-box');
+        const ratioAfter = parseFloat(resizedBox.style.width) / parseFloat(resizedBox.style.height);
+        expect(ratioAfter).toBeCloseTo(startRatio, 2);
+    });
+
+    it('keeps aspect ratio for an unrotated group when shift is held on an edge handle', () => {
+        const box = ctx.container.querySelector('.mb-handles-box');
+        const startRatio = parseFloat(box.style.width) / parseFloat(box.style.height);
+        const handle = box.querySelector('[data-edge="right"]');
+
+        layer._onEdgeResizeDown({
+            currentTarget: handle,
+            clientX: 240,
+            clientY: 55,
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+        });
+
+        listeners.mousemove({
+            clientX: 300,
+            clientY: 55,
+            shiftKey: true,
+        });
+
+        const resizedBox = ctx.container.querySelector('.mb-handles-box');
+        const ratioAfter = parseFloat(resizedBox.style.width) / parseFloat(resizedBox.style.height);
+        expect(ratioAfter).toBeCloseTo(startRatio, 2);
+    });
+
     it('keeps rotated group frame angle during resize after rotation', () => {
         // Страхуем переход rotate -> resize:
         // рамка не должна выпрямляться в момент, когда пользователь

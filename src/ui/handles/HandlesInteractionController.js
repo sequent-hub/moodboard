@@ -49,6 +49,66 @@ export class HandlesInteractionController {
         };
     }
 
+    _computeAxisAlignedResizeBox(startCSS, handleType, deltaX, deltaY, maintainAspectRatio = false, dominantAxis = null) {
+        const start = {
+            x: startCSS.left,
+            y: startCSS.top,
+            width: startCSS.width,
+            height: startCSS.height,
+        };
+        let x = start.x;
+        let y = start.y;
+        let width = start.width;
+        let height = start.height;
+
+        switch (handleType) {
+            case 'e': width = start.width + deltaX; break;
+            case 'w': width = start.width - deltaX; x = start.x + deltaX; break;
+            case 's': height = start.height + deltaY; break;
+            case 'n': height = start.height - deltaY; y = start.y + deltaY; break;
+            case 'se': width = start.width + deltaX; height = start.height + deltaY; break;
+            case 'ne': width = start.width + deltaX; height = start.height - deltaY; y = start.y + deltaY; break;
+            case 'sw': width = start.width - deltaX; x = start.x + deltaX; height = start.height + deltaY; break;
+            case 'nw': width = start.width - deltaX; x = start.x + deltaX; height = start.height - deltaY; y = start.y + deltaY; break;
+        }
+
+        let resolvedDominantAxis = dominantAxis;
+        if (maintainAspectRatio && start.height !== 0) {
+            const aspectRatio = start.width / start.height;
+            if (['nw', 'ne', 'sw', 'se'].includes(handleType)) {
+                const widthChange = Math.abs(width - start.width);
+                const heightChange = Math.abs(height - start.height);
+                if (!resolvedDominantAxis) {
+                    resolvedDominantAxis = widthChange > heightChange ? 'width' : 'height';
+                }
+                if (resolvedDominantAxis === 'width') {
+                    height = width / aspectRatio;
+                    if (['n', 'ne', 'nw'].includes(handleType)) y = start.y + (start.height - height);
+                    else y = start.y;
+                } else {
+                    width = height * aspectRatio;
+                    if (['w', 'sw', 'nw'].includes(handleType)) x = start.x + (start.width - width);
+                    else x = start.x;
+                }
+            } else if (['e', 'w'].includes(handleType)) {
+                height = width / aspectRatio;
+                y = start.y + (start.height - height) / 2;
+                if (handleType === 'w') x = start.x + (start.width - width);
+            } else if (['n', 's'].includes(handleType)) {
+                width = height * aspectRatio;
+                x = start.x + (start.width - width) / 2;
+                if (handleType === 'n') y = start.y + (start.height - height);
+            }
+        }
+
+        width = Math.max(1, width);
+        height = Math.max(1, height);
+
+        const result = { left: x, top: y, width, height };
+        if (resolvedDominantAxis) result.dominantAxis = resolvedDominantAxis;
+        return result;
+    }
+
     _computeRotatedResizeBox(startCSS, pointerCss, rotationDegrees, handleType, maintainAspectRatio = false, dominantAxis = null) {
         const startWidth = startCSS.width;
         const startHeight = startCSS.height;
@@ -231,6 +291,22 @@ export class HandlesInteractionController {
                 newTop = rotatedBox.top;
                 newW = rotatedBox.width;
                 newH = rotatedBox.height;
+            } else if (isGroup) {
+                const axisAlignedBox = this._computeAxisAlignedResizeBox(
+                    startCSS,
+                    dir,
+                    dx,
+                    dy,
+                    maintainAspectRatio,
+                    aspectLockDominantAxis
+                );
+                if (maintainAspectRatio && axisAlignedBox.dominantAxis) {
+                    aspectLockDominantAxis = axisAlignedBox.dominantAxis;
+                }
+                newLeft = axisAlignedBox.left;
+                newTop = axisAlignedBox.top;
+                newW = axisAlignedBox.width;
+                newH = axisAlignedBox.height;
             } else {
                 if (dir.includes('e')) newW = Math.max(1, startCSS.width + dx);
                 if (dir.includes('s')) newH = Math.max(1, startCSS.height + dy);
@@ -506,6 +582,19 @@ export class HandlesInteractionController {
                 newTop = rotatedBox.top;
                 newW = rotatedBox.width;
                 newH = rotatedBox.height;
+            } else if (isGroup) {
+                const edgeHandleType = edge === 'top' ? 'n' : edge === 'bottom' ? 's' : edge === 'left' ? 'w' : 'e';
+                const axisAlignedBox = this._computeAxisAlignedResizeBox(
+                    startCSS,
+                    edgeHandleType,
+                    dxCSS,
+                    dyCSS,
+                    maintainAspectRatio
+                );
+                newLeft = axisAlignedBox.left;
+                newTop = axisAlignedBox.top;
+                newW = axisAlignedBox.width;
+                newH = axisAlignedBox.height;
             } else {
                 if (edge === 'right') newW = Math.max(1, startCSS.width + dxCSS);
                 if (edge === 'bottom') newH = Math.max(1, startCSS.height + dyCSS);

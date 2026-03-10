@@ -186,10 +186,11 @@ export class NoteObject {
         if (!size) return;
         let w = Math.max(80, size.width || this.width);
         let h = Math.max(60, size.height || this.height);
-        // Держим квадрат
-        const side = Math.max(w, h);
-        this.width = side;
-        this.height = side;
+        // Политика квадратного resize применяется на уровне gesture/flow.
+        // Здесь важно уважать уже нормализованный размер, иначе group-resize
+        // начинает расходиться с рассчитанной рамкой группы.
+        this.width = w;
+        this.height = h;
         
         this._redraw();
         this._updateTextPosition();

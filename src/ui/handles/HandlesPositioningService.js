@@ -6,6 +6,56 @@ export class HandlesPositioningService {
         this.host = host;
     }
 
+    _rotatePoint(point, center, angleDegrees) {
+        const angleRad = angleDegrees * Math.PI / 180;
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
+        const dx = point.x - center.x;
+        const dy = point.y - center.y;
+        return {
+            x: center.x + dx * cos - dy * sin,
+            y: center.y + dx * sin + dy * cos,
+        };
+    }
+
+    _getWorldRectFromState(position, size, rotation = 0) {
+        if (!position || !size) return null;
+        const width = Math.max(1, size.width || 1);
+        const height = Math.max(1, size.height || 1);
+        if (Math.abs(rotation || 0) < 0.001) {
+            return {
+                x: position.x,
+                y: position.y,
+                width,
+                height,
+            };
+        }
+
+        const center = {
+            x: position.x + width / 2,
+            y: position.y + height / 2,
+        };
+        const corners = [
+            { x: position.x, y: position.y },
+            { x: position.x + width, y: position.y },
+            { x: position.x + width, y: position.y + height },
+            { x: position.x, y: position.y + height },
+        ].map((point) => this._rotatePoint(point, center, rotation));
+
+        const xs = corners.map((point) => point.x);
+        const ys = corners.map((point) => point.y);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        return {
+            x: minX,
+            y: minY,
+            width: Math.max(1, maxX - minX),
+            height: Math.max(1, maxY - minY),
+        };
+    }
+
     toWorldScreenInverse(dx, dy) {
         const world = this.host.core.pixi.worldLayer || this.host.core.pixi.app.stage;
         const s = world?.scale?.x || 1;
@@ -93,15 +143,41 @@ export class HandlesPositioningService {
         let maxY = -Infinity;
 
         ids.forEach((id) => {
-            const p = this.host.core.pixi.objects.get(id);
-            if (!p) return;
-            const b = p.getBounds();
-            const tl = world.toLocal(new PIXI.Point(b.x, b.y));
-            const br = world.toLocal(new PIXI.Point(b.x + b.width, b.y + b.height));
-            const x0 = Math.min(tl.x, br.x);
-            const y0 = Math.min(tl.y, br.y);
-            const x1 = Math.max(tl.x, br.x);
-            const y1 = Math.max(tl.y, br.y);
+            const positionData = { objectId: id, position: null };
+            const sizeData = { objectId: id, size: null };
+            const rotationData = { objectId: id, rotation: 0 };
+            this.host.eventBus.emit(Events.Tool.GetObjectPosition, positionData);
+            this.host.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+            this.host.eventBus.emit(Events.Tool.GetObjectRotation, rotationData);
+
+            const rectFromState = this._getWorldRectFromState(
+                positionData.position,
+                sizeData.size,
+                rotationData.rotation || 0
+            );
+
+            let x0;
+            let y0;
+            let x1;
+            let y1;
+
+            if (rectFromState) {
+                x0 = rectFromState.x;
+                y0 = rectFromState.y;
+                x1 = rectFromState.x + rectFromState.width;
+                y1 = rectFromState.y + rectFromState.height;
+            } else {
+                const p = this.host.core.pixi.objects.get(id);
+                if (!p) return;
+                const b = p.getBounds();
+                const tl = world.toLocal(new PIXI.Point(b.x, b.y));
+                const br = world.toLocal(new PIXI.Point(b.x + b.width, b.y + b.height));
+                x0 = Math.min(tl.x, br.x);
+                y0 = Math.min(tl.y, br.y);
+                x1 = Math.max(tl.x, br.x);
+                y1 = Math.max(tl.y, br.y);
+            }
+
             minX = Math.min(minX, x0);
             minY = Math.min(minY, y0);
             maxX = Math.max(maxX, x1);

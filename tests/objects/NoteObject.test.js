@@ -402,11 +402,11 @@ describe('NoteObject', () => {
             expect(note.height).toBe(400);
         });
 
-        it('должен поддерживать квадратную форму (берёт максимум)', () => {
+        it('должен уважать переданные ширину и высоту без принудительного квадрата', () => {
             const note = new NoteObject();
             note.updateSize({ width: 300, height: 500 });
 
-            expect(note.width).toBe(500);
+            expect(note.width).toBe(300);
             expect(note.height).toBe(500);
         });
 
@@ -415,7 +415,7 @@ describe('NoteObject', () => {
             note.updateSize({ width: 10, height: 10 });
 
             expect(note.width).toBeGreaterThanOrEqual(80);
-            expect(note.height).toBeGreaterThanOrEqual(80);
+            expect(note.height).toBeGreaterThanOrEqual(60);
         });
 
         it('не должен падать при null', () => {
