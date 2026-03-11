@@ -1,16 +1,5 @@
 import { BaseGrid } from './BaseGrid.js';
-
-/**
- * Фазы сетки: zoom (0-1 = 0-100%) → { size, dotSize }.
- * Размеры гармоничные (96→48→24→12): меньший делит больший без остатка,
- * узлы совпадают при crossfade, нет moiré.
- */
-const PHASES = [
-    { zoomMin: 0.1, zoomMax: 0.45, size: 96, dotSize: 2 },    // 10–45%
-    { zoomMin: 0.35, zoomMax: 0.9, size: 48, dotSize: 1.5 },   // 35–90%
-    { zoomMin: 0.75, zoomMax: 1.8, size: 24, dotSize: 1 },     // 75–180%
-    { zoomMin: 1.5, zoomMax: 5, size: 12, dotSize: 0.6 }     // 150–500%
-];
+import { getActivePhases, getEffectiveSize } from './DotGridZoomPhases.js';
 
 /**
  * Точечная сетка с фазовым переключением при зуме (как в Miro).
@@ -39,42 +28,14 @@ export class DotGrid extends BaseGrid {
         this._zoom = Math.max(0.02, Math.min(5, scale));
     }
 
-    /**
-     * Возвращает активные фазы и их alpha для crossfade.
-     * В зоне перекрытия двух фаз: старая затухает, новая проявляется.
-     * @returns {Array<{ phase: object, alpha: number }>}
-     */
+    /** @returns {Array<{ phase: object, alpha: number }>} */
     _getActivePhases() {
-        const z = this._zoom;
-        const result = [];
-        for (let i = 0; i < PHASES.length; i++) {
-            const p = PHASES[i];
-            if (z < p.zoomMin || z > p.zoomMax) continue;
-            const next = PHASES[i + 1];
-            const prev = PHASES[i - 1];
-            let alpha = 1;
-            if (next && z >= next.zoomMin && p.zoomMax > next.zoomMin) {
-                alpha = (p.zoomMax - z) / (p.zoomMax - next.zoomMin);
-            } else if (prev && z <= prev.zoomMax && prev.zoomMax > p.zoomMin) {
-                alpha = (z - p.zoomMin) / (prev.zoomMax - p.zoomMin);
-            }
-            if (alpha > 0.01) result.push({ phase: p, alpha });
-        }
-        if (result.length === 0) {
-            const nearest = PHASES.reduce((a, b) =>
-                Math.abs(z - (a.zoomMin + a.zoomMax) / 2) < Math.abs(z - (b.zoomMin + b.zoomMax) / 2) ? a : b);
-            result.push({ phase: nearest, alpha: 1 });
-        }
-        return result;
+        return getActivePhases(this._zoom);
     }
 
-    /**
-     * Эффективный size для snap (доминирующая фаза).
-     */
+    /** @returns {number} */
     _getEffectiveSize() {
-        const phases = this._getActivePhases();
-        const dominant = phases.reduce((a, b) => (a.alpha >= b.alpha ? a : b));
-        return dominant.phase.size;
+        return getEffectiveSize(this._zoom);
     }
     
     /**

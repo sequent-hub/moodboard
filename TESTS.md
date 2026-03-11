@@ -344,18 +344,30 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 
 **Хелперы:** `getWorldScale`, `getZoomPercentLabel`, `openZoomMenu`, `clickZoomMenuItem`, `wheelOverCanvas`.
 
-### `tests/image-object2/GridPan.e2e.spec.js` — 4 E2E-теста
+### `tests/image-object2/GridPan.e2e.spec.js` — 6 E2E-тестов
 
-Поведение сетки при панорамировании и зуме. Сетка двигается вместе с доской при pan, не двигается при zoom.
+Поведение сетки при панорамировании и зуме. Сетка двигается при pan и синхронизируется с world при zoom (зумируется вместе с доской).
 
 **Покрытие:**
 
 - **PanUpdate синхронизирует gridLayer и worldLayer** — emit PanUpdate с delta; worldLayer и gridLayer получают один и тот же сдвиг.
-- **Зум не двигает сетку** — кнопка zoom-in меняет scale worldLayer, gridLayer.x/y остаются неизменными.
-- **Зум колесом не двигает сетку** — wheel над canvas; gridLayer.x/y остаются неизменными.
-- **Реальный drag пана** — активация pan tool, mousedown → mousemove → mouseup; worldLayer и gridLayer синхронно сдвигаются.
+- **Синхронизация при зуме (кнопка)** — zoom-in меняет scale; gridLayer.x/y/scale === worldLayer.
+- **Синхронизация при wheel zoom** — wheel над canvas; gridLayer синхронизирован с world.
+- **Dot grid при зуме** — точечная сетка синхронизируется с world при zoom (phase transition).
+- **Dot grid при wheel zoom** — фазы dot grid переключаются при wheel zoom.
+- **Реальный drag пана** — pan tool drag; worldLayer и gridLayer синхронно сдвигаются.
 
 **Хелперы:** `getLayersState`, `emitPanUpdate`.
+
+### `tests/grid/DotGrid.zoom-phases.test.js` — 9 unit-тестов
+
+Логика фаз DotGrid при зуме (DotGridZoomPhases). Чистые функции без PIXI.
+
+**Покрытие:** harmonic sizes (96,48,24,12), getEffectiveSize, getActivePhases, crossfade в overlap zone, invariant без moiré.
+
+### `tests/services/BoardService.grid-zoom.test.js` — 5 unit-тестов
+
+BoardService.refreshGridViewport: синхронизация gridLayer (x, y, scale) с world, вызов setZoom для DotGrid, world-space bounds.
 
 ### `tests/moodboard/MoodBoardDestroyer.topbar.test.js` — 1 тест
 
