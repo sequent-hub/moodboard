@@ -15,3 +15,5 @@ export { EditFileNameCommand } from './EditFileNameCommand.js';
 export { UpdateContentCommand } from './UpdateContentCommand.js';
 export { UpdateTextStyleCommand } from './UpdateTextStyleCommand.js';
 export { UpdateNoteStyleCommand } from './UpdateNoteStyleCommand.js';
+export { UpdateFramePropertiesCommand } from './UpdateFramePropertiesCommand.js';
+export { UpdateFrameTypeCommand } from './UpdateFrameTypeCommand.js';

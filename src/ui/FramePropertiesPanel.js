@@ -1,4 +1,5 @@
 import { Events } from '../core/events/Events.js';
+import { UpdateFrameTypeCommand } from '../core/commands/UpdateFrameTypeCommand.js';
 
 /**
  * Панель свойств фрейма
@@ -52,6 +53,33 @@ export class FramePropertiesPanel {
                 this.hide();
             }
         });
+
+        // Синхронизируем контролы при изменении объекта (undo/redo, команды)
+        this._onStateChanged = (data) => {
+            const { objectId } = data;
+            if (this.currentId && objectId === this.currentId && this.panel && this.panel.style.display !== 'none') {
+                this._updateControlsFromObject();
+                this._syncTypeFromObject();
+            }
+        };
+        this.eventBus.on(Events.Object.StateChanged, this._onStateChanged);
+
+        // Обновляем панель при Undo/Redo (History.Changed вызывается после undo/redo)
+        this._onHistoryChanged = () => {
+            if (this.currentId && this.panel && this.panel.style.display !== 'none') {
+                this._updateControlsFromObject();
+                this._syncTypeFromObject();
+            }
+        };
+        this.eventBus.on(Events.History.Changed, this._onHistoryChanged);
+
+        // Перепозиционируем панель при move/resize undo (GroupMoveCommand, MoveObjectCommand, ResizeObjectCommand)
+        this._onTransformUpdated = (data) => {
+            if (this.currentId && data.objectId === this.currentId && this.panel && this.panel.style.display !== 'none') {
+                this.reposition();
+            }
+        };
+        this.eventBus.on(Events.Object.TransformUpdated, this._onTransformUpdated);
     }
 
     updateFromSelection() {
@@ -535,75 +563,84 @@ export class FramePropertiesPanel {
     }
 
     _applyFrameType(typeValue) {
-        if (!this.currentId) return;
+        if (!this.currentId || !this.core?.history) return;
 
-        // 1) Обновляем тип и временно отключаем фиксацию пропорций на время программного ресайза
+        const objectData = this.core.getObjectData(this.currentId);
+        const oldType = (objectData?.properties?.type) || 'custom';
+
+        if (oldType === typeValue) return;
+
         const willLockAfter = typeValue !== 'custom';
-        this.eventBus.emit(Events.Object.StateChanged, {
-            objectId: this.currentId,
-            updates: { properties: { type: typeValue, lockedAspect: false } }
-        });
 
-        // 2) Для пресетов меняем размеры под аспект, сохраняя центр
-        if (!willLockAfter) return; // Произвольный: без изменения размеров
+        if (!willLockAfter) {
+            // Произвольный — только тип, без изменения размера
+            const command = new UpdateFrameTypeCommand(
+                this.core,
+                this.currentId,
+                oldType,
+                typeValue,
+                null,
+                null,
+                null,
+                null
+            );
+            command.setEventBus(this.core.eventBus);
+            this.core.history.executeCommand(command);
+        } else {
+            // Пресет — тип + resize
+            const aspectMap = { 'a4': 210 / 297, '1x1': 1, '4x3': 4 / 3, '16x9': 16 / 9 };
+            const aspect = aspectMap[typeValue] || 1;
 
-        // Аспект по типу
-        const aspectMap = {
-            'a4': 210 / 297,
-            '1x1': 1,
-            '4x3': 4 / 3,
-            '16x9': 16 / 9
-        };
-        const aspect = aspectMap[typeValue] || 1;
+            const posData = { objectId: this.currentId, position: null };
+            const sizeData = { objectId: this.currentId, size: null };
+            this.eventBus.emit(Events.Tool.GetObjectPosition, posData);
+            this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+            if (!posData.position || !sizeData.size) return;
 
-        // Текущие позиция и размер
-        const posData = { objectId: this.currentId, position: null };
-        const sizeData = { objectId: this.currentId, size: null };
-        this.eventBus.emit(Events.Tool.GetObjectPosition, posData);
-        this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
-        if (!posData.position || !sizeData.size) return;
+            const oldX = posData.position.x;
+            const oldY = posData.position.y;
+            const oldW = Math.max(1, sizeData.size.width);
+            const oldH = Math.max(1, sizeData.size.height);
+            const cx = oldX + oldW / 2;
+            const cy = oldY + oldH / 2;
 
-        const oldX = posData.position.x;
-        const oldY = posData.position.y;
-        const oldW = Math.max(1, sizeData.size.width);
-        const oldH = Math.max(1, sizeData.size.height);
-        const cx = oldX + oldW / 2;
-        const cy = oldY + oldH / 2;
+            const area = oldW * oldH;
+            let newW = Math.max(1, Math.round(Math.sqrt(area * aspect)));
+            let newH = Math.max(1, Math.round(newW / aspect));
+            const newX = Math.round(cx - newW / 2);
+            const newY = Math.round(cy - newH / 2);
 
-        // Сохраняем визуальный масштаб: подбираем размеры с тем же приблизительным "площадью"
-        const area = oldW * oldH;
-        let newW = Math.max(1, Math.round(Math.sqrt(area * aspect)));
-        let newH = Math.max(1, Math.round(newW / aspect));
+            const command = new UpdateFrameTypeCommand(
+                this.core,
+                this.currentId,
+                oldType,
+                typeValue,
+                { width: oldW, height: oldH },
+                { width: newW, height: newH },
+                { x: oldX, y: oldY },
+                { x: newX, y: newY }
+            );
+            command.setEventBus(this.core.eventBus);
+            this.core.history.executeCommand(command);
+        }
 
-        const newX = Math.round(cx - newW / 2);
-        const newY = Math.round(cy - newH / 2);
-
-        // Применяем через события resize для согласованности с историей/ядром
-        this.eventBus.emit(Events.Tool.ResizeUpdate, {
-            object: this.currentId,
-            size: { width: newW, height: newH },
-            position: { x: newX, y: newY }
-        });
-        this.eventBus.emit(Events.Tool.ResizeEnd, {
-            object: this.currentId,
-            oldSize: { width: oldW, height: oldH },
-            newSize: { width: newW, height: newH },
-            oldPosition: { x: oldX, y: oldY },
-            newPosition: { x: newX, y: newY }
-        });
-
-        // Обновим UI сразу
         this._syncTypeFromObject();
-
-        // 3) Включаем обратно фиксацию пропорций (для пресетов)
-        this.eventBus.emit(Events.Object.StateChanged, {
-            objectId: this.currentId,
-            updates: { properties: { lockedAspect: true } }
-        });
     }
 
     destroy() {
         this._hideColorPalette();
+        if (this._onStateChanged && this.eventBus?.off) {
+            this.eventBus.off(Events.Object.StateChanged, this._onStateChanged);
+            this._onStateChanged = null;
+        }
+        if (this._onHistoryChanged && this.eventBus?.off) {
+            this.eventBus.off(Events.History.Changed, this._onHistoryChanged);
+            this._onHistoryChanged = null;
+        }
+        if (this._onTransformUpdated && this.eventBus?.off) {
+            this.eventBus.off(Events.Object.TransformUpdated, this._onTransformUpdated);
+            this._onTransformUpdated = null;
+        }
         if (this._boundDocumentClickHandler) {
             document.removeEventListener('click', this._boundDocumentClickHandler);
             this._boundDocumentClickHandler = null;

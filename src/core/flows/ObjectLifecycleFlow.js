@@ -4,6 +4,7 @@ import {
     UpdateContentCommand,
     UpdateTextStyleCommand,
     UpdateNoteStyleCommand,
+    UpdateFramePropertiesCommand,
 } from '../commands/index.js';
 
 const TEXT_STYLE_PROPS = ['fontFamily', 'fontSize', 'color', 'backgroundColor'];
@@ -77,6 +78,44 @@ function tryCreateTextStyleCommand(core, object, objectId, updates) {
     if (oldValue === newValue) return false;
 
     const command = new UpdateTextStyleCommand(core, objectId, property, oldValue, newValue);
+    core.history.executeCommand(command);
+    return true;
+}
+
+const FRAME_PROP_KEYS = ['title'];
+
+/**
+ * Если updates содержит одно свойство фрейма — создаёт UpdateFramePropertiesCommand.
+ * Поддерживает: title, backgroundColor, type, lockedAspect.
+ * @returns {boolean} true, если команда создана и применена
+ */
+function tryCreateFramePropertiesCommand(core, object, objectId, updates) {
+    if (object.type !== 'frame') return false;
+
+    let property = null;
+    let oldValue = null;
+    let newValue = null;
+
+    if (updates.backgroundColor !== undefined && !updates.properties) {
+        property = 'backgroundColor';
+        newValue = updates.backgroundColor;
+        oldValue = object.backgroundColor ?? 0xFFFFFF;
+    } else if (updates.properties) {
+        const propKeys = Object.keys(updates.properties);
+        if (propKeys.length === 1 && propKeys[0] === 'title') {
+            property = 'title';
+            newValue = updates.properties.title;
+            oldValue = object.properties?.title ?? '';
+        }
+        // type и lockedAspect — только через UpdateFrameTypeCommand в панели (один шаг в истории)
+    }
+
+    if (!property) return false;
+    const supported = [...FRAME_PROP_KEYS, 'backgroundColor'];
+    if (!supported.includes(property)) return false;
+    if (oldValue === newValue) return false;
+
+    const command = new UpdateFramePropertiesCommand(core, objectId, property, oldValue, newValue);
     core.history.executeCommand(command);
     return true;
 }
@@ -177,6 +216,9 @@ export function setupObjectLifecycleFlow(core) {
 
         const textStyleChange = tryCreateTextStyleCommand(core, object, objectId, updates);
         if (textStyleChange) return;
+
+        const framePropsChange = tryCreateFramePropertiesCommand(core, object, objectId, updates);
+        if (framePropsChange) return;
 
         if (updates.properties && object.properties) {
             Object.assign(object.properties, updates.properties);
