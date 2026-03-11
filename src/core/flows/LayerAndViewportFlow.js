@@ -123,7 +123,7 @@ export function setupLayerAndViewportFlow(core) {
                 settings: { pan: { x: world.x || 0, y: world.y || 0 } }
             });
         } catch (_) {}
-        core.boardService?.refreshGridViewport?.();
+        core.eventBus.emit(Events.Viewport.Changed);
     });
 
     core.eventBus.on(Events.UI.ZoomSelection, () => {
@@ -149,7 +149,7 @@ export function setupLayerAndViewportFlow(core) {
         const padding = 40;
         const scaleX = (viewW - padding) / bboxW;
         const scaleY = (viewH - padding) / bboxH;
-        const newScale = Math.max(0.1, Math.min(5, Math.min(scaleX, scaleY)));
+        const newScale = Math.max(0.02, Math.min(5, Math.min(scaleX, scaleY)));
         const world = core.pixi.worldLayer || core.pixi.app.stage;
         const worldCenterX = minX + bboxW / 2;
         const worldCenterY = minY + bboxH / 2;

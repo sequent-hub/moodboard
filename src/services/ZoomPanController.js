@@ -1,29 +1,50 @@
 import { Events } from '../core/events/Events.js';
 
+/**
+ * Уровни зума:
+ * - 12 щелчков от 500% до 100%
+ * - 20 щелчков от 100% до 2% (минимум)
+ */
+const ZOOM_LEVELS = [
+	2, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100,
+	133, 167, 200, 233, 267, 300, 333, 367, 400, 433, 467, 500
+];
+
 export class ZoomPanController {
 	constructor(eventBus, pixi) {
 		this.eventBus = eventBus;
 		this.pixi = pixi;
 	}
 
+	_nearestLevelIndex(percent) {
+		let best = 0;
+		let bestDist = Math.abs(ZOOM_LEVELS[0] - percent);
+		for (let i = 1; i < ZOOM_LEVELS.length; i++) {
+			const d = Math.abs(ZOOM_LEVELS[i] - percent);
+			if (d < bestDist) {
+				bestDist = d;
+				best = i;
+			}
+		}
+		return best;
+	}
+
 	attach() {
 		// Масштабирование колесом — глобально отрабатываем Ctrl+Wheel
 		this.eventBus.on(Events.Tool.WheelZoom, ({ x, y, delta }) => {
-			// Дискретный шаг зума 10%
 			const world = this.pixi.worldLayer || this.pixi.app.stage;
 			const oldScale = world.scale.x || 1;
 			const oldPercent = Math.round(oldScale * 100);
+			const idx = this._nearestLevelIndex(oldPercent);
 			let targetPercent;
 			if (delta < 0) {
-				// Zoom in: к ближайшему следующему кратному 10 плюс шаг
-				targetPercent = Math.min(500, Math.floor(oldPercent / 10) * 10 + 10);
+				targetPercent = ZOOM_LEVELS[Math.min(ZOOM_LEVELS.length - 1, idx + 1)];
 			} else if (delta > 0) {
-				// Zoom out: к ближайшему предыдущему кратному 10 минус шаг
-				targetPercent = Math.max(10, Math.ceil(oldPercent / 10) * 10 - 10);
+				targetPercent = ZOOM_LEVELS[Math.max(0, idx - 1)];
 			} else {
 				return;
 			}
-			const newScale = Math.max(0.1, Math.min(5, targetPercent / 100));
+			const newScale = Math.max(0.02, Math.min(5, targetPercent / 100));
 			if (Math.abs(newScale - oldScale) < 0.0001) return;
 			// Вычисляем мировые координаты точки под курсором до изменения скейла
 			const worldX = (x - world.x) / oldScale;
@@ -80,7 +101,7 @@ export class ZoomPanController {
 			const padding = 40;
 			const scaleX = (viewW - padding) / bboxW;
 			const scaleY = (viewH - padding) / bboxH;
-			const newScale = Math.max(0.1, Math.min(5, Math.min(scaleX, scaleY)));
+			const newScale = Math.max(0.02, Math.min(5, Math.min(scaleX, scaleY)));
 			const world = this.pixi.worldLayer || this.pixi.app.stage;
 			const worldCenterX = minX + bboxW / 2;
 			const worldCenterY = minY + bboxH / 2;

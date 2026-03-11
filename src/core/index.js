@@ -482,7 +482,7 @@ export class CoreMoodBoard {
             try { return '#' + Number(num >>> 0).toString(16).padStart(6, '0'); } catch (_) { return '#F5F5F5'; }
         };
         const world = this.pixi?.worldLayer || app?.stage;
-        const currentZoom = Math.max(0.1, Math.min(5, world?.scale?.x || 1));
+        const currentZoom = Math.max(0.02, Math.min(5, world?.scale?.x || 1));
         const currentPan = {
             x: (world?.x ?? 0),
             y: (world?.y ?? 0)

@@ -93,18 +93,35 @@ export class BoardService {
 	}
 
 	/**
-	 * Перерисовывает сетку под видимую область (при паннинге и т.п.)
+	 * Синхронизирует gridLayer с world (позиция + масштаб) и перерисовывает сетку.
 	 */
 	refreshGridViewport() {
 		if (!this.grid?.enabled || !this.pixi?.gridLayer) return;
 		const view = this.pixi.app?.view;
 		if (!view) return;
+		const world = this.pixi.worldLayer || this.pixi.app.stage;
 		const gl = this.pixi.gridLayer;
-		const pad = Math.max(100, (this.grid.size || 20) * 4);
-		const left = -gl.x - pad;
-		const top = -gl.y - pad;
-		const right = view.clientWidth - gl.x + pad;
-		const bottom = view.clientHeight - gl.y + pad;
+		const scale = world.scale?.x ?? 1;
+
+		// Синхронизация gridLayer с world — сетка зуммируется вместе с доской
+		gl.x = world.x;
+		gl.y = world.y;
+		if (gl.scale) {
+			gl.scale.set(scale);
+		}
+
+		// DotGrid: передаём zoom до setVisibleBounds (чтобы createVisual видел актуальный zoom)
+		if (this.grid.type === 'dot' && typeof this.grid.setZoom === 'function') {
+			this.grid.setZoom(scale);
+		}
+
+		// Видимая область в мировых координатах (с учётом scale)
+		const gridSize = this.grid._getEffectiveSize?.() ?? this.grid.size;
+		const pad = Math.max(100, (gridSize || 20) * 4);
+		const left = (-gl.x - pad) / scale;
+		const top = (-gl.y - pad) / scale;
+		const right = (view.clientWidth - gl.x + pad) / scale;
+		const bottom = (view.clientHeight - gl.y + pad) / scale;
 		this.grid.setVisibleBounds(left, top, right, bottom);
 	}
 }

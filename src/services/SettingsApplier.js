@@ -72,9 +72,10 @@ export class SettingsApplier {
         if (partial.zoom && s.zoom && (typeof s.zoom.current === 'number')) {
             const world = this.pixi?.worldLayer || this.pixi?.app?.stage;
             if (world) {
-                const z = Math.max(0.1, Math.min(5, s.zoom.current));
+                const z = Math.max(0.02, Math.min(5, s.zoom.current));
                 world.scale.set(z);
                 try { this.eventBus.emit(Events.UI.ZoomPercent, { percentage: Math.round(z * 100) }); } catch (_) {}
+                try { this.eventBus.emit(Events.Viewport.Changed); } catch (_) {}
             }
         }
 
