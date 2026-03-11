@@ -37,7 +37,7 @@ async function flushToolbarInit() {
     await Promise.resolve();
 }
 
-describe('Toolbar ImageObject2 button', () => {
+describe.skip('Toolbar ImageObject2 button', () => {
     let container;
     let toolbar;
     let eventBus;

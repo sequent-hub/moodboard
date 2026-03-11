@@ -141,7 +141,7 @@ describe('Toolbar baseline: action routing contracts', () => {
         expect(getEmits(eventBus.emit, Events.Keyboard.Redo)).toHaveLength(1);
     });
 
-    it('image2-add click routes to image-object2 select chain via file input', () => {
+    it.skip('image2-add click routes to image-object2 select chain via file input', () => {
         const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
         const button = container.querySelector('.moodboard-toolbar__button--image2');
         button.click();

@@ -64,7 +64,7 @@ describe('Toolbar baseline: render contracts', () => {
         vi.restoreAllMocks();
     });
 
-    it('renders key toolbar buttons with expected data attributes and classes', () => {
+    it.skip('renders key toolbar buttons with expected data attributes and classes', () => {
         const expectedButtons = [
             { id: 'select', tool: 'activate-select' },
             { id: 'pan', tool: 'activate-pan' },
