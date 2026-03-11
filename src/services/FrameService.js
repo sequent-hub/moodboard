@@ -75,7 +75,7 @@ export class FrameService {
 			const moved = this.state.state.objects.find(o => o.id === data.object);
 			if (moved && moved.type === 'frame') {
 				// Серый фон
-				this.pixi.setFrameFill(moved.id, moved.width, moved.height, 0xEEEEEE);
+				this.pixi.setFrameFill(moved.id, moved.width, moved.height, 0xFAFAFA);
 				// Cнимок стартовых позиций по центру PIXI
 				const fp = this.pixi.objects.get(moved.id);
 				this._frameDragFrameStart = { x: fp?.x || 0, y: fp?.y || 0 };
@@ -220,7 +220,7 @@ export class FrameService {
 				}
 				if (hoverId) {
 					const cur = frames.find(fr => fr.id === hoverId);
-					if (cur) this.pixi.setFrameFill(cur.id, cur.width, cur.height, 0xEEEEEE);
+					if (cur) this.pixi.setFrameFill(cur.id, cur.width, cur.height, 0xFAFAFA);
 				}
 				this._frameHoverId = hoverId || null;
 			}

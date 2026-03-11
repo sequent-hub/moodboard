@@ -146,7 +146,7 @@ describe('FrameService text sync during frame drag', () => {
 
         vi.runAllTimers();
 
-        expect(pixi.setFrameFill).toHaveBeenCalledWith('frame-1', 200, 200, 0xEEEEEE);
+        expect(pixi.setFrameFill).toHaveBeenCalledWith('frame-1', 200, 200, 0xFAFAFA);
         vi.useRealTimers();
     });
 });
