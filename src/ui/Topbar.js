@@ -40,15 +40,15 @@ export class Topbar {
         // не подсвечиваем дефолт до прихода актуального типа из ядра
 
         // Синхронизация активного состояния по событию из ядра
-        this.eventBus.on(Events.UI.GridCurrent, ({ type }) => {
-            this.setActive(type);
-        });
+        this._onGridCurrent = ({ type }) => this.setActive(type);
+        this.eventBus.on(Events.UI.GridCurrent, this._onGridCurrent);
 
         // Обновляем цвет кнопки "краски" при выборе цвета фона
-        this.eventBus.on(Events.UI.PaintPick, ({ btnHex }) => {
+        this._onPaintPick = ({ btnHex }) => {
             if (!btnHex) return;
             this.setPaintButtonHex(btnHex);
-        });
+        };
+        this.eventBus.on(Events.UI.PaintPick, this._onPaintPick);
 
         // Инициализация цвета кнопки "краска" из настроек (или фона рендерера)
         try {
@@ -254,18 +254,6 @@ export class Topbar {
         const colors = this._palette.map(c => ({ id: c.id, name: c.name, hex: c.btnHex, board: c.board }));
         const grid = document.createElement('div');
         grid.className = 'moodboard-topbar__paint-grid';
-        const darken = (hex, amount = 0.25) => {
-            try {
-                const h = hex.replace('#','');
-                const r = parseInt(h.substring(0,2), 16);
-                const g = parseInt(h.substring(2,4), 16);
-                const b = parseInt(h.substring(4,6), 16);
-                const dr = Math.max(0, Math.min(255, Math.round(r * (1 - amount))));
-                const dg = Math.max(0, Math.min(255, Math.round(g * (1 - amount))));
-                const db = Math.max(0, Math.min(255, Math.round(b * (1 - amount))));
-                return `#${dr.toString(16).padStart(2,'0')}${dg.toString(16).padStart(2,'0')}${db.toString(16).padStart(2,'0')}`;
-            } catch (_) { return hex; }
-        };
 
         colors.forEach(c => {
             const b = document.createElement('button');
@@ -274,7 +262,7 @@ export class Topbar {
             b.title = `Цвет ${c.id}`;
             b.style.background = c.hex;
             // Тёмная обводка того же цвета
-            b.style.borderColor = darken(c.hex, 0.35);
+            b.style.borderColor = this._darkenHex(c.hex, 0.35);
             // Цвет галочки — чёрный для максимальной видимости
             b.style.color = '#111';
             // Для надёжного сравнения — сохраняем оба значения в dataset
@@ -326,22 +314,32 @@ export class Topbar {
         this.element.appendChild(pop);
         this._paintPopover = pop;
 
-        // закрытие по клику вне
-        const onDocClick = (ev) => {
+        // закрытие по клику вне (сохраняем ссылку для cleanup при destroy)
+        this._onDocClickOutside = (ev) => {
             if (!pop.contains(ev.target) && ev.target !== anchorBtn) {
                 pop.remove();
                 this._paintPopover = null;
-                document.removeEventListener('click', onDocClick, true);
+                document.removeEventListener('click', this._onDocClickOutside, true);
             }
         };
-        setTimeout(() => document.addEventListener('click', onDocClick, true), 0);
+        setTimeout(() => document.addEventListener('click', this._onDocClickOutside, true), 0);
     }
 
     destroy() {
-        if (this.element) {
-            this.element.remove();
-            this.element = null;
+        if (!this.element) return;
+
+        if (this._paintPopover) {
+            this._paintPopover.remove();
+            this._paintPopover = null;
+            document.removeEventListener('click', this._onDocClickOutside, true);
         }
+
+        if (this._onGridCurrent) this.eventBus.off(Events.UI.GridCurrent, this._onGridCurrent);
+        if (this._onPaintPick) this.eventBus.off(Events.UI.PaintPick, this._onPaintPick);
+
+        this.element.remove();
+        this.element = null;
+        this._paintBtn = null;
     }
 }
 

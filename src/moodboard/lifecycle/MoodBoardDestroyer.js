@@ -23,6 +23,9 @@ export function destroyMoodBoard(board) {
     safeDestroy(board.toolbar, 'toolbar');
     board.toolbar = null;
 
+    safeDestroy(board.topbar, 'topbar');
+    board.topbar = null;
+
     safeDestroy(board.saveStatus, 'saveStatus');
     board.saveStatus = null;
 

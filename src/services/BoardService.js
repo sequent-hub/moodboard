@@ -26,7 +26,6 @@ export class BoardService {
 				this.grid?.setEnabled(false);
 				this.grid?.updateVisual();
 				this.pixi.setGrid(this.grid);
-				// Обновляем сохранённые данные
 				try {
 					this.eventBus.emit(Events.Grid.BoardDataChanged, {
 						grid: { type: 'off', options: this.grid?.serialize ? this.grid.serialize() : {} }
@@ -34,6 +33,7 @@ export class BoardService {
 				} catch (_) {}
 				return;
 			}
+			this.grid?.destroy?.();
 			const gridOptions = {
 				...GridFactory.getDefaultOptions(type),
 				enabled: true,
