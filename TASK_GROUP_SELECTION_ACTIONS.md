@@ -19,7 +19,7 @@
 Проверить одиночное и групповое выделение для:
 
 - text, note, image, shape, drawing, file, emoji (image+isEmojiIcon), frame
-- Фреймы **исключены** из box select (`BoxSelectController`: `if (meta.type === 'frame') continue`) — их выделяют только кликом по рамке.
+- Фреймы включены в box select (выделяются рамкой наравне с другими объектами).
 - Объекты внутри фрейма (frameId) — проверка hitTest и выделения.
 
 ### 3. Групповое перемещение
@@ -53,7 +53,7 @@
 
 - mousedown на пустом месте → mousemove (рисуется прямоугольник) → mouseup → объекты в области выделены.
 - Визуал: `PIXI.Graphics` с именем `selection-box`, синяя обводка и полупрозрачная заливка.
-- Фреймы не включаются в box select.
+- Фреймы включаются в box select.
 - С модификатором (Ctrl/Cmd) — добавление к выделению.
 
 ### 8. Выделение через Shift (или Ctrl/Cmd)
@@ -85,7 +85,7 @@
 
 | Компонент | Файл | Назначение |
 |-----------|------|------------|
-| Box select | `BoxSelectController.js` | start/update/end, rectIntersectsRect, исключение frame |
+| Box select | `BoxSelectController.js` | start/update/end, rectIntersectsRect |
 | Select input | `SelectInputRouter.js` | isMultiSelect = ctrlKey \|\| metaKey, handleObjectSelect, startBoxSelect |
 | Transform | `TransformInteractionController.js` | handleObjectSelect, startGroupDrag, startBoxSelect |
 | Команды | `GroupMoveCommand.js`, `GroupRotateCommand.js`, `GroupResizeCommand.js` | Групповые операции |
@@ -157,7 +157,7 @@
 
 ## Примечание: Frame и box select
 
-Фреймы специально исключены из box select (`BoxSelectController`): их выделяют только кликом по захватной области. Это учтено в scope — E2E должен проверять, что frame не попадает в selection при box select.
+Фреймы включаются в box select наравне с другими объектами. E2E должен проверять выделение фреймов рамкой.
 
 ---
 

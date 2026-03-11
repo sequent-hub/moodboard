@@ -55,9 +55,6 @@ export class BoxSelectController {
             this.emit('get:all:objects', request);
             const matched = [];
             for (const item of request.objects) {
-                const meta = item.pixi && item.pixi._mb;
-                // Исключаем фреймы из выделения рамкой — их можно выбрать только кликом по захватной рамке
-                if (meta && meta.type === 'frame') continue;
                 if (this.rectIntersectsRect(box, item.bounds)) matched.push(item.id);
             }
             let newSelection;
@@ -87,8 +84,6 @@ export class BoxSelectController {
             this.emit('get:all:objects', request);
             const matched = [];
             for (const item of request.objects) {
-                const meta = item.pixi && item.pixi._mb;
-                if (meta && meta.type === 'frame') continue;
                 if (this.rectIntersectsRect(box, item.bounds)) matched.push(item.id);
             }
             if (matched.length > 0) {

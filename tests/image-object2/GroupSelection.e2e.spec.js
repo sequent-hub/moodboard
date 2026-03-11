@@ -166,23 +166,20 @@ test.describe('GroupSelection E2E', () => {
       .toEqual([id1, id2].sort());
   });
 
-  test('box select selects objects in area (except frame)', async ({ page }) => {
+  test('box select selects objects in area including frames', async ({ page }) => {
     await clearBoard(page);
     const id1 = await createObject(page, { type: 'note', properties: { content: 'A' }, width: 100, height: 100 }, { x: 150, y: 150 });
     const id2 = await createObject(page, { type: 'shape', properties: { kind: 'circle' }, width: 80, height: 80 }, { x: 300, y: 160 });
     const frameId = await createObject(page, { type: 'frame', properties: { title: 'F' }, width: 120, height: 80 }, { x: 450, y: 150 });
 
-    await dragBy(page, 100, 100, 400, 280);
+    await dragBy(page, 100, 100, 600, 280);
 
     await expect
       .poll(async () => {
         const sel = await getSelection(page);
-        return sel.length >= 2 && sel.includes(id1) && sel.includes(id2);
+        return sel.length >= 3 && sel.includes(id1) && sel.includes(id2) && sel.includes(frameId);
       })
       .toBe(true);
-
-    const sel = await getSelection(page);
-    expect(sel).not.toContain(frameId);
   });
 
   test.fixme('box select + Ctrl adds to existing selection', async ({ page }) => {

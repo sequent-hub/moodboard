@@ -1,6 +1,6 @@
 /**
  * Unit-тесты BoxSelectController.
- * Страховка: start/update/end, isMultiSelect, исключение frame.
+ * Страховка: start/update/end, isMultiSelect, включение frame в box select.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -89,7 +89,7 @@ describe('BoxSelectController baseline', () => {
         expect(ctrl.initialSelectionBeforeBox).toEqual(['a', 'b']);
     });
 
-    it('update with matching objects excludes frame type', () => {
+    it('update with matching objects includes frame type', () => {
         selection.toArray.mockReturnValue([]);
         emit.mockImplementation((event, req) => {
             if (event === 'get:all:objects' || event === 'tool:get:all:objects') {
@@ -106,9 +106,8 @@ describe('BoxSelectController baseline', () => {
         ctrl.update({ x: 350, y: 200 });
 
         expect(setSelection).toHaveBeenCalledWith(
-            expect.arrayContaining(['note-1', 'shape-1'])
+            expect.arrayContaining(['note-1', 'frame-1', 'shape-1'])
         );
-        expect(setSelection.mock.calls[0][0]).not.toContain('frame-1');
     });
 
     it('end cleans up selectionGraphics', () => {

@@ -44,15 +44,16 @@ describe('SelectTool baseline: box select + events + editor hooks', () => {
         });
 
         tool.onMouseDown(createMouseEvent(10, 10));
-        tool.onMouseMove(createMouseEvent(250, 120));
-        tool.onMouseUp(createMouseEvent(250, 120));
+        tool.onMouseMove(createMouseEvent(400, 120));
+        tool.onMouseUp(createMouseEvent(400, 120));
 
-        expect(new Set(tool.getSelection())).toEqual(new Set(['obj-a', 'obj-b']));
+        expect(new Set(tool.getSelection())).toEqual(new Set(['obj-a', 'obj-b', 'frame-x']));
         // В текущем контракте add-события приходят и на update, и на end box-select.
         const addPayloads = collectEventPayloads(eventBus, Events.Tool.SelectionAdd);
         expect(addPayloads.length).toBeGreaterThanOrEqual(2);
         expect(addPayloads).toContainEqual({ tool: 'select', object: 'obj-a' });
         expect(addPayloads).toContainEqual({ tool: 'select', object: 'obj-b' });
+        expect(addPayloads).toContainEqual({ tool: 'select', object: 'frame-x' });
     });
 
     it('critical selection payload format stays stable', () => {
