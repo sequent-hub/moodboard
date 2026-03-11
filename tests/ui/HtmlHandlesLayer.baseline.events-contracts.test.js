@@ -28,7 +28,7 @@ describe('HtmlHandlesLayer baseline: event contracts', () => {
         const required = [
             Events.Tool.SelectionAdd,
             Events.Tool.SelectionClear,
-            Events.Object.TransformUpdated,
+            Events.History.Changed,
             Events.Tool.ResizeUpdate,
             Events.Tool.RotateUpdate,
             Events.Tool.GroupResizeUpdate,
@@ -61,18 +61,24 @@ describe('HtmlHandlesLayer baseline: event contracts', () => {
         expect(ctx.container.querySelector('.mb-handles-box')).toBeNull();
     });
 
-    it('reacts to TransformUpdated only for selected objects', () => {
-        ctx.setObject('obj-selected', { x: 20, y: 20, width: 100, height: 60, type: 'note' });
-        ctx.setObject('obj-other', { x: 220, y: 160, width: 80, height: 50, type: 'note' });
-        ctx.core.selectTool.selectedObjects.add('obj-selected');
+    it('reacts to History.Changed on undo/redo with frame sync', () => {
+        ctx.setObject('obj-a', { x: 10, y: 20, width: 100, height: 50, type: 'note' });
+        ctx.setObject('obj-b', { x: 180, y: 80, width: 90, height: 70, type: 'note' });
+        ctx.core.selectTool.selectedObjects.add('obj-a');
+        ctx.core.selectTool.selectedObjects.add('obj-b');
+        ctx.eventBus.emit(Events.Tool.SelectionAdd, { tool: 'select', object: 'obj-a' });
 
         const updateSpy = vi.spyOn(layer, 'update');
         updateSpy.mockClear();
 
-        ctx.eventBus.emit(Events.Object.TransformUpdated, { objectId: 'obj-other' });
+        ctx.eventBus.emit(Events.History.Changed, { canUndo: true });
         expect(updateSpy).not.toHaveBeenCalled();
 
-        ctx.eventBus.emit(Events.Object.TransformUpdated, { objectId: 'obj-selected' });
+        ctx.eventBus.emit(Events.History.Changed, { lastUndone: 'group-rotate' });
+        expect(updateSpy).toHaveBeenCalledTimes(1);
+
+        updateSpy.mockClear();
+        ctx.eventBus.emit(Events.History.Changed, { lastRedone: 'group-rotate' });
         expect(updateSpy).toHaveBeenCalledTimes(1);
     });
 });

@@ -103,14 +103,17 @@ describe('Post-refactor verification: layer and viewport flows', () => {
 
 describe('Post-refactor verification: wiring/lifecycle risks', () => {
     it('re-running setupToolEvents does not duplicate handlers for the same event', () => {
-        const ctx = createCoreBaselineContext();
-        ctx.deleteObject = vi.fn();
+        const ctx = createCoreBaselineContext({
+            objects: [{ id: 'obj-1', type: 'note', position: { x: 10, y: 10 }, width: 100, height: 80 }],
+        });
 
         CoreMoodBoard.prototype.setupToolEvents.call(ctx);
         CoreMoodBoard.prototype.setupToolEvents.call(ctx);
 
         ctx.eventBus.emit(Events.Tool.ObjectsDelete, { objects: ['obj-1'] });
-        expect(ctx.deleteObject).toHaveBeenCalledTimes(1);
+        // ObjectsDelete -> GroupDeleteCommand -> history.executeCommand (1 раз при одном обработчике)
+        expect(ctx.history.executeCommand).toHaveBeenCalledTimes(1);
+        expect(ctx.state.getObjects()).not.toContainEqual(expect.objectContaining({ id: 'obj-1' }));
     });
 
     it('SaveManager.destroy removes its EventBus subscriptions', () => {

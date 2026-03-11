@@ -11,7 +11,7 @@ export function onMouseDown(event) {
         return; // Прерываем выполнение, чтобы не обрабатывать клик дальше
     }
 
-    this.isMultiSelect = event.originalEvent.ctrlKey || event.originalEvent.metaKey;
+    this.isMultiSelect = event.originalEvent.ctrlKey || event.originalEvent.metaKey || event.originalEvent.shiftKey;
 
     // Проверяем, что под курсором
     const hitResult = this.hitTest(event.x, event.y);

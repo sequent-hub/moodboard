@@ -72,12 +72,10 @@ export class HandlesEventBridge {
             }],
             [Events.UI.ZoomPercent, () => this.host.update()],
             [Events.Tool.PanUpdate, () => this.host.update()],
-            [Events.Object.TransformUpdated, (data) => {
-                if (this.host.core?.selectTool && data.objectId) {
-                    const isSelected = this.host.core.selectTool.selectedObjects.has(data.objectId);
-                    if (isSelected) {
-                        this.host.update();
-                    }
+            [Events.History.Changed, (data) => {
+                if (data?.lastUndone || data?.lastRedone) {
+                    this.host._endGroupRotationPreview();
+                    this.host.update();
                 }
             }],
         ];

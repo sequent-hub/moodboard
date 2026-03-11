@@ -81,6 +81,14 @@
 - **Поворот группы из нескольких квадратов** — все углы выбранных объектов должны оставаться внутри повернутой рамки во время поворота и после `GroupRotateEnd`.
 - **Resize уже повернутой группы** — после перехода `rotate -> resize` рамка должна оставаться по контурам объектов, а не пропускать углы наружу.
 
+### `tests/ui/HtmlHandlesLayer.undo-frame-sync.test.js` — синхронизация рамки
+
+Контракты рамки выделения: фиксация при повороте, откат при Undo (`src/ui/HtmlHandlesLayer.js`, `src/ui/handles/HandlesEventBridge.js`).
+
+- **Нет пересчёта на TransformUpdated** — после группового поворота рамка не должна меняться; сохраняется от выделения до снятия.
+- **Пересчёт на History.Changed (Undo)** — при Undo рамка должна откатываться вместе с объектами.
+- **Вызов _endGroupRotationPreview при Undo** — при `History.Changed` с `lastUndone`/`lastRedone` preview очищается перед `update()`.
+
 ### `tests/ui/HtmlHandlesLayer.group-resize-repeat.test.js` — regressions повторного group resize
 
 UI-level regressions для `group resize` и `Shift`-режима (`src/ui/handles/HandlesInteractionController.js`, `src/core/flows/TransformFlow.js`).
@@ -287,6 +295,31 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 - **Выделение** — клик по фрейму → selectedObjects содержит id, рамка видна.
 - **Палитра закрывается** — клик вне палитры закрывает её.
 - **Title после зума** — title сохраняется после ZoomPercent.
+
+### `tests/image-object2/GroupSelection.e2e.spec.js` — 10 E2E-тестов
+
+Групповое выделение и команды (box select, multi-select, групповые операции, история).
+
+**Покрытие:**
+
+- **Multi-select Ctrl+click** — добавляет объекты в выделение.
+- **Box select** — mousedown на пустом → mousemove → mouseup выделяет объекты в области; frame исключён.
+- **Box select + Ctrl** — добавление к существующему выделению (fixme: требует доработки координат).
+- **Одиночное выделение** — клик по note, shape, text, frame.
+- **Group move** — выделенная группа перетаскивается, position всех меняется.
+- **Group rotate** — ручка поворота группы меняет rotation у всех.
+- **Group resize** — ручка ресайза группы меняет width/height у всех.
+- **Group delete** — Delete удаляет группу; один Undo восстанавливает всё (GroupDeleteCommand).
+- **Shift+click** — добавляет объект в выделение.
+- **Ctrl+A** — выделяет все объекты на доске.
+
+### `tests/tools/SelectTool.baseline.group-selection.test.js` — 3 unit-теста
+
+Контракты группового выделения: multi-select (Ctrl/Shift), selectAll, setSelection.
+
+### `tests/tools/selection/BoxSelectController.baseline.test.js` — 4 unit-теста
+
+BoxSelectController: start (isMultiSelect), update (исключение frame), end (cleanup).
 
 ### `tests/objects/FrameObject.lifecycle.test.js` — 5 unit-тестов
 

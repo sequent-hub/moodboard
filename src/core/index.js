@@ -138,12 +138,11 @@ export class CoreMoodBoard {
             }
         });
 
-        // Удаление выделенных объектов (делаем копию списка, чтобы избежать мутаций во время удаления)
+        // Удаление выделенных объектов — через ObjectsDelete для GroupDeleteCommand (один Undo)
         this.eventBus.on(Events.Keyboard.Delete, () => {
             if (this.toolManager.getActiveTool()?.name === 'select') {
                 const ids = Array.from(this.toolManager.getActiveTool().selectedObjects);
-                ids.forEach((objectId) => this.deleteObject(objectId));
-                this.toolManager.getActiveTool().clearSelection();
+                this.eventBus.emit(Events.Tool.ObjectsDelete, { objects: ids });
             }
         });
 

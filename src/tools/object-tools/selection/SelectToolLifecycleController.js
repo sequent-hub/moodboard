@@ -1,4 +1,5 @@
 import { Events } from '../../../core/events/Events.js';
+import { unregisterSelectToolCoreSubscriptions } from './SelectToolSetup.js';
 import { ResizeHandles } from '../../ResizeHandles.js';
 import { SimpleDragController } from './SimpleDragController.js';
 import { ResizeController } from './ResizeController.js';
@@ -101,7 +102,7 @@ export function destroySelectTool(superDestroy) {
 
     this.destroyed = true;
 
-    // Очищаем выделение
+    unregisterSelectToolCoreSubscriptions(this);
     this.clearSelection();
 
     // Уничтожаем ручки изменения размера

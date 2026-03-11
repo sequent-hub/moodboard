@@ -75,69 +75,60 @@ export function initializeSelectToolState(instance) {
 }
 
 export function registerSelectToolCoreSubscriptions(instance) {
-    // Подписка на событие готовности дубликата (от Core)
-    // Когда PasteObjectCommand завершится, ядро сообщит newId
     if (!instance.eventBus) return;
 
-    instance.eventBus.on(Events.Tool.DuplicateReady, (data) => {
-        // data: { originalId, newId }
+    const onDuplicateReady = (data) => {
         if (!instance.isAltCloneMode || !instance.clonePending) return;
         if (!data || data.originalId !== instance.cloneSourceId) return;
         instance.onDuplicateReady(data.newId);
-    });
+    };
 
-    // Групповой клон готов
-    instance.eventBus.on(Events.Tool.GroupDuplicateReady, (data) => {
-        // data: { map: { [originalId]: newId } }
+    const onGroupDuplicateReady = (data) => {
         if (!instance.isAltGroupCloneMode || !instance.groupClonePending) return;
         if (!data || !data.map) return;
         instance.onGroupDuplicateReady(data.map);
-    });
+    };
 
-    instance.eventBus.on(Events.Tool.ObjectEdit, (object) => {
-        // Определяем тип редактируемого объекта
+    const onObjectEdit = (object) => {
         const objectType = object.type || (object.object && object.object.type) || 'text';
-
         if (objectType === 'file') {
-            // Для файлов используем специальный редактор названия
             instance._openFileNameEditor(object, object.create || false);
         } else {
-            // Для текста и записок используем обычный редактор
             if (object.create) {
-                // Создание нового объекта с редактированием
                 instance._openTextEditor(object, true);
             } else {
-                // Редактирование существующего объекта
                 instance._openTextEditor(object, false);
             }
         }
-    });
+    };
 
-    // Обработка удаления объектов (undo создания, delete команды и т.д.)
-    instance.eventBus.on(Events.Object.Deleted, (data) => {
+    const onObjectDeleted = (data) => {
         const objectId = data?.objectId || data;
-        console.log('🗑️ SelectTool: получено событие удаления объекта:', objectId, 'данные:', data);
-
-        // ЗАЩИТА: Проверяем что данные валидны
-        if (!objectId) {
-            console.warn('⚠️ SelectTool: получено событие удаления с невалидным objectId');
-            return;
-        }
-
-        if (instance.selection.has(objectId)) {
-            console.log('🗑️ SelectTool: удаляем объект из selection:', objectId);
+        if (!objectId) return;
+        if (instance.selection?.has(objectId)) {
             instance.removeFromSelection(objectId);
-
-            // ИСПРАВЛЕНИЕ: Принудительно очищаем selection если он стал пустым
             if (instance.selection.size() === 0) {
-                console.log('🗑️ SelectTool: selection пустой, скрываем ручки');
                 instance.emit(Events.Tool.SelectionClear);
                 instance.updateResizeHandles();
             }
         } else {
-            console.log('🗑️ SelectTool: объект не был в selection, обновляем ручки на всякий случай');
-            // Принудительно обновляем ручки без излишних действий
             instance.updateResizeHandles();
         }
-    });
+    };
+
+    instance._coreHandlers = { onDuplicateReady, onGroupDuplicateReady, onObjectEdit, onObjectDeleted };
+    instance.eventBus.on(Events.Tool.DuplicateReady, onDuplicateReady);
+    instance.eventBus.on(Events.Tool.GroupDuplicateReady, onGroupDuplicateReady);
+    instance.eventBus.on(Events.Tool.ObjectEdit, onObjectEdit);
+    instance.eventBus.on(Events.Object.Deleted, onObjectDeleted);
+}
+
+export function unregisterSelectToolCoreSubscriptions(instance) {
+    if (!instance.eventBus || !instance._coreHandlers) return;
+    const { onDuplicateReady, onGroupDuplicateReady, onObjectEdit, onObjectDeleted } = instance._coreHandlers;
+    instance.eventBus.off(Events.Tool.DuplicateReady, onDuplicateReady);
+    instance.eventBus.off(Events.Tool.GroupDuplicateReady, onGroupDuplicateReady);
+    instance.eventBus.off(Events.Tool.ObjectEdit, onObjectEdit);
+    instance.eventBus.off(Events.Object.Deleted, onObjectDeleted);
+    instance._coreHandlers = null;
 }

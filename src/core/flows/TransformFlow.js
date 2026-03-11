@@ -243,8 +243,11 @@ export function setupTransformFlow(core) {
                     const halfH = (pixiObject.height || 0) / 2;
                     return { x: pixiObject.x - halfW, y: pixiObject.y - halfH };
                 })();
-            if (Math.abs(start.angle - toAngle) > 0.1 || Math.abs(start.position.x - toPos.x) > 0.1 || Math.abs(start.position.y - toPos.y) > 0.1) {
-                changes.push({ id, fromAngle: start.angle, toAngle, fromPos: start.position, toPos });
+            const halfW = (pixiObject.width || 0) / 2;
+            const halfH = (pixiObject.height || 0) / 2;
+            const fromPos = { x: start.position.x - halfW, y: start.position.y - halfH };
+            if (Math.abs(start.angle - toAngle) > 0.1 || Math.abs(fromPos.x - toPos.x) > 0.1 || Math.abs(fromPos.y - toPos.y) > 0.1) {
+                changes.push({ id, fromAngle: start.angle, toAngle, fromPos, toPos });
             }
         }
         if (changes.length > 0) {

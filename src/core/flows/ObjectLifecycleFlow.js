@@ -1,6 +1,7 @@
 import { Events } from '../events/Events.js';
 import {
     EditFileNameCommand,
+    GroupDeleteCommand,
     UpdateContentCommand,
     UpdateTextStyleCommand,
     UpdateNoteStyleCommand,
@@ -123,7 +124,9 @@ function tryCreateFramePropertiesCommand(core, object, objectId, updates) {
 export function setupObjectLifecycleFlow(core) {
     core.eventBus.on(Events.Tool.ObjectsDelete, ({ objects }) => {
         const ids = Array.isArray(objects) ? objects : [];
-        ids.forEach((id) => core.deleteObject(id));
+        if (ids.length === 0) return;
+        const command = new GroupDeleteCommand(core, ids);
+        core.history.executeCommand(command);
     });
 
     core.eventBus.on(Events.Tool.HitTest, (data) => {
@@ -155,6 +158,17 @@ export function setupObjectLifecycleFlow(core) {
             });
         }
         data.objects = result;
+    });
+
+    core.eventBus.on(Events.Tool.SelectionAll, () => {
+        if (core.toolManager?.getActiveTool()?.name !== 'select') return;
+        const req = { objects: [] };
+        core.eventBus.emit(Events.Tool.GetAllObjects, req);
+        const ids = (req.objects || []).map((o) => o.id);
+        if (ids.length > 0 && core.selectTool) {
+            core.selectTool.setSelection(ids);
+            core.selectTool.updateResizeHandles();
+        }
     });
 
     core.eventBus.on(Events.Tool.GetObjectSize, (data) => {

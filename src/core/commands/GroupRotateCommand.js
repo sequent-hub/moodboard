@@ -17,6 +17,9 @@ export class GroupRotateCommand extends BaseCommand {
 
     execute() {
         for (const c of this.changes) {
+            if (this.core.pixi?.updateObjectRotation) {
+                this.core.pixi.updateObjectRotation(c.id, c.toAngle);
+            }
             this.core.updateObjectRotationDirect(c.id, c.toAngle);
             this.core.updateObjectPositionDirect(c.id, c.toPos);
             this.emit(Events.Object.TransformUpdated, { objectId: c.id, type: 'rotation', angle: c.toAngle });
@@ -26,6 +29,9 @@ export class GroupRotateCommand extends BaseCommand {
 
     undo() {
         for (const c of this.changes) {
+            if (this.core.pixi?.updateObjectRotation) {
+                this.core.pixi.updateObjectRotation(c.id, c.fromAngle);
+            }
             this.core.updateObjectRotationDirect(c.id, c.fromAngle);
             this.core.updateObjectPositionDirect(c.id, c.fromPos);
             this.emit(Events.Object.TransformUpdated, { objectId: c.id, type: 'rotation', angle: c.fromAngle });

@@ -2,6 +2,7 @@
 export { BaseCommand } from './BaseCommand.js';
 export { CreateObjectCommand } from './CreateObjectCommand.js';
 export { DeleteObjectCommand } from './DeleteObjectCommand.js';
+export { GroupDeleteCommand } from './GroupDeleteCommand.js';
 export { MoveObjectCommand } from './MoveObjectCommand.js';
 export { ResizeObjectCommand } from './ResizeObjectCommand.js';
 export { CopyObjectCommand } from './CopyObjectCommand.js';

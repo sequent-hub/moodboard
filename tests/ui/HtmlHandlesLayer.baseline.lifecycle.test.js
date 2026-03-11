@@ -38,7 +38,7 @@ describe('HtmlHandlesLayer baseline: lifecycle contracts', () => {
         const counts = getEventCounts(ctx.eventBus.on);
         expect(counts.get(Events.Tool.SelectionAdd)).toBe(1);
         expect(counts.get(Events.Tool.SelectionClear)).toBe(1);
-        expect(counts.get(Events.Object.TransformUpdated)).toBe(1);
+        expect(counts.get(Events.History.Changed)).toBe(1);
 
         const resizeAddCall = addSpy.mock.calls.find(([name]) => name === 'resize');
         expect(resizeAddCall).toBeTruthy();
