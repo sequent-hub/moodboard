@@ -31,6 +31,7 @@ export class FrameObject {
         }
         this.cornerRadius = Number.isFinite(cssCornerRadius) ? cssCornerRadius : 6;
         this.title = this.objectData.title || this.objectData.properties?.title || 'Новый';
+        this._borderVisible = true;
 
         // Создаем контейнер для фрейма и заголовка
         this.container = new PIXI.Container();
@@ -60,8 +61,14 @@ export class FrameObject {
         if (this.eventBus) {
             this._boundOnZoomChange = this._onZoomChange.bind(this);
             this.eventBus.on(Events.UI.ZoomPercent, this._boundOnZoomChange);
+            this._boundOnSelectionAdd = this._onSelectionAdd.bind(this);
+            this._boundOnSelectionRemove = this._onSelectionRemove.bind(this);
+            this._boundOnSelectionClear = this._onSelectionClear.bind(this);
+            this.eventBus.on(Events.Tool.SelectionAdd, this._boundOnSelectionAdd);
+            this.eventBus.on(Events.Tool.SelectionRemove, this._boundOnSelectionRemove);
+            this.eventBus.on(Events.Tool.SelectionClear, this._boundOnSelectionClear);
         }
-        
+
         this._draw(this.width, this.height, this.fillColor);
         // Применяем начальный масштаб и обрезку заголовка
         this._updateTitleScale();
@@ -86,6 +93,27 @@ export class FrameObject {
             this.fillColor = color;
         }
         this._redrawPreserveTransform(this.width, this.height, this.fillColor);
+    }
+
+    /** Скрыть/показать серую рамку (при выделении скрываем, чтобы не накладывалась на синюю) */
+    setBorderVisible(visible) {
+        if (this._borderVisible === visible) return;
+        this._borderVisible = visible;
+        this._redrawPreserveTransform(this.width, this.height, this.fillColor);
+    }
+
+    _onSelectionAdd(data) {
+        const myId = this.objectData?.id ?? this.container?._mb?.objectId;
+        if (data?.object === myId) this.setBorderVisible(false);
+    }
+
+    _onSelectionRemove(data) {
+        if (data?.object === (this.objectData?.id ?? this.container?._mb?.objectId)) this.setBorderVisible(true);
+    }
+
+    _onSelectionClear(data) {
+        const myId = this.objectData?.id ?? this.container?._mb?.objectId;
+        if (data?.objects?.includes(myId)) this.setBorderVisible(true);
     }
 
     /**
@@ -133,7 +161,7 @@ export class FrameObject {
         const pivotX = width / 2;
         const pivotY = height / 2;
 
-        this._draw(width, height, color);
+        this._draw(width, height, color, this._borderVisible);
 
         container.pivot.set(pivotX, pivotY);
         container.x = x;
@@ -146,15 +174,17 @@ export class FrameObject {
 
     /**
      * Базовая отрисовка
+     * @param {boolean} showStroke — рисовать ли серую рамку (скрываем при выделении)
      */
-    _draw(width, height, color) {
+    _draw(width, height, color, showStroke = true) {
         const g = this.graphics;
         g.clear();
-        // Рисуем с выравниванием обводки внутрь, чтобы внешний контур был ровно width x height
-        try {
-            g.lineStyle({ width: this.borderWidth, color: this.strokeColor, alpha: 1, alignment: 1 });
-        } catch (e) {
-            g.lineStyle(this.borderWidth, this.strokeColor, 1);
+        if (showStroke) {
+            try {
+                g.lineStyle({ width: this.borderWidth, color: this.strokeColor, alpha: 1, alignment: 1 });
+            } catch (e) {
+                g.lineStyle(this.borderWidth, this.strokeColor, 1);
+            }
         }
         g.beginFill(typeof color === 'number' ? color : 0xFFFFFF, 1);
         g.drawRoundedRect(0, 0, Math.max(0, width), Math.max(0, height), this.cornerRadius);
@@ -282,9 +312,17 @@ export class FrameObject {
      * Метод для отписки от событий при уничтожении объекта
      */
     destroy() {
-        if (this.eventBus && this._boundOnZoomChange) {
-            this.eventBus.off(Events.UI.ZoomPercent, this._boundOnZoomChange);
-            this._boundOnZoomChange = null;
+        if (this.eventBus) {
+            if (this._boundOnZoomChange) {
+                this.eventBus.off(Events.UI.ZoomPercent, this._boundOnZoomChange);
+                this._boundOnZoomChange = null;
+            }
+            if (this._boundOnSelectionAdd) {
+                this.eventBus.off(Events.Tool.SelectionAdd, this._boundOnSelectionAdd);
+                this.eventBus.off(Events.Tool.SelectionRemove, this._boundOnSelectionRemove);
+                this.eventBus.off(Events.Tool.SelectionClear, this._boundOnSelectionClear);
+                this._boundOnSelectionAdd = this._boundOnSelectionRemove = this._boundOnSelectionClear = null;
+            }
         }
         if (this.container) {
             this.container.destroy({ children: true });

@@ -90,13 +90,13 @@ describe('FrameObject lifecycle', () => {
     });
 
     it('destroy calls off with the SAME handler reference used in on (no leak)', () => {
-        const handlerRef = [];
+        const handlerRefs = {};
         const capturingBus = {
             on: vi.fn((event, handler) => {
-                if (event === Events.UI.ZoomPercent) handlerRef[0] = handler;
+                handlerRefs[event] = handler;
             }),
             off: vi.fn((event, handler) => {
-                expect(handler).toBe(handlerRef[0]);
+                expect(handler).toBe(handlerRefs[event]);
             }),
         };
 
@@ -104,7 +104,8 @@ describe('FrameObject lifecycle', () => {
         expect(capturingBus.on).toHaveBeenCalledWith(Events.UI.ZoomPercent, expect.any(Function));
 
         frame.destroy();
-        expect(capturingBus.off).toHaveBeenCalledWith(Events.UI.ZoomPercent, handlerRef[0]);
+        expect(capturingBus.off).toHaveBeenCalledWith(Events.UI.ZoomPercent, handlerRefs[Events.UI.ZoomPercent]);
+        expect(capturingBus.off).toHaveBeenCalledWith(Events.Tool.SelectionAdd, handlerRefs[Events.Tool.SelectionAdd]);
     });
 
     it('after destroy, ZoomPercent emit does not call handler (handler was removed)', () => {
