@@ -313,6 +313,21 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 - **Shift+click** — добавляет объект в выделение.
 - **Ctrl+A** — выделяет все объекты на доске.
 
+### `tests/image-object2/TopPanel.e2e.spec.js` — 6 E2E-тестов
+
+Верхняя панель (Topbar): сетки и палитра фона.
+
+**Покрытие:**
+
+- **Сетка line** — клик по `[data-grid="line"]` активирует кнопку, gridLayer содержит графику.
+- **Сетка dot** — клик по `[data-grid="dot"]` переключает на точечную сетку.
+- **Сетка cross** — клик по `[data-grid="cross"]` переключает на сетку крестиков.
+- **Сетка off** — клик по `[data-grid="off"]` отключает сетку (boardService.grid.enabled === false).
+- **Палитра** — клик по `.moodboard-topbar__button--paint` открывает popover с 5 цветами.
+- **Фон доски** — выбор цвета в палитре меняет `renderer.backgroundColor`.
+
+**Хелперы:** `getGridLayerChildren`, `getRendererBackgroundColor`, `getActiveGridButton`, `getBoardServiceGridEnabled`.
+
 ### `tests/tools/SelectTool.baseline.group-selection.test.js` — 3 unit-теста
 
 Контракты группового выделения: multi-select (Ctrl/Shift), selectAll, setSelection.
