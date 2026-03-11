@@ -1,0 +1,52 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e6]:
+    - button [ref=e7] [cursor=pointer]:
+      - img [ref=e8]
+    - button [ref=e11] [cursor=pointer]:
+      - img [ref=e12]
+    - button [ref=e15] [cursor=pointer]:
+      - img [ref=e16]
+    - button [ref=e18] [cursor=pointer]:
+      - img [ref=e19]
+    - button [ref=e21] [cursor=pointer]:
+      - img [ref=e22]
+    - button [ref=e24] [cursor=pointer]:
+      - img [ref=e25]
+    - button [ref=e27] [cursor=pointer]:
+      - img [ref=e28]
+    - button [ref=e30] [cursor=pointer]:
+      - img [ref=e31]
+    - button [ref=e33] [cursor=pointer]:
+      - img [ref=e34]
+    - button [ref=e36] [cursor=pointer]:
+      - img [ref=e37]
+    - button [disabled] [ref=e40]:
+      - img [ref=e41]
+    - button [disabled] [ref=e43]:
+      - img [ref=e44]
+  - generic [ref=e46]:
+    - 'button "Сетка: линии" [ref=e47] [cursor=pointer]':
+      - img [ref=e48]
+    - 'button "Сетка: точки" [ref=e50] [cursor=pointer]':
+      - img [ref=e51]
+    - 'button "Сетка: крестики" [ref=e53] [cursor=pointer]':
+      - img [ref=e54]
+    - 'button "Сетка: выкл" [ref=e59] [cursor=pointer]':
+      - img [ref=e60]
+    - button "Палитра фона" [ref=e63] [cursor=pointer]:
+      - img [ref=e64]
+  - generic:
+    - generic: Готов к работе
+  - generic [ref=e66]:
+    - button "−" [ref=e67] [cursor=pointer]:
+      - generic [ref=e68]: −
+    - generic [ref=e69] [cursor=pointer]:
+      - generic [ref=e70]: 100%
+      - generic [ref=e71]: ▾
+    - button "+" [ref=e72] [cursor=pointer]:
+      - generic [ref=e73]: +
+  - button "🗺️" [ref=e75] [cursor=pointer]
+```

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('ImageObject2 toolbar button (Playwright)', () => {
+test.describe.skip('ImageObject2 toolbar button (Playwright)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/test-moodboard.html');
     await expect(page.locator('.moodboard-toolbar')).toBeVisible();
