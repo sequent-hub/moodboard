@@ -62,7 +62,7 @@ export class HandlesDomRenderer {
         Object.assign(box.style, {
             position: 'absolute', left: `${left}px`, top: `${top}px`,
             width: `${width}px`, height: `${height}px`,
-            border: `2px solid ${HANDLES_ACCENT_COLOR}`, borderRadius: '3px', boxSizing: 'content-box', pointerEvents: 'none',
+            outline: `2px solid ${HANDLES_ACCENT_COLOR}`, outlineOffset: '0', borderRadius: '3px', boxSizing: 'border-box', pointerEvents: 'none',
             transformOrigin: 'center center',
             transform: `rotate(${rotation}deg)`,
         });
