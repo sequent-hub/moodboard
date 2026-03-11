@@ -69,6 +69,7 @@ export class HandlesEventBridge {
                 this.host._finishGroupRotationPreview();
                 this.host._handlesSuppressed = false;
                 this.host._setHandlesVisibility(true);
+                this.host.update();
             }],
             [Events.UI.ZoomPercent, () => this.host.update()],
             [Events.Tool.PanUpdate, () => this.host.update()],
