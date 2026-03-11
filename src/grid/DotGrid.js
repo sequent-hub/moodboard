@@ -34,14 +34,17 @@ export class DotGrid extends BaseGrid {
      * Рисует основные точки сетки
      */
     drawDots() {
+        const b = this.getDrawBounds();
+        const startX = Math.floor(b.left / this.size) * this.size;
+        const startY = Math.floor(b.top / this.size) * this.size;
+        const endX = Math.ceil(b.right / this.size) * this.size;
+        const endY = Math.ceil(b.bottom / this.size) * this.size;
         this.graphics.beginFill(this.color);
-        
-        for (let x = 0; x <= this.width; x += this.size) {
-            for (let y = 0; y <= this.height; y += this.size) {
+        for (let x = startX; x <= endX; x += this.size) {
+            for (let y = startY; y <= endY; y += this.size) {
                 this.drawDot(x, y, this.dotSize);
             }
         }
-        
         this.graphics.endFill();
     }
     
@@ -50,16 +53,17 @@ export class DotGrid extends BaseGrid {
      */
     drawIntersections() {
         const intersectionStep = this.size * 5;
-        
-        // Используем те же параметры, что и у обычных точек
+        const b = this.getDrawBounds();
+        const startX = Math.floor(b.left / intersectionStep) * intersectionStep;
+        const startY = Math.floor(b.top / intersectionStep) * intersectionStep;
+        const endX = Math.ceil(b.right / intersectionStep) * intersectionStep;
+        const endY = Math.ceil(b.bottom / intersectionStep) * intersectionStep;
         this.graphics.beginFill(this.color);
-        
-        for (let x = 0; x <= this.width; x += intersectionStep) {
-            for (let y = 0; y <= this.height; y += intersectionStep) {
+        for (let x = startX; x <= endX; x += intersectionStep) {
+            for (let y = startY; y <= endY; y += intersectionStep) {
                 this.drawDot(x, y, this.dotSize);
             }
         }
-        
         this.graphics.endFill();
     }
     

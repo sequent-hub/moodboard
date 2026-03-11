@@ -33,6 +33,7 @@ export class ZoomPanController {
 			world.x = x - worldX * newScale;
 			world.y = y - worldY * newScale;
 			this.eventBus.emit(Events.UI.ZoomPercent, { percentage: Math.round(newScale * 100) });
+			this.eventBus.emit(Events.Viewport.Changed);
 		});
 
 		// Кнопки зума из UI
@@ -59,6 +60,7 @@ export class ZoomPanController {
 			world.x = centerX - worldX * 1;
 			world.y = centerY - worldY * 1;
 			this.eventBus.emit(Events.UI.ZoomPercent, { percentage: 100 });
+			this.eventBus.emit(Events.Viewport.Changed);
 		});
 		this.eventBus.on(Events.UI.ZoomFit, () => {
 			const objs = (this.pixi?.objects ? Array.from(this.pixi.objects.values()) : []);
@@ -86,6 +88,7 @@ export class ZoomPanController {
 			world.x = viewW / 2 - worldCenterX * newScale;
 			world.y = viewH / 2 - worldCenterY * newScale;
 			this.eventBus.emit(Events.UI.ZoomPercent, { percentage: Math.round(newScale * 100) });
+			this.eventBus.emit(Events.Viewport.Changed);
 		});
 	}
 }

@@ -47,23 +47,24 @@ export class LineGrid extends BaseGrid {
      * Рисует основную сетку
      */
     drawMainGrid() {
-        const w = this.width;
-        const h = this.height;
+        const b = this.getDrawBounds();
         const step = this.size;
         const half = this.lineWidth / 2;
-        // Выравниваем к половине пикселя для чётких линий на любых DPI
+        const startX = Math.floor(b.left / step) * step;
+        const endX = Math.ceil(b.right / step) * step;
+        const startY = Math.floor(b.top / step) * step;
+        const endY = Math.ceil(b.bottom / step) * step;
         // Вертикальные линии
-        for (let x = 0; x <= w; x += step) {
+        for (let x = startX; x <= endX; x += step) {
             const px = Math.round(x) + (Number.isFinite(half) ? 0.5 : 0);
-            this.graphics.moveTo(px, 0);
-            this.graphics.lineTo(px, h);
+            this.graphics.moveTo(px, b.top);
+            this.graphics.lineTo(px, b.bottom);
         }
-        
         // Горизонтальные линии
-        for (let y = 0; y <= h; y += step) {
+        for (let y = startY; y <= endY; y += step) {
             const py = Math.round(y) + (Number.isFinite(half) ? 0.5 : 0);
-            this.graphics.moveTo(0, py);
-            this.graphics.lineTo(w, py);
+            this.graphics.moveTo(b.left, py);
+            this.graphics.lineTo(b.right, py);
         }
     }
     
@@ -77,23 +78,23 @@ export class LineGrid extends BaseGrid {
         } catch (_) {
             this.graphics.lineStyle(0.5, this.subGridColor, this.subGridOpacity);
         }
-        const w = this.width;
-        const h = this.height;
-        // Вертикальные подлинии
-        for (let x = subSize; x < w; x += subSize) {
+        const b = this.getDrawBounds();
+        const startX = Math.floor(b.left / subSize) * subSize;
+        const endX = Math.ceil(b.right / subSize) * subSize;
+        const startY = Math.floor(b.top / subSize) * subSize;
+        const endY = Math.ceil(b.bottom / subSize) * subSize;
+        for (let x = startX; x <= endX; x += subSize) {
             if (x % this.size !== 0) {
                 const px = Math.round(x) + 0.5;
-                this.graphics.moveTo(px, 0);
-                this.graphics.lineTo(px, h);
+                this.graphics.moveTo(px, b.top);
+                this.graphics.lineTo(px, b.bottom);
             }
         }
-        
-        // Горизонтальные подлинии
-        for (let y = subSize; y < h; y += subSize) {
+        for (let y = startY; y <= endY; y += subSize) {
             if (y % this.size !== 0) {
                 const py = Math.round(y) + 0.5;
-                this.graphics.moveTo(0, py);
-                this.graphics.lineTo(w, py);
+                this.graphics.moveTo(b.left, py);
+                this.graphics.lineTo(b.right, py);
             }
         }
     }

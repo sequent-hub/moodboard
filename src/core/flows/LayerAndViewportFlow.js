@@ -107,7 +107,12 @@ export function setupLayerAndViewportFlow(core) {
         if (core.pixi.worldLayer) {
             core.pixi.worldLayer.x += delta.x;
             core.pixi.worldLayer.y += delta.y;
-        } else {
+        }
+        if (core.pixi.gridLayer) {
+            core.pixi.gridLayer.x += delta.x;
+            core.pixi.gridLayer.y += delta.y;
+        }
+        if (!core.pixi.worldLayer) {
             const stage = core.pixi.app.stage;
             stage.x += delta.x;
             stage.y += delta.y;
@@ -118,6 +123,7 @@ export function setupLayerAndViewportFlow(core) {
                 settings: { pan: { x: world.x || 0, y: world.y || 0 } }
             });
         } catch (_) {}
+        core.boardService?.refreshGridViewport?.();
     });
 
     core.eventBus.on(Events.UI.ZoomSelection, () => {
@@ -151,6 +157,7 @@ export function setupLayerAndViewportFlow(core) {
         world.x = viewW / 2 - worldCenterX * newScale;
         world.y = viewH / 2 - worldCenterY * newScale;
         core.eventBus.emit(Events.UI.ZoomPercent, { percentage: Math.round(newScale * 100) });
+        core.eventBus.emit(Events.Viewport.Changed);
     });
 
     core.eventBus.on(Events.UI.MinimapGetData, (data) => {

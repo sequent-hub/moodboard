@@ -34,16 +34,17 @@ export class CrossGrid extends BaseGrid {
         }
 
         const hs = this.crossHalfSize;
-
-        for (let x = 0; x <= this.width; x += this.size) {
-            for (let y = 0; y <= this.height; y += this.size) {
-                // Выравниваем к полу-пикселю для чётких 1px линий
+        const b = this.getDrawBounds();
+        const startX = Math.floor(b.left / this.size) * this.size;
+        const startY = Math.floor(b.top / this.size) * this.size;
+        const endX = Math.ceil(b.right / this.size) * this.size;
+        const endY = Math.ceil(b.bottom / this.size) * this.size;
+        for (let x = startX; x <= endX; x += this.size) {
+            for (let y = startY; y <= endY; y += this.size) {
                 const px = Math.round(x) + 0.5;
                 const py = Math.round(y) + 0.5;
-                // Горизонтальная часть креста
                 g.moveTo(px - hs, py);
                 g.lineTo(px + hs, py);
-                // Вертикальная часть креста
                 g.moveTo(px, py - hs);
                 g.lineTo(px, py + hs);
             }

@@ -84,7 +84,11 @@ export class SettingsApplier {
             if (world) {
                 world.x = s.pan.x;
                 world.y = s.pan.y;
-                // Обновление зависимых слоёв/панелей выполняется по их событиям; здесь только применяем позицию
+                if (this.pixi?.gridLayer) {
+                    this.pixi.gridLayer.x = s.pan.x;
+                    this.pixi.gridLayer.y = s.pan.y;
+                }
+                try { this.eventBus.emit(Events.Viewport.Changed); } catch (_) {}
             }
         }
     }

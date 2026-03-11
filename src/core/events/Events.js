@@ -127,6 +127,9 @@ export const Events = {
 	Grid: {
 		BoardDataChanged: 'board:data-changed',
 	},
+	Viewport: {
+		Changed: 'viewport:changed',
+	},
 
 	Board: {
 		Loaded: 'board:loaded',

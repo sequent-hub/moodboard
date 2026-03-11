@@ -44,8 +44,8 @@ export class BoardService {
 			};
 			try {
 				this.grid = GridFactory.createGrid(type, gridOptions);
-				this.grid.updateVisual();
 				this.pixi.setGrid(this.grid);
+				this.refreshGridViewport();
 				this.eventBus.emit(Events.UI.GridCurrent, { type });
 				// Сообщаем об обновлении данных сетки для сохранения в boardData
 				try {
@@ -67,6 +67,7 @@ export class BoardService {
 			req.view = { width: viewEl.clientWidth, height: viewEl.clientHeight };
 			// Прокидываем только метаданные объектов через ядро (сам список формирует Core)
 		});
+		this.eventBus.on(Events.Viewport.Changed, () => this.refreshGridViewport());
 		this.eventBus.on(Events.UI.MinimapCenterOn, ({ worldX, worldY }) => {
 			const world = this.pixi.worldLayer || this.pixi.app.stage;
 			const viewW = this.pixi.app.view.clientWidth;
@@ -74,6 +75,11 @@ export class BoardService {
 			const s = world.scale?.x || 1;
 			world.x = viewW / 2 - worldX * s;
 			world.y = viewH / 2 - worldY * s;
+			if (this.pixi.gridLayer) {
+				this.pixi.gridLayer.x = world.x;
+				this.pixi.gridLayer.y = world.y;
+			}
+			this.refreshGridViewport();
 		});
 	}
 
@@ -81,8 +87,25 @@ export class BoardService {
 		if (!this.grid) return;
 		const size = this._getCanvasSize?.() || { width: 800, height: 600 };
 		this.grid.resize(size.width, size.height);
+		this.grid.viewportBounds = null;
 		this.grid.updateVisual();
 		this.pixi.setGrid(this.grid);
+	}
+
+	/**
+	 * Перерисовывает сетку под видимую область (при паннинге и т.п.)
+	 */
+	refreshGridViewport() {
+		if (!this.grid?.enabled || !this.pixi?.gridLayer) return;
+		const view = this.pixi.app?.view;
+		if (!view) return;
+		const gl = this.pixi.gridLayer;
+		const pad = Math.max(100, (this.grid.size || 20) * 4);
+		const left = -gl.x - pad;
+		const top = -gl.y - pad;
+		const right = view.clientWidth - gl.x + pad;
+		const bottom = view.clientHeight - gl.y + pad;
+		this.grid.setVisibleBounds(left, top, right, bottom);
 	}
 }
 

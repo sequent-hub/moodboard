@@ -17,6 +17,8 @@ export class BaseGrid {
         // Размеры области отрисовки
         this.width = options.width || 1920;
         this.height = options.height || 1080;
+        /** @type {{ left: number, top: number, right: number, bottom: number } | null} */
+        this.viewportBounds = null;
         
         // PIXI графика
         this.graphics = new PIXI.Graphics();
@@ -133,7 +135,31 @@ export class BaseGrid {
     resize(width, height) {
         this.width = width;
         this.height = height;
+        this.viewportBounds = null;
         this.updateVisual();
+    }
+
+    /**
+     * Устанавливает видимую область для непрерывной отрисовки при паннинге.
+     * @param {number} left
+     * @param {number} top
+     * @param {number} right
+     * @param {number} bottom
+     */
+    setVisibleBounds(left, top, right, bottom) {
+        this.viewportBounds = { left, top, right, bottom };
+        this.updateVisual();
+    }
+
+    /**
+     * Возвращает границы отрисовки: viewportBounds или (0,0,width,height)
+     * @returns {{ left: number, top: number, right: number, bottom: number }}
+     */
+    getDrawBounds() {
+        if (this.viewportBounds) {
+            return this.viewportBounds;
+        }
+        return { left: 0, top: 0, right: this.width, bottom: this.height };
     }
     
     /**

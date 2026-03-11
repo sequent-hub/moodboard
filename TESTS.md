@@ -344,6 +344,19 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 
 **Хелперы:** `getWorldScale`, `getZoomPercentLabel`, `openZoomMenu`, `clickZoomMenuItem`, `wheelOverCanvas`.
 
+### `tests/image-object2/GridPan.e2e.spec.js` — 4 E2E-теста
+
+Поведение сетки при панорамировании и зуме. Сетка двигается вместе с доской при pan, не двигается при zoom.
+
+**Покрытие:**
+
+- **PanUpdate синхронизирует gridLayer и worldLayer** — emit PanUpdate с delta; worldLayer и gridLayer получают один и тот же сдвиг.
+- **Зум не двигает сетку** — кнопка zoom-in меняет scale worldLayer, gridLayer.x/y остаются неизменными.
+- **Зум колесом не двигает сетку** — wheel над canvas; gridLayer.x/y остаются неизменными.
+- **Реальный drag пана** — активация pan tool, mousedown → mousemove → mouseup; worldLayer и gridLayer синхронно сдвигаются.
+
+**Хелперы:** `getLayersState`, `emitPanUpdate`.
+
 ### `tests/moodboard/MoodBoardDestroyer.topbar.test.js` — 1 тест
 
 Проверка: destroyMoodBoard вызывает topbar.destroy.
