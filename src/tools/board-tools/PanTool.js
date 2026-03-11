@@ -4,8 +4,7 @@ import { BaseTool } from '../BaseTool.js';
 export class PanTool extends BaseTool {
     constructor(eventBus) {
         super('pan', eventBus);
-        // По умолчанию курсор для панорамирования — системный move
-        this.cursor = 'move';
+        this.cursor = 'grab'; // курсор-рука (открытая) когда инструмент выбран
         this.isDragging = false;
         this.last = { x: 0, y: 0 };
         this.app = null;
@@ -18,19 +17,16 @@ export class PanTool extends BaseTool {
     activate(app) {
         super.activate();
         this.app = app || this.app;
-        // При активации сразу показываем курсор move
-        this.cursor = 'move';
+        this.cursor = 'grab';
         this.setCursor();
     }
 
     onMouseDown(event) {
-        // ЛКМ или средняя кнопка
+        // ЛКМ или средняя кнопка (или пробел+ЛКМ — aux pan)
         if (event.button === 0 || event.button === 1) {
             this.isDragging = true;
             this.last = { x: event.x, y: event.y };
-            // Во время активного drag оставляем курсор move,
-            // чтобы пользователь всегда видел иконку перемещения
-            this.cursor = 'move';
+            this.cursor = 'grabbing'; // сжатая рука (хватает) во время drag
             this.setCursor();
         }
     }
@@ -46,15 +42,13 @@ export class PanTool extends BaseTool {
     onMouseUp(event) {
         if (this.isDragging) {
             this.isDragging = false;
-            // После завершения drag возвращаем курсор move
-            this.cursor = 'move';
+            this.cursor = 'grab';
             this.setCursor();
         }
     }
 
     onDeactivate() {
         this.isDragging = false;
-        // Сбрасываем курсор на стандартный для canvas
         this.cursor = '';
         this.setCursor();
         super.onDeactivate();
