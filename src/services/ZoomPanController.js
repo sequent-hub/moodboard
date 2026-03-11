@@ -37,11 +37,15 @@ export class ZoomPanController {
 
 		// Кнопки зума из UI
 		this.eventBus.on(Events.UI.ZoomIn, () => {
-			const center = { x: this.pixi.app.view.clientWidth / 2, y: this.pixi.app.view.clientHeight / 2 };
+			const view = this.pixi?.app?.view;
+			if (!view) return;
+			const center = { x: view.clientWidth / 2, y: view.clientHeight / 2 };
 			this.eventBus.emit(Events.Tool.WheelZoom, { x: center.x, y: center.y, delta: -120 });
 		});
 		this.eventBus.on(Events.UI.ZoomOut, () => {
-			const center = { x: this.pixi.app.view.clientWidth / 2, y: this.pixi.app.view.clientHeight / 2 };
+			const view = this.pixi?.app?.view;
+			if (!view) return;
+			const center = { x: view.clientWidth / 2, y: view.clientHeight / 2 };
 			this.eventBus.emit(Events.Tool.WheelZoom, { x: center.x, y: center.y, delta: 120 });
 		});
 		this.eventBus.on(Events.UI.ZoomReset, () => {

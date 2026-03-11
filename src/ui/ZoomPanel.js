@@ -72,17 +72,18 @@ export class ZoomPanel {
             }
         });
 
-        document.addEventListener('mousedown', (e) => {
+        this._onDocMouseDown = (e) => {
             if (!this.menuEl) return;
-            // ИСПРАВЛЕНИЕ: Защита от null элементов
             if (!this.element || !e.target) return;
             if (this.element.contains(e.target)) return;
             this.hideMenu();
-        });
+        };
+        document.addEventListener('mousedown', this._onDocMouseDown);
 
-        this.eventBus.on(Events.UI.ZoomPercent, ({ percentage }) => {
+        this._onZoomPercent = ({ percentage }) => {
             if (this.valueEl) this.valueEl.textContent = `${percentage}%`;
-        });
+        };
+        this.eventBus.on(Events.UI.ZoomPercent, this._onZoomPercent);
     }
 
     showMenu() {
@@ -115,9 +116,19 @@ export class ZoomPanel {
     }
 
     destroy() {
+        if (this._onDocMouseDown) {
+            document.removeEventListener('mousedown', this._onDocMouseDown);
+            this._onDocMouseDown = null;
+        }
+        if (this._onZoomPercent) {
+            this.eventBus.off(Events.UI.ZoomPercent, this._onZoomPercent);
+            this._onZoomPercent = null;
+        }
+        this.hideMenu();
         if (this.element) this.element.remove();
         this.element = null;
         this.labelEl = null;
+        this.valueEl = null;
     }
 }
 

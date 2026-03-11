@@ -65,3 +65,23 @@ describe('ZoomPanController coordinate invariants', () => {
     });
 });
 
+describe('ZoomPanController null guards', () => {
+    it('ZoomIn does not throw when pixi.app.view is missing', () => {
+        const eventBus = createEventBus();
+        const pixi = { worldLayer: null, app: null };
+        const controller = new ZoomPanController(eventBus, pixi);
+        controller.attach();
+
+        expect(() => eventBus.emit(Events.UI.ZoomIn)).not.toThrow();
+    });
+
+    it('ZoomOut does not throw when pixi.app.view is missing', () => {
+        const eventBus = createEventBus();
+        const pixi = { worldLayer: null, app: null };
+        const controller = new ZoomPanController(eventBus, pixi);
+        controller.attach();
+
+        expect(() => eventBus.emit(Events.UI.ZoomOut)).not.toThrow();
+    });
+});
+

@@ -328,6 +328,22 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 
 **Хелперы:** `getGridLayerChildren`, `getRendererBackgroundColor`, `getActiveGridButton`, `getBoardServiceGridEnabled`.
 
+### `tests/image-object2/ZoomPanel.e2e.spec.js` — 8 E2E-тестов
+
+Панель зума (ZoomPanel) и карта доски (MapPanel). Playwright E2E.
+
+**Покрытие:**
+
+- **Кнопки +/−** — клик по `[data-action="zoom-in"]` / `[data-action="zoom-out"]` меняет scale, label обновляется.
+- **Зум колесом** — `page.mouse.wheel(0, -100)` над canvas → zoom in; `(0, 100)` → zoom out.
+- **По размеру экрана** — меню (клик по label) → первый пункт; при объектах scale подстраивается под bbox; при пустой доске — без падений.
+- **К выделению** — второй пункт меню; при выделенном объекте scale подстраивается под bbox выделения.
+- **100%** — третий пункт меню; scale === 1, label «100%».
+- **Панель карты** — клик по `.moodboard-mapbar__button` открывает/закрывает popup с `.moodboard-minimap-canvas`.
+- **MinimapCenterOn** — клик по миникарте меняет world.x/y (центрирует вид).
+
+**Хелперы:** `getWorldScale`, `getZoomPercentLabel`, `openZoomMenu`, `clickZoomMenuItem`, `wheelOverCanvas`.
+
 ### `tests/moodboard/MoodBoardDestroyer.topbar.test.js` — 1 тест
 
 Проверка: destroyMoodBoard вызывает topbar.destroy.
@@ -399,6 +415,26 @@ Lifecycle Topbar: eventBus.off при destroy, удаление document click l
 - **destroy removes element** — элемент удалён из DOM
 - **destroy calls eventBus.off** — отписка от GridCurrent и PaintPick
 - **destroy with popover open** — document.removeEventListener с тем же handler, что addEventListener
+- **destroy idempotent** — повторный вызов не бросает
+
+### `tests/ui/ZoomPanel.destroy.test.js` — 5 тестов
+
+Lifecycle ZoomPanel: eventBus.off(ZoomPercent), document.removeEventListener(mousedown), обнуление valueEl/menuEl.
+
+- **destroy removes element** — элемент удалён из DOM
+- **destroy calls eventBus.off for ZoomPercent** — отписка с тем же handler
+- **destroy calls document.removeEventListener(mousedown)** — закрытие меню по клику вне
+- **destroy idempotent** — повторный вызов не бросает
+- **ZoomPercent after destroy** — callback не бросает при valueEl === null
+
+### `tests/ui/MapPanel.destroy.test.js` — 5 тестов
+
+Lifecycle MapPanel: document.removeEventListener(mousedown), hidePopup при destroy (window resize, document mousemove/mouseup, cancelAnimationFrame).
+
+- **destroy removes element** — элемент удалён из DOM
+- **destroy calls document.removeEventListener(mousedown)** — закрытие popup по клику вне
+- **destroy with popup open** — hidePopup вызывается, window/document listeners снимаются
+- **destroy with popup open** — cancelAnimationFrame вызывается
 - **destroy idempotent** — повторный вызов не бросает
 
 ### `tests/ui/Toolbar.destroy.test.js` — 3 теста

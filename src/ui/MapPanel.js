@@ -35,22 +35,20 @@ export class MapPanel {
             this.eventBus.emit(Events.UI.MapToggle);
         });
 
-        // Закрытие по клику вне панели
-        document.addEventListener('mousedown', (e) => {
+        this._onDocMouseDown = (e) => {
             if (!this.popupEl) return;
-            // ИСПРАВЛЕНИЕ: Защита от null элементов
             if (!this.element || !e.target) return;
             if (this.element.contains(e.target)) return;
             this.hidePopup();
-        });
+        };
+        document.addEventListener('mousedown', this._onDocMouseDown);
 
         // Колесо для зума внутри миникарты
         this.element.addEventListener('wheel', (e) => {
             if (!this.popupEl) return;
-            // ИСПРАВЛЕНИЕ: Защита от null элементов
             if (!this.popupEl || !e.target || !this.popupEl.contains(e.target)) return;
+            if (!this.canvas) return;
             e.preventDefault();
-            // Масштабируем вокруг точки под курсором в миникарте
             const rect = this.canvas.getBoundingClientRect();
             const mx = e.clientX - rect.left;
             const my = e.clientY - rect.top;
@@ -68,6 +66,11 @@ export class MapPanel {
     }
 
     destroy() {
+        if (this._onDocMouseDown) {
+            document.removeEventListener('mousedown', this._onDocMouseDown);
+            this._onDocMouseDown = null;
+        }
+        this.hidePopup();
         if (this.element) this.element.remove();
         this.element = null;
     }
@@ -135,7 +138,7 @@ export class MapPanel {
     }
 
     layoutCanvas() {
-        if (!this.popupEl || !this.canvas) return;
+        if (!this.popupEl || !this.canvas || !this.ctx) return;
         const rect = this.popupEl.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
         this.canvas.width = Math.max(10, Math.floor(rect.width * dpr));
@@ -147,9 +150,11 @@ export class MapPanel {
 
     // Обратное преобразование: миникарта -> мир (используем bbox объектов)
     miniToWorld(miniX, miniY) {
+        if (!this.canvas) return { worldX: 0, worldY: 0 };
         const req = {};
         this.eventBus.emit(Events.UI.MinimapGetData, req);
         const { view, objects } = req;
+        if (!view) return { worldX: 0, worldY: 0 };
         // Рассчитываем bbox по объектам
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         if (objects && objects.length > 0) {
