@@ -85,6 +85,8 @@ export class ToolbarActionRouter {
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
             this.toolbar.placeSelectedButtonId = 'frame';
             this.toolbar.setActiveToolbarButton('place');
+            // Сразу включаем произвольный фрейм; в popup можно выбрать A4, 1:1 и т.д.
+            this.toolbar.eventBus.emit(Events.Place.Set, { type: 'frame-draw', properties: {} });
             return true;
         }
 
