@@ -9,16 +9,23 @@ import { FramePropertiesPanel } from '../../src/ui/FramePropertiesPanel.js';
 
 function createMockEventBus() {
     const handlers = {};
+    const subscriptions = []; // { event, handler } — для проверки off с той же ссылкой
     return {
         on: vi.fn((event, handler) => {
             if (!handlers[event]) handlers[event] = [];
             handlers[event].push(handler);
+            subscriptions.push({ event, handler });
         }),
         emit: vi.fn((event, data) => {
             if (handlers[event]) handlers[event].forEach((h) => h(data));
         }),
-        off: vi.fn(),
+        off: vi.fn((event, handler) => {
+            if (!handlers[event]) return;
+            if (handler) handlers[event] = handlers[event].filter((h) => h !== handler);
+            else handlers[event] = [];
+        }),
         _handlers: handlers,
+        _subscriptions: subscriptions,
     };
 }
 
@@ -141,5 +148,40 @@ describe('FramePropertiesPanel baseline: lifecycle contracts', () => {
         panel.showFor('frame-1');
         expect(() => panel.destroy()).not.toThrow();
         expect(() => panel.destroy()).not.toThrow();
+    });
+
+    it('destroy removes ALL eventBus listeners (no leak)', () => {
+        panel.showFor('frame-1');
+
+        const subs = eventBus._subscriptions || [];
+        expect(subs.length).toBeGreaterThan(0);
+
+        panel.destroy();
+
+        // Для каждой подписки должен быть вызов off(event, handler) с той же ссылкой
+        const offCalls = eventBus.off.mock.calls;
+        for (const { event, handler } of subs) {
+            const hasMatchingOff = offCalls.some(([e, h]) => e === event && h === handler);
+            expect(hasMatchingOff).toBe(true);
+        }
+    });
+
+    it('reposition updates panel position when GetObjectPosition/GetObjectSize return data', () => {
+        panel.showFor('frame-1');
+
+        eventBus.emit.mockImplementation((event, data) => {
+            if (event === Events.Tool.GetObjectPosition && data?.objectId === 'frame-1') {
+                data.position = { x: 100, y: 80 };
+            }
+            if (event === Events.Tool.GetObjectSize && data?.objectId === 'frame-1') {
+                data.size = { width: 200, height: 150 };
+            }
+        });
+
+        core.pixi.worldLayer = { scale: { x: 1 }, x: 0, y: 0 };
+        panel.reposition();
+
+        expect(panel.panel.style.left).toBeDefined();
+        expect(panel.panel.style.top).toBeDefined();
     });
 });

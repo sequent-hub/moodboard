@@ -129,33 +129,8 @@ export class FrameService {
 					}
 				}
 			} else {
-				// Hover-эффект: подсветка фрейма, если центр объекта внутри
-				const centerX = moved.position.x + (moved.width || 0) / 2;
-				const centerY = moved.position.y + (moved.height || 0) / 2;
-				const frames = (this.state.state.objects || []).filter(o => o.type === 'frame');
-				const ordered = frames.slice().sort((a, b) => {
-					const pa = this.pixi.objects.get(a.id);
-					const pb = this.pixi.objects.get(b.id);
-					return (pb?.zIndex || 0) - (pa?.zIndex || 0);
-				});
-				let hoverId = null;
-				for (const f of ordered) {
-					const rect = { x: f.position.x, y: f.position.y, w: f.width || 0, h: f.height || 0 };
-					if (centerX >= rect.x && centerX <= rect.x + rect.w && centerY >= rect.y && centerY <= rect.y + rect.h) {
-						hoverId = f.id; break;
-					}
-				}
-				if (hoverId !== this._frameHoverId) {
-					if (this._frameHoverId) {
-						const prev = frames.find(fr => fr.id === this._frameHoverId);
-						if (prev) this.pixi.setFrameFill(prev.id, prev.width, prev.height, 0xFFFFFF);
-					}
-					if (hoverId) {
-						const cur = frames.find(fr => fr.id === hoverId);
-						if (cur) this.pixi.setFrameFill(cur.id, cur.width, cur.height, 0xEEEEEE);
-					}
-					this._frameHoverId = hoverId || null;
-				}
+				// Hover-эффект: throttle, чтобы не вызывать setFrameFill на каждый кадр
+				this._applyHoverThrottled(data.object);
 			}
 		};
 		this.eventBus.on(Events.Tool.DragUpdate, this._onDragUpdate);
@@ -183,6 +158,12 @@ export class FrameService {
 	detach() {
 		if (!this._attached) return;
 		this._attached = false;
+		if (this._hoverRafId != null) {
+			cancelAnimationFrame(this._hoverRafId);
+			this._hoverRafId = null;
+		}
+		this._hoverRafScheduled = false;
+		this._hoverPendingObjectId = null;
 		if (this._onObjectCreated) this.eventBus.off(Events.Object.Created, this._onObjectCreated);
 		if (this._onDragStart) this.eventBus.off(Events.Tool.DragStart, this._onDragStart);
 		if (this._onDragUpdate) this.eventBus.off(Events.Tool.DragUpdate, this._onDragUpdate);
@@ -203,6 +184,47 @@ export class FrameService {
 			if (o.properties && o.properties.frameId === frameId) res.push(o.id);
 		}
 		return res;
+	}
+
+	_applyHoverThrottled(movedObjectId) {
+		if (this._hoverRafScheduled) return;
+		this._hoverRafScheduled = true;
+		this._hoverPendingObjectId = movedObjectId;
+		this._hoverRafId = requestAnimationFrame(() => {
+			this._hoverRafScheduled = false;
+			this._hoverRafId = null;
+			const oid = this._hoverPendingObjectId;
+			this._hoverPendingObjectId = null;
+			if (!oid) return;
+			const moved = this.state.state.objects.find(o => o.id === oid);
+			if (!moved || moved.type === 'frame') return;
+			const centerX = moved.position.x + (moved.width || 0) / 2;
+			const centerY = moved.position.y + (moved.height || 0) / 2;
+			const frames = (this.state.state.objects || []).filter(o => o.type === 'frame');
+			const ordered = frames.slice().sort((a, b) => {
+				const pa = this.pixi.objects.get(a.id);
+				const pb = this.pixi.objects.get(b.id);
+				return (pb?.zIndex || 0) - (pa?.zIndex || 0);
+			});
+			let hoverId = null;
+			for (const f of ordered) {
+				const rect = { x: f.position.x, y: f.position.y, w: f.width || 0, h: f.height || 0 };
+				if (centerX >= rect.x && centerX <= rect.x + rect.w && centerY >= rect.y && centerY <= rect.y + rect.h) {
+					hoverId = f.id; break;
+				}
+			}
+			if (hoverId !== this._frameHoverId) {
+				if (this._frameHoverId) {
+					const prev = frames.find(fr => fr.id === this._frameHoverId);
+					if (prev) this.pixi.setFrameFill(prev.id, prev.width, prev.height, 0xFFFFFF);
+				}
+				if (hoverId) {
+					const cur = frames.find(fr => fr.id === hoverId);
+					if (cur) this.pixi.setFrameFill(cur.id, cur.width, cur.height, 0xEEEEEE);
+				}
+				this._frameHoverId = hoverId || null;
+			}
+		});
 	}
 
 	_recomputeFrameAttachment(objectId) {

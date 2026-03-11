@@ -18,68 +18,67 @@ export class FramePropertiesPanel {
     }
 
     _attachEvents() {
-        // Показываем панель при изменении выделения
-        this.eventBus.on(Events.Tool.SelectionAdd, () => this.updateFromSelection());
-        this.eventBus.on(Events.Tool.SelectionRemove, () => this.updateFromSelection());
-        this.eventBus.on(Events.Tool.SelectionClear, () => this.hide());
-
-        // Скрываем панель при удалении объекта
-        this.eventBus.on(Events.Object.Deleted, (objectId) => {
+        this._handlers = {};
+        this._handlers.onSelectionAdd = () => this.updateFromSelection();
+        this._handlers.onSelectionRemove = () => this.updateFromSelection();
+        this._handlers.onSelectionClear = () => this.hide();
+        this._handlers.onDeleted = (objectId) => {
             if (this.currentId && objectId === this.currentId) this.hide();
-        });
-
-        // Обновляем позицию при любых изменениях (как в TextPropertiesPanel)
-        this.eventBus.on(Events.Tool.DragStart, () => this.hide());
-        this.eventBus.on(Events.Tool.DragUpdate, () => this.reposition());
-        this.eventBus.on(Events.Tool.DragEnd, () => this.updateFromSelection());
-        this.eventBus.on(Events.Tool.GroupDragUpdate, () => this.reposition());
-        this.eventBus.on(Events.Tool.GroupDragStart, () => this.hide());
-        this.eventBus.on(Events.Tool.GroupDragEnd, () => this.updateFromSelection());
-        this.eventBus.on(Events.Tool.ResizeUpdate, () => this.reposition());
-        this.eventBus.on(Events.Tool.RotateUpdate, () => this.reposition());
-
-        // Обновляем позицию при зуме/пане
-        this.eventBus.on(Events.UI.ZoomPercent, () => {
-            if (this.currentId) this.reposition();
-        });
-
-        this.eventBus.on(Events.Tool.PanUpdate, () => {
-            if (this.currentId) this.reposition();
-        });
-
-        // Скрываем панель при активации других инструментов
-        this.eventBus.on(Events.Tool.Activated, ({ tool }) => {
-            if (tool !== 'select') {
-                this.hide();
-            }
-        });
-
-        // Синхронизируем контролы при изменении объекта (undo/redo, команды)
-        this._onStateChanged = (data) => {
+        };
+        this._handlers.onDragStart = () => this.hide();
+        this._handlers.onDragUpdate = () => this._repositionThrottled();
+        this._handlers.onDragEnd = () => this.updateFromSelection();
+        this._handlers.onGroupDragUpdate = () => this._repositionThrottled();
+        this._handlers.onGroupDragStart = () => this.hide();
+        this._handlers.onGroupDragEnd = () => this.updateFromSelection();
+        this._handlers.onResizeUpdate = () => this._repositionThrottled();
+        this._handlers.onRotateUpdate = () => this._repositionThrottled();
+        this._handlers.onZoomPercent = () => {
+            if (this.currentId) this._repositionThrottled();
+        };
+        this._handlers.onPanUpdate = () => {
+            if (this.currentId) this._repositionThrottled();
+        };
+        this._handlers.onActivated = ({ tool }) => {
+            if (tool !== 'select') this.hide();
+        };
+        this._handlers.onStateChanged = (data) => {
             const { objectId } = data;
             if (this.currentId && objectId === this.currentId && this.panel && this.panel.style.display !== 'none') {
                 this._updateControlsFromObject();
                 this._syncTypeFromObject();
             }
         };
-        this.eventBus.on(Events.Object.StateChanged, this._onStateChanged);
-
-        // Обновляем панель при Undo/Redo (History.Changed вызывается после undo/redo)
-        this._onHistoryChanged = () => {
+        this._handlers.onHistoryChanged = () => {
             if (this.currentId && this.panel && this.panel.style.display !== 'none') {
                 this._updateControlsFromObject();
                 this._syncTypeFromObject();
             }
         };
-        this.eventBus.on(Events.History.Changed, this._onHistoryChanged);
-
-        // Перепозиционируем панель при move/resize undo (GroupMoveCommand, MoveObjectCommand, ResizeObjectCommand)
-        this._onTransformUpdated = (data) => {
+        this._handlers.onTransformUpdated = (data) => {
             if (this.currentId && data.objectId === this.currentId && this.panel && this.panel.style.display !== 'none') {
-                this.reposition();
+                this._repositionThrottled();
             }
         };
-        this.eventBus.on(Events.Object.TransformUpdated, this._onTransformUpdated);
+
+        this.eventBus.on(Events.Tool.SelectionAdd, this._handlers.onSelectionAdd);
+        this.eventBus.on(Events.Tool.SelectionRemove, this._handlers.onSelectionRemove);
+        this.eventBus.on(Events.Tool.SelectionClear, this._handlers.onSelectionClear);
+        this.eventBus.on(Events.Object.Deleted, this._handlers.onDeleted);
+        this.eventBus.on(Events.Tool.DragStart, this._handlers.onDragStart);
+        this.eventBus.on(Events.Tool.DragUpdate, this._handlers.onDragUpdate);
+        this.eventBus.on(Events.Tool.DragEnd, this._handlers.onDragEnd);
+        this.eventBus.on(Events.Tool.GroupDragUpdate, this._handlers.onGroupDragUpdate);
+        this.eventBus.on(Events.Tool.GroupDragStart, this._handlers.onGroupDragStart);
+        this.eventBus.on(Events.Tool.GroupDragEnd, this._handlers.onGroupDragEnd);
+        this.eventBus.on(Events.Tool.ResizeUpdate, this._handlers.onResizeUpdate);
+        this.eventBus.on(Events.Tool.RotateUpdate, this._handlers.onRotateUpdate);
+        this.eventBus.on(Events.UI.ZoomPercent, this._handlers.onZoomPercent);
+        this.eventBus.on(Events.Tool.PanUpdate, this._handlers.onPanUpdate);
+        this.eventBus.on(Events.Tool.Activated, this._handlers.onActivated);
+        this.eventBus.on(Events.Object.StateChanged, this._handlers.onStateChanged);
+        this.eventBus.on(Events.History.Changed, this._handlers.onHistoryChanged);
+        this.eventBus.on(Events.Object.TransformUpdated, this._handlers.onTransformUpdated);
     }
 
     updateFromSelection() {
@@ -151,6 +150,18 @@ export class FramePropertiesPanel {
     _updateControlsFromObject() {
         // Пока ничего не делаем, так как панель пустая
         // Здесь будет логика синхронизации контролов с объектом
+    }
+
+    _repositionThrottled() {
+        if (this._repositionScheduled) return;
+        this._repositionScheduled = true;
+        const rafId = requestAnimationFrame(() => {
+            this._repositionScheduled = false;
+            this._repositionRafId = null;
+            if (!this.panel) return;
+            this.reposition();
+        });
+        this._repositionRafId = rafId;
     }
 
     reposition() {
@@ -629,17 +640,30 @@ export class FramePropertiesPanel {
 
     destroy() {
         this._hideColorPalette();
-        if (this._onStateChanged && this.eventBus?.off) {
-            this.eventBus.off(Events.Object.StateChanged, this._onStateChanged);
-            this._onStateChanged = null;
+        if (this._repositionRafId != null) {
+            cancelAnimationFrame(this._repositionRafId);
+            this._repositionRafId = null;
         }
-        if (this._onHistoryChanged && this.eventBus?.off) {
-            this.eventBus.off(Events.History.Changed, this._onHistoryChanged);
-            this._onHistoryChanged = null;
-        }
-        if (this._onTransformUpdated && this.eventBus?.off) {
-            this.eventBus.off(Events.Object.TransformUpdated, this._onTransformUpdated);
-            this._onTransformUpdated = null;
+        if (this._handlers && this.eventBus?.off) {
+            this.eventBus.off(Events.Tool.SelectionAdd, this._handlers.onSelectionAdd);
+            this.eventBus.off(Events.Tool.SelectionRemove, this._handlers.onSelectionRemove);
+            this.eventBus.off(Events.Tool.SelectionClear, this._handlers.onSelectionClear);
+            this.eventBus.off(Events.Object.Deleted, this._handlers.onDeleted);
+            this.eventBus.off(Events.Tool.DragStart, this._handlers.onDragStart);
+            this.eventBus.off(Events.Tool.DragUpdate, this._handlers.onDragUpdate);
+            this.eventBus.off(Events.Tool.DragEnd, this._handlers.onDragEnd);
+            this.eventBus.off(Events.Tool.GroupDragUpdate, this._handlers.onGroupDragUpdate);
+            this.eventBus.off(Events.Tool.GroupDragStart, this._handlers.onGroupDragStart);
+            this.eventBus.off(Events.Tool.GroupDragEnd, this._handlers.onGroupDragEnd);
+            this.eventBus.off(Events.Tool.ResizeUpdate, this._handlers.onResizeUpdate);
+            this.eventBus.off(Events.Tool.RotateUpdate, this._handlers.onRotateUpdate);
+            this.eventBus.off(Events.UI.ZoomPercent, this._handlers.onZoomPercent);
+            this.eventBus.off(Events.Tool.PanUpdate, this._handlers.onPanUpdate);
+            this.eventBus.off(Events.Tool.Activated, this._handlers.onActivated);
+            this.eventBus.off(Events.Object.StateChanged, this._handlers.onStateChanged);
+            this.eventBus.off(Events.History.Changed, this._handlers.onHistoryChanged);
+            this.eventBus.off(Events.Object.TransformUpdated, this._handlers.onTransformUpdated);
+            this._handlers = null;
         }
         if (this._boundDocumentClickHandler) {
             document.removeEventListener('click', this._boundDocumentClickHandler);

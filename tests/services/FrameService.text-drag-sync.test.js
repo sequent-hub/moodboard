@@ -131,5 +131,23 @@ describe('FrameService text sync during frame drag', () => {
         expect(state.state.objects[1].position).toEqual({ x: 40, y: 30 });
         expect(pixi.setFrameFill).not.toHaveBeenCalled();
     });
+
+    it('when dragging non-frame over frame, setFrameFill is called for hover highlight', () => {
+        vi.useFakeTimers();
+        state.state.objects = [
+            { id: 'frame-1', type: 'frame', position: { x: 0, y: 0 }, width: 200, height: 200 },
+            { id: 'note-1', type: 'note', position: { x: 50, y: 50 }, width: 80, height: 60 }
+        ];
+        pixi.objects.set('frame-1', createPixiObject({ x: 100, y: 100, width: 200, height: 200 }));
+        pixi.objects.set('note-1', createPixiObject({ x: 90, y: 80, width: 80, height: 60 }));
+
+        eventBus.emit(Events.Tool.DragStart, { object: 'note-1' });
+        eventBus.emit(Events.Tool.DragUpdate, { object: 'note-1' });
+
+        vi.runAllTimers();
+
+        expect(pixi.setFrameFill).toHaveBeenCalledWith('frame-1', 200, 200, 0xEEEEEE);
+        vi.useRealTimers();
+    });
 });
 
