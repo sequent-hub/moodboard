@@ -29,6 +29,8 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "test:e2e": "playwright test",
+    "grid:our-metrics": "node scripts/export-our-dot-grid-metrics.mjs",
+    "grid:miro-metrics": "node scripts/analyze-miro-dot-screenshots.mjs",
     "deploy:build": "npm run build && npm run start",
     "deploy:prod": "NODE_ENV=production npm run build && NODE_ENV=production npm run start"
   },
@@ -43,6 +45,7 @@
     "@vitest/ui": "^3.2.4",
     "eslint": "^9.0.0",
     "jsdom": "^26.1.0",
+    "pngjs": "^7.0.0",
     "vite": "^5.0.0",
     "vitest": "^3.2.4"
   },

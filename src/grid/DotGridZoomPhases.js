@@ -1,14 +1,16 @@
 /**
  * Логика фаз точечной сетки при зуме (чистые функции, тестируемые без PIXI).
- * Размеры гармоничные: 96→48→24→12, узлы совпадают при crossfade, нет moiré.
+ * Фазы подобраны по зафиксированным checkpoint'ам Miro:
+ * - high zoom: базовый шаг 20 world units;
+ * - low zoom: шаг укрупняется, чтобы избежать перегруза при отрисовке.
  */
 
 /** @type {{ zoomMin: number, zoomMax: number, size: number, dotSize: number }[]} */
 export const PHASES = [
-    { zoomMin: 0.1, zoomMax: 0.45, size: 96, dotSize: 2 },   // 10–45%
-    { zoomMin: 0.35, zoomMax: 0.9, size: 48, dotSize: 1.5 },  // 35–90%
-    { zoomMin: 0.75, zoomMax: 1.8, size: 24, dotSize: 1 },     // 75–180%
-    { zoomMin: 1.5, zoomMax: 5, size: 12, dotSize: 0.6 }      // 150–500%
+    { zoomMin: 0.02, zoomMax: 0.12, size: 160, dotSize: 0.7 },
+    { zoomMin: 0.12, zoomMax: 0.25, size: 80, dotSize: 0.8 },
+    { zoomMin: 0.25, zoomMax: 0.5, size: 40, dotSize: 0.9 },
+    { zoomMin: 0.5, zoomMax: 5, size: 20, dotSize: 1 }
 ];
 
 /**
@@ -18,26 +20,16 @@ export const PHASES = [
  */
 export function getActivePhases(zoom) {
     const z = Math.max(0.02, Math.min(5, zoom));
-    const result = [];
     for (let i = 0; i < PHASES.length; i++) {
-        const p = PHASES[i];
-        if (z < p.zoomMin || z > p.zoomMax) continue;
-        const next = PHASES[i + 1];
-        const prev = PHASES[i - 1];
-        let alpha = 1;
-        if (next && z >= next.zoomMin && p.zoomMax > next.zoomMin) {
-            alpha = (p.zoomMax - z) / (p.zoomMax - next.zoomMin);
-        } else if (prev && z <= prev.zoomMax && prev.zoomMax > p.zoomMin) {
-            alpha = (z - p.zoomMin) / (prev.zoomMax - p.zoomMin);
+        const phase = PHASES[i];
+        const inRange = i === PHASES.length - 1
+            ? (z >= phase.zoomMin && z <= phase.zoomMax)
+            : (z >= phase.zoomMin && z < phase.zoomMax);
+        if (inRange) {
+            return [{ phase, alpha: 1 }];
         }
-        if (alpha > 0.01) result.push({ phase: p, alpha });
     }
-    if (result.length === 0) {
-        const nearest = PHASES.reduce((a, b) =>
-            Math.abs(z - (a.zoomMin + a.zoomMax) / 2) < Math.abs(z - (b.zoomMin + b.zoomMax) / 2) ? a : b);
-        result.push({ phase: nearest, alpha: 1 });
-    }
-    return result;
+    return [{ phase: PHASES[PHASES.length - 1], alpha: 1 }];
 }
 
 /**
@@ -46,7 +38,5 @@ export function getActivePhases(zoom) {
  * @returns {number}
  */
 export function getEffectiveSize(zoom) {
-    const phases = getActivePhases(zoom);
-    const dominant = phases.reduce((a, b) => (a.alpha >= b.alpha ? a : b));
-    return dominant.phase.size;
+    return getActivePhases(zoom)[0].phase.size;
 }

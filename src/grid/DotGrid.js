@@ -13,6 +13,11 @@ export class DotGrid extends BaseGrid {
         this.dotStyle = options.dotStyle || 'circle'; // 'circle' | 'square'
         this.highlightIntersections = options.highlightIntersections ?? true;
         this.dotSize = options.dotSize ?? 1; // для serialize/setDotSize; фазы переопределяют при отрисовке
+        this.snapSize = options.snapSize ?? 20; // фиксированный шаг привязки в world-координатах
+        // Порог видимости точки на экране и лимит плотности отрисовки.
+        this.minScreenDotRadius = options.minScreenDotRadius ?? 0.45;
+        this.minScreenSpacing = options.minScreenSpacing ?? 8;
+        this.maxDotsPerPhase = options.maxDotsPerPhase ?? 25000;
         this.intersectionSize = options.intersectionSize ?? this.dotSize;
         this.intersectionColor = options.intersectionColor ?? this.color;
 
@@ -55,11 +60,33 @@ export class DotGrid extends BaseGrid {
      */
     _drawPhaseDots(phase, alpha) {
         const b = this.getDrawBounds();
-        const { size, dotSize } = phase;
+        const scale = Math.max(0.001, this._zoom || 1);
+        const baseSize = phase.size;
+        const minWorldSpacing = this.minScreenSpacing / scale;
+        let size = Math.max(baseSize, minWorldSpacing);
+
+        const widthWorld = Math.max(0, b.right - b.left);
+        const heightWorld = Math.max(0, b.bottom - b.top);
+        const estimateDots = () => {
+            const nx = Math.floor(widthWorld / size) + 3;
+            const ny = Math.floor(heightWorld / size) + 3;
+            return nx * ny;
+        };
+        const dots = estimateDots();
+        if (dots > this.maxDotsPerPhase) {
+            const densityFactor = Math.sqrt(dots / this.maxDotsPerPhase);
+            size *= Math.max(1, densityFactor);
+        }
+
         const startX = Math.floor(b.left / size) * size;
         const startY = Math.floor(b.top / size) * size;
         const endX = Math.ceil(b.right / size) * size;
         const endY = Math.ceil(b.bottom / size) * size;
+
+        const minWorldRadius = this.minScreenDotRadius / scale;
+        const maxWorldRadius = size * 0.2;
+        const dotSize = Math.min(Math.max(phase.dotSize, minWorldRadius), maxWorldRadius);
+
         this.graphics.beginFill(this.color, alpha);
         for (let x = startX; x <= endX; x += size) {
             for (let y = startY; y <= endY; y += size) {
@@ -104,8 +131,9 @@ export class DotGrid extends BaseGrid {
      * Вычисляет точку привязки для точечной сетки
      */
     calculateSnapPoint(x, y) {
-        const snapX = Math.round(x / this.size) * this.size;
-        const snapY = Math.round(y / this.size) * this.size;
+        const step = this.snapSize || this.size;
+        const snapX = Math.round(x / step) * step;
+        const snapY = Math.round(y / step) * step;
         
         return { x: snapX, y: snapY };
     }
@@ -164,6 +192,10 @@ export class DotGrid extends BaseGrid {
             ...super.serialize(),
             dotSize: this.dotSize,
             dotStyle: this.dotStyle,
+            snapSize: this.snapSize,
+            minScreenDotRadius: this.minScreenDotRadius,
+            minScreenSpacing: this.minScreenSpacing,
+            maxDotsPerPhase: this.maxDotsPerPhase,
             highlightIntersections: this.highlightIntersections,
             intersectionSize: this.intersectionSize,
             intersectionColor: this.intersectionColor

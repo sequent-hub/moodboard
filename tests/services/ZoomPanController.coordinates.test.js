@@ -59,7 +59,7 @@ describe('ZoomPanController coordinate invariants', () => {
             y: (cursor.y - world.y) / world.scale.x,
         };
 
-        expect(world.scale.x).toBe(1.33); // следующий уровень после 100% в ZOOM_LEVELS
+        expect(world.scale.x).toBe(1.25); // следующий уровень после 100% в ZOOM_LEVELS
         expect(worldAfter.x).toBeCloseTo(worldBefore.x, 8);
         expect(worldAfter.y).toBeCloseTo(worldBefore.y, 8);
     });
