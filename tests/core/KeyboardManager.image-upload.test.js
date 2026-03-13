@@ -146,4 +146,5 @@ describe('KeyboardManager - image upload channels', () => {
         expect(preventDefault).toHaveBeenCalledTimes(1);
         expect(handleImageFileUploadSpy).toHaveBeenCalledWith(file, 'clipboard-item.png');
     });
+
 });

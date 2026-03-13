@@ -15,6 +15,7 @@ import { setupTransformFlow } from './flows/TransformFlow.js';
 import { setupClipboardFlow, setupClipboardKeyboardFlow } from './flows/ClipboardFlow.js';
 import { setupObjectLifecycleFlow } from './flows/ObjectLifecycleFlow.js';
 import { setupLayerAndViewportFlow } from './flows/LayerAndViewportFlow.js';
+import { setupRevitFlow } from './flows/RevitFlow.js';
 import { setupSaveFlow } from './flows/SaveFlow.js';
 
 export class CoreMoodBoard {
@@ -123,6 +124,7 @@ export class CoreMoodBoard {
         setupLayerAndViewportFlow(this);
         setupTransformFlow(this);
         setupObjectLifecycleFlow(this);
+        setupRevitFlow(this);
     }
 
     /**

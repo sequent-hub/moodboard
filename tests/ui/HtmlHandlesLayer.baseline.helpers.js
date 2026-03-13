@@ -65,12 +65,12 @@ export function createHtmlHandlesContext() {
 
     const setObject = (id, next) => {
         const current = store.get(id) || {
-            x: 0, y: 0, width: 1, height: 1, rotation: 0, type: 'note',
+            x: 0, y: 0, width: 1, height: 1, rotation: 0, type: 'note', properties: {},
         };
         const value = { ...current, ...next };
         store.set(id, value);
         core.pixi.objects.set(id, {
-            _mb: { type: value.type },
+            _mb: { type: value.type, properties: value.properties || {} },
             getBounds: () => ({
                 x: (value.x * world.scale.x) + world.x,
                 y: (value.y * world.scale.y) + world.y,

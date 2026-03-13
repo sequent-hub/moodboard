@@ -1,7 +1,24 @@
 import { Events } from '../events/Events.js';
 import { PasteObjectCommand } from '../commands/index.js';
+import { RevitScreenshotMetadataService } from '../../services/RevitScreenshotMetadataService.js';
 
 export function setupClipboardFlow(core) {
+    const revitMetadataService = new RevitScreenshotMetadataService(console);
+
+    const resolveRevitImagePayload = async (src, context = {}) => {
+        const meta = await revitMetadataService.extractFromImageSource(src, context);
+        if (meta.hasMetadata && meta.payload) {
+            return {
+                type: 'revit-screenshot-img',
+                properties: { view: meta.payload }
+            };
+        }
+        return {
+            type: 'image',
+            properties: {}
+        };
+    };
+
     core.eventBus.on(Events.UI.CopyObject, ({ objectId }) => {
         if (!objectId) return;
         core.copyObject(objectId);
@@ -189,7 +206,7 @@ export function setupClipboardFlow(core) {
         const worldX = (screenX - (world?.x || 0)) / s;
         const worldY = (screenY - (world?.y || 0)) / s;
 
-        const placeWithAspect = (natW, natH) => {
+        const placeWithAspect = async (natW, natH) => {
             let w = 300;
             let h = 200;
             if (natW > 0 && natH > 0) {
@@ -197,19 +214,34 @@ export function setupClipboardFlow(core) {
                 w = 300;
                 h = Math.max(1, Math.round(w / ar));
             }
-            const properties = { src, name, width: w, height: h };
+            const revitPayload = await resolveRevitImagePayload(src, {
+                source: 'clipboard:paste-image',
+                name
+            });
+            const properties = {
+                src,
+                name,
+                width: w,
+                height: h,
+                ...revitPayload.properties
+            };
             const extraData = imageId ? { imageId } : {};
-            core.createObject('image', { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) }, properties, extraData);
+            core.createObject(
+                revitPayload.type,
+                { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) },
+                properties,
+                extraData
+            );
         };
 
         try {
             const img = new Image();
             img.decoding = 'async';
-            img.onload = () => placeWithAspect(img.naturalWidth || 0, img.naturalHeight || 0);
-            img.onerror = () => placeWithAspect(0, 0);
+            img.onload = () => { void placeWithAspect(img.naturalWidth || 0, img.naturalHeight || 0); };
+            img.onerror = () => { void placeWithAspect(0, 0); };
             img.src = src;
         } catch (_) {
-            placeWithAspect(0, 0);
+            void placeWithAspect(0, 0);
         }
     });
 
@@ -220,7 +252,7 @@ export function setupClipboardFlow(core) {
         const worldX = (x - (world?.x || 0)) / s;
         const worldY = (y - (world?.y || 0)) / s;
 
-        const placeWithAspect = (natW, natH) => {
+        const placeWithAspect = async (natW, natH) => {
             let w = 300;
             let h = 200;
             if (natW > 0 && natH > 0) {
@@ -228,19 +260,34 @@ export function setupClipboardFlow(core) {
                 w = 300;
                 h = Math.max(1, Math.round(w / ar));
             }
-            const properties = { src, name, width: w, height: h };
+            const revitPayload = await resolveRevitImagePayload(src, {
+                source: 'clipboard:paste-image-at',
+                name
+            });
+            const properties = {
+                src,
+                name,
+                width: w,
+                height: h,
+                ...revitPayload.properties
+            };
             const extraData = imageId ? { imageId } : {};
-            core.createObject('image', { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) }, properties, extraData);
+            core.createObject(
+                revitPayload.type,
+                { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) },
+                properties,
+                extraData
+            );
         };
 
         try {
             const img = new Image();
             img.decoding = 'async';
-            img.onload = () => placeWithAspect(img.naturalWidth || 0, img.naturalHeight || 0);
-            img.onerror = () => placeWithAspect(0, 0);
+            img.onload = () => { void placeWithAspect(img.naturalWidth || 0, img.naturalHeight || 0); };
+            img.onerror = () => { void placeWithAspect(0, 0); };
             img.src = src;
         } catch (_) {
-            placeWithAspect(0, 0);
+            void placeWithAspect(0, 0);
         }
     });
 

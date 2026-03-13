@@ -65,6 +65,7 @@ export const Events = {
 		ZoomFit: 'ui:zoom:fit',
 		ZoomSelection: 'ui:zoom:selection',
 		ZoomPercent: 'ui:zoom:percent',
+		RevitShowInModel: 'ui:revit:show-in-model',
 		MinimapGetData: 'ui:minimap:get-data',
 		MinimapCenterOn: 'ui:minimap:center-on',
 		TextEditStart: 'ui:text:edit:start',

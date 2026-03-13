@@ -31,10 +31,16 @@ export class ImageObject {
             const sy = this.height / texH;
             this.sprite.scale.set(sx, sy);
             // Обновим метаданные базовых размеров
+            const prevMb = this.sprite._mb || {};
             this.sprite._mb = {
-                ...(this.sprite._mb || {}),
-                type: 'image',
-                properties: { src, baseW: texW, baseH: texH }
+                ...prevMb,
+                type: this.objectData?.type || prevMb.type || 'image',
+                properties: {
+                    ...(prevMb.properties || {}),
+                    src,
+                    baseW: texW,
+                    baseH: texH
+                }
             };
         };
 

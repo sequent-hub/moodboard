@@ -74,6 +74,7 @@ describe('Toolbar baseline: lifecycle, events and tooltip contracts', () => {
     it('event name constants remain stable for toolbar contracts', () => {
         expect(Events.UI.UpdateHistoryButtons).toBe('ui:update-history-buttons');
         expect(Events.Keyboard.ToolSelect).toBe('keyboard:tool-select');
+        expect(Events.UI.RevitShowInModel).toBe('ui:revit:show-in-model');
         expect(Events.Place.ImageObject2Selected).toBe('place:image-object2:selected');
         expect(Events.Place.ImageObject2Canceled).toBe('place:image-object2:canceled');
     });

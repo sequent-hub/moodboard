@@ -47,31 +47,33 @@ export class PlacementPayloadFactory {
         });
     }
 
-    emitImageUploaded(position, uploadResult, width, height) {
+    emitImageUploaded(position, uploadResult, width, height, objectType = 'image', extraProperties = {}) {
         this.host.eventBus.emit(Events.UI.ToolbarAction, {
-            type: 'image',
-            id: 'image',
+            type: objectType,
+            id: objectType,
             position,
             properties: {
                 src: uploadResult.url,
                 name: uploadResult.name,
                 width,
-                height
+                height,
+                ...extraProperties
             },
             imageId: uploadResult.imageId || uploadResult.id
         });
     }
 
-    emitImageFallback(position, imageUrl, fileName, width, height) {
+    emitImageFallback(position, imageUrl, fileName, width, height, objectType = 'image', extraProperties = {}) {
         this.host.eventBus.emit(Events.UI.ToolbarAction, {
-            type: 'image',
-            id: 'image',
+            type: objectType,
+            id: objectType,
             position,
             properties: {
                 src: imageUrl,
                 name: fileName,
                 width,
-                height
+                height,
+                ...extraProperties
             }
         });
     }

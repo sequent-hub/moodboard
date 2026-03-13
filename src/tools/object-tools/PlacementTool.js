@@ -17,6 +17,7 @@ const _scaledICursorSvg = (() => {
 
 const TEXT_CURSOR = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(_scaledICursorSvg)}") 0 0, text`;
 import { Events } from '../../core/events/Events.js';
+import { RevitScreenshotMetadataService } from '../../services/RevitScreenshotMetadataService.js';
 import { GhostController } from './placement/GhostController.js';
 import { PlacementPayloadFactory } from './placement/PlacementPayloadFactory.js';
 import { PlacementInputRouter } from './placement/PlacementInputRouter.js';
@@ -42,6 +43,7 @@ export class PlacementTool extends BaseTool {
         this.eventsBridge = new PlacementEventsBridge(this);
         this.sessionStore = new PlacementSessionStore(this);
         this.coordinateResolver = new PlacementCoordinateResolver(this);
+        this.revitMetadataService = new RevitScreenshotMetadataService(console);
         this.sessionStore.initialize();
         // Оригинальные стили курсора PIXI, чтобы можно было временно переопределить pointer/default для текстового инструмента
         this._origCursorStyles = null;
@@ -297,6 +299,13 @@ export class PlacementTool extends BaseTool {
         if (!this.selectedImage) return;
         
         const worldPoint = this._toWorld(event.x, event.y);
+        const metadataResult = await this.revitMetadataService.extractFromFile(this.selectedImage.file, {
+            source: 'place:image-tool',
+            fileName: this.selectedImage.fileName
+        });
+        const isRevitScreenshot = metadataResult.hasMetadata && !!metadataResult.payload;
+        const objectType = isRevitScreenshot ? 'revit-screenshot-img' : 'image';
+        const extraProperties = isRevitScreenshot ? { view: metadataResult.payload } : {};
         
         try {
             // Загружаем изображение на сервер
@@ -319,7 +328,7 @@ export class PlacementTool extends BaseTool {
             };
             
             // Создаем объект изображения с данными с сервера
-            this.payloadFactory.emitImageUploaded(position, uploadResult, targetW, targetH);
+            this.payloadFactory.emitImageUploaded(position, uploadResult, targetW, targetH, objectType, extraProperties);
             
         } catch (uploadError) {
             console.error('Ошибка загрузки изображения на сервер:', uploadError);
@@ -336,7 +345,7 @@ export class PlacementTool extends BaseTool {
                 y: Math.round(worldPoint.y - halfH) 
             };
             
-            this.payloadFactory.emitImageFallback(position, imageUrl, this.selectedImage.fileName, targetW, targetH);
+            this.payloadFactory.emitImageFallback(position, imageUrl, this.selectedImage.fileName, targetW, targetH, objectType, extraProperties);
             
             // Показываем предупреждение пользователю
             alert('Ошибка загрузки изображения на сервер. Изображение добавлено локально.');

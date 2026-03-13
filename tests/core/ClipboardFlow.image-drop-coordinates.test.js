@@ -23,6 +23,12 @@ function createEventBus() {
 describe('ClipboardFlow - PasteImageAt coordinates', () => {
   let originalImage;
 
+  async function waitForCreateObjectCall(spy) {
+    await vi.waitFor(() => {
+      expect(spy).toHaveBeenCalled();
+    });
+  }
+
   beforeEach(() => {
     originalImage = global.Image;
   });
@@ -69,6 +75,7 @@ describe('ClipboardFlow - PasteImageAt coordinates', () => {
       name: 'image.png',
       imageId: 'img-1'
     });
+    await waitForCreateObjectCall(createObject);
 
     const worldX = (580 - 180) / 2;
     const worldY = (390 - 90) / 2;
@@ -126,6 +133,7 @@ describe('ClipboardFlow - PasteImageAt coordinates', () => {
       name: 'broken.png',
       imageId: null
     });
+    await waitForCreateObjectCall(createObject);
 
     const worldX = (420 - 120) / 1.5;
     const worldY = (340 - 40) / 1.5;

@@ -93,6 +93,10 @@ describe('PlacementTool baseline: file/image placement paths', () => {
     });
 
     it('image selected flow emits ToolbarAction with server image fields', async () => {
+        vi.spyOn(tool.revitMetadataService, 'extractFromFile').mockResolvedValue({
+            hasMetadata: false,
+            payload: null
+        });
         core.imageUploadService.uploadImage.mockResolvedValue({
             id: 'img-1',
             imageId: 'img-1',
@@ -128,6 +132,10 @@ describe('PlacementTool baseline: file/image placement paths', () => {
     });
 
     it('image fallback path keeps minimal local payload fields', async () => {
+        vi.spyOn(tool.revitMetadataService, 'extractFromFile').mockResolvedValue({
+            hasMetadata: false,
+            payload: null
+        });
         core.imageUploadService.uploadImage.mockRejectedValue(new Error('upload failed'));
         const originalCreateObjectURL = URL.createObjectURL;
         URL.createObjectURL = vi.fn(() => 'blob://local-image');
@@ -152,6 +160,77 @@ describe('PlacementTool baseline: file/image placement paths', () => {
                     name: 'local.png',
                     width: 222,
                     height: 111,
+                }),
+            })
+        );
+        URL.createObjectURL = originalCreateObjectURL;
+        alertSpy.mockRestore();
+    });
+
+    it('image selected flow emits revit-screenshot-img when metadata detected', async () => {
+        vi.spyOn(tool.revitMetadataService, 'extractFromFile').mockResolvedValue({
+            hasMetadata: true,
+            payload: '{"view":"abc"}'
+        });
+        core.imageUploadService.uploadImage.mockResolvedValue({
+            id: 'img-2',
+            imageId: 'img-2',
+            name: 'revit.png',
+            url: '/api/images/img-2/file',
+            width: 1000,
+            height: 500,
+        });
+        tool.selectedImage = {
+            file: new Blob(['png'], { type: 'image/png' }),
+            fileName: 'revit.png',
+            fileSize: 1000,
+            mimeType: 'image/png',
+            properties: { width: 300, height: 200 },
+        };
+
+        await tool.placeSelectedImage({ x: 400, y: 300, offsetX: 400, offsetY: 300, button: 0 });
+
+        const payload = collectEventPayloads(eventBus, Events.UI.ToolbarAction)[0];
+        expect(payload).toEqual(
+            expect.objectContaining({
+                type: 'revit-screenshot-img',
+                id: 'revit-screenshot-img',
+                imageId: 'img-2',
+                properties: expect.objectContaining({
+                    src: '/api/images/img-2/file',
+                    view: '{"view":"abc"}'
+                }),
+            })
+        );
+    });
+
+    it('image fallback path keeps revit type and view metadata when upload fails', async () => {
+        vi.spyOn(tool.revitMetadataService, 'extractFromFile').mockResolvedValue({
+            hasMetadata: true,
+            payload: '{"view":"fallback"}'
+        });
+        core.imageUploadService.uploadImage.mockRejectedValue(new Error('upload failed'));
+        const originalCreateObjectURL = URL.createObjectURL;
+        URL.createObjectURL = vi.fn(() => 'blob://revit-fallback');
+        const alertSpy = vi.spyOn(globalThis, 'alert').mockImplementation(() => {});
+        tool.selectedImage = {
+            file: new Blob(['png'], { type: 'image/png' }),
+            fileName: 'revit-local.png',
+            fileSize: 1111,
+            mimeType: 'image/png',
+            properties: { width: 200, height: 100 },
+        };
+
+        await tool.placeSelectedImage({ x: 200, y: 120, offsetX: 200, offsetY: 120, button: 0 });
+
+        const payload = collectEventPayloads(eventBus, Events.UI.ToolbarAction)[0];
+        expect(payload).toEqual(
+            expect.objectContaining({
+                type: 'revit-screenshot-img',
+                id: 'revit-screenshot-img',
+                properties: expect.objectContaining({
+                    src: 'blob://revit-fallback',
+                    view: '{"view":"fallback"}'
                 }),
             })
         );

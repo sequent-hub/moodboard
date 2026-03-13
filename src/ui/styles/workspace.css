@@ -297,6 +297,39 @@
     justify-content: center;
 }
 
+.mb-revit-show-in-model {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    height: 28px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #bcd5e2;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #0f3b52;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: auto;
+    z-index: 18;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14);
+}
+
+.mb-revit-show-in-model svg {
+    width: 12px;
+    height: 12px;
+    display: block;
+    fill: currentColor;
+    flex: 0 0 auto;
+}
+
+.mb-revit-show-in-model:hover {
+    background: #f1f8fc;
+}
+
 /* Text editor overlay */
 .moodboard-text-editor {
     position: absolute;

@@ -20,6 +20,7 @@ export class ActionHandler {
             case 'drawing':
             case 'emoji':
             case 'image':
+            case 'revit-screenshot-img':
             case 'comment':
             case 'file':
                 // Передаем imageId как extraData для изображений, fileId для файлов
