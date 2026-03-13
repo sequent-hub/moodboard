@@ -152,6 +152,36 @@ export class ToolEventRouter {
         const dt = event.dataTransfer;
         if (!dt) return;
 
+        const toWorldPosition = (screenX, screenY) => {
+            const world = manager.core?.pixi?.worldLayer || manager.core?.pixi?.app?.stage;
+            const scale = world?.scale?.x || 1;
+            if (!world) {
+                return { x: Math.round(screenX), y: Math.round(screenY) };
+            }
+            return {
+                x: Math.round((screenX - (world.x || 0)) / scale),
+                y: Math.round((screenY - (world.y || 0)) / scale)
+            };
+        };
+        const getFanOffset = (offsetIndex) => {
+            if (offsetIndex <= 0) return { dx: 0, dy: 0 };
+            const step = 25;
+            const directions = [
+                { x: 1, y: 0 },
+                { x: 1, y: 1 },
+                { x: 0, y: 1 },
+                { x: -1, y: 1 },
+                { x: -1, y: 0 },
+                { x: -1, y: -1 },
+                { x: 0, y: -1 },
+                { x: 1, y: -1 }
+            ];
+            const index = offsetIndex - 1;
+            const direction = directions[index % directions.length];
+            const ring = Math.floor(index / directions.length) + 1;
+            return { dx: direction.x * step * ring, dy: direction.y * step * ring };
+        };
+
         const emitAt = (src, name, imageId = null, offsetIndex = 0) => {
             const offset = 25 * offsetIndex;
             manager.eventBus.emit(Events.UI.PasteImageAt, {
@@ -201,8 +231,8 @@ export class ToolEventRouter {
         if (nonImageFiles.length > 0) {
             let index = 0;
             for (const file of nonImageFiles) {
-                const offset = 25 * index++;
-                const position = { x: x + offset, y: y + offset };
+                const fanOffset = getFanOffset(index++);
+                const worldPoint = toWorldPosition(x + fanOffset.dx, y + fanOffset.dy);
                 const fallbackProps = {
                     fileName: file.name || 'file',
                     fileSize: file.size || 0,
@@ -212,13 +242,23 @@ export class ToolEventRouter {
                     width: 120,
                     height: 140
                 };
+                const position = {
+                    x: Math.round(worldPoint.x - fallbackProps.width / 2),
+                    y: Math.round(worldPoint.y - fallbackProps.height / 2)
+                };
                 try {
                     if (manager.core && manager.core.fileUploadService) {
                         const uploadResult = await manager.core.fileUploadService.uploadFile(file, file.name || 'file');
+                        const objectWidth = fallbackProps.width;
+                        const objectHeight = fallbackProps.height;
+                        const centeredPosition = {
+                            x: Math.round(worldPoint.x - objectWidth / 2),
+                            y: Math.round(worldPoint.y - objectHeight / 2)
+                        };
                         manager.eventBus.emit(Events.UI.ToolbarAction, {
                             type: 'file',
                             id: 'file',
-                            position,
+                            position: centeredPosition,
                             properties: {
                                 fileName: uploadResult.name,
                                 fileSize: uploadResult.size,

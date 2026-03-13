@@ -106,6 +106,42 @@ describe('MoodBoard baseline: UI wiring contracts', () => {
         expect(settingsApplier.set).toHaveBeenCalledWith({ backgroundColor: '#ff00aa' });
     });
 
+    it('diagnostic contract: file ToolbarAction keeps provided position through ActionHandler route', async () => {
+        board = createMoodBoard(container, { autoLoad: false });
+        await settleMoodBoard(board);
+
+        const core = lastCoreInstance();
+        const action = {
+            type: 'file',
+            id: 'file',
+            position: { x: 580, y: 390 },
+            properties: {
+                fileName: 'report.pdf',
+                fileSize: 1024,
+                mimeType: 'application/pdf',
+                formattedSize: '1 KB',
+                url: '/api/files/file-1/download',
+                width: 120,
+                height: 140,
+            },
+            fileId: 'file-1',
+        };
+
+        core.eventBus.emit(Events.UI.ToolbarAction, action);
+
+        expect(core.createObject).toHaveBeenCalledWith(
+            'file',
+            { x: 580, y: 390 }, // Позиция уже приходит как левый-верх из маршрута drop
+            action.properties,
+            { fileId: 'file-1' }
+        );
+
+        // Диагностическая проверка: при viewport-transform expected world-позиция иная.
+        const expectedWorld = { x: (580 - 180) / 2, y: (390 - 90) / 2 };
+        const [, calledPosition] = core.createObject.mock.calls.at(-1);
+        expect(calledPosition).not.toEqual(expectedWorld);
+    });
+
     it('registers save event subscriptions only when onSave callback is provided', async () => {
         board = createMoodBoard(container, {
             autoLoad: false,
