@@ -100,6 +100,31 @@ describe('Toolbar baseline: popup contracts', () => {
         expect(popup.querySelector('.moodboard-draw__btn--size-thin-black')).not.toBeInTheDocument();
     });
 
+    it('draw presets keep single active button in visible presets row', () => {
+        container.querySelector('.moodboard-toolbar__button--pencil').click();
+        const popup = container.querySelector('.moodboard-toolbar__popup--draw');
+        expect(popup).toBeTruthy();
+
+        const countVisibleActive = () => {
+            const rows = popup.querySelectorAll('.moodboard-draw__row');
+            const presetRow = rows[1];
+            return presetRow ? presetRow.querySelectorAll('.moodboard-draw__btn--active').length : 0;
+        };
+
+        popup.querySelector('.moodboard-draw__btn--size-thin-black').click();
+        expect(countVisibleActive()).toBe(1);
+
+        popup.querySelector('.moodboard-draw__btn--size-medium-red').click();
+        expect(countVisibleActive()).toBe(1);
+
+        popup.querySelector('.moodboard-draw__btn--marker-tool').click();
+        popup.querySelector('.moodboard-draw__btn--marker-yellow').click();
+        expect(countVisibleActive()).toBe(1);
+
+        popup.querySelector('.moodboard-draw__btn--marker-pink').click();
+        expect(countVisibleActive()).toBe(1);
+    });
+
     it('emoji popup toggles on repeated button clicks', () => {
         const button = container.querySelector('.moodboard-toolbar__button--emoji');
         expect(toolbar.emojiPopupEl.style.display).toBe('none');
@@ -156,6 +181,22 @@ describe('Toolbar baseline: popup contracts', () => {
         expect(toolbar.drawPopupEl.style.display).toBe('none');
         expect(toolbar.emojiPopupEl.style.display).toBe('none');
         expect(toolbar.framePopupEl.style.display).toBe('none');
+    });
+
+    it('outside click keeps draw popup open while draw tool is active', () => {
+        container.querySelector('.moodboard-toolbar__button--pencil').click();
+        expect(toolbar.drawPopupEl.style.display).toBe('block');
+
+        document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(toolbar.drawPopupEl.style.display).toBe('block');
+    });
+
+    it('draw popup closes when activated tool changes from draw', () => {
+        container.querySelector('.moodboard-toolbar__button--pencil').click();
+        expect(toolbar.drawPopupEl.style.display).toBe('block');
+
+        eventBus.emit(Events.Tool.Activated, { tool: 'select' });
+        expect(toolbar.drawPopupEl.style.display).toBe('none');
     });
 
     it('clicking shapes popup action emits Place.Set for shape', () => {
