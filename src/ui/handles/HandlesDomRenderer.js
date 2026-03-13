@@ -48,10 +48,10 @@ export class HandlesDomRenderer {
             revitViewPayload = req.pixiObject?._mb?.properties?.view || null;
         }
 
-        const left = cssRect.left;
-        const top = cssRect.top;
-        const width = cssRect.width;
-        const height = cssRect.height;
+        const left = Math.round(cssRect.left);
+        const top = Math.round(cssRect.top);
+        const width = Math.max(1, Math.round(cssRect.width));
+        const height = Math.max(1, Math.round(cssRect.height));
 
         this.host.layer.innerHTML = '';
         const box = document.createElement('div');

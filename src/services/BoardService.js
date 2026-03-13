@@ -87,8 +87,8 @@ export class BoardService {
 			const viewW = this.pixi.app.view.clientWidth;
 			const viewH = this.pixi.app.view.clientHeight;
 			const s = world.scale?.x || 1;
-			world.x = viewW / 2 - worldX * s;
-			world.y = viewH / 2 - worldY * s;
+			world.x = Math.round(viewW / 2 - worldX * s);
+			world.y = Math.round(viewH / 2 - worldY * s);
 			this.refreshGridViewport();
 		};
 

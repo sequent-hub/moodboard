@@ -33,8 +33,8 @@ export class PlacementInputRouter {
         const h = Math.abs(p.y - host._frameDrawState.startY);
         const g = host._frameDrawState.graphics;
         g.clear();
-        const x0 = Math.floor(x) + 0.5;
-        const y0 = Math.floor(y) + 0.5;
+        const x0 = Math.round(x);
+        const y0 = Math.round(y);
         const w0 = Math.max(1, Math.round(w));
         const h0 = Math.max(1, Math.round(h));
         g.lineStyle(1, 0x3B82F6, 1, 1);

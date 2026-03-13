@@ -183,8 +183,8 @@ export class ToolbarPopupsController {
         const buttonRect = anchorButton.getBoundingClientRect();
         const top = buttonRect.top - toolbarRect.top - 4;
         const left = this.toolbar.element.offsetWidth + 8;
-        this.toolbar.shapesPopupEl.style.top = `${top}px`;
-        this.toolbar.shapesPopupEl.style.left = `${left}px`;
+        this.toolbar.shapesPopupEl.style.top = `${Math.round(top)}px`;
+        this.toolbar.shapesPopupEl.style.left = `${Math.round(left)}px`;
         this.toolbar.shapesPopupEl.style.display = 'block';
     }
 
@@ -363,8 +363,8 @@ export class ToolbarPopupsController {
         const buttonRect = anchorButton.getBoundingClientRect();
         const top = buttonRect.top - toolbarRect.top - 4;
         const left = this.toolbar.element.offsetWidth + 8;
-        this.toolbar.drawPopupEl.style.top = `${top}px`;
-        this.toolbar.drawPopupEl.style.left = `${left}px`;
+        this.toolbar.drawPopupEl.style.top = `${Math.round(top)}px`;
+        this.toolbar.drawPopupEl.style.left = `${Math.round(left)}px`;
         this.toolbar.drawPopupEl.style.display = 'block';
     }
 
@@ -652,8 +652,8 @@ export class ToolbarPopupsController {
         const minTop = 8;
         const maxTop = Math.max(minTop, containerHeight - popupHeight - 8);
         const top = Math.min(Math.max(minTop, desiredTop), maxTop);
-        this.toolbar.emojiPopupEl.style.top = `${top}px`;
-        this.toolbar.emojiPopupEl.style.left = `${left}px`;
+        this.toolbar.emojiPopupEl.style.top = `${Math.round(top)}px`;
+        this.toolbar.emojiPopupEl.style.left = `${Math.round(left)}px`;
         this.toolbar.emojiPopupEl.style.visibility = 'visible';
     }
 

@@ -31,7 +31,9 @@ describe('ZoomPanController coordinate invariants', () => {
         // Далее вычисляем мировую точку под курсором до zoom,
         // выполняем zoom in и сравниваем с точкой после zoom.
         //
-        // Ожидание: точки должны совпасть с высокой точностью.
+        // Ожидание:
+        // - screen-space смещения world остаются integer;
+        // - точка под курсором сохраняется с допустимой погрешностью квантования в 1px.
         const eventBus = createEventBus();
         const world = {
             x: 150,
@@ -60,8 +62,10 @@ describe('ZoomPanController coordinate invariants', () => {
         };
 
         expect(world.scale.x).toBe(1.25); // следующий уровень после 100% в ZOOM_LEVELS
-        expect(worldAfter.x).toBeCloseTo(worldBefore.x, 8);
-        expect(worldAfter.y).toBeCloseTo(worldBefore.y, 8);
+        expect(Number.isInteger(world.x)).toBe(true);
+        expect(Number.isInteger(world.y)).toBe(true);
+        expect(Math.abs(worldAfter.x - worldBefore.x)).toBeLessThanOrEqual(1);
+        expect(Math.abs(worldAfter.y - worldBefore.y)).toBeLessThanOrEqual(1);
     });
 });
 

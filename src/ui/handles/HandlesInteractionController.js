@@ -590,10 +590,10 @@ export class HandlesInteractionController {
                 } catch (_) {}
             }
 
-            box.style.left = `${newLeft}px`;
-            box.style.top = `${newTop}px`;
-            box.style.width = `${newW}px`;
-            box.style.height = `${newH}px`;
+            box.style.left = `${Math.round(newLeft)}px`;
+            box.style.top = `${Math.round(newTop)}px`;
+            box.style.width = `${Math.round(newW)}px`;
+            box.style.height = `${Math.round(newH)}px`;
             this.host._repositionBoxChildren(box);
 
             const screenX = (newLeft - offsetLeft);

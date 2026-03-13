@@ -210,3 +210,30 @@
 
 - `COORDINATE_SYSTEM.md`
 
+## 9. Pixel-perfect integer contract
+
+Проектный инвариант для screen-space:
+
+- В экранном пространстве не допускаются дробные пиксели.
+- Любые screen-space координаты и размеры должны быть integer (`Number.isInteger(...) === true`).
+- Значения вида `.5`, `13.2` и любые другие дробные px в рендер-координатах запрещены.
+
+Обязательные integer-величины в screen-space:
+
+- Позиции: `x`, `y`.
+- Размеры: `width`, `height`.
+- Шаг/период сетки: `step`.
+- Геометрия линий и узлов: `line positions`, `radius`.
+- CSS/DOM координаты overlay-слоёв и ручек.
+
+Границы применения:
+
+- Grid subsystem (`DotGrid`, `LineGrid`, `CrossGrid`).
+- HTML overlays/handles/text layers.
+- Zoom/Pan и любые screen-space трансформации.
+
+Правило применения округления:
+
+- Округление выполняется в точках формирования screen-space значений.
+- Нельзя переносить округление в случайные downstream-слои.
+

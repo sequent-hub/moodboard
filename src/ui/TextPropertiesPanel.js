@@ -258,8 +258,8 @@ export class TextPropertiesPanel {
         const finalX = Math.max(10, Math.min(panelX, containerRect.width - this.panel.offsetWidth - 10));
         const finalY = Math.max(10, panelY);
 
-        this.panel.style.left = `${finalX}px`;
-        this.panel.style.top = `${finalY}px`;
+        this.panel.style.left = `${Math.round(finalX)}px`;
+        this.panel.style.top = `${Math.round(finalY)}px`;
     }
 
     _onDocMouseDown(event) {

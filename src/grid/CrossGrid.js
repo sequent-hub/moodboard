@@ -27,11 +27,15 @@ export class CrossGrid extends BaseGrid {
         const g = this.graphics;
         // Прозрачность — через alpha графики (как у линейной сетки)
         g.alpha = this.opacity;
-        // Тонкие чёткие линии как у линейной сетки: alignment = 0.5
         try {
-            g.lineStyle({ width: Math.max(0.5, this.crossLineWidth), color: this.color, alpha: 1, alignment: 0.5 });
+            g.lineStyle({
+                width: Math.max(1, Math.round(this.crossLineWidth || 1)),
+                color: this.color,
+                alpha: 1,
+                alignment: 0
+            });
         } catch (_) {
-            g.lineStyle(Math.max(0.5, this.crossLineWidth), this.color, 1);
+            g.lineStyle(Math.max(1, Math.round(this.crossLineWidth || 1)), this.color, 1);
         }
 
         const hs = this.crossHalfSize;
@@ -52,8 +56,8 @@ export class CrossGrid extends BaseGrid {
         const endY = b.bottom + step;
         for (let x = startX; x <= endX; x += step) {
             for (let y = startY; y <= endY; y += step) {
-                const px = Math.round(x) + 0.5;
-                const py = Math.round(y) + 0.5;
+                const px = Math.round(x);
+                const py = Math.round(y);
                 g.moveTo(px - hs, py);
                 g.lineTo(px + hs, py);
                 g.moveTo(px, py - hs);

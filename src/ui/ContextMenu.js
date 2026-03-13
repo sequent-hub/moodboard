@@ -65,11 +65,11 @@ export class ContextMenu {
     }
 
     show(x, y, context = 'canvas', targetId = null) {
-        this.lastX = x;
-        this.lastY = y;
+        this.lastX = Math.round(x);
+        this.lastY = Math.round(y);
         this.renderItems(context, targetId);
-        this.element.style.left = `${x}px`;
-        this.element.style.top = `${y}px`;
+        this.element.style.left = `${this.lastX}px`;
+        this.element.style.top = `${this.lastY}px`;
         this.element.style.display = 'block';
         this.isVisible = true;
         this.ensureInViewport();
@@ -90,8 +90,8 @@ export class ContextMenu {
         if (dx !== 0 || dy !== 0) {
             const left = parseInt(this.element.style.left || '0', 10) + dx;
             const top = parseInt(this.element.style.top || '0', 10) + dy;
-            this.element.style.left = `${left}px`;
-            this.element.style.top = `${top}px`;
+            this.element.style.left = `${Math.round(left)}px`;
+            this.element.style.top = `${Math.round(top)}px`;
         }
     }
 

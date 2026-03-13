@@ -29,10 +29,14 @@ export class LineGrid extends BaseGrid {
             this.graphics.alpha = this.opacity;
         }
         try {
-            // В новых версиях можно указать alignment для большей чёткости
-            this.graphics.lineStyle({ width: this.lineWidth, color: this.color, alpha: 1, alignment: 0.5 });
+            this.graphics.lineStyle({
+                width: Math.max(1, Math.round(this.lineWidth || 1)),
+                color: this.color,
+                alpha: 1,
+                alignment: 0
+            });
         } catch (_) {
-            this.graphics.lineStyle(this.lineWidth, this.color, 1);
+            this.graphics.lineStyle(Math.max(1, Math.round(this.lineWidth || 1)), this.color, 1);
         }
         
         // Основные линии сетки
@@ -55,7 +59,6 @@ export class LineGrid extends BaseGrid {
         const worldY = this.viewportTransform?.worldY || 0;
         const anchorX = getScreenAnchor(worldX, step);
         const anchorY = getScreenAnchor(worldY, step);
-        const half = this.lineWidth / 2;
         const alignStart = (min, anchor) => {
             const d = ((anchor - min) % step + step) % step;
             return min + d;
@@ -66,13 +69,13 @@ export class LineGrid extends BaseGrid {
         const endY = b.bottom + step;
         // Вертикальные линии
         for (let x = startX; x <= endX; x += step) {
-            const px = Math.round(x) + (Number.isFinite(half) ? 0.5 : 0);
+            const px = Math.round(x);
             this.graphics.moveTo(px, b.top);
             this.graphics.lineTo(px, b.bottom);
         }
         // Горизонтальные линии
         for (let y = startY; y <= endY; y += step) {
-            const py = Math.round(y) + (Number.isFinite(half) ? 0.5 : 0);
+            const py = Math.round(y);
             this.graphics.moveTo(b.left, py);
             this.graphics.lineTo(b.right, py);
         }
@@ -83,11 +86,16 @@ export class LineGrid extends BaseGrid {
      */
     drawSubGrid() {
         const { screenStep } = this.getScreenGridState();
-        const subSize = Math.max(1, screenStep / this.subGridDivisions);
+        const subSize = Math.max(1, Math.round(screenStep / this.subGridDivisions));
         try {
-            this.graphics.lineStyle({ width: 0.5, color: this.subGridColor, alpha: this.subGridOpacity, alignment: 0.5 });
+            this.graphics.lineStyle({
+                width: 1,
+                color: this.subGridColor,
+                alpha: this.subGridOpacity,
+                alignment: 0
+            });
         } catch (_) {
-            this.graphics.lineStyle(0.5, this.subGridColor, this.subGridOpacity);
+            this.graphics.lineStyle(1, this.subGridColor, this.subGridOpacity);
         }
         const b = this.getDrawBounds();
         const worldX = this.viewportTransform?.worldX || 0;
@@ -111,14 +119,14 @@ export class LineGrid extends BaseGrid {
         };
         for (let x = startX; x <= endX; x += subSize) {
             if (!isOnMajor(x, majorStep, majorAnchorX)) {
-                const px = Math.round(x) + 0.5;
+                const px = Math.round(x);
                 this.graphics.moveTo(px, b.top);
                 this.graphics.lineTo(px, b.bottom);
             }
         }
         for (let y = startY; y <= endY; y += subSize) {
             if (!isOnMajor(y, majorStep, majorAnchorY)) {
-                const py = Math.round(y) + 0.5;
+                const py = Math.round(y);
                 this.graphics.moveTo(b.left, py);
                 this.graphics.lineTo(b.right, py);
             }

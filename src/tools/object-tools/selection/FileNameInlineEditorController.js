@@ -89,8 +89,8 @@ export function openFileNameEditor(object, create = false) {
     const nameY = fileHeight - 40;
     const centerX = fileWidth / 2;
 
-    wrapper.style.left = `${screenPos.x + centerX - 60}px`;  // Центрируем относительно файла
-    wrapper.style.top = `${screenPos.y + nameY}px`;  // Позиционируем на уровне названия
+    wrapper.style.left = `${Math.round(screenPos.x + centerX - 60)}px`;  // Центрируем относительно файла
+    wrapper.style.top = `${Math.round(screenPos.y + nameY)}px`;  // Позиционируем на уровне названия
 
     // Сохраняем состояние редактора
     this.textEditor = {
