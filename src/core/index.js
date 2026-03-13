@@ -636,6 +636,11 @@ export class CoreMoodBoard {
             this.frameService.detach();
             this.frameService = null;
         }
+
+        if (this.boardService) {
+            this.boardService.destroy?.();
+            this.boardService = null;
+        }
         
         if (this.pixi) {
             this.pixi.destroy();

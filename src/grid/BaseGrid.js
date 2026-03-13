@@ -5,6 +5,7 @@ import {
     resolveScreenGridState,
     snapScreenValue,
 } from './ScreenGridPhaseMachine.js';
+import { incrementGridDiagnosticCounter, logGridDiagnostic } from './GridDiagnostics.js';
 
 /**
  * Базовый класс для всех типов сеток
@@ -83,6 +84,7 @@ export class BaseGrid {
      * Привязывает world-координаты к screen-grid контракту.
      */
     snapWorldPoint(x, y) {
+        incrementGridDiagnosticCounter('baseGrid.snapWorldPoint.calls');
         const t = this.viewportTransform || { worldX: 0, worldY: 0, scale: 1 };
         const scale = Math.max(0.001, t.scale || 1);
         const screenX = (x * scale) + (t.worldX || 0);
@@ -92,10 +94,18 @@ export class BaseGrid {
         const anchorY = getScreenAnchor(t.worldY || 0, screenStep);
         const snappedScreenX = snapScreenValue(screenX, anchorX, screenStep);
         const snappedScreenY = snapScreenValue(screenY, anchorY, screenStep);
-        return {
+        const snapped = {
             x: (snappedScreenX - (t.worldX || 0)) / scale,
             y: (snappedScreenY - (t.worldY || 0)) / scale,
         };
+        logGridDiagnostic('BaseGrid', 'snapWorldPoint', {
+            type: this.type,
+            scale,
+            screenStep,
+            input: { x, y },
+            output: snapped,
+        });
+        return snapped;
     }
     
     /**

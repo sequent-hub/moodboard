@@ -23,6 +23,29 @@
   - контракты диалогов выбора файлов/изображений;
   - стабильность событийных контрактов между тулбаром и остальной системой.
 
+- **`npm run test:grid:stability`** — контрактный прогон screen-grid без e2e.
+  Запускает:
+  - `tests/services/BoardService.grid-zoom.test.js`
+  - `tests/services/BoardService.grid-destroy.test.js`
+  - `tests/services/BoardService.lifecycle.screen-grid.test.js`
+  - `tests/services/BoardService.screen-grid.settings-reload.test.js`
+  - `tests/services/GridSnapResolver.screen-state.test.js`
+  - `tests/services/GridSnapResolver.screen-grid-types.test.js`
+  Покрывает:
+  - инвариант screen-space для `gridLayer` (`x=0`, `y=0`, `scale=1`);
+  - lifecycle `BoardService` (attach/detach/destroy) и защиту от дублей listener-ов;
+  - контракт snap для `dot/line/cross` и стабильность при reload настроек.
+
+- **`npm run test:grid:stress`** — длительные стресс-сценарии screen-grid/snap.
+  Запускает:
+  - `tests/services/BoardService.screen-grid.stress.test.js`
+  - `tests/services/GridSnapResolver.screen-grid.stress.test.js`
+  Покрывает:
+  - длинные циклы `zoom/pan/grid-change` без дрейфа `gridLayer`;
+  - отсутствие деградации инвариантов snap в потоках `drag/group-drag/resize/place`.
+
+- **`npm run test:grid:all`** — полный локальный прогон `test:grid:stability` + `test:grid:stress`.
+
 ## Покрытие тестами
 
 **Обновление:** добавлены `24` теста для `HistoryManager` (`tests/core/HistoryManager.baseline.test.js`) — добавление команд в историю, undo/redo, merge, maxHistorySize, служебные методы.
@@ -412,6 +435,44 @@ UI-контракты wiring слоя MoodBoard.
 ### `tests/services/BoardService.grid-destroy.test.js` — 1 тест
 
 BoardService: при смене типа сетки (line → dot) старый grid.destroy() вызывается.
+
+### `tests/services/BoardService.lifecycle.screen-grid.test.js` — 3 unit-теста
+
+Контракты lifecycle для screen-grid в `BoardService`.
+
+- Повторные `init()` не дублируют подписки (`GridChange`, `Viewport.Changed`, minimap events).
+- `destroy()` корректно снимает подписки, очищает grid и вызывает `setGrid(null)`.
+- На серии `Viewport.Changed` сохраняется screen-space инвариант `gridLayer`.
+
+### `tests/services/GridSnapResolver.screen-grid-types.test.js` — 9 unit-тестов
+
+Контракт snap для всех типов сетки в единой screen-grid модели (`dot`, `line`, `cross`).
+
+- Идемпотентность snap (повторный snap не дрейфует).
+- Сценарии `drag`, `group-drag`, `resize`, `place`.
+- Разные состояния viewport (pan/zoom комбинации).
+
+### `tests/services/BoardService.screen-grid.settings-reload.test.js` — 2 unit-теста
+
+Интеграционный контракт `SettingsApplier + BoardService` для циклов применения настроек.
+
+- Повторные `apply(grid/zoom/pan)` сохраняют `gridLayer` в screen-space.
+- Циклы `off/on` и смена типа сетки не ломают cleanup и viewport контракт.
+
+### `tests/services/BoardService.screen-grid.stress.test.js` — 3 stress-теста
+
+Стресс-набор на длительные циклы `BoardService`.
+
+- Многократные `init + grid-change` без роста подписок.
+- Длинные zoom/pan loops без дрейфа `gridLayer`.
+- После stress-циклов `destroy()` полностью освобождает listeners.
+
+### `tests/services/GridSnapResolver.screen-grid.stress.test.js` — 2 stress-теста
+
+Стресс-набор стабильности `GridSnapResolver`.
+
+- Длинные серии snap для `dot/line/cross` без нарушения инварианта идемпотентности.
+- Стабильное поведение при переключении `snapEnabled` в рантайме.
 
 ### `tests/tools/SelectTool.baseline.group-selection.test.js` — 3 unit-теста
 
