@@ -98,28 +98,49 @@ async function triggerRedo(page) {
   }, EVENTS_KEYBOARD_REDO);
 }
 
+async function getActiveToolName(page) {
+  return page.evaluate(() => {
+    const core = window.moodboard?.coreMoodboard;
+    return core?.toolManager?.getActiveTool?.()?.name || null;
+  });
+}
+
+async function ensureDrawPopupVisible(page) {
+  const popup = page.locator('.moodboard-toolbar__popup--draw');
+  if (!(await popup.isVisible())) {
+    await page.click('.moodboard-toolbar__button--pencil');
+  }
+  await expect(popup).toBeVisible();
+  return popup;
+}
+
+async function getVisiblePresetActiveCount(page) {
+  return page.evaluate(() => {
+    const popup = document.querySelector('.moodboard-toolbar__popup--draw');
+    if (!popup) return 0;
+    const rows = popup.querySelectorAll('.moodboard-draw__row');
+    const presetRow = rows[1];
+    if (!presetRow) return 0;
+    return presetRow.querySelectorAll('.moodboard-draw__btn--active').length;
+  });
+}
+
 /** Открывает popup рисования и выбирает инструмент. */
 async function openDrawPopupAndSelectTool(page, toolClass) {
-  await page.click('.moodboard-toolbar__button--pencil');
-  const popup = page.locator('.moodboard-toolbar__popup--draw');
-  await expect(popup).toBeVisible();
+  await ensureDrawPopupVisible(page);
   await page.click(`.moodboard-draw__grid .${toolClass}`);
 }
 
 /** Выбирает карандаш, потом preset. */
 async function selectPencilPreset(page, presetBtnClass) {
-  await page.click('.moodboard-toolbar__button--pencil');
-  const popup = page.locator('.moodboard-toolbar__popup--draw');
-  await expect(popup).toBeVisible();
+  await ensureDrawPopupVisible(page);
   await page.click(`.moodboard-draw__grid .moodboard-draw__btn--pencil-tool`);
   await page.click(`.moodboard-draw__grid .${presetBtnClass}`);
 }
 
 /** Выбирает маркер, потом preset. */
 async function selectMarkerPreset(page, presetBtnClass) {
-  await page.click('.moodboard-toolbar__button--pencil');
-  const popup = page.locator('.moodboard-toolbar__popup--draw');
-  await expect(popup).toBeVisible();
+  await ensureDrawPopupVisible(page);
   await page.click(`.moodboard-draw__grid .moodboard-draw__btn--marker-tool`);
   await page.click(`.moodboard-draw__grid .${presetBtnClass}`);
 }
@@ -142,6 +163,61 @@ test.describe('DrawingTool E2E (draw instrument)', () => {
     await expect(grid.locator('.moodboard-draw__btn--eraser-tool')).toBeVisible();
     // Второй ряд — presets карандаша (по умолчанию выбран карандаш)
     await expect(grid.locator('.moodboard-draw__btn--size-thin-black')).toBeVisible();
+  });
+
+  test('draw popup stays open after canvas click while draw tool is active', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--pencil');
+    const popup = page.locator('.moodboard-toolbar__popup--draw');
+    await expect(popup).toBeVisible();
+
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    await canvas.click();
+
+    const activeToolAfterCanvasClick = await getActiveToolName(page);
+    expect(activeToolAfterCanvasClick).toBe('draw');
+    await expect(popup).toBeVisible();
+  });
+
+  test('draw popup closes on Escape when draw gets canceled', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--pencil');
+    const popup = page.locator('.moodboard-toolbar__popup--draw');
+    await expect(popup).toBeVisible();
+
+    await page.keyboard.press('Escape');
+
+    const activeToolAfterEscape = await getActiveToolName(page);
+    expect(activeToolAfterEscape).toBe('select');
+    await expect(popup).toBeHidden();
+  });
+
+  test('draw popup closes when selecting another tool', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--pencil');
+    const popup = page.locator('.moodboard-toolbar__popup--draw');
+    await expect(popup).toBeVisible();
+
+    await page.click('.moodboard-toolbar__button--select');
+
+    const activeToolAfterSelect = await getActiveToolName(page);
+    expect(activeToolAfterSelect).toBe('select');
+    await expect(popup).toBeHidden();
+  });
+
+  test('draw presets keep single active button in visible preset row', async ({ page }) => {
+    await ensureDrawPopupVisible(page);
+
+    await page.click('.moodboard-draw__grid .moodboard-draw__btn--pencil-tool');
+    await page.click('.moodboard-draw__grid .moodboard-draw__btn--size-thin-black');
+    expect(await getVisiblePresetActiveCount(page)).toBe(1);
+
+    await page.click('.moodboard-draw__grid .moodboard-draw__btn--size-medium-red');
+    expect(await getVisiblePresetActiveCount(page)).toBe(1);
+
+    await page.click('.moodboard-draw__grid .moodboard-draw__btn--marker-tool');
+    await page.click('.moodboard-draw__grid .moodboard-draw__btn--marker-yellow');
+    expect(await getVisiblePresetActiveCount(page)).toBe(1);
+
+    await page.click('.moodboard-draw__grid .moodboard-draw__btn--marker-pink');
+    expect(await getVisiblePresetActiveCount(page)).toBe(1);
   });
 
   test('cursor changes to pencil when draw tool is active', async ({ page }) => {

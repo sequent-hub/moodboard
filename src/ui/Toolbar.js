@@ -46,7 +46,13 @@ export class Toolbar {
             console.error('❌ Ошибка загрузки иконок:', error);
         }
 
-        this._toolActivatedHandler = ({ tool }) => this.setActiveToolbarButton(tool);
+        this._toolActivatedHandler = ({ tool }) => {
+            this.setActiveToolbarButton(tool);
+            // Draw palette must stay open only while draw tool is active.
+            if (tool !== 'draw') {
+                this.closeDrawPopup();
+            }
+        };
         this.createToolbar();
         this.attachEvents();
         this.setupHistoryEvents();
@@ -133,9 +139,13 @@ export class Toolbar {
             const isDrawButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--pencil');
             const isEmojiButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--emoji');
             const isFrameButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--frame');
+            const isDrawActive = !!(this.element && this.element.querySelector('.moodboard-toolbar__button--pencil.moodboard-toolbar__button--active'));
+
             if (!isInsideToolbar && !isInsideShapesPopup && !isShapesButton && !isInsideDrawPopup && !isDrawButton && !isInsideEmojiPopup && !isEmojiButton && !isInsideFramePopup && !isFrameButton) {
                 this.closeShapesPopup();
-                this.closeDrawPopup();
+                if (!isDrawActive) {
+                    this.closeDrawPopup();
+                }
                 this.closeEmojiPopup();
                 this.closeFramePopup();
             }

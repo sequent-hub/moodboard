@@ -232,6 +232,9 @@ export class ToolbarPopupsController {
         const row2 = document.createElement('div');
         row2.className = 'moodboard-draw__row';
         this.toolbar.drawRow2 = row2;
+        const clearActivePresetButtons = () => {
+            row2.querySelectorAll('.moodboard-draw__btn--active').forEach((el) => el.classList.remove('moodboard-draw__btn--active'));
+        };
 
         const pencilPresetEl = document.createElement('div');
         pencilPresetEl.className = 'moodboard-draw__row';
@@ -267,7 +270,7 @@ export class ToolbarPopupsController {
             btn.appendChild(holder);
             btn.addEventListener('click', () => {
                 this.toolbar.animateButton(btn);
-                pencilPresetEl.querySelectorAll('.moodboard-draw__btn--active').forEach((el) => el.classList.remove('moodboard-draw__btn--active'));
+                clearActivePresetButtons();
                 btn.classList.add('moodboard-draw__btn--active');
                 const width = s.width;
                 const color = parseInt(s.color.replace('#', ''), 16);
@@ -291,7 +294,7 @@ export class ToolbarPopupsController {
             btn.appendChild(sw);
             btn.addEventListener('click', () => {
                 this.toolbar.animateButton(btn);
-                markerPresetEl.querySelectorAll('.moodboard-draw__btn--active').forEach((el) => el.classList.remove('moodboard-draw__btn--active'));
+                clearActivePresetButtons();
                 btn.classList.add('moodboard-draw__btn--active');
                 const color = parseInt(s.color.replace('#', ''), 16);
                 this.toolbar.eventBus.emit(Events.Draw.BrushSet, { mode: 'marker', color, width: 8 });
