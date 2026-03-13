@@ -15,8 +15,8 @@ export class DotGrid extends BaseGrid {
         this.highlightIntersections = options.highlightIntersections ?? true;
         this.dotSize = options.dotSize ?? 1; // для serialize/setDotSize; фазы переопределяют при отрисовке
         this.snapSize = options.snapSize ?? 20; // фиксированный шаг привязки в world-координатах
-        // Порог видимости точки на экране и лимит плотности отрисовки.
-        this.minScreenDotRadius = options.minScreenDotRadius ?? 0.45;
+        // Минимальный радиус точки на экране: 1px (диаметр 2px).
+        this.minScreenDotRadius = Math.max(1, Math.round(options.minScreenDotRadius ?? 1));
         this.minScreenSpacing = options.minScreenSpacing ?? 8;
         this.maxDotsPerPhase = options.maxDotsPerPhase ?? 25000;
         this.intersectionSize = options.intersectionSize ?? this.dotSize;
@@ -24,6 +24,16 @@ export class DotGrid extends BaseGrid {
 
         /** Текущий zoom (scale) для выбора фазы. 1 = 100%. */
         this._zoom = 1;
+
+        // DotGrid всегда непрозрачный.
+        this.opacity = 1;
+        this.graphics.alpha = 1;
+
+        // Непрерывный anchor для исключения скачков при смене phase step.
+        this._continuousAnchorX = null;
+        this._continuousAnchorY = null;
+        this._lastWorldOffsetX = null;
+        this._lastWorldOffsetY = null;
     }
 
     /**
@@ -50,7 +60,7 @@ export class DotGrid extends BaseGrid {
     createVisual() {
         this.size = this._getEffectiveSize();
         const phases = this._getActivePhases();
-        const baseOpacity = this.opacity ?? 0.7;
+        const baseOpacity = 1;
         for (const { phase, alpha } of phases) {
             this._drawPhaseDots(phase, baseOpacity * alpha);
         }
@@ -62,41 +72,24 @@ export class DotGrid extends BaseGrid {
     _drawPhaseDots(phase, alpha) {
         const b = this.getDrawBounds();
         const scale = Math.max(0.001, this.viewportTransform?.scale || this._zoom || 1);
-        let stepPx = getScreenSpacing(this._zoom, this.minScreenSpacing);
-
-        const widthPx = Math.max(0, b.right - b.left);
-        const heightPx = Math.max(0, b.bottom - b.top);
-        const estimateDots = () => {
-            const nx = Math.floor(widthPx / stepPx) + 3;
-            const ny = Math.floor(heightPx / stepPx) + 3;
-            return nx * ny;
-        };
-        const dots = estimateDots();
-        if (dots > this.maxDotsPerPhase) {
-            const densityFactor = Math.sqrt(dots / this.maxDotsPerPhase);
-            stepPx *= Math.max(1, densityFactor);
-        }
+        const stepPx = Math.max(1, Math.round(getScreenSpacing(this._zoom)));
 
         const worldX = this.viewportTransform?.worldX || 0;
         const worldY = this.viewportTransform?.worldY || 0;
-        const anchorX = getScreenAnchor(worldX, stepPx);
-        const anchorY = getScreenAnchor(worldY, stepPx);
+        const anchorX = this._getContinuousAnchor('x', worldX, stepPx);
+        const anchorY = this._getContinuousAnchor('y', worldY, stepPx);
 
         const alignStart = (min, anchor, step) => {
-            const d = ((anchor - min) % step + step) % step;
-            return min + d;
+            const minInt = Math.round(min);
+            const d = ((anchor - minInt) % step + step) % step;
+            return minInt + d;
         };
         const startX = alignStart(b.left, anchorX, stepPx);
         const startY = alignStart(b.top, anchorY, stepPx);
-        const endX = b.right + stepPx;
-        const endY = b.bottom + stepPx;
+        const endX = Math.round(b.right) + stepPx;
+        const endY = Math.round(b.bottom) + stepPx;
 
-        const phaseScreenRadius = phase.dotSize * scale;
-        const maxScreenRadius = stepPx * 0.2;
-        const dotSize = Math.min(
-            Math.max(phaseScreenRadius, this.minScreenDotRadius),
-            maxScreenRadius
-        );
+        const dotSize = Math.max(this.minScreenDotRadius, Math.round(phase.dotSize * scale));
 
         this.graphics.beginFill(this.color, alpha);
         for (let x = startX; x <= endX; x += stepPx) {
@@ -105,6 +98,24 @@ export class DotGrid extends BaseGrid {
             }
         }
         this.graphics.endFill();
+    }
+
+    _getContinuousAnchor(axis, worldOffset, stepPx) {
+        const rawAnchor = Math.round(getScreenAnchor(worldOffset, stepPx));
+        const key = axis === 'x' ? '_continuousAnchorX' : '_continuousAnchorY';
+        const worldKey = axis === 'x' ? '_lastWorldOffsetX' : '_lastWorldOffsetY';
+        const prev = this[key];
+        const prevWorld = this[worldKey];
+        if (prev == null || prevWorld == null) {
+            this[key] = rawAnchor;
+            this[worldKey] = worldOffset;
+            return rawAnchor;
+        }
+        const delta = worldOffset - prevWorld;
+        const continuous = Number.isFinite(delta) ? (prev + Math.round(delta)) : rawAnchor;
+        this[key] = continuous;
+        this[worldKey] = worldOffset;
+        return continuous;
     }
     
     /**
@@ -130,11 +141,14 @@ export class DotGrid extends BaseGrid {
      * Рисует одну точку
      */
     drawDot(x, y, size) {
+        const px = Math.round(x);
+        const py = Math.round(y);
+        const r = Math.max(1, Math.round(size));
         if (this.dotStyle === 'circle') {
-            this.graphics.drawCircle(x, y, size);
+            this.graphics.drawCircle(px, py, r);
         } else if (this.dotStyle === 'square') {
-            const half = size;
-            this.graphics.drawRect(x - half, y - half, half * 2, half * 2);
+            const half = r;
+            this.graphics.drawRect(px - half, py - half, half * 2, half * 2);
         }
     }
     
@@ -185,6 +199,15 @@ export class DotGrid extends BaseGrid {
      */
     setHighlightIntersections(enabled) {
         this.highlightIntersections = enabled;
+        this.updateVisual();
+    }
+
+    /**
+     * DotGrid всегда непрозрачный: внешний вызов setOpacity игнорируем.
+     */
+    setOpacity() {
+        this.opacity = 1;
+        this.graphics.alpha = 1;
         this.updateVisual();
     }
 

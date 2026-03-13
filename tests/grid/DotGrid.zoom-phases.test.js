@@ -14,7 +14,7 @@ const EXPECTED_BY_ZOOM = [
   { z: 0.15, size: 80 },
   { z: 0.20, size: 80 },
   { z: 0.33, size: 40 },
-  { z: 0.50, size: 20 },
+  { z: 0.50, size: 40 },
   { z: 1.00, size: 20 },
   { z: 2.00, size: 20 },
   { z: 4.00, size: 20 },
@@ -54,6 +54,11 @@ describe('DotGridZoomPhases', () => {
         const phases = getActivePhases(z);
         expect(phases[0].phase.size).toBe(size);
       }
+    });
+
+    it('uses coarse phase exactly at 50% boundary', () => {
+      expect(getActivePhases(0.5)[0].phase.size).toBe(40);
+      expect(getActivePhases(0.5001)[0].phase.size).toBe(20);
     });
   });
 

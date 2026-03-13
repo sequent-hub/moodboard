@@ -78,7 +78,7 @@ export class GridFactory {
                 enabled: true,
                 size: 30,
                 color: 0x6a6aff,
-                opacity: 0.7,
+                opacity: 1,
                 dotSize: 1,
                 dotStyle: 'circle',
                 highlightIntersections: true
@@ -130,21 +130,21 @@ export class GridFactory {
                 type: 'dot',
                 size: 10,
                 color: 0xC0C0C0,
-                opacity: 0.6,
+                opacity: 1,
                 dotSize: 1
             },
             'standard-dots': {
                 type: 'dot',
                 size: 20,
                 color: 0xB0B0B0,
-                opacity: 0.7,
+                opacity: 1,
                 dotSize: 2
             },
             'bold-dots': {
                 type: 'dot',
                 size: 30,
                 color: 0xA0A0A0,
-                opacity: 0.8,
+                opacity: 1,
                 dotSize: 3,
                 dotStyle: 'square'
             },

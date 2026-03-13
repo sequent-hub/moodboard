@@ -33,6 +33,7 @@
     "test:grid:stress": "vitest run tests/services/BoardService.screen-grid.stress.test.js tests/services/GridSnapResolver.screen-grid.stress.test.js",
     "test:grid:all": "npm run test:grid:stability && npm run test:grid:stress",
     "grid:our-metrics": "node scripts/export-our-dot-grid-metrics.mjs",
+    "grid:diagnose:dot": "node scripts/diagnose-dot-grid-behavior.mjs",
     "grid:miro-metrics": "node scripts/analyze-miro-dot-screenshots.mjs",
     "deploy:build": "npm run build && npm run start",
     "deploy:prod": "NODE_ENV=production npm run build && NODE_ENV=production npm run start"
