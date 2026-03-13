@@ -194,7 +194,7 @@ export class HandlesDomRenderer {
             const showInModelButton = document.createElement('button');
             showInModelButton.type = 'button';
             showInModelButton.className = 'mb-revit-show-in-model';
-            showInModelButton.innerHTML = `${REVIT_SHOW_IN_MODEL_ICON_SVG}<span>показать в моделе</span>`;
+            showInModelButton.innerHTML = `${REVIT_SHOW_IN_MODEL_ICON_SVG}<span>Показать в модели</span>`;
             showInModelButton.style.left = `${Math.round(left + width / 2)}px`;
             showInModelButton.style.top = `${Math.round(top - 34)}px`;
             showInModelButton.addEventListener('mousedown', (evt) => {

@@ -34,7 +34,7 @@ describe('HtmlHandlesLayer Revit button', () => {
         expect(button).not.toBeNull();
         const icon = button.querySelector('svg');
         expect(icon).not.toBeNull();
-        expect(button.textContent).toContain('показать в моделе');
+        expect(button.textContent).toContain('Показать в модели');
     });
 
     it('emits ui:revit:show-in-model when button clicked', () => {
