@@ -83,6 +83,7 @@ describe('BoardService screen-grid stress contracts', () => {
 
         expect(eventBus.events.get(Events.UI.GridChange)?.size || 0).toBe(1);
         expect(eventBus.events.get(Events.Viewport.Changed)?.size || 0).toBe(1);
+        expect(eventBus.events.get(Events.Tool.WheelZoom)?.size || 0).toBe(1);
         expect(eventBus.events.get(Events.UI.MinimapGetData)?.size || 0).toBe(1);
         expect(eventBus.events.get(Events.UI.MinimapCenterOn)?.size || 0).toBe(1);
         expect(created.length).toBe(45);
@@ -131,6 +132,7 @@ describe('BoardService screen-grid stress contracts', () => {
 
         expect(eventBus.events.has(Events.UI.GridChange)).toBe(false);
         expect(eventBus.events.has(Events.Viewport.Changed)).toBe(false);
+        expect(eventBus.events.has(Events.Tool.WheelZoom)).toBe(false);
         expect(eventBus.events.has(Events.UI.MinimapGetData)).toBe(false);
         expect(eventBus.events.has(Events.UI.MinimapCenterOn)).toBe(false);
         expect(latestGrid.destroy).toHaveBeenCalledTimes(1);

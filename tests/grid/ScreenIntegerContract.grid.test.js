@@ -46,7 +46,7 @@ function configureGrid(grid, zoom) {
 }
 
 describe('Pixel-perfect integer contract: grid', () => {
-    const checkpoints = [0.1, 0.33, 0.5, 1, 2];
+    const checkpoints = [0.1, 0.33, 0.5, 1, 1.25, 1.5, 2];
 
     it('DotGrid emits integer draw coordinates on zoom checkpoints', async () => {
         const { DotGrid } = await import('../../src/grid/DotGrid.js');
@@ -62,6 +62,23 @@ describe('Pixel-perfect integer contract: grid', () => {
             guard.assertNoFractions();
         }
         expect(true).toBe(true);
+    });
+
+    it('DotGrid uses same dot radius at 125% and 150% zoom', async () => {
+        const { DotGrid } = await import('../../src/grid/DotGrid.js');
+        const grid = new DotGrid({ enabled: true, size: 20, dotSize: 1, lineWidth: 1 });
+        const getRadiusAtZoom = (zoom) => {
+            grid.graphics._calls = [];
+            configureGrid(grid, zoom);
+            grid.createVisual();
+            const circleCall = getCalls(grid).find((c) => c.name === 'drawCircle');
+            return circleCall ? circleCall.values[2] : null;
+        };
+        const r125 = getRadiusAtZoom(1.25);
+        const r150 = getRadiusAtZoom(1.5);
+        expect(r125).toBe(1);
+        expect(r150).toBe(1);
+        expect(r125).toBe(r150);
     });
 
     it('LineGrid emits integer draw coordinates on zoom checkpoints', async () => {

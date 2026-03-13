@@ -1,5 +1,5 @@
 import { BaseGrid } from './BaseGrid.js';
-import { getActivePhases, getEffectiveSize, getScreenSpacing } from './DotGridZoomPhases.js';
+import { getActivePhases, getDotOpacity, getEffectiveSize, getScreenSpacing } from './DotGridZoomPhases.js';
 import { getScreenAnchor } from './ScreenGridPhaseMachine.js';
 
 /**
@@ -29,11 +29,11 @@ export class DotGrid extends BaseGrid {
         this.opacity = 1;
         this.graphics.alpha = 1;
 
-        // Непрерывный anchor для исключения скачков при смене phase step.
-        this._continuousAnchorX = null;
-        this._continuousAnchorY = null;
-        this._lastWorldOffsetX = null;
-        this._lastWorldOffsetY = null;
+        // Cursor-centric anchor-контракт: при зуме точка под курсором фиксируется.
+        this._anchorX = null;
+        this._anchorY = null;
+        this._lastStepPxX = null;
+        this._lastStepPxY = null;
     }
 
     /**
@@ -73,11 +73,15 @@ export class DotGrid extends BaseGrid {
         const b = this.getDrawBounds();
         const scale = Math.max(0.001, this.viewportTransform?.scale || this._zoom || 1);
         const stepPx = Math.max(1, Math.round(getScreenSpacing(this._zoom)));
+        const zoomOpacity = getDotOpacity(this._zoom);
 
         const worldX = this.viewportTransform?.worldX || 0;
         const worldY = this.viewportTransform?.worldY || 0;
-        const anchorX = this._getContinuousAnchor('x', worldX, stepPx);
-        const anchorY = this._getContinuousAnchor('y', worldY, stepPx);
+        const cursorX = this.viewportTransform?.zoomCursorX;
+        const cursorY = this.viewportTransform?.zoomCursorY;
+        const useCursorAnchor = this.viewportTransform?.useCursorAnchor === true;
+        const anchorX = this._resolveScreenAnchor('x', worldX, stepPx, cursorX, useCursorAnchor);
+        const anchorY = this._resolveScreenAnchor('y', worldY, stepPx, cursorY, useCursorAnchor);
 
         const alignStart = (min, anchor, step) => {
             const minInt = Math.round(min);
@@ -89,9 +93,13 @@ export class DotGrid extends BaseGrid {
         const endX = Math.round(b.right) + stepPx;
         const endY = Math.round(b.bottom) + stepPx;
 
-        const dotSize = Math.max(this.minScreenDotRadius, Math.round(phase.dotSize * scale));
+        const phaseScreenRadius = phase.dotSize * scale;
+        const roundedRadius = phaseScreenRadius < 2
+            ? Math.floor(phaseScreenRadius)
+            : Math.round(phaseScreenRadius);
+        const dotSize = Math.max(this.minScreenDotRadius, roundedRadius);
 
-        this.graphics.beginFill(this.color, alpha);
+        this.graphics.beginFill(this.color, alpha * zoomOpacity);
         for (let x = startX; x <= endX; x += stepPx) {
             for (let y = startY; y <= endY; y += stepPx) {
                 this.drawDot(x, y, dotSize);
@@ -100,22 +108,30 @@ export class DotGrid extends BaseGrid {
         this.graphics.endFill();
     }
 
-    _getContinuousAnchor(axis, worldOffset, stepPx) {
-        const rawAnchor = Math.round(getScreenAnchor(worldOffset, stepPx));
-        const key = axis === 'x' ? '_continuousAnchorX' : '_continuousAnchorY';
-        const worldKey = axis === 'x' ? '_lastWorldOffsetX' : '_lastWorldOffsetY';
-        const prev = this[key];
-        const prevWorld = this[worldKey];
-        if (prev == null || prevWorld == null) {
-            this[key] = rawAnchor;
-            this[worldKey] = worldOffset;
-            return rawAnchor;
+    _normalizeAnchor(anchor, stepPx) {
+        const step = Math.max(1, Math.round(stepPx));
+        const normalized = ((Math.round(anchor) % step) + step) % step;
+        return normalized;
+    }
+
+    _resolveScreenAnchor(axis, worldOffset, stepPx, cursorPx, useCursorAnchor) {
+        const anchorKey = axis === 'x' ? '_anchorX' : '_anchorY';
+        const lastStepKey = axis === 'x' ? '_lastStepPxX' : '_lastStepPxY';
+        const step = Math.max(1, Math.round(stepPx));
+        const rawAnchor = this._normalizeAnchor(getScreenAnchor(worldOffset, step), step);
+
+        // Во время cursor-centric zoom привязываем сетку к экранной позиции курсора.
+        // Это сохраняет точку под курсором на одном screen-пикселе при смене шага.
+        if (useCursorAnchor && Number.isFinite(cursorPx)) {
+            const cursorAnchor = this._normalizeAnchor(Math.round(cursorPx), step);
+            this[anchorKey] = cursorAnchor;
+            this[lastStepKey] = step;
+            return cursorAnchor;
         }
-        const delta = worldOffset - prevWorld;
-        const continuous = Number.isFinite(delta) ? (prev + Math.round(delta)) : rawAnchor;
-        this[key] = continuous;
-        this[worldKey] = worldOffset;
-        return continuous;
+
+        this[anchorKey] = rawAnchor;
+        this[lastStepKey] = step;
+        return rawAnchor;
     }
     
     /**

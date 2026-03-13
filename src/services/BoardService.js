@@ -14,6 +14,8 @@ export class BoardService {
 		this._eventsAttached = false;
 		this._handlers = null;
 		this._destroyed = false;
+		this._lastZoomCursor = null;
+		this._consumeZoomCursorAnchor = false;
 	}
 
 	async init(getCanvasSize) {
@@ -82,6 +84,11 @@ export class BoardService {
 		};
 
 		const onViewportChanged = () => this.refreshGridViewport();
+		const onWheelZoom = ({ x, y } = {}) => {
+			if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+			this._lastZoomCursor = { x: Math.round(x), y: Math.round(y) };
+			this._consumeZoomCursorAnchor = true;
+		};
 		const onMinimapCenterOn = ({ worldX, worldY }) => {
 			const world = this.pixi.worldLayer || this.pixi.app.stage;
 			const viewW = this.pixi.app.view.clientWidth;
@@ -96,6 +103,7 @@ export class BoardService {
 			onGridChange,
 			onMinimapGetData,
 			onViewportChanged,
+			onWheelZoom,
 			onMinimapCenterOn,
 		};
 	}
@@ -110,6 +118,7 @@ export class BoardService {
 		// Миникарта: данные и управление
 		this.eventBus.on(Events.UI.MinimapGetData, this._handlers.onMinimapGetData);
 		this.eventBus.on(Events.Viewport.Changed, this._handlers.onViewportChanged);
+		this.eventBus.on(Events.Tool.WheelZoom, this._handlers.onWheelZoom);
 		this.eventBus.on(Events.UI.MinimapCenterOn, this._handlers.onMinimapCenterOn);
 		this._eventsAttached = true;
 		incrementGridDiagnosticCounter('boardService.lifecycle.attach');
@@ -121,6 +130,7 @@ export class BoardService {
 		this.eventBus.off(Events.UI.GridChange, this._handlers.onGridChange);
 		this.eventBus.off(Events.UI.MinimapGetData, this._handlers.onMinimapGetData);
 		this.eventBus.off(Events.Viewport.Changed, this._handlers.onViewportChanged);
+		this.eventBus.off(Events.Tool.WheelZoom, this._handlers.onWheelZoom);
 		this.eventBus.off(Events.UI.MinimapCenterOn, this._handlers.onMinimapCenterOn);
 		this._eventsAttached = false;
 		incrementGridDiagnosticCounter('boardService.lifecycle.detach');
@@ -167,13 +177,19 @@ export class BoardService {
 			this.grid.setZoom(scale);
 		}
 		if (typeof this.grid.setViewportTransform === 'function') {
+			const zoomCursor = this._lastZoomCursor;
+			const useCursorAnchor = this._consumeZoomCursorAnchor && !!zoomCursor;
 			this.grid.setViewportTransform({
 				worldX: world.x || 0,
 				worldY: world.y || 0,
 				scale,
 				viewWidth: view.clientWidth,
 				viewHeight: view.clientHeight,
+				zoomCursorX: zoomCursor?.x ?? null,
+				zoomCursorY: zoomCursor?.y ?? null,
+				useCursorAnchor,
 			});
+			this._consumeZoomCursorAnchor = false;
 		}
 
 		// Видимая область в screen-координатах.

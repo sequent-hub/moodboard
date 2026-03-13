@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
+import { Events } from '../../src/core/events/Events.js';
 import { BoardService } from '../../src/services/BoardService.js';
 
 describe('BoardService: grid zoom sync', () => {
@@ -120,6 +121,9 @@ describe('BoardService: grid zoom sync', () => {
       scale: 2,
       viewWidth: 800,
       viewHeight: 600,
+      zoomCursorX: null,
+      zoomCursorY: null,
+      useCursorAnchor: false,
     });
   });
 
@@ -134,5 +138,45 @@ describe('BoardService: grid zoom sync', () => {
     boardService.refreshGridViewport();
 
     expect(grid.setVisibleBounds).not.toHaveBeenCalled();
+  });
+
+  it('passes wheel zoom cursor anchor hint to grid transform', () => {
+    const setViewportTransform = vi.fn();
+    const grid = {
+      enabled: true,
+      type: 'dot',
+      size: 20,
+      setZoom: vi.fn(),
+      setViewportTransform,
+      setVisibleBounds: vi.fn(),
+      updateVisual: vi.fn(),
+      getPixiObject: () => ({ x: 0, y: 0 }),
+    };
+    boardService.grid = grid;
+
+    eventBus.emit(Events.Tool.WheelZoom, { x: 401.6, y: 249.2, delta: -120 });
+    boardService.refreshGridViewport();
+    boardService.refreshGridViewport();
+
+    expect(setViewportTransform).toHaveBeenNthCalledWith(1, {
+      worldX: 0,
+      worldY: 0,
+      scale: 1,
+      viewWidth: 800,
+      viewHeight: 600,
+      zoomCursorX: 402,
+      zoomCursorY: 249,
+      useCursorAnchor: true,
+    });
+    expect(setViewportTransform).toHaveBeenNthCalledWith(2, {
+      worldX: 0,
+      worldY: 0,
+      scale: 1,
+      viewWidth: 800,
+      viewHeight: 600,
+      zoomCursorX: 402,
+      zoomCursorY: 249,
+      useCursorAnchor: false,
+    });
   });
 });

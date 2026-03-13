@@ -5,7 +5,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   getActivePhases,
+  getDotOpacity,
   getEffectiveSize,
+  getScreenSpacing,
   PHASES,
 } from '../../src/grid/DotGridZoomPhases.js';
 
@@ -71,6 +73,57 @@ describe('DotGridZoomPhases', () => {
       expect(PHASES[3].size).toBe(20);
       expect(PHASES[0].zoomMin).toBe(0.02);
       expect(PHASES[3].zoomMax).toBe(5);
+    });
+  });
+
+  describe('getScreenSpacing', () => {
+    it('keeps >=100% profile unchanged and orders 100..2 checkpoints', () => {
+      const checkpoints = [
+        { z: 1.0, step: 20 },
+        { z: 0.75, step: 19 },
+        { z: 0.5, step: 18 },
+        { z: 0.33, step: 17 },
+        { z: 0.25, step: 16 },
+        { z: 0.2, step: 15 },
+        { z: 0.15, step: 14 },
+        { z: 0.1, step: 13 },
+        { z: 0.05, step: 12 },
+        { z: 0.02, step: 11 },
+      ];
+      for (const row of checkpoints) {
+        expect(getScreenSpacing(row.z)).toBe(row.step);
+      }
+    });
+  });
+
+  describe('getDotOpacity', () => {
+    it('returns 1.0 at 100%, 0.5 at 2%, and 0.3 at 500%', () => {
+      expect(getDotOpacity(1)).toBe(1);
+      expect(getDotOpacity(0.02)).toBe(0.5);
+      expect(getDotOpacity(5)).toBe(0.3);
+    });
+
+    it('returns interpolated opacity between 2% and 100%', () => {
+      expect(getDotOpacity(0.5)).toBeCloseTo(0.744897959, 6);
+      expect(getDotOpacity(0.25)).toBeCloseTo(0.617346939, 6);
+      expect(getDotOpacity(0.1)).toBeCloseTo(0.540816327, 6);
+    });
+
+    it('matches configured opacity checkpoints at >100%', () => {
+      expect(getDotOpacity(1.25)).toBeCloseTo(0.9, 6);
+      expect(getDotOpacity(1.5)).toBeCloseTo(0.7, 6);
+      expect(getDotOpacity(2)).toBeCloseTo(0.6, 6);
+      expect(getDotOpacity(2.5)).toBeCloseTo(0.5, 6);
+      expect(getDotOpacity(3)).toBeCloseTo(0.4, 6);
+      expect(getDotOpacity(4)).toBeCloseTo(0.35, 6);
+      expect(getDotOpacity(5)).toBeCloseTo(0.3, 6);
+    });
+
+    it('interpolates between >100% checkpoints', () => {
+      // between 125%(0.9) and 150%(0.7)
+      expect(getDotOpacity(1.375)).toBeCloseTo(0.8, 6);
+      // between 300%(0.4) and 400%(0.35)
+      expect(getDotOpacity(3.5)).toBeCloseTo(0.375, 6);
     });
   });
 });
