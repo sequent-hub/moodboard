@@ -14,6 +14,7 @@ describe('ToolManager - drag and drop image upload', () => {
     let manager;
     let originalFileReader;
     let consoleWarnSpy;
+    let originalMoodboardGlobal;
 
     beforeEach(() => {
         eventBus = { emit: vi.fn() };
@@ -22,11 +23,15 @@ describe('ToolManager - drag and drop image upload', () => {
         core = { imageUploadService: { uploadImage: vi.fn() } };
         manager = new ToolManager(eventBus, container, null, core);
         originalFileReader = global.FileReader;
+        originalMoodboardGlobal = (typeof window !== 'undefined') ? window.moodboard : undefined;
         consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     });
 
     afterEach(() => {
         global.FileReader = originalFileReader;
+        if (typeof window !== 'undefined') {
+            window.moodboard = originalMoodboardGlobal;
+        }
         consoleWarnSpy.mockRestore();
         vi.restoreAllMocks();
     });
@@ -284,5 +289,188 @@ describe('ToolManager - drag and drop image upload', () => {
             x: Math.round(expectedWorld.x - 60),
             y: Math.round(expectedWorld.y - 70),
         });
+    });
+
+    it('stale drop guard: результаты старого drop не эмитятся после нового drop', async () => {
+        let resolveFirst;
+        let resolveSecond;
+        core.imageUploadService.uploadImage = vi
+            .fn()
+            .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+            .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+
+        const file1 = new Blob(['png1'], { type: 'image/png' });
+        file1.name = 'first.png';
+        const file2 = new Blob(['png2'], { type: 'image/png' });
+        file2.name = 'second.png';
+
+        const firstDrop = manager.handleDrop({
+            preventDefault: vi.fn(),
+            clientX: 100,
+            clientY: 120,
+            dataTransfer: {
+                files: [file1],
+                getData: vi.fn(() => ''),
+            },
+        });
+
+        const secondDrop = manager.handleDrop({
+            preventDefault: vi.fn(),
+            clientX: 200,
+            clientY: 220,
+            dataTransfer: {
+                files: [file2],
+                getData: vi.fn(() => ''),
+            },
+        });
+
+        resolveSecond({
+            url: '/api/images/img-2/file',
+            name: 'second.png',
+            imageId: 'img-2',
+        });
+        await secondDrop;
+
+        resolveFirst({
+            url: '/api/images/img-1/file',
+            name: 'first.png',
+            imageId: 'img-1',
+        });
+        await firstDrop;
+
+        const pasteEvents = eventBus.emit.mock.calls
+            .filter(([eventName]) => eventName === Events.UI.PasteImageAt)
+            .map(([, payload]) => payload);
+
+        expect(pasteEvents).toHaveLength(1);
+        expect(pasteEvents[0]).toEqual({
+            x: 200,
+            y: 220,
+            src: '/api/images/img-2/file',
+            name: 'second.png',
+            imageId: 'img-2',
+        });
+    });
+
+    it('ограничивает параллелизм file upload до 2 задач', async () => {
+        const resolvers = new Map();
+        const started = [];
+        core.fileUploadService = {
+            uploadFile: vi.fn((file) => new Promise((resolve) => {
+                started.push(file.name);
+                resolvers.set(file.name, () => resolve({
+                    id: `id-${file.name}`,
+                    fileId: `id-${file.name}`,
+                    name: file.name,
+                    size: file.size,
+                    mimeType: file.type,
+                    formattedSize: '1 B',
+                    url: `/api/files/${file.name}/download`,
+                }));
+            })),
+        };
+
+        const fileA = new Blob(['a'], { type: 'application/pdf' });
+        fileA.name = 'a.pdf';
+        const fileB = new Blob(['b'], { type: 'application/pdf' });
+        fileB.name = 'b.pdf';
+        const fileC = new Blob(['c'], { type: 'application/pdf' });
+        fileC.name = 'c.pdf';
+
+        const dropPromise = manager.handleDrop({
+            preventDefault: vi.fn(),
+            clientX: 100,
+            clientY: 200,
+            dataTransfer: {
+                files: [fileA, fileB, fileC],
+                getData: vi.fn(() => ''),
+            },
+        });
+
+        await Promise.resolve();
+        expect(started).toEqual(['a.pdf', 'b.pdf']);
+
+        resolvers.get('a.pdf')();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(started).toEqual(['a.pdf', 'b.pdf', 'c.pdf']);
+
+        resolvers.get('b.pdf')();
+        resolvers.get('c.pdf')();
+        await dropPromise;
+
+        const fileActions = eventBus.emit.mock.calls
+            .filter(([eventName]) => eventName === Events.UI.ToolbarAction);
+        expect(fileActions).toHaveLength(3);
+    });
+
+    it('ограничивает обработку до maxFilesPerDrop и показывает предупреждение', async () => {
+        const notifySpy = vi.fn();
+        if (typeof window !== 'undefined') {
+            window.moodboard = {
+                workspaceManager: { showNotification: notifySpy }
+            };
+        }
+        core.fileUploadService = {
+            uploadFile: vi.fn(async (file, name) => ({
+                id: `id-${name}`,
+                fileId: `id-${name}`,
+                name: name || file.name,
+                size: file.size || 0,
+                mimeType: file.type || 'application/octet-stream',
+                formattedSize: '1 B',
+                url: `/api/files/${name}/download`,
+            })),
+        };
+
+        const files = Array.from({ length: 55 }, (_, i) => ({ name: `f${i}.txt`, size: 1, type: 'text/plain' }));
+        await manager.handleDrop({
+            preventDefault: vi.fn(),
+            clientX: 100,
+            clientY: 100,
+            dataTransfer: {
+                files,
+                getData: vi.fn(() => ''),
+            },
+        });
+
+        expect(core.fileUploadService.uploadFile).toHaveBeenCalledTimes(50);
+        expect(notifySpy).toHaveBeenCalledWith('Обработаны первые 50 файлов из 55');
+    });
+
+    it('пропускает oversized файлы и обрабатывает только допустимые', async () => {
+        const notifySpy = vi.fn();
+        if (typeof window !== 'undefined') {
+            window.moodboard = {
+                workspaceManager: { showNotification: notifySpy }
+            };
+        }
+        core.fileUploadService = {
+            uploadFile: vi.fn(async (file, name) => ({
+                id: `id-${name}`,
+                fileId: `id-${name}`,
+                name: name || file.name,
+                size: file.size || 0,
+                mimeType: file.type || 'application/octet-stream',
+                formattedSize: '1 B',
+                url: `/api/files/${name}/download`,
+            })),
+        };
+
+        const okFile = { name: 'ok.txt', size: 1024, type: 'text/plain' };
+        const hugeFile = { name: 'huge.bin', size: 60 * 1024 * 1024, type: 'application/octet-stream' };
+
+        await manager.handleDrop({
+            preventDefault: vi.fn(),
+            clientX: 100,
+            clientY: 100,
+            dataTransfer: {
+                files: [okFile, hugeFile],
+                getData: vi.fn(() => ''),
+            },
+        });
+
+        expect(core.fileUploadService.uploadFile).toHaveBeenCalledTimes(1);
+        expect(core.fileUploadService.uploadFile).toHaveBeenCalledWith(okFile, 'ok.txt');
+        expect(notifySpy).toHaveBeenCalledWith('Пропущено 1 файлов: размер каждого должен быть не более 50 МБ');
     });
 });

@@ -174,7 +174,7 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 - `tests/integration/ImagePersistence.network-fail.test.js` — 2 теста: «локально видно, после reopen пропало» при timeout и контрольный success-кейс.
 - `tests/core/SaveManager.retry.test.js` — 2 теста: retry/backoff и остановка после `maxRetries`.
 - `tests/core/KeyboardManager.image-upload.test.js` — 2 теста: вставка изображения через клавиатурный канал (success + fallback `data:`).
-- `tests/tools/ToolManager.image-drop.test.js` — 6 тестов: drag-and-drop изображений и вложений (success/fallback, смещение canvas, world-координаты при pan/zoom, центрирование file в точке курсора, веерная раскладка multi-drop).
+- `tests/tools/ToolManager.image-drop.test.js` — 10 тестов: drag-and-drop изображений и вложений (success/fallback, смещение canvas, world-координаты при pan/zoom, центрирование file в точке курсора, веерная раскладка multi-drop, stale-drop guard, ограничение параллелизма upload до 2 задач, лимит количества файлов и лимит размера файла с предупреждением).
 - `tests/core/ClipboardFlow.image-drop-coordinates.test.js` — 2 теста: пересчет `PasteImageAt` в world-координаты и fallback-размер изображения при ошибке загрузки.
 - `tests/ui/SaveStatus.test.js` — 5 тестов: `pending/saving/saved/error`, auto-hide, обработка `save:error`.
 - `tests/integration/SaveStatus.network-state.test.js` — 2 теста: связка `SaveManager + SaveStatus` при success/timeout.
