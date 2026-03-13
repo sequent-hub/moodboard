@@ -1,6 +1,6 @@
 /**
  * BoardService: синхронизация сетки с world при зуме.
- * refreshGridViewport должен синхронизировать gridLayer (x, y, scale) с world.
+ * refreshGridViewport должен поддерживать screen-grid контракт.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
@@ -23,7 +23,7 @@ describe('BoardService: grid zoom sync', () => {
     await boardService.init(() => ({ width: 800, height: 600 }));
   });
 
-  it('refreshGridViewport syncs gridLayer position with world', () => {
+  it('refreshGridViewport keeps gridLayer anchored to screen', () => {
     const grid = {
       enabled: true,
       type: 'line',
@@ -42,11 +42,11 @@ describe('BoardService: grid zoom sync', () => {
 
     boardService.refreshGridViewport();
 
-    expect(pixi.gridLayer.x).toBe(100);
-    expect(pixi.gridLayer.y).toBe(50);
+    expect(pixi.gridLayer.x).toBe(0);
+    expect(pixi.gridLayer.y).toBe(0);
   });
 
-  it('refreshGridViewport syncs gridLayer scale with world', () => {
+  it('refreshGridViewport keeps gridLayer scale equal to 1', () => {
     const grid = {
       enabled: true,
       type: 'line',
@@ -62,7 +62,7 @@ describe('BoardService: grid zoom sync', () => {
 
     boardService.refreshGridViewport();
 
-    expect(pixi.gridLayer.scale.x).toBe(2);
+    expect(pixi.gridLayer.scale.x).toBe(1);
   });
 
   it('refreshGridViewport calls setZoom on DotGrid', () => {
@@ -89,10 +89,12 @@ describe('BoardService: grid zoom sync', () => {
 
   it('refreshGridViewport computes world-space bounds when scaled', () => {
     const setVisibleBounds = vi.fn();
+    const setViewportTransform = vi.fn();
     const grid = {
       enabled: true,
       type: 'line',
       size: 32,
+      setViewportTransform,
       setVisibleBounds,
       updateVisual: vi.fn(),
       getPixiObject: () => ({ x: 0, y: 0 }),
@@ -112,6 +114,13 @@ describe('BoardService: grid zoom sync', () => {
     const [left, top, right, bottom] = args;
     expect(right).toBeGreaterThan(left);
     expect(bottom).toBeGreaterThan(top);
+    expect(setViewportTransform).toHaveBeenCalledWith({
+      worldX: 400,
+      worldY: 300,
+      scale: 2,
+      viewWidth: 800,
+      viewHeight: 600,
+    });
   });
 
   it('refreshGridViewport does nothing when grid disabled', () => {

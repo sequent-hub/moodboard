@@ -75,10 +75,6 @@ export class BoardService {
 			const s = world.scale?.x || 1;
 			world.x = viewW / 2 - worldX * s;
 			world.y = viewH / 2 - worldY * s;
-			if (this.pixi.gridLayer) {
-				this.pixi.gridLayer.x = world.x;
-				this.pixi.gridLayer.y = world.y;
-			}
 			this.refreshGridViewport();
 		});
 	}
@@ -93,7 +89,7 @@ export class BoardService {
 	}
 
 	/**
-	 * Синхронизирует gridLayer с world (позиция + масштаб) и перерисовывает сетку.
+	 * Обновляет screen-grid слой по viewport состоянию.
 	 */
 	refreshGridViewport() {
 		if (!this.grid?.enabled || !this.pixi?.gridLayer) return;
@@ -103,25 +99,32 @@ export class BoardService {
 		const gl = this.pixi.gridLayer;
 		const scale = world.scale?.x ?? 1;
 
-		// Синхронизация gridLayer с world — сетка зуммируется вместе с доской
-		gl.x = world.x;
-		gl.y = world.y;
+		// Screen-grid всегда рендерится в координатах экрана.
+		gl.x = 0;
+		gl.y = 0;
 		if (gl.scale) {
-			gl.scale.set(scale);
+			gl.scale.set(1);
 		}
 
-		// DotGrid: передаём zoom до setVisibleBounds (чтобы createVisual видел актуальный zoom)
-		if (this.grid.type === 'dot' && typeof this.grid.setZoom === 'function') {
+		if (typeof this.grid.setZoom === 'function') {
 			this.grid.setZoom(scale);
 		}
+		if (typeof this.grid.setViewportTransform === 'function') {
+			this.grid.setViewportTransform({
+				worldX: world.x || 0,
+				worldY: world.y || 0,
+				scale,
+				viewWidth: view.clientWidth,
+				viewHeight: view.clientHeight,
+			});
+		}
 
-		// Видимая область в мировых координатах (с учётом scale)
-		const gridSize = this.grid._getEffectiveSize?.() ?? this.grid.size;
-		const pad = Math.max(100, (gridSize || 20) * 4);
-		const left = (-gl.x - pad) / scale;
-		const top = (-gl.y - pad) / scale;
-		const right = (view.clientWidth - gl.x + pad) / scale;
-		const bottom = (view.clientHeight - gl.y + pad) / scale;
+		// Видимая область в screen-координатах.
+		const pad = 32;
+		const left = -pad;
+		const top = -pad;
+		const right = view.clientWidth + pad;
+		const bottom = view.clientHeight + pad;
 		this.grid.setVisibleBounds(left, top, right, bottom);
 	}
 }

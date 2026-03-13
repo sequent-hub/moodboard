@@ -85,10 +85,6 @@ export class SettingsApplier {
             if (world) {
                 world.x = s.pan.x;
                 world.y = s.pan.y;
-                if (this.pixi?.gridLayer) {
-                    this.pixi.gridLayer.x = s.pan.x;
-                    this.pixi.gridLayer.y = s.pan.y;
-                }
                 try { this.eventBus.emit(Events.Viewport.Changed); } catch (_) {}
             }
         }

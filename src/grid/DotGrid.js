@@ -1,5 +1,6 @@
 import { BaseGrid } from './BaseGrid.js';
-import { getActivePhases, getEffectiveSize } from './DotGridZoomPhases.js';
+import { getActivePhases, getEffectiveSize, getScreenSpacing } from './DotGridZoomPhases.js';
+import { getScreenAnchor } from './ScreenGridPhaseMachine.js';
 
 /**
  * Точечная сетка с фазовым переключением при зуме (как в Miro).
@@ -60,36 +61,46 @@ export class DotGrid extends BaseGrid {
      */
     _drawPhaseDots(phase, alpha) {
         const b = this.getDrawBounds();
-        const scale = Math.max(0.001, this._zoom || 1);
-        const baseSize = phase.size;
-        const minWorldSpacing = this.minScreenSpacing / scale;
-        let size = Math.max(baseSize, minWorldSpacing);
+        const scale = Math.max(0.001, this.viewportTransform?.scale || this._zoom || 1);
+        let stepPx = getScreenSpacing(this._zoom, this.minScreenSpacing);
 
-        const widthWorld = Math.max(0, b.right - b.left);
-        const heightWorld = Math.max(0, b.bottom - b.top);
+        const widthPx = Math.max(0, b.right - b.left);
+        const heightPx = Math.max(0, b.bottom - b.top);
         const estimateDots = () => {
-            const nx = Math.floor(widthWorld / size) + 3;
-            const ny = Math.floor(heightWorld / size) + 3;
+            const nx = Math.floor(widthPx / stepPx) + 3;
+            const ny = Math.floor(heightPx / stepPx) + 3;
             return nx * ny;
         };
         const dots = estimateDots();
         if (dots > this.maxDotsPerPhase) {
             const densityFactor = Math.sqrt(dots / this.maxDotsPerPhase);
-            size *= Math.max(1, densityFactor);
+            stepPx *= Math.max(1, densityFactor);
         }
 
-        const startX = Math.floor(b.left / size) * size;
-        const startY = Math.floor(b.top / size) * size;
-        const endX = Math.ceil(b.right / size) * size;
-        const endY = Math.ceil(b.bottom / size) * size;
+        const worldX = this.viewportTransform?.worldX || 0;
+        const worldY = this.viewportTransform?.worldY || 0;
+        const anchorX = getScreenAnchor(worldX, stepPx);
+        const anchorY = getScreenAnchor(worldY, stepPx);
 
-        const minWorldRadius = this.minScreenDotRadius / scale;
-        const maxWorldRadius = size * 0.2;
-        const dotSize = Math.min(Math.max(phase.dotSize, minWorldRadius), maxWorldRadius);
+        const alignStart = (min, anchor, step) => {
+            const d = ((anchor - min) % step + step) % step;
+            return min + d;
+        };
+        const startX = alignStart(b.left, anchorX, stepPx);
+        const startY = alignStart(b.top, anchorY, stepPx);
+        const endX = b.right + stepPx;
+        const endY = b.bottom + stepPx;
+
+        const phaseScreenRadius = phase.dotSize * scale;
+        const maxScreenRadius = stepPx * 0.2;
+        const dotSize = Math.min(
+            Math.max(phaseScreenRadius, this.minScreenDotRadius),
+            maxScreenRadius
+        );
 
         this.graphics.beginFill(this.color, alpha);
-        for (let x = startX; x <= endX; x += size) {
-            for (let y = startY; y <= endY; y += size) {
+        for (let x = startX; x <= endX; x += stepPx) {
+            for (let y = startY; y <= endY; y += stepPx) {
                 this.drawDot(x, y, dotSize);
             }
         }

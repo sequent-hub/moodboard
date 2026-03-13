@@ -7,6 +7,7 @@ import { HistoryManager } from './HistoryManager.js';
 import { ApiClient } from './ApiClient.js';
 import { ImageUploadService } from '../services/ImageUploadService.js';
 import { FileUploadService } from '../services/FileUploadService.js';
+import { GridSnapResolver } from '../services/GridSnapResolver.js';
 import { CreateObjectCommand, DeleteObjectCommand, MoveObjectCommand, PasteObjectCommand } from './commands/index.js';
 import { Events } from './events/Events.js';
 import { generateObjectId } from '../utils/objectIdGenerator.js';
@@ -60,6 +61,7 @@ export class CoreMoodBoard {
             requireCsrf: this.options.requireCsrf !== false, // По умолчанию требуем CSRF
             csrfToken: this.options.csrfToken
         });
+        this.gridSnapResolver = new GridSnapResolver(this);
         
         // Связываем SaveManager с ApiClient для правильной обработки изображений
         this.saveManager.setApiClient(this.apiClient);
@@ -247,18 +249,25 @@ export class CoreMoodBoard {
         // position — левый верх (state); приводим к центру в PIXI, используя размеры PIXI объекта
         // Все объекты используют pivot по центру, поэтому логика одинакова для всех
         const pixiObject = this.pixi.objects.get(objectId);
+        let nextPosition = position;
+        if (pixiObject && this.gridSnapResolver) {
+            nextPosition = this.gridSnapResolver.snapWorldTopLeft(position, {
+                width: pixiObject.width || 0,
+                height: pixiObject.height || 0,
+            });
+        }
         if (pixiObject) {
             const halfW = (pixiObject.width || 0) / 2;
             const halfH = (pixiObject.height || 0) / 2;
-            pixiObject.x = position.x + halfW;
-            pixiObject.y = position.y + halfH;
+            pixiObject.x = nextPosition.x + halfW;
+            pixiObject.y = nextPosition.y + halfH;
         }
         
         // Обновляем позицию в состоянии (без эмита события)
         const objects = this.state.state.objects;
         const object = objects.find(obj => obj.id === objectId);
         if (object) {
-            object.position = { ...position };
+            object.position = { ...nextPosition };
             this.state.markDirty(); // Помечаем для автосохранения
         }
     }
@@ -290,19 +299,22 @@ export class CoreMoodBoard {
 
         // Обновляем позицию если передана (state: левый-верх; PIXI: центр)
         if (position) {
+            const snappedPosition = this.gridSnapResolver
+                ? this.gridSnapResolver.snapWorldTopLeft(position, size)
+                : position;
             const pixiObject2 = this.pixi.objects.get(objectId);
             if (pixiObject2) {
                 const halfW = (size?.width ?? pixiObject2.width ?? 0) / 2;
                 const halfH = (size?.height ?? pixiObject2.height ?? 0) / 2;
-                pixiObject2.x = position.x + halfW;
-                pixiObject2.y = position.y + halfH;
+                pixiObject2.x = snappedPosition.x + halfW;
+                pixiObject2.y = snappedPosition.y + halfH;
 
                 // Обновляем позицию в состоянии
                 const objects = this.state.state.objects;
                 const object = objects.find(obj => obj.id === objectId);
                 if (object) {
-                    object.position.x = position.x;
-                    object.position.y = position.y;
+                    object.position.x = snappedPosition.x;
+                    object.position.y = snappedPosition.y;
                 }
             }
         } else if (prevCenter) {
@@ -373,10 +385,16 @@ export class CoreMoodBoard {
                 properties = { ...(properties || {}), title: 'Фрейм 1' };
             }
         }
+        const snappedCreatePos = this.gridSnapResolver
+            ? this.gridSnapResolver.snapWorldTopLeft(position, {
+                width: initialWidth,
+                height: initialHeight,
+            })
+            : position;
         const objectData = {
             id: generateObjectId(exists),
             type,
-            position,
+            position: snappedCreatePos,
             width: initialWidth,
             height: initialHeight,
             properties,

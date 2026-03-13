@@ -1,4 +1,5 @@
 import { BaseGrid } from './BaseGrid.js';
+import { getScreenAnchor } from './ScreenGridPhaseMachine.js';
 
 /**
  * Линейная прямоугольная сетка
@@ -48,12 +49,21 @@ export class LineGrid extends BaseGrid {
      */
     drawMainGrid() {
         const b = this.getDrawBounds();
-        const step = this.size;
+        const { screenStep } = this.getScreenGridState();
+        const step = Math.max(1, screenStep);
+        const worldX = this.viewportTransform?.worldX || 0;
+        const worldY = this.viewportTransform?.worldY || 0;
+        const anchorX = getScreenAnchor(worldX, step);
+        const anchorY = getScreenAnchor(worldY, step);
         const half = this.lineWidth / 2;
-        const startX = Math.floor(b.left / step) * step;
-        const endX = Math.ceil(b.right / step) * step;
-        const startY = Math.floor(b.top / step) * step;
-        const endY = Math.ceil(b.bottom / step) * step;
+        const alignStart = (min, anchor) => {
+            const d = ((anchor - min) % step + step) % step;
+            return min + d;
+        };
+        const startX = alignStart(b.left, anchorX);
+        const endX = b.right + step;
+        const startY = alignStart(b.top, anchorY);
+        const endY = b.bottom + step;
         // Вертикальные линии
         for (let x = startX; x <= endX; x += step) {
             const px = Math.round(x) + (Number.isFinite(half) ? 0.5 : 0);
@@ -72,26 +82,42 @@ export class LineGrid extends BaseGrid {
      * Рисует подсетку (более мелкие линии)
      */
     drawSubGrid() {
-        const subSize = this.size / this.subGridDivisions;
+        const { screenStep } = this.getScreenGridState();
+        const subSize = Math.max(1, screenStep / this.subGridDivisions);
         try {
             this.graphics.lineStyle({ width: 0.5, color: this.subGridColor, alpha: this.subGridOpacity, alignment: 0.5 });
         } catch (_) {
             this.graphics.lineStyle(0.5, this.subGridColor, this.subGridOpacity);
         }
         const b = this.getDrawBounds();
-        const startX = Math.floor(b.left / subSize) * subSize;
-        const endX = Math.ceil(b.right / subSize) * subSize;
-        const startY = Math.floor(b.top / subSize) * subSize;
-        const endY = Math.ceil(b.bottom / subSize) * subSize;
+        const worldX = this.viewportTransform?.worldX || 0;
+        const worldY = this.viewportTransform?.worldY || 0;
+        const anchorX = getScreenAnchor(worldX, subSize);
+        const anchorY = getScreenAnchor(worldY, subSize);
+        const alignStart = (min, anchor) => {
+            const d = ((anchor - min) % subSize + subSize) % subSize;
+            return min + d;
+        };
+        const startX = alignStart(b.left, anchorX);
+        const endX = b.right + subSize;
+        const startY = alignStart(b.top, anchorY);
+        const endY = b.bottom + subSize;
+        const majorStep = Math.max(1, screenStep);
+        const majorAnchorX = getScreenAnchor(worldX, majorStep);
+        const majorAnchorY = getScreenAnchor(worldY, majorStep);
+        const isOnMajor = (value, major, anchor) => {
+            const rel = (value - anchor) / major;
+            return Math.abs(rel - Math.round(rel)) < 1e-4;
+        };
         for (let x = startX; x <= endX; x += subSize) {
-            if (x % this.size !== 0) {
+            if (!isOnMajor(x, majorStep, majorAnchorX)) {
                 const px = Math.round(x) + 0.5;
                 this.graphics.moveTo(px, b.top);
                 this.graphics.lineTo(px, b.bottom);
             }
         }
         for (let y = startY; y <= endY; y += subSize) {
-            if (y % this.size !== 0) {
+            if (!isOnMajor(y, majorStep, majorAnchorY)) {
                 const py = Math.round(y) + 0.5;
                 this.graphics.moveTo(b.left, py);
                 this.graphics.lineTo(b.right, py);

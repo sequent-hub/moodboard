@@ -9,6 +9,7 @@
 
 - **DOM/CSS**: `clientX/clientY`, CSS `left/top/width/height` для HTML-слоев (`HtmlHandlesLayer`, `HtmlTextLayer`).
 - **World (`worldLayer`)**: рабочие координаты инструментов и логики преобразований.
+- **Screen Grid (`gridLayer`)**: экранный фон, не масштабируется/не панорамируется напрямую вместе с `worldLayer`.
 - **PIXI display**: координаты `pixiObject.x/y` в сцене.
 - **State**: `state.objects[].position` хранится как **левый верх** (`top-left`).
 - **Bounds (`getBounds`)**: глобальные экранные границы PIXI, часто переводятся обратно в world.
@@ -101,7 +102,15 @@
 - `PanTool` эмитит `tool:pan:update` с экранным `delta`.
 - Core сдвигает `worldLayer.x/y`.
 - `ZoomPanController` сохраняет world-точку под курсором, меняет scale и корректирует `world.x/y`, чтобы точка оставалась под курсором.
+- `BoardService.refreshGridViewport` передает в grid viewport-state (`worldX/worldY/scale/viewWidth/viewHeight`) и обновляет screen-phase.
 - `HtmlHandlesLayer` и `HtmlTextLayer` подписаны на pan/zoom и делают пересчет позиции.
+
+### 3.9 Snap через screen-grid state
+
+1. `GridSnapResolver` получает top-left объекта и его размер.
+2. Центр объекта переводится в экранные координаты через `worldX/worldY/scale`.
+3. Привязка выполняется к активной screen-phase (step + anchor от pan).
+4. Привязанные экранные координаты переводятся обратно в world и записываются в state.
 
 ## 4. События EventBus, по которым передаются координаты
 

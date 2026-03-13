@@ -108,10 +108,6 @@ export function setupLayerAndViewportFlow(core) {
             core.pixi.worldLayer.x += delta.x;
             core.pixi.worldLayer.y += delta.y;
         }
-        if (core.pixi.gridLayer) {
-            core.pixi.gridLayer.x += delta.x;
-            core.pixi.gridLayer.y += delta.y;
-        }
         if (!core.pixi.worldLayer) {
             const stage = core.pixi.app.stage;
             stage.x += delta.x;
@@ -202,15 +198,12 @@ export function setupLayerAndViewportFlow(core) {
             if (!pixiObject) continue;
             const startCenter = core._groupDragStart.get(id) || { x: pixiObject.x, y: pixiObject.y };
             const newCenter = { x: startCenter.x + dx, y: startCenter.y + dy };
-            pixiObject.x = newCenter.x;
-            pixiObject.y = newCenter.y;
-            const obj = core.state.state.objects.find(o => o.id === id);
-            if (obj) {
-                const halfW = (pixiObject.width || 0) / 2;
-                const halfH = (pixiObject.height || 0) / 2;
-                obj.position.x = newCenter.x - halfW;
-                obj.position.y = newCenter.y - halfH;
-            }
+            const halfW = (pixiObject.width || 0) / 2;
+            const halfH = (pixiObject.height || 0) / 2;
+            core.updateObjectPositionDirect(id, {
+                x: newCenter.x - halfW,
+                y: newCenter.y - halfH,
+            });
         }
         core.state.markDirty();
     });

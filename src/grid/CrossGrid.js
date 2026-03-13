@@ -1,5 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { BaseGrid } from './BaseGrid.js';
+import { getScreenAnchor } from './ScreenGridPhaseMachine.js';
 
 /**
  * Сетка с крестиками (плюсами) в узлах
@@ -35,12 +36,22 @@ export class CrossGrid extends BaseGrid {
 
         const hs = this.crossHalfSize;
         const b = this.getDrawBounds();
-        const startX = Math.floor(b.left / this.size) * this.size;
-        const startY = Math.floor(b.top / this.size) * this.size;
-        const endX = Math.ceil(b.right / this.size) * this.size;
-        const endY = Math.ceil(b.bottom / this.size) * this.size;
-        for (let x = startX; x <= endX; x += this.size) {
-            for (let y = startY; y <= endY; y += this.size) {
+        const { screenStep } = this.getScreenGridState();
+        const step = Math.max(1, screenStep);
+        const worldX = this.viewportTransform?.worldX || 0;
+        const worldY = this.viewportTransform?.worldY || 0;
+        const anchorX = getScreenAnchor(worldX, step);
+        const anchorY = getScreenAnchor(worldY, step);
+        const alignStart = (min, anchor) => {
+            const d = ((anchor - min) % step + step) % step;
+            return min + d;
+        };
+        const startX = alignStart(b.left, anchorX);
+        const startY = alignStart(b.top, anchorY);
+        const endX = b.right + step;
+        const endY = b.bottom + step;
+        for (let x = startX; x <= endX; x += step) {
+            for (let y = startY; y <= endY; y += step) {
                 const px = Math.round(x) + 0.5;
                 const py = Math.round(y) + 0.5;
                 g.moveTo(px - hs, py);

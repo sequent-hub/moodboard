@@ -124,10 +124,12 @@
 - `src/services/ImageUploadService.js`
 - `src/services/FileUploadService.js`
 - `src/services/SettingsApplier.js`
+- `src/services/GridSnapResolver.js`
 
 Ответственность:
 - Изолированная бизнес-логика, не привязанная к одному UI-компоненту.
 - Зум/пан, порядок слоев, логика фреймов.
+- Screen-space snapping через `GridSnapResolver`.
 - Загрузка изображений/файлов и применение настроек доски.
 
 ### 2.8 Grid subsystem
@@ -138,9 +140,12 @@
 - `src/grid/DotGrid.js`
 - `src/grid/LineGrid.js`
 - `src/grid/CrossGrid.js`
+- `src/grid/ScreenGridPhaseMachine.js`
 
 Ответственность:
 - Создание и конфигурация сетки доски.
+- Screen-grid рендер в экранных координатах на основе viewport state.
+- Единая phase/state machine для dot/line/cross.
 - Представление различных типов сетки.
 
 ### 2.9 Utilities и assets

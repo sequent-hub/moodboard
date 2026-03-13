@@ -1,4 +1,10 @@
 import * as PIXI from 'pixi.js';
+import {
+    DEFAULT_PHASES,
+    getScreenAnchor,
+    resolveScreenGridState,
+    snapScreenValue,
+} from './ScreenGridPhaseMachine.js';
 
 /**
  * Базовый класс для всех типов сеток
@@ -19,6 +25,16 @@ export class BaseGrid {
         this.height = options.height || 1080;
         /** @type {{ left: number, top: number, right: number, bottom: number } | null} */
         this.viewportBounds = null;
+        this.viewportTransform = {
+            worldX: 0,
+            worldY: 0,
+            scale: 1,
+            viewWidth: this.width,
+            viewHeight: this.height,
+        };
+        this._zoom = 1;
+        this.minScreenSpacing = options.minScreenSpacing ?? 8;
+        this.screenPhases = options.screenPhases || DEFAULT_PHASES;
         
         // PIXI графика
         this.graphics = new PIXI.Graphics();
@@ -61,6 +77,25 @@ export class BaseGrid {
         }
         
         return this.calculateSnapPoint(x, y);
+    }
+
+    /**
+     * Привязывает world-координаты к screen-grid контракту.
+     */
+    snapWorldPoint(x, y) {
+        const t = this.viewportTransform || { worldX: 0, worldY: 0, scale: 1 };
+        const scale = Math.max(0.001, t.scale || 1);
+        const screenX = (x * scale) + (t.worldX || 0);
+        const screenY = (y * scale) + (t.worldY || 0);
+        const { screenStep } = this.getScreenGridState();
+        const anchorX = getScreenAnchor(t.worldX || 0, screenStep);
+        const anchorY = getScreenAnchor(t.worldY || 0, screenStep);
+        const snappedScreenX = snapScreenValue(screenX, anchorX, screenStep);
+        const snappedScreenY = snapScreenValue(screenY, anchorY, screenStep);
+        return {
+            x: (snappedScreenX - (t.worldX || 0)) / scale,
+            y: (snappedScreenY - (t.worldY || 0)) / scale,
+        };
     }
     
     /**
@@ -112,6 +147,10 @@ export class BaseGrid {
         this.size = Math.max(1, size);
         this.updateVisual();
     }
+
+    setZoom(scale) {
+        this._zoom = Math.max(0.02, Math.min(5, scale || 1));
+    }
     
     /**
      * Устанавливает цвет сетки
@@ -135,8 +174,17 @@ export class BaseGrid {
     resize(width, height) {
         this.width = width;
         this.height = height;
+        this.viewportTransform.viewWidth = width;
+        this.viewportTransform.viewHeight = height;
         this.viewportBounds = null;
         this.updateVisual();
+    }
+
+    setViewportTransform(transform = {}) {
+        this.viewportTransform = {
+            ...this.viewportTransform,
+            ...transform,
+        };
     }
 
     /**
@@ -160,6 +208,13 @@ export class BaseGrid {
             return this.viewportBounds;
         }
         return { left: 0, top: 0, right: this.width, bottom: this.height };
+    }
+
+    getScreenGridState() {
+        return resolveScreenGridState(this._zoom, {
+            minScreenSpacing: this.minScreenSpacing,
+            phases: this.screenPhases,
+        });
     }
     
     /**

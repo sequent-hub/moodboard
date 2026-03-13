@@ -10,7 +10,7 @@ Goal: align our `dot grid` behavior with Miro as close as possible, based on rep
 
 - Grid mode in Miro: `Dot grid`
 - Zoom method: bottom-right `+` and `-` controls
-- Checkpoint set: `10, 15, 20, 33, 50, 75, 100, 125, 150, 200, 250, 300, 400`
+- Checkpoint set: `10, 15, 20, 33, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500`
 
 ## Captured Evidence
 
@@ -139,3 +139,10 @@ Reference points with high confidence:
 | 400 | 80 | 80 | 0 |
 
 This table shows parity on high-confidence checkpoints (`50-400%`) for screen spacing.
+
+## Screen-Grid Contract (current implementation)
+
+- Grid layer is rendered in screen space (`gridLayer.x/y = 0`, `gridLayer.scale = 1`) and stays behind scene.
+- World pan/zoom are consumed as viewport events; grid visual phase is recomputed from zoom and pan state.
+- Dot/line/cross share one screen-phase machine (`src/grid/ScreenGridPhaseMachine.js`).
+- Snapping uses `snap_screen_state` through `GridSnapResolver`: object coordinates are snapped against active screen phase and transformed back to world.

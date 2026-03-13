@@ -1,6 +1,6 @@
 /**
  * E2E-тесты поведения сетки при панорамировании и зуме.
- * Сетка двигается при pan и синхронизируется с world при zoom (зумируется вместе с доской).
+ * Screen-grid остаётся в экранных координатах и реагирует на viewport события.
  */
 import { test, expect } from '@playwright/test';
 
@@ -32,7 +32,7 @@ test.describe('GridPan E2E', () => {
     }, delta);
   }
 
-  test('grid pans with board: PanUpdate syncs gridLayer and worldLayer', async ({ page }) => {
+  test('grid keeps screen anchor on PanUpdate', async ({ page }) => {
     await page.click('.moodboard-topbar__button[data-grid="line"]');
     await expect.poll(() => page.evaluate(() => window.moodboard?.coreMoodboard?.pixi?.gridLayer?.children?.length || 0)).toBeGreaterThan(0);
 
@@ -43,11 +43,11 @@ test.describe('GridPan E2E', () => {
     const after = await getLayersState(page);
     expect(after.world.x).toBe(before.world.x + delta.x);
     expect(after.world.y).toBe(before.world.y + delta.y);
-    expect(after.grid.x).toBe(before.grid.x + delta.x);
-    expect(after.grid.y).toBe(before.grid.y + delta.y);
+    expect(after.grid.x).toBe(0);
+    expect(after.grid.y).toBe(0);
   });
 
-  test('grid syncs with world when zooming (zoom-in button)', async ({ page }) => {
+  test('line grid keeps screen anchor when zooming (zoom-in button)', async ({ page }) => {
     await page.click('.moodboard-topbar__button[data-grid="line"]');
     await expect.poll(() => page.evaluate(() => window.moodboard?.coreMoodboard?.pixi?.gridLayer?.children?.length || 0)).toBeGreaterThan(0);
 
@@ -60,12 +60,12 @@ test.describe('GridPan E2E', () => {
       .toBeGreaterThan(before.world.scale);
 
     const after = await getLayersState(page);
-    expect(after.grid.x).toBe(after.world.x);
-    expect(after.grid.y).toBe(after.world.y);
-    expect(after.grid.scale).toBe(after.world.scale);
+    expect(after.grid.x).toBe(0);
+    expect(after.grid.y).toBe(0);
+    expect(after.grid.scale).toBe(1);
   });
 
-  test('grid syncs with world on wheel zoom', async ({ page }) => {
+  test('line grid keeps screen anchor on wheel zoom', async ({ page }) => {
     await page.click('.moodboard-topbar__button[data-grid="line"]');
     await expect.poll(() => page.evaluate(() => window.moodboard?.coreMoodboard?.pixi?.gridLayer?.children?.length || 0)).toBeGreaterThan(0);
 
@@ -82,12 +82,12 @@ test.describe('GridPan E2E', () => {
       .toBeGreaterThan(before.world.scale);
 
     const after = await getLayersState(page);
-    expect(after.grid.x).toBe(after.world.x);
-    expect(after.grid.y).toBe(after.world.y);
-    expect(after.grid.scale).toBe(after.world.scale);
+    expect(after.grid.x).toBe(0);
+    expect(after.grid.y).toBe(0);
+    expect(after.grid.scale).toBe(1);
   });
 
-  test('dot grid syncs with world when zooming', async ({ page }) => {
+  test('dot grid keeps screen anchor when zooming', async ({ page }) => {
     await page.click('.moodboard-topbar__button[data-grid="dot"]');
     await expect.poll(() => page.evaluate(() => window.moodboard?.coreMoodboard?.pixi?.gridLayer?.children?.length || 0)).toBeGreaterThan(0);
 
@@ -101,12 +101,12 @@ test.describe('GridPan E2E', () => {
       .toBeGreaterThan(before.world.scale);
 
     const after = await getLayersState(page);
-    expect(after.grid.x).toBe(after.world.x);
-    expect(after.grid.y).toBe(after.world.y);
-    expect(after.grid.scale).toBe(after.world.scale);
+    expect(after.grid.x).toBe(0);
+    expect(after.grid.y).toBe(0);
+    expect(after.grid.scale).toBe(1);
   });
 
-  test('dot grid syncs with world on wheel zoom (phase transition)', async ({ page }) => {
+  test('dot grid keeps screen anchor on wheel zoom (phase transition)', async ({ page }) => {
     await page.click('.moodboard-topbar__button[data-grid="dot"]');
     await expect.poll(() => page.evaluate(() => window.moodboard?.coreMoodboard?.pixi?.gridLayer?.children?.length || 0)).toBeGreaterThan(0);
 
@@ -119,9 +119,9 @@ test.describe('GridPan E2E', () => {
     await page.mouse.wheel(0, -100);
 
     const state = await getLayersState(page);
-    expect(state.grid.scale).toBe(state.world.scale);
-    expect(state.grid.x).toBe(state.world.x);
-    expect(state.grid.y).toBe(state.world.y);
+    expect(state.grid.scale).toBe(1);
+    expect(state.grid.x).toBe(0);
+    expect(state.grid.y).toBe(0);
   });
 
   test('grid pans with real pan tool drag', async ({ page }) => {
@@ -148,7 +148,7 @@ test.describe('GridPan E2E', () => {
     const expectedDy = -40;
     expect(Math.abs(after.world.x - before.world.x - expectedDx)).toBeLessThan(2);
     expect(Math.abs(after.world.y - before.world.y - expectedDy)).toBeLessThan(2);
-    expect(Math.abs(after.grid.x - before.grid.x - expectedDx)).toBeLessThan(2);
-    expect(Math.abs(after.grid.y - before.grid.y - expectedDy)).toBeLessThan(2);
+    expect(Math.abs(after.grid.x)).toBeLessThan(0.1);
+    expect(Math.abs(after.grid.y)).toBeLessThan(0.1);
   });
 });
