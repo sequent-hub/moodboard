@@ -1,6 +1,9 @@
 import { BaseGrid } from './BaseGrid.js';
-import { getActivePhases, getDotColor, getEffectiveSize, getRawScreenDotRadius, getScreenDotRadius, getScreenSpacing } from './DotGridZoomPhases.js';
+import { getActivePhases, getDotCheckpointForZoom, getDotColor, getEffectiveSize, getRawScreenDotRadius, getScreenDotRadius, getScreenSpacing } from './DotGridZoomPhases.js';
 import { getScreenAnchor } from './ScreenGridPhaseMachine.js';
+
+/** Checkpoint zoomPercent: 1px dot вместо круга */
+const DOT_1PX_CHECKPOINTS = new Set([7, 7.6, 8.4, 15, 17, 19, 20, 21, 24, 26, 30, 37, 41, 46]);
 
 /**
  * Точечная сетка с фазовым переключением при зуме (как в Miro).
@@ -93,9 +96,13 @@ export class DotGrid extends BaseGrid {
         const endX = Math.round(b.right) + stepPx;
         const endY = Math.round(b.bottom) + stepPx;
 
-        const dotSize = this._allowFloatDotRadius
+        const rawDotSize = this._allowFloatDotRadius
             ? getRawScreenDotRadius(this._zoom, this.minScreenDotRadius)
             : getScreenDotRadius(this._zoom, this.minScreenDotRadius);
+        const checkpoint = getDotCheckpointForZoom(this._zoom);
+        const zoomPct = checkpoint?.zoomPercent ?? 100;
+        const use1px = DOT_1PX_CHECKPOINTS.has(zoomPct);
+        const dotSize = use1px ? 0.4 : rawDotSize;
         const dotColor = getDotColor(this._zoom, this.color);
 
         this.graphics.beginFill(dotColor, alpha);
@@ -161,6 +168,10 @@ export class DotGrid extends BaseGrid {
         const r = this._allowFloatDotRadius
             ? Math.max(0, Number(size) || 0)
             : Math.max(0, Math.round(size));
+        if (r < 1) {
+            this.graphics.drawRect(px, py, 1, 1);
+            return;
+        }
         if (this.dotStyle === 'circle') {
             this.graphics.drawCircle(px, py, r);
         } else if (this.dotStyle === 'square') {
