@@ -11,12 +11,12 @@ export class LineGrid extends BaseGrid {
         this.type = 'line';
 
         // Жесткий Miro-профиль line-grid: не зависим от сохраненных override.
-        this.showSubGrid = true;
-        this.subGridDivisions = 5;
+        this.showSubGrid = false;
+        this.subGridDivisions = 0;
         this.subGridColor = 0xFEFEFE;
         this.subGridOpacity = 1;
-        this.superGridColor = 0xECECEC;
-        this.superGridOpacity = 1;
+        this.bigGridColor = 0xECECEC;
+        this.bigGridOpacity = 1;
         this.lineWidth = 1;
         this.color = 0xF4F4F4;
         this.opacity = 1;
@@ -54,15 +54,11 @@ export class LineGrid extends BaseGrid {
         // Основные линии сетки
         this.drawMainGrid();
 
-        // Дополнительная крупная сетка (Miro-подобный второй уровень).
-        if ((state.superMajorScreenStep || 0) > 0) {
-            this.drawSuperGrid();
+        // Вторая (крупная) сетка.
+        if ((state.secondGridStep || 0) > 0) {
+            this.drawSecondGrid();
         }
         
-        // Дополнительная подсетка
-        if (this.showSubGrid && state.showSubGridByZoom && (state.minorScreenStep || 0) > 0) {
-            this.drawSubGrid();
-        }
     }
     
     /**
@@ -156,19 +152,19 @@ export class LineGrid extends BaseGrid {
         }
     }
 
-    drawSuperGrid() {
-        const { superMajorScreenStep } = this.getScreenGridState();
-        const step = Math.max(1, Math.round(superMajorScreenStep || 0));
+    drawSecondGrid() {
+        const { secondGridStep } = this.getScreenGridState();
+        const step = Math.max(1, Math.round(secondGridStep || 0));
         if (step <= 0) return;
         try {
             this.graphics.lineStyle({
                 width: 1,
-                color: this.superGridColor,
-                alpha: this.superGridOpacity,
+                color: this.bigGridColor,
+                alpha: this.bigGridOpacity,
                 alignment: 0
             });
         } catch (_) {
-            this.graphics.lineStyle(1, this.superGridColor, this.superGridOpacity);
+            this.graphics.lineStyle(1, this.bigGridColor, this.bigGridOpacity);
         }
         const b = this.getDrawBounds();
         const worldX = this.viewportTransform?.worldX || 0;
@@ -263,8 +259,8 @@ export class LineGrid extends BaseGrid {
             subGridDivisions: this.subGridDivisions,
             subGridColor: this.subGridColor,
             subGridOpacity: this.subGridOpacity,
-            superGridColor: this.superGridColor,
-            superGridOpacity: this.superGridOpacity
+            bigGridColor: this.bigGridColor,
+            bigGridOpacity: this.bigGridOpacity
         };
     }
 }

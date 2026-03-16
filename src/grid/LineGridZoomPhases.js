@@ -95,26 +95,14 @@ const EXACT_MAJOR_BY_PERCENT = new Map(
 export function resolveLineGridState(zoom, options = {}) {
     const z = clampZoom(zoom);
     const base = resolveScreenGridState(z, options);
-    const subDivisions = Math.max(2, Math.round(options.subGridDivisions ?? 5));
     const zoomPercent = z * 100;
 
     const roundedPercent = Math.round(zoomPercent);
     const normalizedPercent = normalizeZoomPercent(zoomPercent);
     let majorScreenStep = EXACT_MAJOR_BY_PERCENT.get(normalizedPercent) ?? interpolateMajorStep(zoomPercent);
-    let showSubGridByZoom = true;
-
-    // На 73% остается только одна крупная сетка (мелкая исчезает).
-    if (roundedPercent === 73) {
-        showSubGridByZoom = false;
-    }
-    if (normalizedPercent === 19.0 || normalizedPercent === 4.6) {
-        showSubGridByZoom = false;
-    }
-
-    const minorScreenStep = showSubGridByZoom
-        ? Math.max(1, Math.round(majorScreenStep / subDivisions))
-        : null;
-    const hasSuperGridByRoundedPercent =
+    const minorScreenStep = null;
+    const showSubGridByZoom = false;
+    const hasSecondGridByRoundedPercent =
         roundedPercent === 254 ||
         roundedPercent === 227 ||
         roundedPercent === 203 ||
@@ -132,7 +120,7 @@ export function resolveLineGridState(zoom, options = {}) {
         roundedPercent === 46 ||
         roundedPercent === 41 ||
         roundedPercent === 37;
-    const hasSuperGridByExactPercent =
+    const hasSecondGridByExactPercent =
         normalizedPercent === 33.0 ||
         normalizedPercent === 30.0 ||
         normalizedPercent === 26.0 ||
@@ -155,10 +143,10 @@ export function resolveLineGridState(zoom, options = {}) {
         normalizedPercent === 46.0 ||
         normalizedPercent === 41.0 ||
         normalizedPercent === 37.0;
-    const hasSuperGrid = hasSuperGridByRoundedPercent || hasSuperGridByExactPercent;
-    const hasSuperGridForUltraLowZoom = normalizedPercent < 5.0 && normalizedPercent !== 4.6;
-    const superMajorScreenStep = hasSuperGrid
-        || hasSuperGridForUltraLowZoom
+    const hasSecondGrid = hasSecondGridByRoundedPercent || hasSecondGridByExactPercent;
+    const hasSecondGridForUltraLowZoom = normalizedPercent < 5.0 && normalizedPercent !== 4.6;
+    const secondGridStep = (roundedPercent === 100 || hasSecondGrid)
+        || hasSecondGridForUltraLowZoom
         ? Math.max(1, Math.round(majorScreenStep * 4))
         : null;
 
@@ -167,9 +155,9 @@ export function resolveLineGridState(zoom, options = {}) {
         screenStep: majorScreenStep,
         majorScreenStep,
         minorScreenStep,
-        superMajorScreenStep,
+        secondGridStep,
         showSubGridByZoom,
-        subDivisions,
+        subDivisions: 0,
     };
 }
 
