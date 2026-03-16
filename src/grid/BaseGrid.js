@@ -159,7 +159,7 @@ export class BaseGrid {
     }
 
     setZoom(scale) {
-        this._zoom = Math.max(0.02, Math.min(5, scale || 1));
+        this._zoom = Math.max(0.01, Math.min(5, scale || 1));
     }
     
     /**

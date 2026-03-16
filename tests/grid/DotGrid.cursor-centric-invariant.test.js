@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getScreenSpacing } from '../../src/grid/DotGridZoomPhases.js';
 import { snapScreenValue } from '../../src/grid/ScreenGridPhaseMachine.js';
+import { MIRO_ZOOM_LEVELS } from '../../src/services/MiroZoomLevels.js';
 
 class GraphicsMock {
     constructor() {
@@ -19,7 +20,7 @@ vi.mock('pixi.js', () => ({
     Graphics: GraphicsMock,
 }));
 
-const ZOOM_LEVELS = [2, 5, 10, 15, 20, 25, 33, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500];
+const ZOOM_LEVELS = MIRO_ZOOM_LEVELS;
 
 function buildTransitions(levels) {
     const transitions = [];

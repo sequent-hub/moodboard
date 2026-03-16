@@ -1,5 +1,6 @@
 import { BaseGrid } from './BaseGrid.js';
 import { getScreenAnchor } from './ScreenGridPhaseMachine.js';
+import { resolveLineGridState } from './LineGridZoomPhases.js';
 
 /**
  * Линейная прямоугольная сетка
@@ -8,16 +9,26 @@ export class LineGrid extends BaseGrid {
     constructor(options = {}) {
         super(options);
         this.type = 'line';
-        
-        // Дополнительные настройки для линейной сетки
-        // Параметры не задаём по умолчанию здесь — их поставляет GridFactory.
-        this.showSubGrid = options.showSubGrid;
-        this.subGridDivisions = options.subGridDivisions;
-        this.subGridColor = options.subGridColor;
-        this.subGridOpacity = options.subGridOpacity;
-        this.lineWidth = options.lineWidth;
-        this.color = options.color;
-        this.opacity = options.opacity;
+
+        // Жесткий Miro-профиль line-grid: не зависим от сохраненных override.
+        this.showSubGrid = true;
+        this.subGridDivisions = 5;
+        this.subGridColor = 0xFEFEFE;
+        this.subGridOpacity = 1;
+        this.superGridColor = 0xECECEC;
+        this.superGridOpacity = 1;
+        this.lineWidth = 1;
+        this.color = 0xF4F4F4;
+        this.opacity = 1;
+
+        this._majorAnchorX = null;
+        this._majorAnchorY = null;
+        this._majorStepX = null;
+        this._majorStepY = null;
+        this._minorAnchorX = null;
+        this._minorAnchorY = null;
+        this._minorStepX = null;
+        this._minorStepY = null;
     }
     
     /**
@@ -28,6 +39,7 @@ export class LineGrid extends BaseGrid {
         if (typeof this.opacity === 'number') {
             this.graphics.alpha = this.opacity;
         }
+        const state = this.getScreenGridState();
         try {
             this.graphics.lineStyle({
                 width: Math.max(1, Math.round(this.lineWidth || 1)),
@@ -41,9 +53,14 @@ export class LineGrid extends BaseGrid {
         
         // Основные линии сетки
         this.drawMainGrid();
+
+        // Дополнительная крупная сетка (Miro-подобный второй уровень).
+        if ((state.superMajorScreenStep || 0) > 0) {
+            this.drawSuperGrid();
+        }
         
         // Дополнительная подсетка
-        if (this.showSubGrid) {
+        if (this.showSubGrid && state.showSubGridByZoom && (state.minorScreenStep || 0) > 0) {
             this.drawSubGrid();
         }
     }
@@ -57,8 +74,11 @@ export class LineGrid extends BaseGrid {
         const step = Math.max(1, screenStep);
         const worldX = this.viewportTransform?.worldX || 0;
         const worldY = this.viewportTransform?.worldY || 0;
-        const anchorX = getScreenAnchor(worldX, step);
-        const anchorY = getScreenAnchor(worldY, step);
+        const cursorX = this.viewportTransform?.zoomCursorX;
+        const cursorY = this.viewportTransform?.zoomCursorY;
+        const useCursorAnchor = this.viewportTransform?.useCursorAnchor === true;
+        const anchorX = this._resolveScreenAnchor('x', worldX, step, cursorX, useCursorAnchor, 'major');
+        const anchorY = this._resolveScreenAnchor('y', worldY, step, cursorY, useCursorAnchor, 'major');
         const alignStart = (min, anchor) => {
             const d = ((anchor - min) % step + step) % step;
             return min + d;
@@ -85,8 +105,8 @@ export class LineGrid extends BaseGrid {
      * Рисует подсетку (более мелкие линии)
      */
     drawSubGrid() {
-        const { screenStep } = this.getScreenGridState();
-        const subSize = Math.max(1, Math.round(screenStep / this.subGridDivisions));
+        const { screenStep, minorScreenStep } = this.getScreenGridState();
+        const subSize = Math.max(1, Math.round(minorScreenStep || (screenStep / this.subGridDivisions)));
         try {
             this.graphics.lineStyle({
                 width: 1,
@@ -100,8 +120,11 @@ export class LineGrid extends BaseGrid {
         const b = this.getDrawBounds();
         const worldX = this.viewportTransform?.worldX || 0;
         const worldY = this.viewportTransform?.worldY || 0;
-        const anchorX = getScreenAnchor(worldX, subSize);
-        const anchorY = getScreenAnchor(worldY, subSize);
+        const cursorX = this.viewportTransform?.zoomCursorX;
+        const cursorY = this.viewportTransform?.zoomCursorY;
+        const useCursorAnchor = this.viewportTransform?.useCursorAnchor === true;
+        const anchorX = this._resolveScreenAnchor('x', worldX, subSize, cursorX, useCursorAnchor, 'minor');
+        const anchorY = this._resolveScreenAnchor('y', worldY, subSize, cursorY, useCursorAnchor, 'minor');
         const alignStart = (min, anchor) => {
             const d = ((anchor - min) % subSize + subSize) % subSize;
             return min + d;
@@ -111,8 +134,8 @@ export class LineGrid extends BaseGrid {
         const startY = alignStart(b.top, anchorY);
         const endY = b.bottom + subSize;
         const majorStep = Math.max(1, screenStep);
-        const majorAnchorX = getScreenAnchor(worldX, majorStep);
-        const majorAnchorY = getScreenAnchor(worldY, majorStep);
+        const majorAnchorX = this._resolveScreenAnchor('x', worldX, majorStep, cursorX, useCursorAnchor, 'major');
+        const majorAnchorY = this._resolveScreenAnchor('y', worldY, majorStep, cursorY, useCursorAnchor, 'major');
         const isOnMajor = (value, major, anchor) => {
             const rel = (value - anchor) / major;
             return Math.abs(rel - Math.round(rel)) < 1e-4;
@@ -131,6 +154,77 @@ export class LineGrid extends BaseGrid {
                 this.graphics.lineTo(b.right, py);
             }
         }
+    }
+
+    drawSuperGrid() {
+        const { superMajorScreenStep } = this.getScreenGridState();
+        const step = Math.max(1, Math.round(superMajorScreenStep || 0));
+        if (step <= 0) return;
+        try {
+            this.graphics.lineStyle({
+                width: 1,
+                color: this.superGridColor,
+                alpha: this.superGridOpacity,
+                alignment: 0
+            });
+        } catch (_) {
+            this.graphics.lineStyle(1, this.superGridColor, this.superGridOpacity);
+        }
+        const b = this.getDrawBounds();
+        const worldX = this.viewportTransform?.worldX || 0;
+        const worldY = this.viewportTransform?.worldY || 0;
+        const cursorX = this.viewportTransform?.zoomCursorX;
+        const cursorY = this.viewportTransform?.zoomCursorY;
+        const useCursorAnchor = this.viewportTransform?.useCursorAnchor === true;
+        const anchorX = this._resolveScreenAnchor('x', worldX, step, cursorX, useCursorAnchor, 'major');
+        const anchorY = this._resolveScreenAnchor('y', worldY, step, cursorY, useCursorAnchor, 'major');
+        const alignStart = (min, anchor) => {
+            const d = ((anchor - min) % step + step) % step;
+            return min + d;
+        };
+        const startX = alignStart(b.left, anchorX);
+        const endX = b.right + step;
+        const startY = alignStart(b.top, anchorY);
+        const endY = b.bottom + step;
+        for (let x = startX; x <= endX; x += step) {
+            const px = Math.round(x);
+            this.graphics.moveTo(px, b.top);
+            this.graphics.lineTo(px, b.bottom);
+        }
+        for (let y = startY; y <= endY; y += step) {
+            const py = Math.round(y);
+            this.graphics.moveTo(b.left, py);
+            this.graphics.lineTo(b.right, py);
+        }
+    }
+
+    _normalizeAnchor(anchor, stepPx) {
+        const step = Math.max(1, Math.round(stepPx));
+        return ((Math.round(anchor) % step) + step) % step;
+    }
+
+    _resolveScreenAnchor(axis, worldOffset, stepPx, cursorPx, useCursorAnchor, layer) {
+        const step = Math.max(1, Math.round(stepPx));
+        const anchorKey = `_${layer}Anchor${axis === 'x' ? 'X' : 'Y'}`;
+        const stepKey = `_${layer}Step${axis === 'x' ? 'X' : 'Y'}`;
+        const raw = this._normalizeAnchor(getScreenAnchor(worldOffset, step), step);
+        if (useCursorAnchor && Number.isFinite(cursorPx)) {
+            const locked = this._normalizeAnchor(Math.round(cursorPx), step);
+            this[anchorKey] = locked;
+            this[stepKey] = step;
+            return locked;
+        }
+        this[anchorKey] = raw;
+        this[stepKey] = step;
+        return raw;
+    }
+
+    getScreenGridState() {
+        return resolveLineGridState(this._zoom, {
+            minScreenSpacing: this.minScreenSpacing,
+            phases: this.screenPhases,
+            subGridDivisions: this.subGridDivisions,
+        });
     }
     
     /**
@@ -168,7 +262,9 @@ export class LineGrid extends BaseGrid {
             showSubGrid: this.showSubGrid,
             subGridDivisions: this.subGridDivisions,
             subGridColor: this.subGridColor,
-            subGridOpacity: this.subGridOpacity
+            subGridOpacity: this.subGridOpacity,
+            superGridColor: this.superGridColor,
+            superGridOpacity: this.superGridOpacity
         };
     }
 }

@@ -61,7 +61,7 @@ describe('ZoomPanController coordinate invariants', () => {
             y: (cursor.y - world.y) / world.scale.x,
         };
 
-        expect(world.scale.x).toBe(1.25); // следующий уровень после 100% в ZOOM_LEVELS
+        expect(world.scale.x).toBe(1.12); // следующий уровень после 100% в Miro-профиле
         expect(Number.isInteger(world.x)).toBe(true);
         expect(Number.isInteger(world.y)).toBe(true);
         expect(Math.abs(worldAfter.x - worldBefore.x)).toBeLessThanOrEqual(1);

@@ -1,12 +1,19 @@
 import { Events } from '../core/events/Events.js';
+import {
+	MIRO_ZOOM_DOWN_FROM_100,
+	MIRO_ZOOM_DOWN_FROM_400,
+	MIRO_ZOOM_UP_FROM_100,
+	MIRO_ZOOM_UP_TO_100,
+} from './MiroZoomLevels.js';
 
 /**
- * Уровни зума, выровненные под профиль Miro.
- * Верхняя граница — 500%.
+ * Направленные zoom-последовательности, выровненные под наблюдения Miro.
  */
-const ZOOM_LEVELS = [
-	2, 5, 10, 15, 20, 25, 33, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500
-];
+const ZOOM_UP_TO_100 = MIRO_ZOOM_UP_TO_100;
+const ZOOM_UP_FROM_100 = MIRO_ZOOM_UP_FROM_100;
+const ZOOM_DOWN_FROM_100 = MIRO_ZOOM_DOWN_FROM_100;
+const ZOOM_DOWN_FROM_400 = MIRO_ZOOM_DOWN_FROM_400;
+const EPSILON = 1e-6;
 
 export class ZoomPanController {
 	constructor(eventBus, pixi) {
@@ -14,17 +21,34 @@ export class ZoomPanController {
 		this.pixi = pixi;
 	}
 
-	_nearestLevelIndex(percent) {
-		let best = 0;
-		let bestDist = Math.abs(ZOOM_LEVELS[0] - percent);
-		for (let i = 1; i < ZOOM_LEVELS.length; i++) {
-			const d = Math.abs(ZOOM_LEVELS[i] - percent);
-			if (d < bestDist) {
-				bestDist = d;
-				best = i;
-			}
+	_nextAscendingLevel(percent, levels) {
+		for (let i = 0; i < levels.length; i += 1) {
+			if (levels[i] > percent + EPSILON) return levels[i];
 		}
-		return best;
+		return levels[levels.length - 1];
+	}
+
+	_nextDescendingLevel(percent, levels) {
+		for (let i = 0; i < levels.length; i += 1) {
+			if (levels[i] < percent - EPSILON) return levels[i];
+		}
+		return levels[levels.length - 1];
+	}
+
+	_pickTargetPercent(oldPercent, delta) {
+		if (delta < 0) {
+			if (oldPercent >= 100) {
+				return this._nextAscendingLevel(oldPercent, ZOOM_UP_FROM_100);
+			}
+			return this._nextAscendingLevel(oldPercent, ZOOM_UP_TO_100);
+		}
+		if (delta > 0) {
+			if (oldPercent > 100) {
+				return this._nextDescendingLevel(oldPercent, ZOOM_DOWN_FROM_400);
+			}
+			return this._nextDescendingLevel(oldPercent, ZOOM_DOWN_FROM_100);
+		}
+		return oldPercent;
 	}
 
 	attach() {
@@ -32,18 +56,13 @@ export class ZoomPanController {
 		this.eventBus.on(Events.Tool.WheelZoom, ({ x, y, delta }) => {
 			const world = this.pixi.worldLayer || this.pixi.app.stage;
 			const oldScale = world.scale.x || 1;
-			const oldPercent = Math.round(oldScale * 100);
-			const idx = this._nearestLevelIndex(oldPercent);
-			let targetPercent;
-			if (delta < 0) {
-				targetPercent = ZOOM_LEVELS[Math.min(ZOOM_LEVELS.length - 1, idx + 1)];
-			} else if (delta > 0) {
-				targetPercent = ZOOM_LEVELS[Math.max(0, idx - 1)];
-			} else {
-				return;
-			}
-			const newScale = Math.max(0.02, Math.min(5, targetPercent / 100));
+			const oldPercent = oldScale * 100;
+			if (!(delta < 0 || delta > 0)) return;
+
+			const targetPercent = this._pickTargetPercent(oldPercent, delta);
+			const newScale = Math.max(0.01, Math.min(5, targetPercent / 100));
 			if (Math.abs(newScale - oldScale) < 0.0001) return;
+
 			// Вычисляем мировые координаты точки под курсором до изменения скейла
 			const worldX = (x - world.x) / oldScale;
 			const worldY = (y - world.y) / oldScale;
@@ -99,7 +118,7 @@ export class ZoomPanController {
 			const padding = 40;
 			const scaleX = (viewW - padding) / bboxW;
 			const scaleY = (viewH - padding) / bboxH;
-			const newScale = Math.max(0.02, Math.min(5, Math.min(scaleX, scaleY)));
+			const newScale = Math.max(0.01, Math.min(5, Math.min(scaleX, scaleY)));
 			const world = this.pixi.worldLayer || this.pixi.app.stage;
 			const worldCenterX = minX + bboxW / 2;
 			const worldCenterY = minY + bboxH / 2;
