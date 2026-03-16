@@ -56,6 +56,18 @@
   - integer-контракт CSS-координат для HTML-handles/overlay;
   - integer-контракт экранных смещений viewport в `ZoomPanController` и `BoardService`.
 
+- **`npm run test:run -- tests/grid/LineGrid.zoom-phases.test.js tests/grid/LineGrid.cursor-centric-invariant.test.js tests/services/ZoomPanController.coordinates.test.js`** — целевой прогон line-grid профиля Miro.
+  Запускает:
+  - `tests/grid/LineGrid.zoom-phases.test.js`
+  - `tests/grid/LineGrid.cursor-centric-invariant.test.js`
+  - `tests/services/ZoomPanController.coordinates.test.js`
+  Покрывает:
+  - контракт `line`-сетки в модели `small + big(second)` без `minor`-подсетки;
+  - checkpoint-таблицу размеров клеток на согласованных zoom-шагах (включая дубли меток `8` и `5`);
+  - правила single-grid шагов (`73`, `19`, второй `5`) и second-grid шагов (`x4`) там, где они зафиксированы;
+  - стабильность cursor-centric якоря при переходах между соседними zoom-уровнями;
+  - корректную directed-лестницу `ZoomPanController` (`100 -> 92 -> 82 -> 73 -> ...`) без незафиксированных шагов.
+
 ## Покрытие тестами
 
 **Обновление:** добавлены `24` теста для `HistoryManager` (`tests/core/HistoryManager.baseline.test.js`) — добавление команд в историю, undo/redo, merge, maxHistorySize, служебные методы.
