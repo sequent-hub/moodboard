@@ -64,6 +64,9 @@ export function destroyMoodBoard(board) {
     safeDestroy(board.mapbar, 'mapbar');
     board.mapbar = null;
 
+    safeDestroy(board.dotGridDebugPanel, 'dotGridDebugPanel');
+    board.dotGridDebugPanel = null;
+
     safeDestroy(board.coreMoodboard, 'coreMoodboard');
     board.coreMoodboard = null;
 

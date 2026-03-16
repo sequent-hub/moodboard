@@ -3,6 +3,7 @@ import { SaveStatus } from '../../ui/SaveStatus.js';
 import { Topbar } from '../../ui/Topbar.js';
 import { ZoomPanel } from '../../ui/ZoomPanel.js';
 import { MapPanel } from '../../ui/MapPanel.js';
+import { DotGridDebugPanel } from '../../ui/DotGridDebugPanel.js';
 import { ContextMenu } from '../../ui/ContextMenu.js';
 import { HtmlTextLayer } from '../../ui/HtmlTextLayer.js';
 import { HtmlHandlesLayer } from '../../ui/HtmlHandlesLayer.js';
@@ -69,6 +70,13 @@ function initMapbar(board) {
     );
 }
 
+function initDotGridDebugPanel(board) {
+    board.dotGridDebugPanel = new DotGridDebugPanel(
+        board.workspaceElement,
+        board.coreMoodboard
+    );
+}
+
 function initContextMenu(board) {
     board.contextMenu = new ContextMenu(
         board.canvasContainer,
@@ -104,6 +112,7 @@ export function createMoodBoardUi(board) {
     initTopbar(board);
     initZoombar(board);
     initMapbar(board);
+    initDotGridDebugPanel(board);
     initContextMenu(board);
     initHtmlLayersAndPanels(board);
 }

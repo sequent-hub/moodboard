@@ -4,9 +4,12 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  DOT_CHECKPOINTS,
   getActivePhases,
+  getDotColor,
   getDotOpacity,
   getEffectiveSize,
+  getScreenDotRadius,
   getScreenSpacing,
   PHASES,
 } from '../../src/grid/DotGridZoomPhases.js';
@@ -76,19 +79,31 @@ describe('DotGridZoomPhases', () => {
     });
   });
 
+  describe('dot checkpoints definition', () => {
+    it('contains fixed checkpoint for 181% and 400%', () => {
+      expect(DOT_CHECKPOINTS.some((r) => r.zoomPercent === 181)).toBe(true);
+      expect(DOT_CHECKPOINTS.some((r) => r.zoomPercent === 400)).toBe(true);
+    });
+  });
+
   describe('getScreenSpacing', () => {
-    it('keeps >=100% profile unchanged and orders 100..2 checkpoints', () => {
+    it('returns fixed spacing by checkpoint', () => {
       const checkpoints = [
-        { z: 1.0, step: 20 },
-        { z: 0.75, step: 19 },
-        { z: 0.5, step: 18 },
-        { z: 0.33, step: 17 },
-        { z: 0.25, step: 16 },
-        { z: 0.2, step: 15 },
-        { z: 0.15, step: 14 },
-        { z: 0.1, step: 13 },
-        { z: 0.05, step: 12 },
-        { z: 0.02, step: 11 },
+        { z: 0.10, step: 16 },
+        { z: 0.15, step: 12 },
+        { z: 0.20, step: 16 },
+        { z: 0.33, step: 13 },
+        { z: 0.50, step: 10 },
+        { z: 0.75, step: 15 },
+        { z: 1.00, step: 20 },
+        { z: 1.29, step: 26 },
+        { z: 1.44, step: 29 },
+        { z: 1.62, step: 32 },
+        { z: 1.81, step: 36 },
+        { z: 2.00, step: 40 },
+        { z: 3.00, step: 60 },
+        { z: 4.00, step: 80 },
+        { z: 5.00, step: 100 },
       ];
       for (const row of checkpoints) {
         expect(getScreenSpacing(row.z)).toBe(row.step);
@@ -96,34 +111,40 @@ describe('DotGridZoomPhases', () => {
     });
   });
 
+  describe('getScreenDotRadius', () => {
+    it('returns fixed radius by checkpoint', () => {
+      expect(getScreenDotRadius(0.1)).toBe(1);
+      expect(getScreenDotRadius(1)).toBe(1);
+      expect(getScreenDotRadius(1.29)).toBe(2);
+      expect(getScreenDotRadius(1.44)).toBe(2);
+      expect(getScreenDotRadius(1.62)).toBe(2);
+      expect(getScreenDotRadius(1.81)).toBe(2);
+      expect(getScreenDotRadius(2)).toBe(2);
+      expect(getScreenDotRadius(3)).toBe(3);
+      expect(getScreenDotRadius(4)).toBe(4);
+      expect(getScreenDotRadius(5)).toBe(5);
+    });
+  });
+
+  describe('getDotColor', () => {
+    it('returns fixed color for checkpoints', () => {
+      expect(getDotColor(1.29)).toBe(0xE3E3E3);
+      expect(getDotColor(1.44)).toBe(0xE7E7E7);
+      expect(getDotColor(1.62)).toBe(0xE5E5E5);
+      expect(getDotColor(1.81)).toBe(0xE2E2E2);
+      expect(getDotColor(4.0)).toBe(0xE8E8E8);
+    });
+  });
+
   describe('getDotOpacity', () => {
-    it('returns 1.0 at 100%, 0.5 at 2%, and 0.3 at 500%', () => {
+    it('always returns 1 for any zoom checkpoint', () => {
       expect(getDotOpacity(1)).toBe(1);
-      expect(getDotOpacity(0.02)).toBe(0.5);
-      expect(getDotOpacity(5)).toBe(0.3);
-    });
-
-    it('returns interpolated opacity between 2% and 100%', () => {
-      expect(getDotOpacity(0.5)).toBeCloseTo(0.744897959, 6);
-      expect(getDotOpacity(0.25)).toBeCloseTo(0.617346939, 6);
-      expect(getDotOpacity(0.1)).toBeCloseTo(0.540816327, 6);
-    });
-
-    it('matches configured opacity checkpoints at >100%', () => {
-      expect(getDotOpacity(1.25)).toBeCloseTo(0.9, 6);
-      expect(getDotOpacity(1.5)).toBeCloseTo(0.7, 6);
-      expect(getDotOpacity(2)).toBeCloseTo(0.6, 6);
-      expect(getDotOpacity(2.5)).toBeCloseTo(0.5, 6);
-      expect(getDotOpacity(3)).toBeCloseTo(0.4, 6);
-      expect(getDotOpacity(4)).toBeCloseTo(0.35, 6);
-      expect(getDotOpacity(5)).toBeCloseTo(0.3, 6);
-    });
-
-    it('interpolates between >100% checkpoints', () => {
-      // between 125%(0.9) and 150%(0.7)
-      expect(getDotOpacity(1.375)).toBeCloseTo(0.8, 6);
-      // between 300%(0.4) and 400%(0.35)
-      expect(getDotOpacity(3.5)).toBeCloseTo(0.375, 6);
+      expect(getDotOpacity(0.02)).toBe(1);
+      expect(getDotOpacity(0.1)).toBe(1);
+      expect(getDotOpacity(0.5)).toBe(1);
+      expect(getDotOpacity(1.25)).toBe(1);
+      expect(getDotOpacity(4)).toBe(1);
+      expect(getDotOpacity(5)).toBe(1);
     });
   });
 });

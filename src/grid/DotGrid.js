@@ -1,5 +1,5 @@
 import { BaseGrid } from './BaseGrid.js';
-import { getActivePhases, getDotOpacity, getEffectiveSize, getScreenSpacing } from './DotGridZoomPhases.js';
+import { getActivePhases, getDotColor, getEffectiveSize, getRawScreenDotRadius, getScreenDotRadius, getScreenSpacing } from './DotGridZoomPhases.js';
 import { getScreenAnchor } from './ScreenGridPhaseMachine.js';
 
 /**
@@ -15,8 +15,7 @@ export class DotGrid extends BaseGrid {
         this.highlightIntersections = options.highlightIntersections ?? true;
         this.dotSize = options.dotSize ?? 1; // для serialize/setDotSize; фазы переопределяют при отрисовке
         this.snapSize = options.snapSize ?? 20; // фиксированный шаг привязки в world-координатах
-        // Минимальный радиус точки на экране: 1px (диаметр 2px).
-        this.minScreenDotRadius = Math.max(1, Math.round(options.minScreenDotRadius ?? 1));
+        this.minScreenDotRadius = options.minScreenDotRadius ?? 0;
         this.minScreenSpacing = options.minScreenSpacing ?? 8;
         this.maxDotsPerPhase = options.maxDotsPerPhase ?? 25000;
         this.intersectionSize = options.intersectionSize ?? this.dotSize;
@@ -34,6 +33,9 @@ export class DotGrid extends BaseGrid {
         this._anchorY = null;
         this._lastStepPxX = null;
         this._lastStepPxY = null;
+
+        // Временный debug-режим: разрешает дробный радиус для тонкой подстройки.
+        this._allowFloatDotRadius = false;
     }
 
     /**
@@ -71,9 +73,7 @@ export class DotGrid extends BaseGrid {
      */
     _drawPhaseDots(phase, alpha) {
         const b = this.getDrawBounds();
-        const scale = Math.max(0.001, this.viewportTransform?.scale || this._zoom || 1);
         const stepPx = Math.max(1, Math.round(getScreenSpacing(this._zoom)));
-        const zoomOpacity = getDotOpacity(this._zoom);
 
         const worldX = this.viewportTransform?.worldX || 0;
         const worldY = this.viewportTransform?.worldY || 0;
@@ -93,13 +93,12 @@ export class DotGrid extends BaseGrid {
         const endX = Math.round(b.right) + stepPx;
         const endY = Math.round(b.bottom) + stepPx;
 
-        const phaseScreenRadius = phase.dotSize * scale;
-        const roundedRadius = phaseScreenRadius < 2
-            ? Math.floor(phaseScreenRadius)
-            : Math.round(phaseScreenRadius);
-        const dotSize = Math.max(this.minScreenDotRadius, roundedRadius);
+        const dotSize = this._allowFloatDotRadius
+            ? getRawScreenDotRadius(this._zoom, this.minScreenDotRadius)
+            : getScreenDotRadius(this._zoom, this.minScreenDotRadius);
+        const dotColor = getDotColor(this._zoom, this.color);
 
-        this.graphics.beginFill(this.color, alpha * zoomOpacity);
+        this.graphics.beginFill(dotColor, alpha);
         for (let x = startX; x <= endX; x += stepPx) {
             for (let y = startY; y <= endY; y += stepPx) {
                 this.drawDot(x, y, dotSize);
@@ -159,7 +158,9 @@ export class DotGrid extends BaseGrid {
     drawDot(x, y, size) {
         const px = Math.round(x);
         const py = Math.round(y);
-        const r = Math.max(1, Math.round(size));
+        const r = this._allowFloatDotRadius
+            ? Math.max(0, Number(size) || 0)
+            : Math.max(0, Math.round(size));
         if (this.dotStyle === 'circle') {
             this.graphics.drawCircle(px, py, r);
         } else if (this.dotStyle === 'square') {
@@ -215,6 +216,15 @@ export class DotGrid extends BaseGrid {
      */
     setHighlightIntersections(enabled) {
         this.highlightIntersections = enabled;
+        this.updateVisual();
+    }
+
+    /**
+     * Временная debug-настройка дробного радиуса.
+     * @param {boolean} enabled
+     */
+    setAllowFloatDotRadius(enabled) {
+        this._allowFloatDotRadius = enabled === true;
         this.updateVisual();
     }
 
