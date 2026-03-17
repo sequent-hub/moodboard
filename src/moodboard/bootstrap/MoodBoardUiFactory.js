@@ -112,7 +112,11 @@ export function createMoodBoardUi(board) {
     initTopbar(board);
     initZoombar(board);
     initMapbar(board);
-    initDotGridDebugPanel(board);
+    // Debug-панель сетки оставляем в проекте, но не показываем по умолчанию.
+    // Для включения: передать showGridDebugPanel: true в options MoodBoard.
+    if (board?.options?.showGridDebugPanel === true) {
+        initDotGridDebugPanel(board);
+    }
     initContextMenu(board);
     initHtmlLayersAndPanels(board);
 }

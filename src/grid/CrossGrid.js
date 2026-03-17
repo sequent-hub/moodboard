@@ -21,6 +21,12 @@ export class CrossGrid extends BaseGrid {
         // CrossGrid всегда непрозрачный, независимо от входящих настроек.
         this.opacity = 1;
         this.graphics.alpha = 1;
+
+        // Cursor-centric anchor-контракт: при зуме узел под курсором фиксируется.
+        this._anchorX = null;
+        this._anchorY = null;
+        this._lastStepPxX = null;
+        this._lastStepPxY = null;
     }
 
     /**
@@ -39,8 +45,11 @@ export class CrossGrid extends BaseGrid {
         const step = Math.max(1, Math.round(checkpoint.spacing || 20));
         const worldX = this.viewportTransform?.worldX || 0;
         const worldY = this.viewportTransform?.worldY || 0;
-        const anchorX = getScreenAnchor(worldX, step);
-        const anchorY = getScreenAnchor(worldY, step);
+        const cursorX = this.viewportTransform?.zoomCursorX;
+        const cursorY = this.viewportTransform?.zoomCursorY;
+        const useCursorAnchor = this.viewportTransform?.useCursorAnchor === true;
+        const anchorX = this._resolveScreenAnchor('x', worldX, step, cursorX, useCursorAnchor);
+        const anchorY = this._resolveScreenAnchor('y', worldY, step, cursorY, useCursorAnchor);
         const alignStart = (min, anchor) => {
             const d = ((anchor - min) % step + step) % step;
             return min + d;
@@ -61,6 +70,29 @@ export class CrossGrid extends BaseGrid {
 
         }
         g.endFill();
+    }
+
+    _normalizeAnchor(anchor, stepPx) {
+        const step = Math.max(1, Math.round(stepPx));
+        return ((Math.round(anchor) % step) + step) % step;
+    }
+
+    _resolveScreenAnchor(axis, worldOffset, stepPx, cursorPx, useCursorAnchor) {
+        const anchorKey = axis === 'x' ? '_anchorX' : '_anchorY';
+        const lastStepKey = axis === 'x' ? '_lastStepPxX' : '_lastStepPxY';
+        const step = Math.max(1, Math.round(stepPx));
+        const rawAnchor = this._normalizeAnchor(getScreenAnchor(worldOffset, step), step);
+
+        if (useCursorAnchor && Number.isFinite(cursorPx)) {
+            const cursorAnchor = this._normalizeAnchor(Math.round(cursorPx), step);
+            this[anchorKey] = cursorAnchor;
+            this[lastStepKey] = step;
+            return cursorAnchor;
+        }
+
+        this[anchorKey] = rawAnchor;
+        this[lastStepKey] = step;
+        return rawAnchor;
     }
 
     /**
