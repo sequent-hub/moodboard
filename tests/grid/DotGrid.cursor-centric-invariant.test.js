@@ -47,6 +47,11 @@ function stepPx(zoomScale) {
     return Math.max(1, Math.round(getScreenSpacing(zoomScale)));
 }
 
+function normalizeAnchor(anchor, stepPx) {
+    const step = Math.max(1, Math.round(stepPx));
+    return ((Math.round(anchor) % step) + step) % step;
+}
+
 describe('DotGrid cursor-centric invariant', () => {
     it('keeps dot under cursor fixed for all zoom transitions when cursor starts on a dot', async () => {
         const { DotGrid } = await import('../../src/grid/DotGrid.js');
@@ -86,6 +91,32 @@ describe('DotGrid cursor-centric invariant', () => {
                 expect(afterPoint.x - beforePoint.x).toBe(0);
                 expect(afterPoint.y - beforePoint.y).toBe(0);
             }
+        }
+    });
+
+    it('preserves cursor-to-dot offset when cursor starts between dots', async () => {
+        const { DotGrid } = await import('../../src/grid/DotGrid.js');
+        const transitions = buildTransitions(ZOOM_LEVELS);
+        const cursor = { x: 401, y: 249 };
+
+        for (const [fromPercent, toPercent] of transitions) {
+            const grid = new DotGrid({ enabled: true, size: 20, dotSize: 1 });
+            const worldBefore = { x: 137, y: -83, scale: fromPercent / 100 };
+            const beforeStep = stepPx(worldBefore.scale);
+            const beforeAnchorX = grid._resolveScreenAnchor('x', worldBefore.x, beforeStep, null, false);
+            const beforeAnchorY = grid._resolveScreenAnchor('y', worldBefore.y, beforeStep, null, false);
+            const beforeOffsetX = normalizeAnchor(cursor.x - beforeAnchorX, beforeStep);
+            const beforeOffsetY = normalizeAnchor(cursor.y - beforeAnchorY, beforeStep);
+
+            const worldAfter = applyCursorCentricZoom(worldBefore, cursor, toPercent);
+            const afterStep = stepPx(worldAfter.scale);
+            const afterAnchorX = grid._resolveScreenAnchor('x', worldAfter.x, afterStep, cursor.x, true);
+            const afterAnchorY = grid._resolveScreenAnchor('y', worldAfter.y, afterStep, cursor.y, true);
+            const afterOffsetX = normalizeAnchor(cursor.x - afterAnchorX, afterStep);
+            const afterOffsetY = normalizeAnchor(cursor.y - afterAnchorY, afterStep);
+
+            expect(afterOffsetX).toBe(normalizeAnchor(beforeOffsetX, afterStep));
+            expect(afterOffsetY).toBe(normalizeAnchor(beforeOffsetY, afterStep));
         }
     });
 });

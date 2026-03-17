@@ -36,6 +36,11 @@ function applyCursorCentricZoom(world, cursor, targetPercent) {
     };
 }
 
+function normalizeAnchor(anchor, stepPx) {
+    const step = Math.max(1, Math.round(stepPx));
+    return ((Math.round(anchor) % step) + step) % step;
+}
+
 describe('LineGrid cursor-centric invariant', () => {
     it('keeps major line under cursor stable during zoom transitions', async () => {
         const { LineGrid } = await import('../../src/grid/LineGrid.js');
@@ -83,6 +88,34 @@ describe('LineGrid cursor-centric invariant', () => {
                 expect(afterPoint.x - beforePoint.x).toBe(0);
                 expect(afterPoint.y - beforePoint.y).toBe(0);
             }
+        }
+    });
+
+    it('preserves cursor-to-line offset when cursor starts between lines', async () => {
+        const { LineGrid } = await import('../../src/grid/LineGrid.js');
+        const transitions = buildTransitions(MIRO_ZOOM_LEVELS);
+        const cursor = { x: 401, y: 249 };
+
+        for (const [fromPercent, toPercent] of transitions) {
+            const grid = new LineGrid({ enabled: true, lineWidth: 1, subGridDivisions: 5 });
+            const worldBefore = { x: 133, y: -77, scale: fromPercent / 100 };
+            const fromState = resolveLineGridState(worldBefore.scale, { subGridDivisions: 5 });
+            const fromStep = Math.max(1, Math.round(fromState.majorScreenStep));
+            const beforeAnchorX = grid._resolveScreenAnchor('x', worldBefore.x, fromStep, null, false, 'major');
+            const beforeAnchorY = grid._resolveScreenAnchor('y', worldBefore.y, fromStep, null, false, 'major');
+            const beforeOffsetX = normalizeAnchor(cursor.x - beforeAnchorX, fromStep);
+            const beforeOffsetY = normalizeAnchor(cursor.y - beforeAnchorY, fromStep);
+
+            const worldAfter = applyCursorCentricZoom(worldBefore, cursor, toPercent);
+            const toState = resolveLineGridState(worldAfter.scale, { subGridDivisions: 5 });
+            const toStep = Math.max(1, Math.round(toState.majorScreenStep));
+            const afterAnchorX = grid._resolveScreenAnchor('x', worldAfter.x, toStep, cursor.x, true, 'major');
+            const afterAnchorY = grid._resolveScreenAnchor('y', worldAfter.y, toStep, cursor.y, true, 'major');
+            const afterOffsetX = normalizeAnchor(cursor.x - afterAnchorX, toStep);
+            const afterOffsetY = normalizeAnchor(cursor.y - afterAnchorY, toStep);
+
+            expect(afterOffsetX).toBe(normalizeAnchor(beforeOffsetX, toStep));
+            expect(afterOffsetY).toBe(normalizeAnchor(beforeOffsetY, toStep));
         }
     });
 });

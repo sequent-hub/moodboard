@@ -27,6 +27,8 @@ export class CrossGrid extends BaseGrid {
         this._anchorY = null;
         this._lastStepPxX = null;
         this._lastStepPxY = null;
+        this._cursorOffsetX = 0;
+        this._cursorOffsetY = 0;
     }
 
     /**
@@ -80,11 +82,20 @@ export class CrossGrid extends BaseGrid {
     _resolveScreenAnchor(axis, worldOffset, stepPx, cursorPx, useCursorAnchor) {
         const anchorKey = axis === 'x' ? '_anchorX' : '_anchorY';
         const lastStepKey = axis === 'x' ? '_lastStepPxX' : '_lastStepPxY';
+        const cursorOffsetKey = axis === 'x' ? '_cursorOffsetX' : '_cursorOffsetY';
         const step = Math.max(1, Math.round(stepPx));
         const rawAnchor = this._normalizeAnchor(getScreenAnchor(worldOffset, step), step);
 
         if (useCursorAnchor && Number.isFinite(cursorPx)) {
-            const cursorAnchor = this._normalizeAnchor(Math.round(cursorPx), step);
+            const prevAnchor = Number(this[anchorKey]);
+            const prevStep = Math.max(1, Math.round(Number(this[lastStepKey]) || step));
+            if (Number.isFinite(prevAnchor)) {
+                this[cursorOffsetKey] = this._normalizeAnchor(Math.round(cursorPx) - prevAnchor, prevStep);
+            } else if (!Number.isFinite(this[cursorOffsetKey])) {
+                this[cursorOffsetKey] = 0;
+            }
+            const offset = this._normalizeAnchor(this[cursorOffsetKey], step);
+            const cursorAnchor = this._normalizeAnchor(Math.round(cursorPx) - offset, step);
             this[anchorKey] = cursorAnchor;
             this[lastStepKey] = step;
             return cursorAnchor;

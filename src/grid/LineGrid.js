@@ -29,6 +29,10 @@ export class LineGrid extends BaseGrid {
         this._minorAnchorY = null;
         this._minorStepX = null;
         this._minorStepY = null;
+        this._majorCursorOffsetX = 0;
+        this._majorCursorOffsetY = 0;
+        this._minorCursorOffsetX = 0;
+        this._minorCursorOffsetY = 0;
     }
     
     /**
@@ -203,9 +207,18 @@ export class LineGrid extends BaseGrid {
         const step = Math.max(1, Math.round(stepPx));
         const anchorKey = `_${layer}Anchor${axis === 'x' ? 'X' : 'Y'}`;
         const stepKey = `_${layer}Step${axis === 'x' ? 'X' : 'Y'}`;
+        const cursorOffsetKey = `_${layer}CursorOffset${axis === 'x' ? 'X' : 'Y'}`;
         const raw = this._normalizeAnchor(getScreenAnchor(worldOffset, step), step);
         if (useCursorAnchor && Number.isFinite(cursorPx)) {
-            const locked = this._normalizeAnchor(Math.round(cursorPx), step);
+            const prevAnchor = Number(this[anchorKey]);
+            const prevStep = Math.max(1, Math.round(Number(this[stepKey]) || step));
+            if (Number.isFinite(prevAnchor)) {
+                this[cursorOffsetKey] = this._normalizeAnchor(Math.round(cursorPx) - prevAnchor, prevStep);
+            } else if (!Number.isFinite(this[cursorOffsetKey])) {
+                this[cursorOffsetKey] = 0;
+            }
+            const offset = this._normalizeAnchor(this[cursorOffsetKey], step);
+            const locked = this._normalizeAnchor(Math.round(cursorPx) - offset, step);
             this[anchorKey] = locked;
             this[stepKey] = step;
             return locked;
