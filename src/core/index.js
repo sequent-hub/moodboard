@@ -245,12 +245,13 @@ export class CoreMoodBoard {
      * Прямое обновление позиции объекта (без команды)
      * Используется во время перетаскивания для плавного движения
      */
-    updateObjectPositionDirect(objectId, position) {
+    updateObjectPositionDirect(objectId, position, options = {}) {
         // position — левый верх (state); приводим к центру в PIXI, используя размеры PIXI объекта
         // Все объекты используют pivot по центру, поэтому логика одинакова для всех
         const pixiObject = this.pixi.objects.get(objectId);
         let nextPosition = position;
-        if (pixiObject && this.gridSnapResolver) {
+        const applySnap = options.snap !== false;
+        if (applySnap && pixiObject && this.gridSnapResolver) {
             nextPosition = this.gridSnapResolver.snapWorldTopLeft(position, {
                 width: pixiObject.width || 0,
                 height: pixiObject.height || 0,
@@ -291,7 +292,7 @@ export class CoreMoodBoard {
      * Прямое обновление размера и позиции объекта (без команды)
      * Используется во время изменения размера для плавного изменения
      */
-    updateObjectSizeAndPositionDirect(objectId, size, position = null, objectType = null) {
+    updateObjectSizeAndPositionDirect(objectId, size, position = null, objectType = null, options = {}) {
         // Обновляем размер в PIXI
         const pixiObject = this.pixi.objects.get(objectId);
         const prevCenter = pixiObject ? { x: pixiObject.x, y: pixiObject.y } : null;
@@ -299,7 +300,8 @@ export class CoreMoodBoard {
 
         // Обновляем позицию если передана (state: левый-верх; PIXI: центр)
         if (position) {
-            const snappedPosition = this.gridSnapResolver
+            const applySnap = options.snap !== false;
+            const snappedPosition = (applySnap && this.gridSnapResolver)
                 ? this.gridSnapResolver.snapWorldTopLeft(position, size)
                 : position;
             const pixiObject2 = this.pixi.objects.get(objectId);

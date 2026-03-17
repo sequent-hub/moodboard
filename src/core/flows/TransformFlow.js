@@ -95,7 +95,7 @@ export function setupTransformFlow(core) {
                 height: Math.max(10, snap.size.height * sy)
             };
             const newPos = { x: newCenter.x - newSize.width / 2, y: newCenter.y - newSize.height / 2 };
-            core.updateObjectSizeAndPositionDirect(id, newSize, newPos, snap.type || null);
+            core.updateObjectSizeAndPositionDirect(id, newSize, newPos, snap.type || null, { snap: false });
         }
     });
 
@@ -134,7 +134,7 @@ export function setupTransformFlow(core) {
             position = resolveResizePositionFallback(core, data.object, data.size);
         }
 
-        core.updateObjectSizeAndPositionDirect(data.object, data.size, position, objectType);
+        core.updateObjectSizeAndPositionDirect(data.object, data.size, position, objectType, { snap: false });
     });
 
     core.eventBus.on(Events.Tool.ResizeEnd, (data) => {

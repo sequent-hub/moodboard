@@ -203,7 +203,7 @@ export function setupLayerAndViewportFlow(core) {
             core.updateObjectPositionDirect(id, {
                 x: newCenter.x - halfW,
                 y: newCenter.y - halfH,
-            });
+            }, { snap: false });
         }
         core.state.markDirty();
     });
@@ -228,7 +228,7 @@ export function setupLayerAndViewportFlow(core) {
     });
 
     core.eventBus.on(Events.Tool.DragUpdate, (data) => {
-        core.updateObjectPositionDirect(data.object, data.position);
+        core.updateObjectPositionDirect(data.object, data.position, { snap: false });
     });
 
     core.eventBus.on(Events.Tool.DragEnd, (data) => {
