@@ -1,6 +1,6 @@
 import { BaseGrid } from './BaseGrid.js';
 import { getScreenAnchor } from './ScreenGridPhaseMachine.js';
-import { getCrossCheckpointForZoom } from './CrossGridZoomPhases.js';
+import { getCrossCheckpointForZoom, getCrossColor } from './CrossGridZoomPhases.js';
 
 /**
  * Сетка с крестиками (плюсами) в узлах
@@ -12,12 +12,15 @@ export class CrossGrid extends BaseGrid {
 
         // Размер половины креста от центра до конца линии
         this.crossHalfSize = options.crossHalfSize || 4;
-        this.crossLineWidth = options.crossLineWidth || this.lineWidth || 1;
+        this.crossLineWidth = 1;
 
         // По умолчанию делаем цвет крестиков серым
         if (options.color == null) {
             this.color = 0xB0B0B0;
         }
+        // CrossGrid всегда непрозрачный, независимо от входящих настроек.
+        this.opacity = 1;
+        this.graphics.alpha = 1;
     }
 
     /**
@@ -25,18 +28,10 @@ export class CrossGrid extends BaseGrid {
      */
     createVisual() {
         const g = this.graphics;
-        // Прозрачность — через alpha графики (как у линейной сетки)
-        g.alpha = this.opacity;
-        try {
-            g.lineStyle({
-                width: Math.max(1, Math.round(this.crossLineWidth || 1)),
-                color: this.color,
-                alpha: 1,
-                alignment: 0
-            });
-        } catch (_) {
-            g.lineStyle(Math.max(1, Math.round(this.crossLineWidth || 1)), this.color, 1);
-        }
+        // Строго без прозрачности.
+        g.alpha = 1;
+        const lineColor = getCrossColor(this._zoom, this.color);
+        g.beginFill(lineColor, 1);
 
         const checkpoint = getCrossCheckpointForZoom(this._zoom);
         const hs = Math.max(1, Math.round(checkpoint.crossHalfSize || this.crossHalfSize || 1));
@@ -58,13 +53,14 @@ export class CrossGrid extends BaseGrid {
             for (let y = startY; y <= endY; y += step) {
                 const px = Math.round(x);
                 const py = Math.round(y);
-                g.moveTo(px - hs, py);
-                g.lineTo(px + hs, py);
-                g.moveTo(px, py - hs);
-                g.lineTo(px, py + hs);
+                const ray = hs * 2 + 1;
+                // Строгий 1px-контракт: рисуем пиксельные прямоугольники вместо stroke-линий.
+                g.drawRect(px - hs, py, ray, 1);
+                g.drawRect(px, py - hs, 1, ray);
             }
 
         }
+        g.endFill();
     }
 
     /**
@@ -85,7 +81,17 @@ export class CrossGrid extends BaseGrid {
     }
 
     setCrossLineWidth(w) {
-        this.crossLineWidth = Math.max(1, w);
+        void w;
+        this.crossLineWidth = 1;
+        this.updateVisual();
+    }
+
+    /**
+     * CrossGrid всегда непрозрачный: внешний setOpacity игнорируется.
+     */
+    setOpacity() {
+        this.opacity = 1;
+        this.graphics.alpha = 1;
         this.updateVisual();
     }
 

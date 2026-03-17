@@ -1,6 +1,17 @@
 import { getCrossCheckpointForZoom, updateCrossCheckpoint } from '../grid/CrossGridZoomPhases.js';
 import { Events } from '../core/events/Events.js';
 
+function intToHex(color) {
+    const n = Math.max(0, Math.min(0xFFFFFF, Math.round(Number(color) || 0)));
+    return `#${n.toString(16).padStart(6, '0')}`;
+}
+
+function hexToInt(hex) {
+    const h = String(hex || '').trim().replace('#', '');
+    if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+    return Number.parseInt(h, 16);
+}
+
 export class DotGridDebugPanel {
     constructor(container, coreMoodboard) {
         this.container = container;
@@ -86,19 +97,13 @@ export class DotGridDebugPanel {
         this.spacingValue.style.color = '#64748b';
         panel.appendChild(this.spacingValue);
 
-        this.lineWidthRange = document.createElement('input');
-        this.lineWidthRange.type = 'range';
-        this.lineWidthRange.min = '1';
-        this.lineWidthRange.max = '12';
-        this.lineWidthRange.step = '1';
-        this.lineWidthRange.style.width = '100%';
-        makeRow('line width', this.lineWidthRange);
-
-        this.lineWidthValue = document.createElement('div');
-        this.lineWidthValue.style.marginTop = '-6px';
-        this.lineWidthValue.style.marginBottom = '8px';
-        this.lineWidthValue.style.color = '#64748b';
-        panel.appendChild(this.lineWidthValue);
+        this.colorInput = document.createElement('input');
+        this.colorInput.type = 'color';
+        this.colorInput.style.width = '100%';
+        this.colorInput.style.height = '30px';
+        this.colorInput.style.border = '1px solid #d1d5db';
+        this.colorInput.style.borderRadius = '6px';
+        makeRow('color', this.colorInput);
 
         const controls = document.createElement('div');
         controls.style.display = 'flex';
@@ -133,7 +138,10 @@ export class DotGridDebugPanel {
     _attach() {
         this._onCrossSizeInput = () => this._applyPatch({ crossHalfSize: Number(this.crossSizeRange.value) });
         this._onSpacingInput = () => this._applyPatch({ spacing: Number(this.spacingRange.value) });
-        this._onLineWidthInput = () => this._applyLineWidth(Number(this.lineWidthRange.value));
+        this._onColorInput = () => {
+            const color = hexToInt(this.colorInput.value);
+            if (color != null) this._applyPatch({ color });
+        };
         this._onCopyClick = async () => {
             if (!this._activeCheckpoint) return;
             const worldScale = this._getWorldScale();
@@ -143,6 +151,7 @@ export class DotGridDebugPanel {
                 gridType: 'cross',
                 spacing: this._activeCheckpoint.spacing,
                 crossHalfSize: this._activeCheckpoint.crossHalfSize,
+                color: `0x${Number(this._activeCheckpoint.color || 0).toString(16).toUpperCase().padStart(6, '0')}`,
             };
             const text = JSON.stringify(payload);
             try {
@@ -164,7 +173,7 @@ export class DotGridDebugPanel {
 
         this.crossSizeRange.addEventListener('input', this._onCrossSizeInput);
         this.spacingRange.addEventListener('input', this._onSpacingInput);
-        this.lineWidthRange.addEventListener('input', this._onLineWidthInput);
+        this.colorInput.addEventListener('input', this._onColorInput);
         this.copyBtn.addEventListener('click', this._onCopyClick);
         this.enableCrossBtn.addEventListener('click', this._onEnableCrossClick);
     }
@@ -183,14 +192,10 @@ export class DotGridDebugPanel {
             if (changed && !this._isApplying) {
                 this.crossSizeRange.value = String(checkpoint.crossHalfSize);
                 this.spacingRange.value = String(checkpoint.spacing);
+                this.colorInput.value = intToHex(checkpoint.color);
             }
             this.crossSizeValue.textContent = `cross half size: ${this.crossSizeRange.value}px`;
             this.spacingValue.textContent = `spacing: ${this.spacingRange.value}px`;
-            const lineWidth = Number(grid?.crossLineWidth || 1);
-            if (!this._isApplyingLineWidth) {
-                this.lineWidthRange.value = String(Math.max(1, Math.round(lineWidth)));
-            }
-            this.lineWidthValue.textContent = `line width: ${Math.max(1, Math.round(lineWidth))}px`;
         }, 150);
     }
 
@@ -223,27 +228,12 @@ export class DotGridDebugPanel {
             this._activeCheckpoint = updated;
             this.crossSizeRange.value = String(updated.crossHalfSize);
             this.spacingRange.value = String(updated.spacing);
+            this.colorInput.value = intToHex(updated.color);
             this.crossSizeValue.textContent = `cross half size: ${this.crossSizeRange.value}px`;
             this.spacingValue.textContent = `spacing: ${this.spacingRange.value}px`;
             this._refreshGridVisual();
         }
         this._isApplying = false;
-    }
-
-    _applyLineWidth(nextLineWidth) {
-        const grid = this._getGrid();
-        if (!grid || grid.type !== 'cross') return;
-        this._isApplyingLineWidth = true;
-        const v = Math.max(1, Math.round(Number(nextLineWidth) || 1));
-        if (typeof grid.setCrossLineWidth === 'function') {
-            grid.setCrossLineWidth(v);
-        } else {
-            grid.crossLineWidth = v;
-            grid.updateVisual?.();
-        }
-        this.lineWidthValue.textContent = `line width: ${v}px`;
-        this._refreshGridVisual();
-        this._isApplyingLineWidth = false;
     }
 
     destroy() {
@@ -253,7 +243,7 @@ export class DotGridDebugPanel {
         }
         this.crossSizeRange?.removeEventListener('input', this._onCrossSizeInput);
         this.spacingRange?.removeEventListener('input', this._onSpacingInput);
-        this.lineWidthRange?.removeEventListener('input', this._onLineWidthInput);
+        this.colorInput?.removeEventListener('input', this._onColorInput);
         this.copyBtn?.removeEventListener('click', this._onCopyClick);
         this.enableCrossBtn?.removeEventListener('click', this._onEnableCrossClick);
         if (this.element) this.element.remove();

@@ -88,7 +88,7 @@ export class GridFactory {
             cross: {
                 enabled: true,
                 size: 65,            // шаг между крестиками
-                color: 0xB8BAFF,     // целевой цвет
+                color: 0xE8E8E8,     // как у dot-сетки
                 opacity: 1,          // непрозрачно
                 crossHalfSize: 5,    // длина луча (половина креста) в px
                 crossLineWidth: 1
