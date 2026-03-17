@@ -1,15 +1,5 @@
-import { getDotCheckpointForZoom, updateDotCheckpoint } from '../grid/DotGridZoomPhases.js';
-
-function intToHex(color) {
-    const n = Math.max(0, Math.min(0xFFFFFF, Math.round(Number(color) || 0)));
-    return `#${n.toString(16).padStart(6, '0')}`;
-}
-
-function hexToInt(hex) {
-    const h = String(hex || '').trim().replace('#', '');
-    if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
-    return Number.parseInt(h, 16);
-}
+import { getCrossCheckpointForZoom, updateCrossCheckpoint } from '../grid/CrossGridZoomPhases.js';
+import { Events } from '../core/events/Events.js';
 
 export class DotGridDebugPanel {
     constructor(container, coreMoodboard) {
@@ -45,7 +35,7 @@ export class DotGridDebugPanel {
         panel.style.color = '#1f2937';
 
         const title = document.createElement('div');
-        title.textContent = 'Dot Grid Debug';
+        title.textContent = 'Cross Grid Debug';
         title.style.fontWeight = '700';
         title.style.marginBottom = '8px';
         panel.appendChild(title);
@@ -53,7 +43,7 @@ export class DotGridDebugPanel {
         this.infoEl = document.createElement('div');
         this.infoEl.style.marginBottom = '8px';
         this.infoEl.style.color = '#475569';
-        this.infoEl.textContent = 'zoom: -, checkpoint: -';
+        this.infoEl.textContent = 'zoom: -, checkpoint: -, grid: -';
         panel.appendChild(this.infoEl);
 
         const makeRow = (labelText, inputEl) => {
@@ -68,24 +58,24 @@ export class DotGridDebugPanel {
             panel.appendChild(row);
         };
 
-        this.radiusRange = document.createElement('input');
-        this.radiusRange.type = 'range';
-        this.radiusRange.min = '0';
-        this.radiusRange.max = '6';
-        this.radiusRange.step = '0.1';
-        this.radiusRange.style.width = '100%';
-        makeRow('dot radius', this.radiusRange);
+        this.crossSizeRange = document.createElement('input');
+        this.crossSizeRange.type = 'range';
+        this.crossSizeRange.min = '1';
+        this.crossSizeRange.max = '12';
+        this.crossSizeRange.step = '1';
+        this.crossSizeRange.style.width = '100%';
+        makeRow('cross half size', this.crossSizeRange);
 
-        this.radiusValue = document.createElement('div');
-        this.radiusValue.style.marginTop = '-6px';
-        this.radiusValue.style.marginBottom = '8px';
-        this.radiusValue.style.color = '#64748b';
-        panel.appendChild(this.radiusValue);
+        this.crossSizeValue = document.createElement('div');
+        this.crossSizeValue.style.marginTop = '-6px';
+        this.crossSizeValue.style.marginBottom = '8px';
+        this.crossSizeValue.style.color = '#64748b';
+        panel.appendChild(this.crossSizeValue);
 
         this.spacingRange = document.createElement('input');
         this.spacingRange.type = 'range';
         this.spacingRange.min = '8';
-        this.spacingRange.max = '120';
+        this.spacingRange.max = '140';
         this.spacingRange.step = '1';
         this.spacingRange.style.width = '100%';
         makeRow('spacing', this.spacingRange);
@@ -96,13 +86,19 @@ export class DotGridDebugPanel {
         this.spacingValue.style.color = '#64748b';
         panel.appendChild(this.spacingValue);
 
-        this.colorInput = document.createElement('input');
-        this.colorInput.type = 'color';
-        this.colorInput.style.width = '100%';
-        this.colorInput.style.height = '30px';
-        this.colorInput.style.border = '1px solid #d1d5db';
-        this.colorInput.style.borderRadius = '6px';
-        makeRow('color', this.colorInput);
+        this.lineWidthRange = document.createElement('input');
+        this.lineWidthRange.type = 'range';
+        this.lineWidthRange.min = '1';
+        this.lineWidthRange.max = '12';
+        this.lineWidthRange.step = '1';
+        this.lineWidthRange.style.width = '100%';
+        makeRow('line width', this.lineWidthRange);
+
+        this.lineWidthValue = document.createElement('div');
+        this.lineWidthValue.style.marginTop = '-6px';
+        this.lineWidthValue.style.marginBottom = '8px';
+        this.lineWidthValue.style.color = '#64748b';
+        panel.appendChild(this.lineWidthValue);
 
         const controls = document.createElement('div');
         controls.style.display = 'flex';
@@ -119,15 +115,15 @@ export class DotGridDebugPanel {
         this.copyBtn.style.background = '#f8fafc';
         controls.appendChild(this.copyBtn);
 
-        this.floatRadiusToggle = document.createElement('button');
-        this.floatRadiusToggle.textContent = 'Float ON';
-        this.floatRadiusToggle.style.flex = '0 0 72px';
-        this.floatRadiusToggle.style.padding = '6px 8px';
-        this.floatRadiusToggle.style.border = '1px solid #93c5fd';
-        this.floatRadiusToggle.style.borderRadius = '6px';
-        this.floatRadiusToggle.style.cursor = 'pointer';
-        this.floatRadiusToggle.style.background = '#dbeafe';
-        controls.appendChild(this.floatRadiusToggle);
+        this.enableCrossBtn = document.createElement('button');
+        this.enableCrossBtn.textContent = 'Set Cross';
+        this.enableCrossBtn.style.flex = '0 0 80px';
+        this.enableCrossBtn.style.padding = '6px 8px';
+        this.enableCrossBtn.style.border = '1px solid #93c5fd';
+        this.enableCrossBtn.style.borderRadius = '6px';
+        this.enableCrossBtn.style.cursor = 'pointer';
+        this.enableCrossBtn.style.background = '#dbeafe';
+        controls.appendChild(this.enableCrossBtn);
 
         panel.appendChild(controls);
         this.element = panel;
@@ -135,21 +131,18 @@ export class DotGridDebugPanel {
     }
 
     _attach() {
-        this._onRadiusInput = () => this._applyPatch({ dotRadius: Number(this.radiusRange.value) });
+        this._onCrossSizeInput = () => this._applyPatch({ crossHalfSize: Number(this.crossSizeRange.value) });
         this._onSpacingInput = () => this._applyPatch({ spacing: Number(this.spacingRange.value) });
-        this._onColorInput = () => {
-            const color = hexToInt(this.colorInput.value);
-            if (color != null) this._applyPatch({ color });
-        };
+        this._onLineWidthInput = () => this._applyLineWidth(Number(this.lineWidthRange.value));
         this._onCopyClick = async () => {
             if (!this._activeCheckpoint) return;
             const worldScale = this._getWorldScale();
             const payload = {
                 zoomPercent: this._activeCheckpoint.zoomPercent,
                 zoomLabel: `${Math.round((worldScale || 1) * 100)}%`,
+                gridType: 'cross',
                 spacing: this._activeCheckpoint.spacing,
-                dotRadius: this._activeCheckpoint.dotRadius,
-                color: `0x${this._activeCheckpoint.color.toString(16).padStart(6, '0').toUpperCase()}`,
+                crossHalfSize: this._activeCheckpoint.crossHalfSize,
             };
             const text = JSON.stringify(payload);
             try {
@@ -161,47 +154,43 @@ export class DotGridDebugPanel {
                 setTimeout(() => { this.copyBtn.textContent = 'Copy checkpoint'; }, 1000);
             }
         };
-        this._onFloatToggle = () => {
-            this._floatEnabled = !this._floatEnabled;
-            this.floatRadiusToggle.textContent = this._floatEnabled ? 'Float ON' : 'Float OFF';
-            this.floatRadiusToggle.style.background = this._floatEnabled ? '#dbeafe' : '#f8fafc';
-            this.floatRadiusToggle.style.borderColor = this._floatEnabled ? '#93c5fd' : '#cbd5e1';
-            const grid = this._getGrid();
-            if (grid && typeof grid.setAllowFloatDotRadius === 'function') {
-                grid.setAllowFloatDotRadius(this._floatEnabled);
+        this._onEnableCrossClick = () => {
+            const eventBus = this.core?.eventBus;
+            if (eventBus) {
+                eventBus.emit(Events.UI.GridChange, { type: 'cross' });
+                return;
             }
         };
 
-        this._floatEnabled = true;
-        this.radiusRange.addEventListener('input', this._onRadiusInput);
+        this.crossSizeRange.addEventListener('input', this._onCrossSizeInput);
         this.spacingRange.addEventListener('input', this._onSpacingInput);
-        this.colorInput.addEventListener('input', this._onColorInput);
+        this.lineWidthRange.addEventListener('input', this._onLineWidthInput);
         this.copyBtn.addEventListener('click', this._onCopyClick);
-        this.floatRadiusToggle.addEventListener('click', this._onFloatToggle);
+        this.enableCrossBtn.addEventListener('click', this._onEnableCrossClick);
     }
 
     _startPolling() {
         this._pollTimer = setInterval(() => {
             const scale = this._getWorldScale();
             if (!Number.isFinite(scale)) return;
-            const checkpoint = getDotCheckpointForZoom(scale);
+            const checkpoint = getCrossCheckpointForZoom(scale);
             if (!checkpoint) return;
-            this.infoEl.textContent = `zoom: ${Math.round(scale * 100)}%, checkpoint: ${checkpoint.zoomPercent}%`;
+            const grid = this._getGrid();
+            this.infoEl.textContent = `zoom: ${Math.round(scale * 100)}%, checkpoint: ${checkpoint.zoomPercent}%, grid: ${grid?.type || 'none'}`;
 
             const changed = !this._activeCheckpoint || this._activeCheckpoint.zoomPercent !== checkpoint.zoomPercent;
             this._activeCheckpoint = checkpoint;
             if (changed && !this._isApplying) {
-                this.radiusRange.value = String(checkpoint.dotRadius);
+                this.crossSizeRange.value = String(checkpoint.crossHalfSize);
                 this.spacingRange.value = String(checkpoint.spacing);
-                this.colorInput.value = intToHex(checkpoint.color);
             }
-            this.radiusValue.textContent = `radius: ${Number(this.radiusRange.value).toFixed(1)}`;
+            this.crossSizeValue.textContent = `cross half size: ${this.crossSizeRange.value}px`;
             this.spacingValue.textContent = `spacing: ${this.spacingRange.value}px`;
-
-            const grid = this._getGrid();
-            if (grid && typeof grid.setAllowFloatDotRadius === 'function') {
-                grid.setAllowFloatDotRadius(this._floatEnabled);
+            const lineWidth = Number(grid?.crossLineWidth || 1);
+            if (!this._isApplyingLineWidth) {
+                this.lineWidthRange.value = String(Math.max(1, Math.round(lineWidth)));
             }
+            this.lineWidthValue.textContent = `line width: ${Math.max(1, Math.round(lineWidth))}px`;
         }, 150);
     }
 
@@ -229,17 +218,32 @@ export class DotGridDebugPanel {
     _applyPatch(patch) {
         if (!this._activeCheckpoint) return;
         this._isApplying = true;
-        const updated = updateDotCheckpoint(this._activeCheckpoint.zoomPercent, patch);
+        const updated = updateCrossCheckpoint(this._activeCheckpoint.zoomPercent, patch);
         if (updated) {
             this._activeCheckpoint = updated;
-            this.radiusRange.value = String(updated.dotRadius);
+            this.crossSizeRange.value = String(updated.crossHalfSize);
             this.spacingRange.value = String(updated.spacing);
-            this.colorInput.value = intToHex(updated.color);
-            this.radiusValue.textContent = `radius: ${Number(this.radiusRange.value).toFixed(1)}`;
+            this.crossSizeValue.textContent = `cross half size: ${this.crossSizeRange.value}px`;
             this.spacingValue.textContent = `spacing: ${this.spacingRange.value}px`;
             this._refreshGridVisual();
         }
         this._isApplying = false;
+    }
+
+    _applyLineWidth(nextLineWidth) {
+        const grid = this._getGrid();
+        if (!grid || grid.type !== 'cross') return;
+        this._isApplyingLineWidth = true;
+        const v = Math.max(1, Math.round(Number(nextLineWidth) || 1));
+        if (typeof grid.setCrossLineWidth === 'function') {
+            grid.setCrossLineWidth(v);
+        } else {
+            grid.crossLineWidth = v;
+            grid.updateVisual?.();
+        }
+        this.lineWidthValue.textContent = `line width: ${v}px`;
+        this._refreshGridVisual();
+        this._isApplyingLineWidth = false;
     }
 
     destroy() {
@@ -247,15 +251,11 @@ export class DotGridDebugPanel {
             clearInterval(this._pollTimer);
             this._pollTimer = null;
         }
-        this.radiusRange?.removeEventListener('input', this._onRadiusInput);
+        this.crossSizeRange?.removeEventListener('input', this._onCrossSizeInput);
         this.spacingRange?.removeEventListener('input', this._onSpacingInput);
-        this.colorInput?.removeEventListener('input', this._onColorInput);
+        this.lineWidthRange?.removeEventListener('input', this._onLineWidthInput);
         this.copyBtn?.removeEventListener('click', this._onCopyClick);
-        this.floatRadiusToggle?.removeEventListener('click', this._onFloatToggle);
-        const grid = this._getGrid();
-        if (grid && typeof grid.setAllowFloatDotRadius === 'function') {
-            grid.setAllowFloatDotRadius(false);
-        }
+        this.enableCrossBtn?.removeEventListener('click', this._onEnableCrossClick);
         if (this.element) this.element.remove();
         this.element = null;
     }

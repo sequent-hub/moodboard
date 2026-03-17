@@ -1,6 +1,6 @@
-import * as PIXI from 'pixi.js';
 import { BaseGrid } from './BaseGrid.js';
 import { getScreenAnchor } from './ScreenGridPhaseMachine.js';
+import { getCrossCheckpointForZoom } from './CrossGridZoomPhases.js';
 
 /**
  * Сетка с крестиками (плюсами) в узлах
@@ -38,10 +38,10 @@ export class CrossGrid extends BaseGrid {
             g.lineStyle(Math.max(1, Math.round(this.crossLineWidth || 1)), this.color, 1);
         }
 
-        const hs = this.crossHalfSize;
+        const checkpoint = getCrossCheckpointForZoom(this._zoom);
+        const hs = Math.max(1, Math.round(checkpoint.crossHalfSize || this.crossHalfSize || 1));
         const b = this.getDrawBounds();
-        const { screenStep } = this.getScreenGridState();
-        const step = Math.max(1, screenStep);
+        const step = Math.max(1, Math.round(checkpoint.spacing || 20));
         const worldX = this.viewportTransform?.worldX || 0;
         const worldY = this.viewportTransform?.worldY || 0;
         const anchorX = getScreenAnchor(worldX, step);
@@ -63,6 +63,7 @@ export class CrossGrid extends BaseGrid {
                 g.moveTo(px, py - hs);
                 g.lineTo(px, py + hs);
             }
+
         }
     }
 
