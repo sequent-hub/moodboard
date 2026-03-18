@@ -16,11 +16,13 @@ export class MindmapTextOverlayAdapter {
 
     applyElementStyles(el) {
         el.classList.add('mb-text--mindmap');
-        el.style.pointerEvents = 'auto';
-        el.style.cursor = 'text';
+        el.style.pointerEvents = 'none';
+        el.style.cursor = 'default';
     }
 
-    attachEditOnClick({ el, objectId, objectData, eventBus }) {
+    attachEditOnClick({ el, targetEl, objectId, objectData, eventBus }) {
+        const clickableEl = targetEl || el;
+        const contentEl = targetEl || el;
         const onTextClick = (event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -30,7 +32,7 @@ export class MindmapTextOverlayAdapter {
                 id: objectId,
                 type: 'mindmap',
                 position: posData.position || objectData?.position || { x: 0, y: 0 },
-                properties: { content: el.textContent || '' },
+                properties: { content: contentEl.textContent || '' },
                 caretClick: {
                     clientX: event.clientX,
                     clientY: event.clientY,
@@ -39,9 +41,9 @@ export class MindmapTextOverlayAdapter {
             });
         };
 
-        el.addEventListener('click', onTextClick);
+        clickableEl.addEventListener('click', onTextClick);
         return () => {
-            el.removeEventListener('click', onTextClick);
+            clickableEl.removeEventListener('click', onTextClick);
         };
     }
 }

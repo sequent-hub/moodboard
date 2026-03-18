@@ -148,7 +148,9 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
     const mindmapObject = await getMindmapObject(page);
     const mindmapId = mindmapObject.id;
 
-    const textEl = page.locator(`.mb-text--mindmap[data-id="${mindmapId}"]`);
+    const textBoxEl = page.locator(`.mb-text--mindmap[data-id="${mindmapId}"]`);
+    const textEl = page.locator(`.mb-text--mindmap[data-id="${mindmapId}"] .mb-text--mindmap-content`);
+    await expect(textBoxEl).toBeVisible();
     await expect(textEl).toBeVisible();
 
     const staticTextMetrics = await page.evaluate((objectId) => {
@@ -163,11 +165,19 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
     }, mindmapId);
     expect(staticTextMetrics).toBeTruthy();
 
-    const textBox = await textEl.boundingBox();
+    const textBox = await textBoxEl.boundingBox();
     expect(textBox).toBeTruthy();
     await page.mouse.click(
-      textBox.x + textBox.width * 0.5,
+      textBox.x + 8,
       textBox.y + textBox.height * 0.5
+    );
+    await expect(page.locator('.moodboard-text-input')).toHaveCount(0);
+
+    const textContentBox = await textEl.boundingBox();
+    expect(textContentBox).toBeTruthy();
+    await page.mouse.click(
+      textContentBox.x + textContentBox.width * 0.5,
+      textContentBox.y + textContentBox.height * 0.5
     );
 
     const textarea = page.locator('.moodboard-text-input');

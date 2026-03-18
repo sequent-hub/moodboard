@@ -19,8 +19,9 @@ function applyMindmapCaretFromClick({ create, objectId, object, textarea }) {
             try {
                 const el = window.moodboardMindmapHtmlTextLayer?.idToEl?.get?.(objectId) || null;
                 const fullText = (typeof textarea.value === 'string') ? textarea.value : '';
-                if (!el || !fullText || !el.firstChild) return;
-                const textNode = el.firstChild;
+                const contentEl = el?.querySelector?.('.mb-text--mindmap-content') || null;
+                const textNode = contentEl?.firstChild || null;
+                if (!el || !fullText || !textNode) return;
                 const len = textNode.textContent.length;
                 if (len === 0) {
                     textarea.selectionStart = textarea.selectionEnd = 0;

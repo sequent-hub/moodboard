@@ -14,6 +14,7 @@ export class MindmapHtmlTextLayer {
         this.layer = null;
         this.idToEl = new Map();
         this.idToCleanup = new Map();
+        this.idToContentEl = new Map();
         this.overlayAdapter = new MindmapTextOverlayAdapter();
     }
 
@@ -53,9 +54,9 @@ export class MindmapHtmlTextLayer {
         });
 
         this.eventBus.on(Events.Tool.UpdateObjectContent, ({ objectId, content }) => {
-            const el = this.idToEl.get(objectId);
-            if (el && typeof content === 'string') {
-                el.textContent = content;
+            const contentEl = this.idToContentEl.get(objectId);
+            if (contentEl && typeof content === 'string') {
+                contentEl.textContent = content;
             }
         });
 
@@ -99,6 +100,7 @@ export class MindmapHtmlTextLayer {
         this.layer = null;
         this.idToEl.clear();
         this.idToCleanup.clear();
+        this.idToContentEl.clear();
     }
 
     rebuildFromState() {
@@ -118,6 +120,8 @@ export class MindmapHtmlTextLayer {
         const el = document.createElement('div');
         el.className = 'mb-text';
         el.dataset.id = objectId;
+        const contentEl = document.createElement('span');
+        contentEl.className = 'mb-text--mindmap-content';
 
         const fontFamily = this.overlayAdapter.getDefaultFontFamily(objectData);
         const color = objectData.color || objectData.properties?.color || objectData.properties?.textColor || '#000000';
@@ -137,21 +141,24 @@ export class MindmapHtmlTextLayer {
 
         this.overlayAdapter.applyElementStyles(el);
 
-        el.textContent = objectData.content || objectData.properties?.content || '';
+        contentEl.textContent = objectData.content || objectData.properties?.content || '';
         el.dataset.baseFontSize = String(baseFontSize);
         el.dataset.baseW = String(Math.max(1, objectData.width || objectData.properties?.width || 220));
         el.dataset.baseH = String(Math.max(1, objectData.height || objectData.properties?.height || 140));
 
         const cleanup = this.overlayAdapter.attachEditOnClick({
             el,
+            targetEl: contentEl,
             objectId,
             objectData,
             eventBus: this.eventBus,
         });
         this.idToCleanup.set(objectId, cleanup);
 
+        el.appendChild(contentEl);
         this.layer.appendChild(el);
         this.idToEl.set(objectId, el);
+        this.idToContentEl.set(objectId, contentEl);
     }
 
     _removeTextEl(objectId) {
@@ -161,6 +168,7 @@ export class MindmapHtmlTextLayer {
         if (el) el.remove();
         this.idToEl.delete(objectId);
         this.idToCleanup.delete(objectId);
+        this.idToContentEl.delete(objectId);
     }
 
     updateAll() {
@@ -215,7 +223,10 @@ export class MindmapHtmlTextLayer {
 
         const content = objectData.content || objectData.properties?.content;
         if (typeof content === 'string') {
-            el.textContent = content;
+            const contentEl = this.idToContentEl.get(objectId);
+            if (contentEl) {
+                contentEl.textContent = content;
+            }
         }
 
         el.style.transformOrigin = 'center center';

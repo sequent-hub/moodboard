@@ -239,14 +239,23 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    pointer-events: auto;
-    cursor: text;
+    pointer-events: none;
+    cursor: default;
     color: #1e3a8a;
     font-family: 'Roboto', Arial, sans-serif;
     font-weight: 500;
     padding-left: 12px;
     padding-right: 12px;
     outline: 1px solid #22c55e;
+}
+
+.mb-text--mindmap-content {
+    pointer-events: auto;
+    display: inline-block;
+    max-width: 100%;
+    white-space: pre-wrap;
+    word-break: break-word;
+    cursor: default;
 }
 
 .moodboard-text-input--mindmap-debug {
