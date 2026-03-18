@@ -10,8 +10,7 @@ import {
     showStaticTextAfterEditing,
     updateGlobalTextEditorHandlesLayer,
 } from './TextEditorLifecycleRegistry.js';
-
-const MINDMAP_MAX_LINE_CHARS = 50;
+import { MINDMAP_LAYOUT } from '../../../ui/mindmap/MindmapLayoutConfig.js';
 
 function applyMindmapCaretFromClick({ create, objectId, object, textarea }) {
     try {
@@ -109,7 +108,7 @@ function measureMindmapTextWidthPx(textarea, measureEl) {
     return Math.max(0, Math.ceil(maxWidth));
 }
 
-function normalizeMindmapLineLength(value, maxLineChars = MINDMAP_MAX_LINE_CHARS) {
+function normalizeMindmapLineLength(value, maxLineChars = MINDMAP_LAYOUT.maxLineChars) {
     const text = (typeof value === 'string')
         ? value.replace(/\r/g, '').replace(/\n/g, '')
         : '';
@@ -121,11 +120,11 @@ function normalizeMindmapLineLength(value, maxLineChars = MINDMAP_MAX_LINE_CHARS
     return chunks.join('\n');
 }
 
-function normalizeMindmapValueAndCaret(value, caretPos) {
+function normalizeMindmapValueAndCaret(value, caretPos, maxLineChars = MINDMAP_LAYOUT.maxLineChars) {
     const safeValue = (typeof value === 'string') ? value : '';
     const safeCaret = Number.isFinite(caretPos) ? Math.max(0, Math.min(safeValue.length, caretPos)) : safeValue.length;
-    const normalizedValue = normalizeMindmapLineLength(safeValue);
-    const normalizedCaret = normalizeMindmapLineLength(safeValue.slice(0, safeCaret)).length;
+    const normalizedValue = normalizeMindmapLineLength(safeValue, maxLineChars);
+    const normalizedCaret = normalizeMindmapLineLength(safeValue.slice(0, safeCaret), maxLineChars).length;
     return { normalizedValue, normalizedCaret };
 }
 
@@ -173,8 +172,9 @@ export function openMindmapEditor(object, create = false) {
     this.eventBus.emit(Events.UI.TextEditStart, { objectId: objectId || null });
     hideGlobalTextEditorHandlesLayer();
 
-    let objectWidth = properties.width || 320;
-    let objectHeight = properties.height || 125;
+    let objectWidth = properties.width || MINDMAP_LAYOUT.width;
+    let objectHeight = properties.height || MINDMAP_LAYOUT.height;
+    const maxLineChars = Math.max(1, Math.round(properties.maxLineChars || MINDMAP_LAYOUT.maxLineChars));
     if (objectId) {
         const sizeData = { objectId, size: null };
         this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
@@ -283,7 +283,7 @@ export function openMindmapEditor(object, create = false) {
         Math.round(
             (typeof properties.capsuleBaseHeight === 'number' && properties.capsuleBaseHeight > 0)
                 ? properties.capsuleBaseHeight
-                : ((typeof properties.height === 'number' && properties.height > 0) ? properties.height : 100)
+                : ((typeof properties.height === 'number' && properties.height > 0) ? properties.height : MINDMAP_LAYOUT.height)
         )
     );
     const resizeSession = {
@@ -443,7 +443,8 @@ export function openMindmapEditor(object, create = false) {
     const onInput = () => {
         const { normalizedValue, normalizedCaret } = normalizeMindmapValueAndCaret(
             textarea.value,
-            textarea.selectionStart
+            textarea.selectionStart,
+            maxLineChars
         );
         if (normalizedValue !== textarea.value) {
             textarea.value = normalizedValue;
@@ -470,7 +471,7 @@ export function openMindmapEditor(object, create = false) {
         textarea.removeEventListener('keydown', onKeyDown);
         textarea.removeEventListener('input', onInput);
 
-        const value = normalizeMindmapLineLength(textarea.value).trim();
+        const value = normalizeMindmapLineLength(textarea.value, maxLineChars).trim();
         const commitValue = commit;
 
         if (objectId && resizeSession.started && resizeSession.oldSize && resizeSession.newSize) {

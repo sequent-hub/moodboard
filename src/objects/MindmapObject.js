@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import { MINDMAP_LAYOUT } from '../ui/mindmap/MindmapLayoutConfig.js';
 
 /**
  * Простой объект mindmap: прямоугольник с синей обводкой и полупрозрачной синей заливкой.
@@ -6,8 +7,8 @@ import * as PIXI from 'pixi.js';
 export class MindmapObject {
     constructor(objectData = {}) {
         this.objectData = objectData;
-        this.width = objectData.width || objectData.properties?.width || 320;
-        this.height = objectData.height || objectData.properties?.height || 125;
+        this.width = objectData.width || objectData.properties?.width || MINDMAP_LAYOUT.width;
+        this.height = objectData.height || objectData.properties?.height || MINDMAP_LAYOUT.height;
         const props = objectData.properties || {};
         this.strokeColor = (typeof props.strokeColor === 'number') ? props.strokeColor : 0x2563EB;
         this.fillColor = (typeof props.fillColor === 'number') ? props.fillColor : 0x3B82F6;
@@ -15,7 +16,7 @@ export class MindmapObject {
         this.strokeWidth = (typeof props.strokeWidth === 'number') ? props.strokeWidth : 2;
         this.capsuleBaseHeight = (typeof props.capsuleBaseHeight === 'number')
             ? Math.max(1, Math.round(props.capsuleBaseHeight))
-            : Math.max(1, Math.round(Math.min(this.height, 100)));
+            : Math.max(1, Math.round(Math.min(this.height, MINDMAP_LAYOUT.height)));
 
         this.graphics = new PIXI.Graphics();
         this._draw();

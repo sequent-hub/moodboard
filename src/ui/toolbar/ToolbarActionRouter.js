@@ -1,4 +1,5 @@
 import { Events } from '../../core/events/Events.js';
+import { MINDMAP_LAYOUT } from '../mindmap/MindmapLayoutConfig.js';
 
 export class ToolbarActionRouter {
     constructor(toolbar) {
@@ -77,8 +78,8 @@ export class ToolbarActionRouter {
         }
 
         if (toolType === 'mindmap-add') {
-            const mindmapWidth = 306;
-            const mindmapHeight = 100;
+            const mindmapWidth = MINDMAP_LAYOUT.width;
+            const mindmapHeight = MINDMAP_LAYOUT.height;
             this.toolbar.animateButton(button);
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
@@ -90,10 +91,13 @@ export class ToolbarActionRouter {
                 type: 'mindmap',
                 size: { width: mindmapWidth, height: mindmapHeight },
                 properties: {
-                    fontSize: 20,
+                    fontSize: MINDMAP_LAYOUT.fontSize,
                     width: mindmapWidth,
                     height: mindmapHeight,
                     capsuleBaseHeight: mindmapHeight,
+                    paddingX: MINDMAP_LAYOUT.paddingX,
+                    paddingY: MINDMAP_LAYOUT.paddingY,
+                    maxLineChars: MINDMAP_LAYOUT.maxLineChars,
                     strokeColor: 0x2563EB,
                     fillColor: 0x3B82F6,
                     fillAlpha: 0.25,

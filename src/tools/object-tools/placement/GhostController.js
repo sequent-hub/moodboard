@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import { MINDMAP_LAYOUT } from '../../../ui/mindmap/MindmapLayoutConfig.js';
 
 export class GhostController {
     constructor(host) {
@@ -511,8 +512,8 @@ export class GhostController {
         host.ghostContainer = new PIXI.Container();
         host.ghostContainer.alpha = 0.75;
 
-        const width = Math.max(1, Math.round(host.pending.properties?.width || 320));
-        const height = Math.max(1, Math.round(host.pending.properties?.height || 125));
+        const width = Math.max(1, Math.round(host.pending.properties?.width || MINDMAP_LAYOUT.width));
+        const height = Math.max(1, Math.round(host.pending.properties?.height || MINDMAP_LAYOUT.height));
         const strokeColor = (typeof host.pending.properties?.strokeColor === 'number')
             ? host.pending.properties.strokeColor
             : 0x2563EB;
@@ -528,7 +529,7 @@ export class GhostController {
         const dynamicRadius = Math.max(0, Math.floor(Math.min(width, height) / 2));
         const baseHeight = Math.max(
             1,
-            Math.round(host.pending.properties?.capsuleBaseHeight || host.pending.properties?.height || height)
+            Math.round(host.pending.properties?.capsuleBaseHeight || host.pending.properties?.height || MINDMAP_LAYOUT.height)
         );
         const baseRadius = Math.max(0, Math.floor(baseHeight / 2));
         const cornerRadius = Math.min(dynamicRadius, baseRadius);

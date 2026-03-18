@@ -1,9 +1,10 @@
 import { Events } from '../../core/events/Events.js';
 import * as PIXI from 'pixi.js';
 import { MindmapTextOverlayAdapter } from './MindmapTextOverlayAdapter.js';
+import { MINDMAP_LAYOUT } from './MindmapLayoutConfig.js';
 
 const MINDMAP_PLACEHOLDER = 'Напишите что-нибудь';
-const MINDMAP_MAX_LINE_CHARS = 50;
+const MINDMAP_MAX_LINE_CHARS = MINDMAP_LAYOUT.maxLineChars;
 
 function normalizeMindmapLineLength(value, maxLineChars = MINDMAP_MAX_LINE_CHARS) {
     const text = (typeof value === 'string')
@@ -141,12 +142,19 @@ export class MindmapHtmlTextLayer {
 
         const fontFamily = this.overlayAdapter.getDefaultFontFamily(objectData);
         const color = objectData.color || objectData.properties?.color || objectData.properties?.textColor || '#000000';
-        const baseFontSize = objectData.fontSize || objectData.properties?.fontSize || 20;
+        const baseFontSize = objectData.fontSize || objectData.properties?.fontSize || MINDMAP_LAYOUT.fontSize;
         const baseLineHeight = Math.round(baseFontSize * 1.24);
+        const paddingX = Math.max(0, Math.round(objectData.properties?.paddingX ?? MINDMAP_LAYOUT.paddingX));
+        const paddingY = Math.max(0, Math.round(objectData.properties?.paddingY ?? MINDMAP_LAYOUT.paddingY));
+        const maxLineChars = Math.max(1, Math.round(objectData.properties?.maxLineChars || MINDMAP_LAYOUT.maxLineChars));
 
         el.style.color = color;
         el.style.fontFamily = fontFamily;
         el.style.lineHeight = `${baseLineHeight}px`;
+        el.style.paddingTop = `${paddingY}px`;
+        el.style.paddingBottom = `${paddingY}px`;
+        el.style.paddingLeft = `${paddingX}px`;
+        el.style.paddingRight = `${paddingX}px`;
         el.style.whiteSpace = 'pre';
         el.style.wordBreak = 'normal';
         el.style.overflowWrap = 'normal';
@@ -160,8 +168,9 @@ export class MindmapHtmlTextLayer {
         const initialContent = objectData.content || objectData.properties?.content || '';
         this._applyContentValue(el, contentEl, initialContent);
         el.dataset.baseFontSize = String(baseFontSize);
-        el.dataset.baseW = String(Math.max(1, objectData.width || objectData.properties?.width || 320));
-        el.dataset.baseH = String(Math.max(1, objectData.height || objectData.properties?.height || 125));
+        el.dataset.baseW = String(Math.max(1, objectData.width || objectData.properties?.width || MINDMAP_LAYOUT.width));
+        el.dataset.baseH = String(Math.max(1, objectData.height || objectData.properties?.height || MINDMAP_LAYOUT.height));
+        el.dataset.maxLineChars = String(maxLineChars);
 
         const cleanup = this.overlayAdapter.attachEditOnClick({
             el,
@@ -212,7 +221,7 @@ export class MindmapHtmlTextLayer {
             ? (pixiObject.rotation * 180 / Math.PI)
             : (objectData.rotation || objectData.transform?.rotation || 0);
 
-        const baseFS = parseFloat(el.dataset.baseFontSize || '20') || 20;
+        const baseFS = parseFloat(el.dataset.baseFontSize || `${MINDMAP_LAYOUT.fontSize}`) || MINDMAP_LAYOUT.fontSize;
         const worldScale = world?.scale?.x || 1;
         const sCss = worldScale / res;
         const fontSizePx = Math.max(1, baseFS * sCss);
@@ -247,7 +256,11 @@ export class MindmapHtmlTextLayer {
     }
 
     _applyContentValue(containerEl, contentEl, rawContent) {
-        const actual = normalizeMindmapLineLength((typeof rawContent === 'string') ? rawContent : '');
+        const maxLineChars = Math.max(
+            1,
+            parseInt(containerEl?.dataset?.maxLineChars || `${MINDMAP_LAYOUT.maxLineChars}`, 10) || MINDMAP_LAYOUT.maxLineChars
+        );
+        const actual = normalizeMindmapLineLength((typeof rawContent === 'string') ? rawContent : '', maxLineChars);
         const isPlaceholder = actual.trim().length === 0;
         containerEl.dataset.mbContent = actual;
         contentEl.textContent = isPlaceholder ? MINDMAP_PLACEHOLDER : actual;
