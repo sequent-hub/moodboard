@@ -24,6 +24,9 @@ export class HandlesDomRenderer {
 
         const rot = box.querySelector('[data-handle="rotate"]');
         if (rot) rot.style.display = show ? '' : 'none';
+        this.host.layer.querySelectorAll('.mb-mindmap-side-btn').forEach((btn) => {
+            btn.style.display = show ? '' : 'none';
+        });
         if (show && !box.querySelector('[data-dir]')) {
             this.host.update();
         }
@@ -192,6 +195,39 @@ export class HandlesDomRenderer {
             rotateHandle.addEventListener('mousedown', (e) => this.host._onRotateHandleDown(e, box));
         }
         box.appendChild(rotateHandle);
+
+        if (isMindmapTarget) {
+            const createMindmapSideButton = (side) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'mb-mindmap-side-btn';
+                btn.dataset.side = side;
+                btn.dataset.id = id;
+                btn.textContent = '';
+                btn.setAttribute('aria-label', 'Добавить узел mindmap');
+                const centerY = top + Math.round(height / 2);
+                const edgeGap = 10;
+                const buttonRadius = 10;
+                const centerOffset = edgeGap + buttonRadius;
+                if (side === 'left') {
+                    btn.style.left = `${Math.round(left - centerOffset)}px`;
+                } else {
+                    btn.style.left = `${Math.round(left + width + centerOffset)}px`;
+                }
+                btn.style.top = `${centerY}px`;
+                btn.addEventListener('mousedown', (evt) => {
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                });
+                btn.addEventListener('click', (evt) => {
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                });
+                return btn;
+            };
+            this.host.layer.appendChild(createMindmapSideButton('left'));
+            this.host.layer.appendChild(createMindmapSideButton('right'));
+        }
 
         if (isRevitScreenshotTarget && typeof revitViewPayload === 'string' && revitViewPayload.length > 0) {
             const showInModelButton = document.createElement('button');

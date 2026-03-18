@@ -328,6 +328,49 @@
     justify-content: center;
 }
 
+.mb-mindmap-side-btn {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(107, 114, 128, 0.65);
+    color: #ffffff;
+    cursor: pointer;
+    pointer-events: auto;
+    z-index: 13;
+    padding: 0;
+}
+
+.mb-mindmap-side-btn:hover {
+    background: #80D8FF;
+}
+
+.mb-mindmap-side-btn::before,
+.mb-mindmap-side-btn::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    background: #ffffff;
+    border-radius: 999px;
+    transform: translate(-50%, -50%);
+}
+
+.mb-mindmap-side-btn::before {
+    width: 10px;
+    height: 2px;
+}
+
+.mb-mindmap-side-btn::after {
+    width: 2px;
+    height: 10px;
+}
+
 .mb-revit-show-in-model {
     position: absolute;
     transform: translate(-50%, -100%);
