@@ -36,6 +36,7 @@ export class HandlesDomRenderer {
 
         let isFileTarget = false;
         let isFrameTarget = false;
+        let isMindmapTarget = false;
         let isRevitScreenshotTarget = false;
         let revitViewPayload = null;
         if (id !== '__group__') {
@@ -44,6 +45,7 @@ export class HandlesDomRenderer {
             const mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
             isFileTarget = mbType === 'file';
             isFrameTarget = mbType === 'frame';
+            isMindmapTarget = mbType === 'mindmap';
             isRevitScreenshotTarget = mbType === 'revit-screenshot-img';
             revitViewPayload = req.pixiObject?._mb?.properties?.view || null;
         }
@@ -169,7 +171,7 @@ export class HandlesDomRenderer {
         const rotateHandle = document.createElement('div');
         rotateHandle.dataset.handle = 'rotate';
         rotateHandle.dataset.id = id;
-        if (isFileTarget || isFrameTarget) {
+        if (isFileTarget || isFrameTarget || isMindmapTarget) {
             Object.assign(rotateHandle.style, { display: 'none', pointerEvents: 'none' });
         } else {
             rotateHandle.className = 'mb-rotate-handle';
