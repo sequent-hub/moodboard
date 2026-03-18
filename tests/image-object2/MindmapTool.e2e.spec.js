@@ -853,4 +853,54 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
     expect(state.lineCount).toBe(Math.ceil(state.plainLen / 50));
     expect(state.minLine).toBeGreaterThan(1);
   });
+
+  test('mindmap allows drag from text and click-to-edit on text', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return !!obj?.id;
+      })
+      .toBe(true);
+
+    const textEl = page.locator('.mb-text--mindmap-content').first();
+    const textBox = await textEl.boundingBox();
+    expect(textBox).toBeTruthy();
+
+    const beforePos = await page.evaluate(() => {
+      const board = window.moodboard.exportBoard();
+      const obj = (board?.objects || []).find((o) => o.type === 'mindmap');
+      if (!obj) return null;
+      return { x: obj.position.x, y: obj.position.y };
+    });
+    expect(beforePos).toBeTruthy();
+
+    // Drag starting from text.
+    await page.mouse.move(textBox.x + textBox.width * 0.5, textBox.y + textBox.height * 0.5);
+    await page.mouse.down();
+    await page.mouse.move(textBox.x + textBox.width * 0.5 + 60, textBox.y + textBox.height * 0.5 + 25);
+    await page.mouse.up();
+
+    await expect
+      .poll(async () => {
+        const board = await page.evaluate(() => window.moodboard.exportBoard());
+        const obj = (board?.objects || []).find((o) => o.type === 'mindmap');
+        if (!obj || !beforePos) return false;
+        const dx = Math.abs(obj.position.x - beforePos.x);
+        const dy = Math.abs(obj.position.y - beforePos.y);
+        return dx >= 10 || dy >= 10;
+      })
+      .toBe(true);
+
+    // Simple click on text still opens editor.
+    const textBox2 = await textEl.boundingBox();
+    expect(textBox2).toBeTruthy();
+    await page.mouse.click(textBox2.x + textBox2.width * 0.5, textBox2.y + textBox2.height * 0.5);
+    await expect(page.locator('.moodboard-text-input')).toBeVisible();
+  });
 });
