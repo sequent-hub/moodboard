@@ -46,7 +46,11 @@ export class MindmapObject {
     _draw() {
         const g = this.graphics;
         g.clear();
-        g.lineStyle(this.strokeWidth, this.strokeColor, 1);
+        try {
+            g.lineStyle({ width: this.strokeWidth, color: this.strokeColor, alpha: 1, alignment: 0 });
+        } catch (_) {
+            g.lineStyle(this.strokeWidth, this.strokeColor, 1, 0);
+        }
         g.beginFill(this.fillColor, this.fillAlpha);
         g.drawRoundedRect(0, 0, this.width, this.height, this.cornerRadius);
         g.endFill();

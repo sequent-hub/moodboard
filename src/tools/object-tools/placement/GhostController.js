@@ -530,7 +530,11 @@ export class GhostController {
             : 8;
 
         const graphics = new PIXI.Graphics();
-        graphics.lineStyle(strokeWidth, strokeColor, 1);
+        try {
+            graphics.lineStyle({ width: strokeWidth, color: strokeColor, alpha: 1, alignment: 0 });
+        } catch (_) {
+            graphics.lineStyle(strokeWidth, strokeColor, 1, 0);
+        }
         graphics.beginFill(fillColor, fillAlpha);
         graphics.drawRoundedRect(0, 0, width, height, cornerRadius);
         graphics.endFill();
