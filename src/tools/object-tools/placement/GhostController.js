@@ -526,6 +526,11 @@ export class GhostController {
         const strokeWidth = (typeof host.pending.properties?.strokeWidth === 'number')
             ? host.pending.properties.strokeWidth
             : 2;
+        const fontSize = Math.max(1, Math.round(host.pending.properties?.fontSize || MINDMAP_LAYOUT.fontSize));
+        const fontFamily = host.pending.properties?.fontFamily || 'Roboto, Arial, sans-serif';
+        const textColor = host.pending.properties?.textColor || 0x1e3a8a;
+        const paddingX = Math.max(0, Math.round(host.pending.properties?.paddingX ?? MINDMAP_LAYOUT.paddingX));
+        const placeholderText = 'Напишите что-нибудь';
         const dynamicRadius = Math.max(0, Math.floor(Math.min(width, height) / 2));
         const baseHeight = Math.max(
             1,
@@ -566,6 +571,32 @@ export class GhostController {
         drawGhostCapsule(strokeWidth, 1);
 
         host.ghostContainer.addChild(graphics);
+
+        try {
+            const lineHeight = Math.max(1, Math.round(fontSize * 1.24));
+            const rendererRes = Math.max(1, host.app?.renderer?.resolution || 1);
+            const textScale = 1 / rendererRes;
+            const placeholder = new PIXI.Text(placeholderText, {
+                fontFamily,
+                fontSize,
+                fontWeight: '400',
+                fill: textColor,
+                align: 'left',
+                lineHeight,
+                wordWrap: false,
+                breakWords: false,
+            });
+            placeholder.alpha = 0.45;
+            placeholder.scale.set(textScale);
+            placeholder.x = paddingX;
+            const localBounds = placeholder.getLocalBounds();
+            const measuredHeight = Math.max(1, Number.isFinite(localBounds?.height) ? localBounds.height : lineHeight);
+            const scaledMeasuredHeight = measuredHeight * textScale;
+            const targetY = (height - scaledMeasuredHeight) / 2;
+            placeholder.y = (Math.round(targetY * 2) / 2) - 2;
+            host.ghostContainer.addChild(placeholder);
+        } catch (_) {}
+
         host.ghostContainer.pivot.x = width / 2;
         host.ghostContainer.pivot.y = height / 2;
         host.world.addChild(host.ghostContainer);
