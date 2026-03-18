@@ -5,7 +5,7 @@ import { MINDMAP_LAYOUT } from '../mindmap/MindmapLayoutConfig.js';
 
 const HANDLES_ACCENT_COLOR = '#80D8FF';
 const REVIT_SHOW_IN_MODEL_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" aria-hidden="true" focusable="false"><path d="M384 64C366.3 64 352 78.3 352 96C352 113.7 366.3 128 384 128L466.7 128L265.3 329.4C252.8 341.9 252.8 362.2 265.3 374.7C277.8 387.2 298.1 387.2 310.6 374.7L512 173.3L512 256C512 273.7 526.3 288 544 288C561.7 288 576 273.7 576 256L576 96C576 78.3 561.7 64 544 64L384 64zM144 160C99.8 160 64 195.8 64 240L64 496C64 540.2 99.8 576 144 576L400 576C444.2 576 480 540.2 480 496L480 416C480 398.3 465.7 384 448 384C430.3 384 416 398.3 416 416L416 496C416 504.8 408.8 512 400 512L144 512C135.2 512 128 504.8 128 496L128 240C128 231.2 135.2 224 144 224L224 224C241.7 224 256 209.7 256 192C256 174.3 241.7 160 224 160L144 160z"/></svg>';
-const MINDMAP_CHILD_WIDTH_FACTOR = 0.8;
+const MINDMAP_CHILD_WIDTH_FACTOR = 0.9;
 const MINDMAP_CHILD_HEIGHT_FACTOR = 0.8;
 const MINDMAP_CHILD_PADDING_FACTOR = 0.5;
 const MINDMAP_CHILD_STROKE_COLOR = 0x16A34A;
@@ -37,15 +37,21 @@ export class HandlesDomRenderer {
         const box = this.host.layer.querySelector('.mb-handles-box');
         if (!box) return;
 
+        const applyVisibility = (el) => {
+            if (!el) return;
+            const lockedHidden = el.dataset.lockedHidden === '1';
+            el.style.display = show && !lockedHidden ? '' : 'none';
+        };
+
         box.querySelectorAll('[data-dir]').forEach((el) => {
-            el.style.display = show ? '' : 'none';
+            applyVisibility(el);
         });
         box.querySelectorAll('[data-edge]').forEach((el) => {
-            el.style.display = show ? '' : 'none';
+            applyVisibility(el);
         });
 
         const rot = box.querySelector('[data-handle="rotate"]');
-        if (rot) rot.style.display = show ? '' : 'none';
+        if (rot) applyVisibility(rot);
         this.host.layer.querySelectorAll('.mb-mindmap-side-btn').forEach((btn) => {
             btn.style.display = show ? '' : 'none';
         });
@@ -136,6 +142,7 @@ export class HandlesDomRenderer {
             h.style.left = `${x - 6}px`;
             h.style.top = `${y - 6}px`;
             h.style.display = isNonResizableTarget ? 'none' : 'block';
+            if (isNonResizableTarget) h.dataset.lockedHidden = '1';
 
             const inner = document.createElement('div');
             inner.className = 'mb-handle-inner';
@@ -179,6 +186,7 @@ export class HandlesDomRenderer {
                 cursor,
                 display: isNonResizableTarget ? 'none' : 'block',
             });
+            if (isNonResizableTarget) e.dataset.lockedHidden = '1';
             if (!isNonResizableTarget) {
                 e.addEventListener('mousedown', (evt) => this.host._onEdgeResizeDown(evt));
             }
@@ -218,6 +226,7 @@ export class HandlesDomRenderer {
         rotateHandle.dataset.handle = 'rotate';
         rotateHandle.dataset.id = id;
         if (isFileTarget || isFrameTarget || isMindmapTarget) {
+            rotateHandle.dataset.lockedHidden = '1';
             Object.assign(rotateHandle.style, { display: 'none', pointerEvents: 'none' });
         } else {
             rotateHandle.className = 'mb-rotate-handle';
