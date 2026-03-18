@@ -963,6 +963,41 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       })
       .toBe(true);
 
+    await expect
+      .poll(async () => {
+        return page.evaluate((rootId) => {
+          const board = window.moodboard.exportBoard();
+          const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+          const rootNode = nodes.find((o) => o.id === rootId);
+          const childNode = nodes.find((o) => o.id !== rootId);
+          if (!rootNode || !childNode) return false;
+          const rootPaddingX = Number(rootNode.properties?.paddingX || 0);
+          const rootPaddingY = Number(rootNode.properties?.paddingY || 0);
+          const childPaddingX = Number(childNode.properties?.paddingX || 0);
+          const childPaddingY = Number(childNode.properties?.paddingY || 0);
+          const rootWidth = Number(rootNode.properties?.width || rootNode.width || 0);
+          const rootHeight = Number(rootNode.properties?.height || rootNode.height || 0);
+          const childWidth = Number(childNode.properties?.width || childNode.width || 0);
+          const childHeight = Number(childNode.properties?.height || childNode.height || 0);
+          const childStroke = Number(childNode.properties?.strokeColor || 0);
+          const childFill = Number(childNode.properties?.fillColor || 0);
+          const childFillAlpha = Number(childNode.properties?.fillAlpha || 0);
+          return (
+            childWidth < rootWidth &&
+            childHeight < rootHeight &&
+            childPaddingX > 0 &&
+            childPaddingX === Math.round(rootPaddingX / 2) &&
+            childPaddingY > 0 &&
+            childPaddingY === Math.round(rootPaddingY / 2) &&
+            childStroke === 0x16A34A &&
+            childFill === 0x16A34A &&
+            childFillAlpha > 0 &&
+            childFillAlpha < 1
+          );
+        }, rootObject.id);
+      })
+      .toBe(true);
+
     await triggerUndo(page);
     await expect
       .poll(async () => {

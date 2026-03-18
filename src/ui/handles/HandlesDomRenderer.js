@@ -1,9 +1,16 @@
 import { Events } from '../../core/events/Events.js';
 import { createRotatedResizeCursor } from '../../tools/object-tools/selection/CursorController.js';
 import { createChildMindmapIntentMetadata } from '../../mindmap/MindmapCompoundContract.js';
+import { MINDMAP_LAYOUT } from '../mindmap/MindmapLayoutConfig.js';
 
 const HANDLES_ACCENT_COLOR = '#80D8FF';
 const REVIT_SHOW_IN_MODEL_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" aria-hidden="true" focusable="false"><path d="M384 64C366.3 64 352 78.3 352 96C352 113.7 366.3 128 384 128L466.7 128L265.3 329.4C252.8 341.9 252.8 362.2 265.3 374.7C277.8 387.2 298.1 387.2 310.6 374.7L512 173.3L512 256C512 273.7 526.3 288 544 288C561.7 288 576 273.7 576 256L576 96C576 78.3 561.7 64 544 64L384 64zM144 160C99.8 160 64 195.8 64 240L64 496C64 540.2 99.8 576 144 576L400 576C444.2 576 480 540.2 480 496L480 416C480 398.3 465.7 384 448 384C430.3 384 416 398.3 416 416L416 496C416 504.8 408.8 512 400 512L144 512C135.2 512 128 504.8 128 496L128 240C128 231.2 135.2 224 144 224L224 224C241.7 224 256 209.7 256 192C256 174.3 241.7 160 224 160L144 160z"/></svg>';
+const MINDMAP_CHILD_WIDTH_FACTOR = 0.8;
+const MINDMAP_CHILD_HEIGHT_FACTOR = 0.8;
+const MINDMAP_CHILD_PADDING_FACTOR = 0.5;
+const MINDMAP_CHILD_STROKE_COLOR = 0x16A34A;
+const MINDMAP_CHILD_FILL_COLOR = 0x16A34A;
+const MINDMAP_CHILD_FILL_ALPHA = 0.25;
 
 export class HandlesDomRenderer {
     constructor(host, rotateIconSvg) {
@@ -234,9 +241,24 @@ export class HandlesDomRenderer {
                     const gapWorld = Math.max(1, Math.round((10 * rendererRes) / worldScale));
                     const sourceWidth = Math.max(1, Math.round(sourceMindmapProperties?.width || worldBounds.width || 100));
                     const sourceHeight = Math.max(1, Math.round(sourceMindmapProperties?.height || worldBounds.height || 100));
+                    const sourceRole = sourceMindmapProperties?.mindmap?.role || null;
+                    const sourcePaddingX = Math.max(1, Math.round(sourceMindmapProperties?.paddingX || MINDMAP_LAYOUT.paddingX));
+                    const sourcePaddingY = Math.max(1, Math.round(sourceMindmapProperties?.paddingY || MINDMAP_LAYOUT.paddingY));
+                    const childWidth = sourceRole === 'child'
+                        ? sourceWidth
+                        : Math.max(1, Math.round(sourceWidth * MINDMAP_CHILD_WIDTH_FACTOR));
+                    const childHeight = sourceRole === 'child'
+                        ? sourceHeight
+                        : Math.max(1, Math.round(sourceHeight * MINDMAP_CHILD_HEIGHT_FACTOR));
+                    const childPaddingX = sourceRole === 'child'
+                        ? sourcePaddingX
+                        : Math.max(1, Math.round(sourcePaddingX * MINDMAP_CHILD_PADDING_FACTOR));
+                    const childPaddingY = sourceRole === 'child'
+                        ? sourcePaddingY
+                        : Math.max(1, Math.round(sourcePaddingY * MINDMAP_CHILD_PADDING_FACTOR));
                     const nextPosition = {
                         x: (side === 'left')
-                            ? Math.round(worldBounds.x - sourceWidth - gapWorld)
+                            ? Math.round(worldBounds.x - childWidth - gapWorld)
                             : Math.round(worldBounds.x + worldBounds.width + gapWorld),
                         y: Math.round(worldBounds.y),
                     };
@@ -253,8 +275,14 @@ export class HandlesDomRenderer {
                             ...(sourceMindmapProperties || {}),
                             mindmap: childMindmapMeta,
                             content: '',
-                            width: sourceWidth,
-                            height: sourceHeight,
+                            width: childWidth,
+                            height: childHeight,
+                            capsuleBaseHeight: childHeight,
+                            paddingX: childPaddingX,
+                            paddingY: childPaddingY,
+                            strokeColor: MINDMAP_CHILD_STROKE_COLOR,
+                            fillColor: MINDMAP_CHILD_FILL_COLOR,
+                            fillAlpha: MINDMAP_CHILD_FILL_ALPHA,
                         },
                     });
                 });
