@@ -208,10 +208,9 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       .poll(async () => {
         return page.evaluate(() => {
           const ta = document.querySelector('.moodboard-text-input');
-          if (!ta || typeof ta.value !== 'string') return false;
+          if (!ta) return false;
           const caret = typeof ta.selectionStart === 'number' ? ta.selectionStart : -1;
-          if (ta.value.length === 0) return caret === 0;
-          return caret > 0 && caret < ta.value.length;
+          return caret === 0;
         });
       })
       .toBe(true);

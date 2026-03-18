@@ -13,54 +13,10 @@ import {
 
 function applyMindmapCaretFromClick({ create, objectId, object, textarea }) {
     try {
-        const click = object?.caretClick || null;
-        if (create || !objectId || !click || typeof window === 'undefined') return;
+        if (typeof window === 'undefined') return;
         setTimeout(() => {
             try {
-                const el = window.moodboardMindmapHtmlTextLayer?.idToEl?.get?.(objectId) || null;
-                const fullText = (typeof textarea.value === 'string') ? textarea.value : '';
-                if (!fullText) {
-                    textarea.selectionStart = textarea.selectionEnd = 0;
-                    return;
-                }
-                const contentEl = el?.querySelector?.('.mb-text--mindmap-content') || null;
-                const textNode = contentEl?.firstChild || null;
-                if (!el || !textNode) return;
-                const len = textNode.textContent.length;
-                if (len === 0) {
-                    textarea.selectionStart = textarea.selectionEnd = 0;
-                    return;
-                }
-                const doc = el.ownerDocument || document;
-                let bestIdx = 0;
-                let bestDist = Infinity;
-                for (let i = 0; i <= len; i++) {
-                    const range = doc.createRange();
-                    range.setStart(textNode, i);
-                    range.setEnd(textNode, i);
-                    const rects = range.getClientRects();
-                    const rect = rects && rects.length > 0 ? rects[0] : range.getBoundingClientRect();
-                    if (rect && isFinite(rect.left) && isFinite(rect.top)) {
-                        if (click.clientX >= rect.left && click.clientX <= rect.right &&
-                            click.clientY >= rect.top && click.clientY <= rect.bottom) {
-                            bestIdx = i;
-                            bestDist = 0;
-                            break;
-                        }
-                        const cx = Math.max(rect.left, Math.min(click.clientX, rect.right));
-                        const cy = Math.max(rect.top, Math.min(click.clientY, rect.bottom));
-                        const dx = click.clientX - cx;
-                        const dy = click.clientY - cy;
-                        const d2 = dx * dx + dy * dy;
-                        if (d2 < bestDist) {
-                            bestDist = d2;
-                            bestIdx = i;
-                        }
-                    }
-                }
-                const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-                const caret = clamp(bestIdx, 0, fullText.length);
-                textarea.selectionStart = textarea.selectionEnd = caret;
+                textarea.selectionStart = textarea.selectionEnd = 0;
                 if (typeof textarea.scrollTop === 'number') textarea.scrollTop = 0;
             } catch (_) {}
         }, 0);
@@ -128,7 +84,8 @@ export function openMindmapEditor(object, create = false) {
     textarea.classList.add('moodboard-text-input--mindmap-debug');
     textarea.placeholder = 'Напишите что-нибудь';
     textarea.style.fontFamily = properties.fontFamily || 'Roboto, Arial, sans-serif';
-    textarea.style.textAlign = 'center';
+    textarea.style.fontWeight = '400';
+    textarea.style.textAlign = 'left';
     textarea.style.resize = 'none';
     textarea.style.overflow = 'hidden';
     textarea.style.whiteSpace = 'pre-wrap';
@@ -172,7 +129,6 @@ export function openMindmapEditor(object, create = false) {
             if (staticStyle?.fontFamily) textarea.style.fontFamily = staticStyle.fontFamily;
             if (staticStyle?.fontSize) textarea.style.fontSize = staticStyle.fontSize;
             if (staticStyle?.lineHeight) textarea.style.lineHeight = staticStyle.lineHeight;
-            if (staticStyle?.fontWeight) textarea.style.fontWeight = staticStyle.fontWeight;
             if (staticStyle?.color) textarea.style.color = staticStyle.color;
             if (staticStyle?.paddingLeft) textarea.style.paddingLeft = staticStyle.paddingLeft;
             if (staticStyle?.paddingRight) textarea.style.paddingRight = staticStyle.paddingRight;
