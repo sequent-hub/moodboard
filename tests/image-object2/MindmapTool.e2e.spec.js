@@ -150,10 +150,86 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
 
     const textEl = page.locator(`.mb-text--mindmap[data-id="${mindmapId}"]`);
     await expect(textEl).toBeVisible();
+
+    const staticTextMetrics = await page.evaluate((objectId) => {
+      const el = document.querySelector(`.mb-text--mindmap[data-id="${objectId}"]`);
+      if (!el) return null;
+      const style = window.getComputedStyle(el);
+      return {
+        left: parseFloat(el.style.left || '0'),
+        top: parseFloat(el.style.top || '0'),
+        fontSize: parseFloat(style.fontSize || '0'),
+      };
+    }, mindmapId);
+    expect(staticTextMetrics).toBeTruthy();
+
     await textEl.click();
 
     const textarea = page.locator('.moodboard-text-input');
     await expect(textarea).toBeVisible();
+
+    await expect
+      .poll(async () => {
+        const editorMetrics = await page.evaluate(() => {
+          const wrapper = document.querySelector('.moodboard-text-editor');
+          const textareaEl = document.querySelector('.moodboard-text-input');
+          if (!wrapper || !textareaEl) return null;
+          const style = window.getComputedStyle(textareaEl);
+          return {
+            left: parseFloat(wrapper.style.left || '0'),
+            top: parseFloat(wrapper.style.top || '0'),
+            fontSize: parseFloat(style.fontSize || '0'),
+          };
+        });
+        if (!editorMetrics || !staticTextMetrics) return false;
+        const dx = Math.abs(editorMetrics.left - staticTextMetrics.left);
+        const dy = Math.abs(editorMetrics.top - staticTextMetrics.top);
+        const df = Math.abs(editorMetrics.fontSize - staticTextMetrics.fontSize);
+        return dx <= 1 && dy <= 1 && df <= 1;
+      })
+      .toBe(true);
+
+    await expect
+      .poll(async () => {
+        const centerMetrics = await page.evaluate(() => {
+          const staticEl = document.querySelector('.mb-text--mindmap');
+          const textareaEl = document.querySelector('.moodboard-text-input');
+          if (!staticEl || !textareaEl) return null;
+          const staticRect = staticEl.getBoundingClientRect();
+          const textareaRect = textareaEl.getBoundingClientRect();
+          return {
+            staticCenterY: staticRect.top + staticRect.height / 2,
+            editorCenterY: textareaRect.top + textareaRect.height / 2,
+          };
+        });
+        if (!centerMetrics) return false;
+        const dyCenter = Math.abs(centerMetrics.staticCenterY - centerMetrics.editorCenterY);
+        return dyCenter <= 1;
+      })
+      .toBe(true);
+
+    await expect
+      .poll(async () => {
+        const lineMetrics = await page.evaluate(() => {
+          const staticEl = document.querySelector('.mb-text--mindmap');
+          const textareaEl = document.querySelector('.moodboard-text-input');
+          if (!staticEl || !textareaEl) return null;
+          const staticRect = staticEl.getBoundingClientRect();
+          const textareaRect = textareaEl.getBoundingClientRect();
+          const style = window.getComputedStyle(textareaEl);
+          const lineHeight = parseFloat(style.lineHeight || '0');
+          const paddingTop = parseFloat(style.paddingTop || '0');
+          if (!Number.isFinite(lineHeight) || lineHeight <= 0) return null;
+          const staticCenterY = staticRect.top + staticRect.height / 2;
+          const lineCenterY = textareaRect.top + paddingTop + lineHeight / 2;
+          return { staticCenterY, lineCenterY };
+        });
+        if (!lineMetrics) return false;
+        const dy = Math.abs(lineMetrics.staticCenterY - lineMetrics.lineCenterY);
+        return dy <= 1;
+      })
+      .toBe(true);
+
     await textarea.fill('Обновленный текст');
 
     // Клик мимо текста закрывает редактор.

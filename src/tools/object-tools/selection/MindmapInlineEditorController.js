@@ -68,6 +68,8 @@ export function openMindmapEditor(object, create = false) {
 
     const wrapper = createTextEditorWrapper();
     const textarea = createTextEditorTextarea(properties.content || '');
+    wrapper.classList.add('moodboard-text-editor--mindmap-debug');
+    textarea.classList.add('moodboard-text-input--mindmap-debug');
     textarea.placeholder = 'Введите текст';
     textarea.style.fontFamily = properties.fontFamily || 'Roboto, Arial, sans-serif';
     textarea.style.textAlign = 'center';
@@ -75,6 +77,9 @@ export function openMindmapEditor(object, create = false) {
     textarea.style.overflow = 'hidden';
     textarea.style.whiteSpace = 'pre-wrap';
     textarea.style.wordBreak = 'break-word';
+    textarea.style.paddingTop = '0px';
+    textarea.style.paddingBottom = '0px';
+    textarea.setAttribute('rows', '1');
 
     const containerRect = view.parentElement.getBoundingClientRect();
     const viewRect = view.getBoundingClientRect();
@@ -88,21 +93,98 @@ export function openMindmapEditor(object, create = false) {
     const width = Math.max(1, br.x - tl.x);
     const height = Math.max(1, br.y - tl.y);
 
-    const insetX = Math.max(8, Math.round(width * 0.08));
-    const insetY = Math.max(6, Math.round(height * 0.12));
-    wrapper.style.left = `${Math.round(left + insetX)}px`;
-    wrapper.style.top = `${Math.round(top + insetY)}px`;
-    wrapper.style.width = `${Math.max(1, Math.round(width - insetX * 2))}px`;
-    wrapper.style.height = `${Math.max(1, Math.round(height - insetY * 2))}px`;
+    let targetLeft = Math.round(left);
+    let targetTop = Math.round(top);
+    let targetWidth = Math.max(1, Math.round(width));
+    let targetHeight = Math.max(1, Math.round(height));
+
+    const staticTextEl = (typeof window !== 'undefined')
+        ? window.moodboardMindmapHtmlTextLayer?.idToEl?.get?.(objectId)
+        : null;
+    if (staticTextEl) {
+        const cssLeft = parseFloat(staticTextEl.style.left || 'NaN');
+        const cssTop = parseFloat(staticTextEl.style.top || 'NaN');
+        const cssWidth = parseFloat(staticTextEl.style.width || 'NaN');
+        const cssHeight = parseFloat(staticTextEl.style.height || 'NaN');
+        if (isFinite(cssLeft)) targetLeft = Math.round(cssLeft);
+        if (isFinite(cssTop)) targetTop = Math.round(cssTop);
+        if (isFinite(cssWidth) && cssWidth > 0) targetWidth = Math.max(1, Math.round(cssWidth));
+        if (isFinite(cssHeight) && cssHeight > 0) targetHeight = Math.max(1, Math.round(cssHeight));
+
+        if (typeof window.getComputedStyle === 'function') {
+            const staticStyle = window.getComputedStyle(staticTextEl);
+            if (staticStyle?.fontFamily) textarea.style.fontFamily = staticStyle.fontFamily;
+            if (staticStyle?.fontSize) textarea.style.fontSize = staticStyle.fontSize;
+            if (staticStyle?.lineHeight) textarea.style.lineHeight = staticStyle.lineHeight;
+            if (staticStyle?.fontWeight) textarea.style.fontWeight = staticStyle.fontWeight;
+            if (staticStyle?.color) textarea.style.color = staticStyle.color;
+            if (staticStyle?.paddingLeft) textarea.style.paddingLeft = staticStyle.paddingLeft;
+            if (staticStyle?.paddingRight) textarea.style.paddingRight = staticStyle.paddingRight;
+        }
+    } else if (properties.fontSize) {
+        textarea.style.fontSize = `${properties.fontSize}px`;
+    }
+
+    wrapper.style.left = `${targetLeft}px`;
+    wrapper.style.top = `${targetTop}px`;
+    wrapper.style.width = `${targetWidth}px`;
+    wrapper.style.height = `${targetHeight}px`;
     wrapper.style.borderRadius = '999px';
     wrapper.style.padding = '0';
+    wrapper.style.display = 'flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.justifyContent = 'center';
 
     textarea.style.width = '100%';
-    textarea.style.height = '100%';
+    textarea.style.height = 'auto';
     textarea.style.minHeight = '0';
 
+    const getSingleLineTextareaHeight = () => {
+        if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return 1;
+        const style = window.getComputedStyle(textarea);
+        const lineHeight = parseFloat(style.lineHeight || '0');
+        const paddingTop = parseFloat(style.paddingTop || '0');
+        const paddingBottom = parseFloat(style.paddingBottom || '0');
+        const base = lineHeight + paddingTop + paddingBottom;
+        return Math.max(1, Math.ceil(Number.isFinite(base) ? base : 1));
+    };
+
+    const alignTextareaLineCenter = () => {
+        if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return;
+        const wrapperRect = wrapper.getBoundingClientRect();
+        const textareaRect = textarea.getBoundingClientRect();
+        const textareaStyle = window.getComputedStyle(textarea);
+        const lineHeight = parseFloat(textareaStyle.lineHeight || '0');
+        const paddingTop = parseFloat(textareaStyle.paddingTop || '0');
+        if (!Number.isFinite(lineHeight) || lineHeight <= 0 || !Number.isFinite(paddingTop)) return;
+        const desiredLineCenterY = wrapperRect.top + wrapperRect.height / 2;
+        const currentLineCenterY = textareaRect.top + paddingTop + lineHeight / 2;
+        const deltaY = desiredLineCenterY - currentLineCenterY;
+        textarea.style.transform = `translateY(${deltaY}px)`;
+    };
+
+    const syncTextareaHeight = (isInitial = false) => {
+        textarea.style.height = 'auto';
+        const singleLineHeight = getSingleLineTextareaHeight();
+        const scrollHeight = Math.max(1, Math.ceil(textarea.scrollHeight));
+        const nextHeight = isInitial
+            ? singleLineHeight
+            : Math.max(singleLineHeight, scrollHeight);
+        textarea.style.height = `${nextHeight}px`;
+        textarea.style.marginTop = '0px';
+        textarea.style.transform = 'translateY(0px)';
+        alignTextareaLineCenter();
+        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(() => {
+                alignTextareaLineCenter();
+            });
+        }
+    };
+
+    textarea.addEventListener('input', syncTextareaHeight);
     wrapper.appendChild(textarea);
     view.parentElement.appendChild(wrapper);
+    syncTextareaHeight(true);
 
     hideStaticTextDuringEditing(this, objectId);
 
@@ -114,6 +196,7 @@ export function openMindmapEditor(object, create = false) {
 
         textarea.removeEventListener('blur', onBlur);
         textarea.removeEventListener('keydown', onKeyDown);
+        textarea.removeEventListener('input', syncTextareaHeight);
 
         const value = textarea.value.trim();
         const commitValue = commit && value.length > 0;

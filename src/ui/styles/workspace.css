@@ -246,6 +246,11 @@
     font-weight: 500;
     padding-left: 12px;
     padding-right: 12px;
+    outline: 1px solid #22c55e;
+}
+
+.moodboard-text-input--mindmap-debug {
+    outline: 1px solid #ef4444 !important;
 }
 
 /* HTML handles layer */
