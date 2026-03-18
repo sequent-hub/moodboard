@@ -93,6 +93,7 @@ export class ToolbarActionRouter {
                     fontSize: 20,
                     width: mindmapWidth,
                     height: mindmapHeight,
+                    capsuleBaseHeight: mindmapHeight,
                     strokeColor: 0x2563EB,
                     fillColor: 0x3B82F6,
                     fillAlpha: 0.25,

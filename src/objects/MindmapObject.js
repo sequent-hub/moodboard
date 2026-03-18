@@ -13,6 +13,9 @@ export class MindmapObject {
         this.fillColor = (typeof props.fillColor === 'number') ? props.fillColor : 0x3B82F6;
         this.fillAlpha = (typeof props.fillAlpha === 'number') ? props.fillAlpha : 0.25;
         this.strokeWidth = (typeof props.strokeWidth === 'number') ? props.strokeWidth : 2;
+        this.capsuleBaseHeight = (typeof props.capsuleBaseHeight === 'number')
+            ? Math.max(1, Math.round(props.capsuleBaseHeight))
+            : Math.max(1, Math.round(Math.min(this.height, 100)));
 
         this.graphics = new PIXI.Graphics();
         this._draw();
@@ -45,7 +48,9 @@ export class MindmapObject {
     _draw() {
         const g = this.graphics;
         g.clear();
-        const capsuleRadius = Math.max(0, Math.floor(Math.min(this.width, this.height) / 2));
+        const dynamicRadius = Math.max(0, Math.floor(Math.min(this.width, this.height) / 2));
+        const fixedBaseRadius = Math.max(0, Math.floor(this.capsuleBaseHeight / 2));
+        const capsuleRadius = Math.min(dynamicRadius, fixedBaseRadius);
         try {
             g.lineStyle({ width: this.strokeWidth, color: this.strokeColor, alpha: 1, alignment: 0 });
         } catch (_) {
