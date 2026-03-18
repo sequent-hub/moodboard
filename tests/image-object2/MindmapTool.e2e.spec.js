@@ -374,4 +374,153 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       })
       .toBe(true);
   });
+
+  test('mindmap enforces max 50 chars per line and keeps same line breaks in display mode', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return !!obj?.id;
+      })
+      .toBe(true);
+
+    const mindmapObject = await getMindmapObject(page);
+    expect(mindmapObject).toBeTruthy();
+    const mindmapId = mindmapObject.id;
+
+    const textEl = page.locator(`.mb-text--mindmap[data-id="${mindmapId}"] .mb-text--mindmap-content`);
+    const textContentBox = await textEl.boundingBox();
+    expect(textContentBox).toBeTruthy();
+    await page.mouse.click(
+      textContentBox.x + textContentBox.width * 0.5,
+      textContentBox.y + textContentBox.height * 0.5
+    );
+
+    const textarea = page.locator('.moodboard-text-input');
+    await expect(textarea).toBeVisible();
+
+    const longLine = '1234567890'.repeat(6); // 60 chars
+    await textarea.fill(longLine);
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(() => {
+          const ta = document.querySelector('.moodboard-text-input');
+          if (!ta) return null;
+          const lines = String(ta.value || '').split('\n');
+          return lines.every((line) => line.length <= 50);
+        });
+      })
+      .toBe(true);
+
+    const editorValue = await page.evaluate(() => {
+      const ta = document.querySelector('.moodboard-text-input');
+      return ta ? String(ta.value || '') : '';
+    });
+    const editorLines = editorValue.split('\n');
+    expect(editorLines.length).toBeGreaterThan(1);
+    expect(editorLines.every((line) => line.length <= 50)).toBe(true);
+
+    await page.mouse.click(canvasBox.x + 20, canvasBox.y + 20);
+    await expect(textarea).toHaveCount(0);
+
+    await expect
+      .poll(async () => {
+        return page.evaluate((objectId) => {
+          const board = window.moodboard.exportBoard();
+          const obj = (board?.objects || []).find((o) => o.id === objectId);
+          const textNode = document.querySelector(`.mb-text--mindmap[data-id="${objectId}"] .mb-text--mindmap-content`);
+          if (!obj || !textNode) return null;
+          const saved = String(obj.properties?.content || '');
+          const shown = String(textNode.textContent || '');
+          const savedLines = saved.split('\n');
+          const shownLines = shown.split('\n');
+          return {
+            saved,
+            shown,
+            savedLinesLen: savedLines.length,
+            shownLinesLen: shownLines.length,
+            savedValid: savedLines.every((line) => line.length <= 50),
+            shownValid: shownLines.every((line) => line.length <= 50),
+          };
+        }, mindmapId);
+      })
+      .toMatchObject({
+        saved: editorValue,
+        shown: editorValue,
+        savedLinesLen: editorLines.length,
+        shownLinesLen: editorLines.length,
+        savedValid: true,
+        shownValid: true,
+      });
+  });
+
+  test('mindmap capsule height grows with each additional line', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return !!obj?.id;
+      })
+      .toBe(true);
+
+    const mindmapObject = await getMindmapObject(page);
+    expect(mindmapObject).toBeTruthy();
+    const mindmapId = mindmapObject.id;
+    const initialHeight = Math.round(mindmapObject.height || 0);
+    expect(initialHeight).toBeGreaterThan(0);
+
+    const textEl = page.locator(`.mb-text--mindmap[data-id="${mindmapId}"] .mb-text--mindmap-content`);
+    const textContentBox = await textEl.boundingBox();
+    expect(textContentBox).toBeTruthy();
+    await page.mouse.click(
+      textContentBox.x + textContentBox.width * 0.5,
+      textContentBox.y + textContentBox.height * 0.5
+    );
+
+    const textarea = page.locator('.moodboard-text-input');
+    await expect(textarea).toBeVisible();
+
+    await textarea.fill('x'.repeat(50)); // 1 line
+    const firstLineTop = await page.evaluate(() => {
+      const ta = document.querySelector('.moodboard-text-input');
+      const rect = ta?.getBoundingClientRect();
+      return rect ? rect.top : null;
+    });
+    expect(firstLineTop).not.toBeNull();
+
+    await textarea.fill('x'.repeat(60)); // 2 lines by 50-char rule
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return Math.round(obj?.height || 0) > initialHeight;
+      })
+      .toBe(true);
+    const heightTwoLines = Math.round((await getMindmapObject(page))?.height || 0);
+    const secondLineTop = await page.evaluate(() => {
+      const ta = document.querySelector('.moodboard-text-input');
+      const rect = ta?.getBoundingClientRect();
+      return rect ? rect.top : null;
+    });
+    expect(secondLineTop).not.toBeNull();
+    expect(Math.abs(secondLineTop - firstLineTop)).toBeLessThanOrEqual(1);
+
+    await textarea.fill('x'.repeat(120)); // 3 lines by 50-char rule
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return Math.round(obj?.height || 0) > heightTwoLines;
+      })
+      .toBe(true);
+  });
 });

@@ -3,6 +3,22 @@ import * as PIXI from 'pixi.js';
 import { MindmapTextOverlayAdapter } from './MindmapTextOverlayAdapter.js';
 
 const MINDMAP_PLACEHOLDER = 'Напишите что-нибудь';
+const MINDMAP_MAX_LINE_CHARS = 50;
+
+function normalizeMindmapLineLength(value, maxLineChars = MINDMAP_MAX_LINE_CHARS) {
+    const text = (typeof value === 'string') ? value : '';
+    const chunks = [];
+    for (const line of text.split('\n')) {
+        if (line.length <= maxLineChars) {
+            chunks.push(line);
+            continue;
+        }
+        for (let i = 0; i < line.length; i += maxLineChars) {
+            chunks.push(line.slice(i, i + maxLineChars));
+        }
+    }
+    return chunks.join('\n');
+}
 
 /**
  * Отдельный HTML-слой только для текста mindmap-объектов.
@@ -134,8 +150,9 @@ export class MindmapHtmlTextLayer {
         el.style.color = color;
         el.style.fontFamily = fontFamily;
         el.style.lineHeight = `${baseLineHeight}px`;
-        el.style.whiteSpace = 'pre-wrap';
-        el.style.wordBreak = 'break-word';
+        el.style.whiteSpace = 'pre';
+        el.style.wordBreak = 'normal';
+        el.style.overflowWrap = 'normal';
         el.style.overflow = 'hidden';
         el.style.letterSpacing = '0px';
         el.style.fontKerning = 'normal';
@@ -237,7 +254,7 @@ export class MindmapHtmlTextLayer {
     }
 
     _applyContentValue(containerEl, contentEl, rawContent) {
-        const actual = (typeof rawContent === 'string') ? rawContent : '';
+        const actual = normalizeMindmapLineLength((typeof rawContent === 'string') ? rawContent : '');
         const isPlaceholder = actual.trim().length === 0;
         containerEl.dataset.mbContent = actual;
         contentEl.textContent = isPlaceholder ? MINDMAP_PLACEHOLDER : actual;

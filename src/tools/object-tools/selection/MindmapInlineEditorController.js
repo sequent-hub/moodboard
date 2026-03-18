@@ -11,6 +11,8 @@ import {
     updateGlobalTextEditorHandlesLayer,
 } from './TextEditorLifecycleRegistry.js';
 
+const MINDMAP_MAX_LINE_CHARS = 50;
+
 function applyMindmapCaretFromClick({ create, objectId, object, textarea }) {
     try {
         if (typeof window === 'undefined') return;
@@ -50,6 +52,29 @@ function measureMindmapTextWidthPx(textarea, measureEl) {
         }
     }
     return Math.max(0, Math.ceil(maxWidth));
+}
+
+function normalizeMindmapLineLength(value, maxLineChars = MINDMAP_MAX_LINE_CHARS) {
+    const text = (typeof value === 'string') ? value : '';
+    const chunks = [];
+    for (const line of text.split('\n')) {
+        if (line.length <= maxLineChars) {
+            chunks.push(line);
+            continue;
+        }
+        for (let i = 0; i < line.length; i += maxLineChars) {
+            chunks.push(line.slice(i, i + maxLineChars));
+        }
+    }
+    return chunks.join('\n');
+}
+
+function normalizeMindmapValueAndCaret(value, caretPos) {
+    const safeValue = (typeof value === 'string') ? value : '';
+    const safeCaret = Number.isFinite(caretPos) ? Math.max(0, Math.min(safeValue.length, caretPos)) : safeValue.length;
+    const normalizedValue = normalizeMindmapLineLength(safeValue);
+    const normalizedCaret = normalizeMindmapLineLength(safeValue.slice(0, safeCaret)).length;
+    return { normalizedValue, normalizedCaret };
 }
 
 /**
@@ -117,11 +142,13 @@ export function openMindmapEditor(object, create = false) {
     textarea.style.textAlign = 'left';
     textarea.style.resize = 'none';
     textarea.style.overflow = 'hidden';
-    textarea.style.whiteSpace = 'pre-wrap';
-    textarea.style.wordBreak = 'break-word';
+    textarea.style.whiteSpace = 'pre';
+    textarea.style.wordBreak = 'normal';
+    textarea.style.overflowWrap = 'normal';
     textarea.style.paddingTop = '0px';
     textarea.style.paddingBottom = '0px';
     textarea.setAttribute('rows', '1');
+    textarea.setAttribute('wrap', 'off');
 
     const measureEl = (typeof document !== 'undefined')
         ? document.createElement('span')
@@ -196,7 +223,9 @@ export function openMindmapEditor(object, create = false) {
     textarea.style.minHeight = '0';
 
     const initialCssWidth = targetWidth;
+    const initialCssHeight = targetHeight;
     const initialWorldWidth = objectWidth;
+    const initialWorldHeight = objectHeight;
     const resizeSession = {
         started: false,
         oldSize: null,
@@ -215,7 +244,9 @@ export function openMindmapEditor(object, create = false) {
         return Math.max(1, Math.ceil(Number.isFinite(base) ? base : 1));
     };
 
-    const alignTextareaLineCenter = () => {
+    let baselineLineInset = null;
+
+    const alignTextareaLineTop = () => {
         if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return;
         const wrapperRect = wrapper.getBoundingClientRect();
         const textareaRect = textarea.getBoundingClientRect();
@@ -223,9 +254,13 @@ export function openMindmapEditor(object, create = false) {
         const lineHeight = parseFloat(textareaStyle.lineHeight || '0');
         const paddingTop = parseFloat(textareaStyle.paddingTop || '0');
         if (!Number.isFinite(lineHeight) || lineHeight <= 0 || !Number.isFinite(paddingTop)) return;
-        const desiredLineCenterY = wrapperRect.top + wrapperRect.height / 2;
-        const currentLineCenterY = textareaRect.top + paddingTop + lineHeight / 2;
-        const deltaY = desiredLineCenterY - currentLineCenterY;
+        const currentLineTopY = textareaRect.top + paddingTop;
+        if (!Number.isFinite(currentLineTopY)) return;
+        if (!Number.isFinite(baselineLineInset)) {
+            baselineLineInset = currentLineTopY - wrapperRect.top;
+        }
+        const desiredLineTopY = wrapperRect.top + baselineLineInset;
+        const deltaY = desiredLineTopY - currentLineTopY;
         textarea.style.transform = `translateY(${deltaY}px)`;
     };
 
@@ -239,10 +274,10 @@ export function openMindmapEditor(object, create = false) {
         textarea.style.height = `${nextHeight}px`;
         textarea.style.marginTop = '0px';
         textarea.style.transform = 'translateY(0px)';
-        alignTextareaLineCenter();
+        alignTextareaLineTop();
         if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
             window.requestAnimationFrame(() => {
-                alignTextareaLineCenter();
+                alignTextareaLineTop();
             });
         }
     };
@@ -270,7 +305,19 @@ export function openMindmapEditor(object, create = false) {
         return viewRes / worldScale;
     };
 
-    const syncMindmapWidth = () => {
+    const getEditorLineCount = () => {
+        const value = String(textarea.value || '');
+        return Math.max(1, value.split('\n').length);
+    };
+
+    const getEditorLineHeightPx = () => {
+        if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return 1;
+        const style = window.getComputedStyle(textarea);
+        const lineHeight = parseFloat(style.lineHeight || '0');
+        return Math.max(1, Math.ceil(Number.isFinite(lineHeight) ? lineHeight : 1));
+    };
+
+    const syncMindmapSize = () => {
         if (!objectId) return;
 
         const value = String(textarea.value || '');
@@ -280,22 +327,33 @@ export function openMindmapEditor(object, create = false) {
         const nextCssWidth = hasText
             ? Math.max(1, Math.ceil(textWidth + padding.left + padding.right))
             : initialCssWidth;
+        const lineCount = getEditorLineCount();
+        const lineHeightPx = getEditorLineHeightPx();
+        const nextCssHeight = Math.max(1, Math.ceil(initialCssHeight + (Math.max(1, lineCount) - 1) * lineHeightPx));
 
         const currentCssWidth = Math.max(1, Math.round(parseFloat(wrapper.style.width || `${initialCssWidth}`)));
-        if (Math.abs(nextCssWidth - currentCssWidth) <= 0) return;
+        const currentCssHeight = Math.max(1, Math.round(parseFloat(wrapper.style.height || `${initialCssHeight}`)));
+        const widthChangedCss = nextCssWidth !== currentCssWidth;
+        const heightChangedCss = nextCssHeight !== currentCssHeight;
+        if (!widthChangedCss && !heightChangedCss) return;
 
-        wrapper.style.width = `${nextCssWidth}px`;
+        if (widthChangedCss) wrapper.style.width = `${nextCssWidth}px`;
+        if (heightChangedCss) wrapper.style.height = `${nextCssHeight}px`;
 
         const cssToWorld = getCssToWorldScale();
         const nextWorldWidth = hasText
             ? Math.max(1, Math.round(nextCssWidth * cssToWorld))
             : Math.max(1, Math.round(initialWorldWidth));
+        const nextWorldHeight = Math.max(1, Math.round(nextCssHeight * cssToWorld));
 
         const sizeData = { objectId, size: null };
         this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
         const currentSize = sizeData.size || { width: initialWorldWidth, height: objectHeight };
         const currentWorldWidth = Math.max(1, Math.round(currentSize.width || initialWorldWidth));
-        if (nextWorldWidth === currentWorldWidth) return;
+        const currentWorldHeight = Math.max(1, Math.round(currentSize.height || initialWorldHeight));
+        const widthChangedWorld = nextWorldWidth !== currentWorldWidth;
+        const heightChangedWorld = nextWorldHeight !== currentWorldHeight;
+        if (!widthChangedWorld && !heightChangedWorld) return;
 
         const posData = { objectId, position: null };
         this.eventBus.emit(Events.Tool.GetObjectPosition, posData);
@@ -303,11 +361,11 @@ export function openMindmapEditor(object, create = false) {
 
         if (!resizeSession.started) {
             resizeSession.started = true;
-            resizeSession.oldSize = { width: currentWorldWidth, height: currentSize.height };
+            resizeSession.oldSize = { width: currentWorldWidth, height: currentWorldHeight };
             resizeSession.oldPosition = { x: currentPosition.x, y: currentPosition.y };
         }
 
-        resizeSession.newSize = { width: nextWorldWidth, height: currentSize.height };
+        resizeSession.newSize = { width: nextWorldWidth, height: nextWorldHeight };
         resizeSession.newPosition = { x: currentPosition.x, y: currentPosition.y };
 
         this.eventBus.emit(Events.Tool.ResizeUpdate, {
@@ -318,7 +376,15 @@ export function openMindmapEditor(object, create = false) {
     };
 
     const onInput = () => {
-        syncMindmapWidth();
+        const { normalizedValue, normalizedCaret } = normalizeMindmapValueAndCaret(
+            textarea.value,
+            textarea.selectionStart
+        );
+        if (normalizedValue !== textarea.value) {
+            textarea.value = normalizedValue;
+            textarea.selectionStart = textarea.selectionEnd = normalizedCaret;
+        }
+        syncMindmapSize();
         syncTextareaHeight(false);
     };
 
@@ -339,7 +405,7 @@ export function openMindmapEditor(object, create = false) {
         textarea.removeEventListener('keydown', onKeyDown);
         textarea.removeEventListener('input', onInput);
 
-        const value = textarea.value.trim();
+        const value = normalizeMindmapLineLength(textarea.value).trim();
         const commitValue = commit;
 
         if (objectId && resizeSession.started && resizeSession.oldSize && resizeSession.newSize) {
