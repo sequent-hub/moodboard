@@ -6,16 +6,13 @@ const MINDMAP_PLACEHOLDER = 'Напишите что-нибудь';
 const MINDMAP_MAX_LINE_CHARS = 50;
 
 function normalizeMindmapLineLength(value, maxLineChars = MINDMAP_MAX_LINE_CHARS) {
-    const text = (typeof value === 'string') ? value : '';
+    const text = (typeof value === 'string')
+        ? value.replace(/\r/g, '').replace(/\n/g, '')
+        : '';
     const chunks = [];
-    for (const line of text.split('\n')) {
-        if (line.length <= maxLineChars) {
-            chunks.push(line);
-            continue;
-        }
-        for (let i = 0; i < line.length; i += maxLineChars) {
-            chunks.push(line.slice(i, i + maxLineChars));
-        }
+    if (text.length === 0) return '';
+    for (let i = 0; i < text.length; i += maxLineChars) {
+        chunks.push(text.slice(i, i + maxLineChars));
     }
     return chunks.join('\n');
 }

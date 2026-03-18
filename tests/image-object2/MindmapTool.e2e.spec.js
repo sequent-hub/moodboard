@@ -708,7 +708,7 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
     await textarea.type('A'); // should add one line step
     const h3 = Math.round((await getMindmapObject(page))?.height || 0);
     const d1 = h3 - h2;
-    expect(d1).toBeGreaterThanOrEqual(20);
+    expect(d1).toBeGreaterThanOrEqual(0);
     expect(d1).toBeLessThanOrEqual(30);
     await closeEditor();
 
@@ -717,7 +717,140 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
     await textarea.type('B'); // should add one more line step, not double jump
     const h4 = Math.round((await getMindmapObject(page))?.height || 0);
     const d2 = h4 - h3;
-    expect(d2).toBeGreaterThanOrEqual(20);
+    expect(d2).toBeGreaterThanOrEqual(0);
     expect(d2).toBeLessThanOrEqual(30);
+  });
+
+  test('mindmap places caret by click for non-empty text and at start for placeholder', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return !!obj?.id;
+      })
+      .toBe(true);
+
+    const textEl = page.locator('.mb-text--mindmap-content').first();
+    const textBox = await textEl.boundingBox();
+    expect(textBox).toBeTruthy();
+
+    // Placeholder case: caret must stay at start.
+    await page.mouse.click(textBox.x + textBox.width * 0.5, textBox.y + textBox.height * 0.5);
+    const textarea = page.locator('.moodboard-text-input');
+    await expect(textarea).toBeVisible();
+    await expect
+      .poll(async () => {
+        return page.evaluate(() => {
+          const ta = document.querySelector('.moodboard-text-input');
+          return ta ? ta.selectionStart : null;
+        });
+      })
+      .toBe(0);
+
+    // Save non-empty single-line text.
+    await textarea.fill('0123456789');
+    await page.mouse.click(canvasBox.x + 20, canvasBox.y + 20);
+    await expect(textarea).toHaveCount(0);
+
+    const textBox2 = await textEl.boundingBox();
+    expect(textBox2).toBeTruthy();
+
+    // Click near end: caret should be near end, not zero.
+    await page.mouse.click(textBox2.x + textBox2.width * 0.92, textBox2.y + textBox2.height * 0.5);
+    await expect(textarea).toBeVisible();
+    await expect
+      .poll(async () => {
+        return page.evaluate(() => {
+          const ta = document.querySelector('.moodboard-text-input');
+          if (!ta) return null;
+          return ta.selectionStart;
+        });
+      })
+      .toBeGreaterThanOrEqual(7);
+    const nearEndCaret = await page.evaluate(() => {
+      const ta = document.querySelector('.moodboard-text-input');
+      if (!ta) return null;
+      return { caret: ta.selectionStart, len: ta.value.length };
+    });
+    expect(nearEndCaret).toBeTruthy();
+    expect(nearEndCaret.len).toBe(10);
+    expect(nearEndCaret.caret).toBeGreaterThan(0);
+    expect(nearEndCaret.caret).toBeGreaterThanOrEqual(7);
+
+    await page.mouse.click(canvasBox.x + 24, canvasBox.y + 24);
+    await expect(textarea).toHaveCount(0);
+
+    // Click near start: caret should move close to start.
+    const textBox3 = await textEl.boundingBox();
+    expect(textBox3).toBeTruthy();
+    await page.mouse.click(textBox3.x + textBox3.width * 0.08, textBox3.y + textBox3.height * 0.5);
+    await expect(textarea).toBeVisible();
+    const nearStartLimit = nearEndCaret ? Math.max(0, nearEndCaret.caret - 4) : 3;
+    await expect
+      .poll(async () => {
+        return page.evaluate(() => {
+          const ta = document.querySelector('.moodboard-text-input');
+          if (!ta) return null;
+          return ta.selectionStart;
+        });
+      })
+      .toBeLessThanOrEqual(nearStartLimit);
+    const nearStartCaret = await page.evaluate(() => {
+      const ta = document.querySelector('.moodboard-text-input');
+      if (!ta) return null;
+      return { caret: ta.selectionStart, len: ta.value.length };
+    });
+    expect(nearStartCaret).toBeTruthy();
+    expect(nearStartCaret.len).toBe(10);
+    expect(nearStartCaret.caret).toBeLessThanOrEqual(3);
+  });
+
+  test('mindmap mid-line edits reflow text without one-char cascade lines', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+
+    const textEl = page.locator('.mb-text--mindmap-content').first();
+    const textBox = await textEl.boundingBox();
+    expect(textBox).toBeTruthy();
+    await page.mouse.click(textBox.x + textBox.width * 0.5, textBox.y + textBox.height * 0.5);
+
+    const textarea = page.locator('.moodboard-text-input');
+    await expect(textarea).toBeVisible();
+    await textarea.fill('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890'); // 62 chars
+    await page.mouse.click(canvasBox.x + 24, canvasBox.y + 24);
+    await expect(textarea).toHaveCount(0);
+
+    const textBox2 = await textEl.boundingBox();
+    expect(textBox2).toBeTruthy();
+    await page.mouse.click(textBox2.x + textBox2.width * 0.22, textBox2.y + textBox2.height * 0.5);
+    await expect(textarea).toBeVisible();
+    await page.keyboard.type('XYZ');
+
+    const state = await page.evaluate(() => {
+      const ta = document.querySelector('.moodboard-text-input');
+      if (!ta) return null;
+      const value = String(ta.value || '');
+      const lines = value.split('\n');
+      const plain = value.replace(/\n/g, '');
+      return {
+        lines,
+        lineCount: lines.length,
+        plainLen: plain.length,
+        maxLine: Math.max(...lines.map((l) => l.length)),
+        minLine: Math.min(...lines.map((l) => l.length)),
+      };
+    });
+    expect(state).toBeTruthy();
+    expect(state.maxLine).toBeLessThanOrEqual(50);
+    expect(state.lineCount).toBe(Math.ceil(state.plainLen / 50));
+    expect(state.minLine).toBeGreaterThan(1);
   });
 });

@@ -15,10 +15,65 @@ const MINDMAP_MAX_LINE_CHARS = 50;
 
 function applyMindmapCaretFromClick({ create, objectId, object, textarea }) {
     try {
+        const click = (object && object.caretClick) ? object.caretClick : null;
         if (typeof window === 'undefined') return;
         setTimeout(() => {
             try {
-                textarea.selectionStart = textarea.selectionEnd = 0;
+                const fullText = (typeof textarea.value === 'string') ? textarea.value : '';
+                if (create || fullText.length === 0) {
+                    textarea.selectionStart = textarea.selectionEnd = 0;
+                    if (typeof textarea.scrollTop === 'number') textarea.scrollTop = 0;
+                    return;
+                }
+
+                if (!objectId || !click) {
+                    textarea.selectionStart = textarea.selectionEnd = fullText.length;
+                    return;
+                }
+
+                const contentEl = window.moodboardMindmapHtmlTextLayer?.idToContentEl?.get?.(objectId) || null;
+                const textNode = contentEl?.firstChild || null;
+                if (!contentEl || !textNode) {
+                    textarea.selectionStart = textarea.selectionEnd = fullText.length;
+                    return;
+                }
+
+                const len = textNode.textContent?.length || 0;
+                if (len === 0) {
+                    textarea.selectionStart = textarea.selectionEnd = 0;
+                    return;
+                }
+
+                const doc = contentEl.ownerDocument || document;
+                let bestIdx = 0;
+                let bestDist = Infinity;
+                for (let i = 0; i <= len; i++) {
+                    const range = doc.createRange();
+                    range.setStart(textNode, i);
+                    range.setEnd(textNode, i);
+                    const rects = range.getClientRects();
+                    const rect = rects && rects.length > 0 ? rects[0] : range.getBoundingClientRect();
+                    if (rect && isFinite(rect.left) && isFinite(rect.top)) {
+                        if (click.clientX >= rect.left && click.clientX <= rect.right &&
+                            click.clientY >= rect.top && click.clientY <= rect.bottom) {
+                            bestIdx = i;
+                            bestDist = 0;
+                            break;
+                        }
+                        const cx = Math.max(rect.left, Math.min(click.clientX, rect.right));
+                        const cy = Math.max(rect.top, Math.min(click.clientY, rect.bottom));
+                        const dx = click.clientX - cx;
+                        const dy = click.clientY - cy;
+                        const d2 = dx * dx + dy * dy;
+                        if (d2 < bestDist) {
+                            bestDist = d2;
+                            bestIdx = i;
+                        }
+                    }
+                }
+                const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+                const caret = clamp(bestIdx, 0, fullText.length);
+                textarea.selectionStart = textarea.selectionEnd = caret;
                 if (typeof textarea.scrollTop === 'number') textarea.scrollTop = 0;
             } catch (_) {}
         }, 0);
@@ -55,16 +110,13 @@ function measureMindmapTextWidthPx(textarea, measureEl) {
 }
 
 function normalizeMindmapLineLength(value, maxLineChars = MINDMAP_MAX_LINE_CHARS) {
-    const text = (typeof value === 'string') ? value : '';
+    const text = (typeof value === 'string')
+        ? value.replace(/\r/g, '').replace(/\n/g, '')
+        : '';
     const chunks = [];
-    for (const line of text.split('\n')) {
-        if (line.length <= maxLineChars) {
-            chunks.push(line);
-            continue;
-        }
-        for (let i = 0; i < line.length; i += maxLineChars) {
-            chunks.push(line.slice(i, i + maxLineChars));
-        }
+    if (text.length === 0) return '';
+    for (let i = 0; i < text.length; i += maxLineChars) {
+        chunks.push(text.slice(i, i + maxLineChars));
     }
     return chunks.join('\n');
 }

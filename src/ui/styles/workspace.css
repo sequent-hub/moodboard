@@ -248,7 +248,6 @@
     padding-bottom: 50px;
     padding-left: 50px;
     padding-right: 50px;
-    outline: 1px solid #22c55e;
 }
 
 .mb-text--mindmap-content {
@@ -264,10 +263,6 @@
 
 .mb-text--mindmap-content.is-placeholder {
     opacity: 0.45;
-}
-
-.moodboard-text-input--mindmap-debug {
-    outline: 1px solid #ef4444 !important;
 }
 
 /* HTML handles layer */

@@ -49,6 +49,7 @@ export class HandlesDomRenderer {
             isRevitScreenshotTarget = mbType === 'revit-screenshot-img';
             revitViewPayload = req.pixiObject?._mb?.properties?.view || null;
         }
+        const isNonResizableTarget = isFileTarget || isMindmapTarget;
 
         const left = Math.round(cssRect.left);
         const top = Math.round(cssRect.top);
@@ -85,11 +86,11 @@ export class HandlesDomRenderer {
             h.dataset.dir = dir;
             h.dataset.id = id;
             h.className = 'mb-handle';
-            h.style.pointerEvents = isFileTarget ? 'none' : 'auto';
+            h.style.pointerEvents = isNonResizableTarget ? 'none' : 'auto';
             h.style.cursor = cursor;
             h.style.left = `${x - 6}px`;
             h.style.top = `${y - 6}px`;
-            h.style.display = isFileTarget ? 'none' : 'block';
+            h.style.display = isNonResizableTarget ? 'none' : 'block';
 
             const inner = document.createElement('div');
             inner.className = 'mb-handle-inner';
@@ -105,7 +106,7 @@ export class HandlesDomRenderer {
                 h.style.borderColor = HANDLES_ACCENT_COLOR;
             });
 
-            if (!isFileTarget) {
+            if (!isNonResizableTarget) {
                 h.addEventListener('mousedown', (e) => this.host._onHandleDown(e, box));
             }
 
@@ -129,11 +130,11 @@ export class HandlesDomRenderer {
             e.dataset.id = id;
             e.className = 'mb-edge';
             Object.assign(e.style, style, {
-                pointerEvents: isFileTarget ? 'none' : 'auto',
+                pointerEvents: isNonResizableTarget ? 'none' : 'auto',
                 cursor,
-                display: isFileTarget ? 'none' : 'block',
+                display: isNonResizableTarget ? 'none' : 'block',
             });
-            if (!isFileTarget) {
+            if (!isNonResizableTarget) {
                 e.addEventListener('mousedown', (evt) => this.host._onEdgeResizeDown(evt));
             }
             box.appendChild(e);
