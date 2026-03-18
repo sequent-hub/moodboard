@@ -68,6 +68,7 @@ export class HandlesDomRenderer {
         let isFileTarget = false;
         let isFrameTarget = false;
         let isMindmapTarget = false;
+        let isMindmapOnlyGroupTarget = false;
         let isRevitScreenshotTarget = false;
         let revitViewPayload = null;
         let sourceMindmapProperties = null;
@@ -99,8 +100,14 @@ export class HandlesDomRenderer {
                 if (incoming === 'left') hiddenIncomingSide.value = 'right';
                 else if (incoming === 'right') hiddenIncomingSide.value = 'left';
             }
+        } else {
+            const selectionIds = Array.isArray(options.selectionIds) ? options.selectionIds : [];
+            if (selectionIds.length > 0) {
+                const byId = new Map((this.host.core?.state?.state?.objects || []).map((obj) => [obj?.id, obj]));
+                isMindmapOnlyGroupTarget = selectionIds.every((selectedId) => byId.get(selectedId)?.type === 'mindmap');
+            }
         }
-        const isNonResizableTarget = isFileTarget || isMindmapTarget;
+        const isNonResizableTarget = isFileTarget || isMindmapTarget || isMindmapOnlyGroupTarget;
 
         const left = Math.round(cssRect.left);
         const top = Math.round(cssRect.top);
@@ -225,7 +232,7 @@ export class HandlesDomRenderer {
         const rotateHandle = document.createElement('div');
         rotateHandle.dataset.handle = 'rotate';
         rotateHandle.dataset.id = id;
-        if (isFileTarget || isFrameTarget || isMindmapTarget) {
+        if (isFileTarget || isFrameTarget || isMindmapTarget || isMindmapOnlyGroupTarget) {
             rotateHandle.dataset.lockedHidden = '1';
             Object.assign(rotateHandle.style, { display: 'none', pointerEvents: 'none' });
         } else {

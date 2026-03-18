@@ -1492,6 +1492,88 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       .toBe(true);
   });
 
+  test('mindmap-only group selection keeps outline without resize handles', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5);
+
+    const root = await getMindmapObject(page);
+    expect(root?.id).toBeTruthy();
+
+    await page.evaluate((rootId) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+      const tm = core.toolManager;
+      const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+      if (!selectTool) return;
+      selectTool.setSelection([rootId]);
+      if (typeof selectTool.updateResizeHandles === 'function') {
+        selectTool.updateResizeHandles();
+      }
+    }, root.id);
+
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toBeVisible();
+    await page.locator('.mb-mindmap-side-btn[data-side="right"]').click();
+
+    await expect
+      .poll(async () => {
+        return page.evaluate((rootId) => {
+          const board = window.moodboard.exportBoard();
+          const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+          const childNode = nodes.find((o) => o.id !== rootId) || null;
+          return childNode?.id || null;
+        }, root.id);
+      })
+      .toEqual(expect.any(String));
+
+    const child = await page.evaluate((rootId) => {
+      const board = window.moodboard.exportBoard();
+      const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+      return nodes.find((o) => o.id !== rootId) || null;
+    }, root.id);
+    expect(child?.id).toBeTruthy();
+
+    await page.evaluate(({ rootId, childId }) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+      const tm = core.toolManager;
+      const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+      if (!selectTool) return;
+      selectTool.setSelection([rootId, childId]);
+      if (typeof selectTool.updateResizeHandles === 'function') {
+        selectTool.updateResizeHandles();
+      }
+    }, { rootId: root.id, childId: child.id });
+
+    await expect(page.locator('.mb-handles-box')).toBeVisible();
+    await expect
+      .poll(async () => {
+        return page.evaluate(() => {
+          const box = document.querySelector('.mb-handles-box');
+          if (!box) return null;
+          const countVisible = (selector) => (
+            Array.from(box.querySelectorAll(selector))
+              .filter((el) => window.getComputedStyle(el).display !== 'none')
+              .length
+          );
+          return {
+            corners: countVisible('[data-dir]'),
+            edges: countVisible('[data-edge]'),
+            rotate: countVisible('[data-handle="rotate"]'),
+          };
+        });
+      })
+      .toEqual({
+        corners: 0,
+        edges: 0,
+        rotate: 0,
+      });
+  });
+
   test('mindmap compound metadata survives export/load roundtrip', async ({ page }) => {
     await page.click('.moodboard-toolbar__button--mindmap');
     const canvas = page.locator('.moodboard-workspace__canvas canvas');

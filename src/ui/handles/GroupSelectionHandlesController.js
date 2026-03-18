@@ -15,6 +15,7 @@ export class GroupSelectionHandlesController {
                     height: preview.startBounds.height,
                 }, '__group__', {
                     rotation: preview.angle || 0,
+                    selectionIds: ids,
                 });
                 return;
             }
@@ -24,6 +25,8 @@ export class GroupSelectionHandlesController {
             this.host.hide();
             return;
         }
-        this.host._showBounds(worldBounds, '__group__');
+        this.host._showBounds(worldBounds, '__group__', {
+            selectionIds: ids,
+        });
     }
 }
