@@ -1290,6 +1290,208 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       .toBe(true);
   });
 
+  test('mindmap deep branching keeps bottom clones on local parent level', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5);
+
+    const root = await expect
+      .poll(async () => getMindmapObject(page))
+      .toMatchObject({ id: expect.any(String) });
+    const rootNode = await getMindmapObject(page);
+    expect(rootNode?.id).toBeTruthy();
+
+    const selectNode = async (nodeId) => {
+      await page.evaluate((id) => {
+        const core = window.moodboard?.coreMoodboard;
+        if (!core) return;
+        core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+        const tm = core.toolManager;
+        const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+        if (!selectTool) return;
+        selectTool.setSelection([id]);
+        if (typeof selectTool.updateResizeHandles === 'function') {
+          selectTool.updateResizeHandles();
+        }
+      }, nodeId);
+    };
+
+    const getMindmapNodes = async () => page.evaluate(() => {
+      const board = window.moodboard.exportBoard();
+      return (board?.objects || [])
+        .filter((o) => o.type === 'mindmap')
+        .map((o) => ({
+          id: o.id,
+          position: { x: o.position?.x || 0, y: o.position?.y || 0 },
+          mindmap: { ...(o.properties?.mindmap || {}) },
+        }));
+    });
+
+    // root --(+right)--> childA
+    await selectNode(rootNode.id);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toBeVisible();
+    await page.locator('.mb-mindmap-side-btn[data-side="right"]').click();
+    await expect.poll(async () => (await getMindmapNodes()).length).toBe(2);
+    const nodesAfterA = await getMindmapNodes();
+    const childA = nodesAfterA.find((n) => n.id !== rootNode.id);
+    expect(childA?.id).toBeTruthy();
+    expect(childA.mindmap?.parentId).toBe(rootNode.id);
+
+    // childA --(+right)--> childB
+    await selectNode(childA.id);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toBeVisible();
+    const beforeB = await getMindmapNodes();
+    await page.locator('.mb-mindmap-side-btn[data-side="right"]').click();
+    await expect.poll(async () => (await getMindmapNodes()).length).toBe(3);
+    const afterB = await getMindmapNodes();
+    const beforeBIds = new Set(beforeB.map((n) => n.id));
+    const childB = afterB.find((n) => !beforeBIds.has(n.id));
+    expect(childB?.id).toBeTruthy();
+    expect(childB.mindmap?.parentId).toBe(childA.id);
+
+    // childB --(bottom)--> siblingB1 with same parent as childB
+    await selectNode(childB.id);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="bottom"]')).toBeVisible();
+    const beforeD = await getMindmapNodes();
+    await page.locator('.mb-mindmap-side-btn[data-side="bottom"]').click();
+    await expect.poll(async () => (await getMindmapNodes()).length).toBe(4);
+    const afterD = await getMindmapNodes();
+    const beforeDIds = new Set(beforeD.map((n) => n.id));
+    const siblingB1 = afterD.find((n) => !beforeDIds.has(n.id));
+    expect(siblingB1?.id).toBeTruthy();
+    expect(siblingB1.mindmap?.parentId).toBe(childB.mindmap?.parentId);
+    expect(siblingB1.mindmap?.parentId).not.toBe(childB.id);
+
+    // siblingB1 --(bottom)--> siblingB2 still on same local parent level
+    await selectNode(siblingB1.id);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="bottom"]')).toBeVisible();
+    const beforeE = await getMindmapNodes();
+    await page.locator('.mb-mindmap-side-btn[data-side="bottom"]').click();
+    await expect.poll(async () => (await getMindmapNodes()).length).toBe(5);
+    const afterE = await getMindmapNodes();
+    const beforeEIds = new Set(beforeE.map((n) => n.id));
+    const siblingB2 = afterE.find((n) => !beforeEIds.has(n.id));
+    expect(siblingB2?.id).toBeTruthy();
+    expect(siblingB2.mindmap?.parentId).toBe(siblingB1.mindmap?.parentId);
+    expect(siblingB2.mindmap?.parentId).toBe(childA.id);
+    expect(siblingB2.mindmap?.parentId).not.toBe(siblingB1.id);
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(({ firstId, secondId, expectedParentId }) => {
+          const segments = window.moodboardMindmapConnectionLayer?._lastSegments || [];
+          const first = segments.find((s) => s.childId === firstId) || null;
+          const second = segments.find((s) => s.childId === secondId) || null;
+          if (!first || !second) return false;
+          return first.parentId === expectedParentId && second.parentId === expectedParentId;
+        }, { firstId: siblingB1.id, secondId: siblingB2.id, expectedParentId: childA.id });
+      })
+      .toBe(true);
+  });
+
+  test('mindmap mixed plus-and-bottom keeps operation semantics on next level', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5);
+
+    const rootNode = await expect
+      .poll(async () => getMindmapObject(page))
+      .toMatchObject({ id: expect.any(String) });
+    const root = await getMindmapObject(page);
+    expect(root?.id).toBeTruthy();
+
+    const selectNode = async (nodeId) => {
+      await page.evaluate((id) => {
+        const core = window.moodboard?.coreMoodboard;
+        if (!core) return;
+        core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+        const tm = core.toolManager;
+        const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+        if (!selectTool) return;
+        selectTool.setSelection([id]);
+        if (typeof selectTool.updateResizeHandles === 'function') {
+          selectTool.updateResizeHandles();
+        }
+      }, nodeId);
+    };
+
+    const getNodes = async () => page.evaluate(() => {
+      const board = window.moodboard.exportBoard();
+      return (board?.objects || [])
+        .filter((o) => o.type === 'mindmap')
+        .map((o) => ({
+          id: o.id,
+          mindmap: { ...(o.properties?.mindmap || {}) },
+        }));
+    });
+
+    // root --(+right)--> childA
+    await selectNode(root.id);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toBeVisible();
+    const beforeA = await getNodes();
+    await page.locator('.mb-mindmap-side-btn[data-side="right"]').click();
+    await expect.poll(async () => (await getNodes()).length).toBe(beforeA.length + 1);
+    const afterA = await getNodes();
+    const beforeAIds = new Set(beforeA.map((n) => n.id));
+    const childA = afterA.find((n) => !beforeAIds.has(n.id));
+    expect(childA?.id).toBeTruthy();
+    expect(childA.mindmap?.parentId).toBe(root.id);
+    expect(childA.mindmap?.side).toBe('right');
+
+    // childA --(bottom)--> siblingA2 (same parent as childA)
+    await selectNode(childA.id);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="bottom"]')).toBeVisible();
+    const beforeB = await getNodes();
+    await page.locator('.mb-mindmap-side-btn[data-side="bottom"]').click();
+    await expect.poll(async () => (await getNodes()).length).toBe(beforeB.length + 1);
+    const afterB = await getNodes();
+    const beforeBIds = new Set(beforeB.map((n) => n.id));
+    const siblingA2 = afterB.find((n) => !beforeBIds.has(n.id));
+    expect(siblingA2?.id).toBeTruthy();
+    expect(siblingA2.mindmap?.parentId).toBe(root.id);
+    expect(siblingA2.mindmap?.parentId).not.toBe(childA.id);
+    expect(siblingA2.mindmap?.side).toBe('right');
+
+    // siblingA2 --(+right)--> childC (plus must create child of selected node)
+    await selectNode(siblingA2.id);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toBeVisible();
+    const beforeC = await getNodes();
+    await page.locator('.mb-mindmap-side-btn[data-side="right"]').click();
+    await expect.poll(async () => (await getNodes()).length).toBe(beforeC.length + 1);
+    const afterC = await getNodes();
+    const beforeCIds = new Set(beforeC.map((n) => n.id));
+    const childC = afterC.find((n) => !beforeCIds.has(n.id));
+    expect(childC?.id).toBeTruthy();
+    expect(childC.mindmap?.parentId).toBe(siblingA2.id);
+    expect(childC.mindmap?.parentId).not.toBe(root.id);
+    expect(childC.mindmap?.side).toBe('right');
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(({ siblingId, childId, rootId, siblingFromBottomId }) => {
+          const segments = window.moodboardMindmapConnectionLayer?._lastSegments || [];
+          const bottomSeg = segments.find((s) => s.childId === siblingFromBottomId) || null;
+          const plusSeg = segments.find((s) => s.childId === childId) || null;
+          if (!bottomSeg || !plusSeg) return false;
+          return (
+            bottomSeg.parentId === rootId &&
+            plusSeg.parentId === siblingId &&
+            plusSeg.parentId !== rootId
+          );
+        }, {
+          siblingId: siblingA2.id,
+          childId: childC.id,
+          rootId: root.id,
+          siblingFromBottomId: siblingA2.id,
+        });
+      })
+      .toBe(true);
+  });
+
   test('mindmap compound metadata survives export/load roundtrip', async ({ page }) => {
     await page.click('.moodboard-toolbar__button--mindmap');
     const canvas = page.locator('.moodboard-workspace__canvas canvas');
