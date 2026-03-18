@@ -25,6 +25,7 @@ export class ToolbarRenderer {
 
         const existingTools = [
             { id: 'frame', iconName: 'frame', title: 'Добавить фрейм', type: 'frame' },
+            { id: 'mindmap', iconName: 'mindmap', title: 'Интеллект-карта', type: 'mindmap-add' },
             { id: 'divider', type: 'divider' },
             { id: 'undo', iconName: 'undo', title: 'Отменить (Ctrl+Z)', type: 'undo', disabled: true },
             { id: 'redo', iconName: 'redo', title: 'Повторить (Ctrl+Y)', type: 'redo', disabled: true }

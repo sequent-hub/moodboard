@@ -64,6 +64,7 @@
 .moodboard-toolbar__button--attachments:hover,
 .moodboard-toolbar__button--emoji:hover,
 .moodboard-toolbar__button--frame:hover,
+.moodboard-toolbar__button--mindmap:hover,
 .moodboard-toolbar__button--clear:hover,
 .moodboard-toolbar__button--undo:hover:not(:disabled),
 .moodboard-toolbar__button--redo:hover:not(:disabled) { background: #80D8FF !important; }

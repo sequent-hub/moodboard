@@ -28,14 +28,15 @@ export class IconLoader {
                 import('../assets/icons/frame.svg?raw'),
                 import('../assets/icons/clear.svg?raw'),
                 import('../assets/icons/undo.svg?raw'),
-                import('../assets/icons/redo.svg?raw')
+                import('../assets/icons/redo.svg?raw'),
+                import('../assets/icons/mindmap.svg?raw')
             ]);
 
             // Сохраняем иконки в кэш
             const iconNames = [
                 'select', 'pan', 'text-add', 'note', 'image', 'shapes',
                 'pencil', 'comments', 'attachments', 'emoji', 'frame',
-                'clear', 'undo', 'redo'
+                'clear', 'undo', 'redo', 'mindmap'
             ];
 
             iconNames.forEach((name, index) => {
@@ -134,6 +135,10 @@ export class IconLoader {
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
   <path d="M15 14L20 9L15 4M4 20V13C4 11.9391 4.42143 10.9217 5.17157 10.1716C5.92172 9.42143 6.93913 9 8 9H20" 
         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`,
+            'mindmap': `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M19 2a3 3 0 1 1 0 6c-.463 0-.9-.109-1.291-.296l-1.19 1.19A3.992 3.992 0 0 1 18 12a3.991 3.991 0 0 1-1.48 3.105l1.189 1.19A2.984 2.984 0 0 1 19 16a3 3 0 1 1-3 3c0-.463.108-.9.295-1.291l-1.748-1.748A4.106 4.106 0 0 1 14 16h-4c-.186 0-.37-.014-.549-.04l-1.747 1.75c.187.392.296.828.296 1.291a3 3 0 1 1-3-3c.462 0 .899.108 1.29.295l1.19-1.19A3.992 3.992 0 0 1 6 12a3.99 3.99 0 0 1 1.48-3.106l-1.19-1.19A2.982 2.982 0 0 1 5 8a3 3 0 1 1 3-3c0 .463-.109.899-.296 1.29l1.748 1.748C9.632 8.014 9.814 8 10 8h4c.185 0 .368.013.547.037l1.748-1.747A2.983 2.983 0 0 1 16 5a3 3 0 0 1 3-3ZM5 18a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm14 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm-9-8a2 2 0 1 0 0 4h4a2 2 0 1 0 0-4h-4ZM5 4a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm14 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/>
 </svg>`
         };
 
@@ -187,7 +192,7 @@ export class IconLoader {
         const iconNames = [
             'select', 'pan', 'text-add', 'note', 'image', 'shapes',
             'pencil', 'comments', 'attachments', 'emoji', 'frame',
-            'clear', 'undo', 'redo'
+            'clear', 'undo', 'redo', 'mindmap'
         ];
 
         iconNames.forEach(name => {
@@ -219,7 +224,8 @@ export class IconLoader {
             'frame': '<svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="2" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
             'clear': '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M3 6H17L16 18H4L3 6Z" fill="currentColor"/></svg>',
             'undo': '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M8 4L3 9L8 14" stroke="currentColor" stroke-width="2" fill="none"/></svg>',
-            'redo': '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M12 4L17 9L12 14" stroke="currentColor" stroke-width="2" fill="none"/></svg>'
+            'redo': '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M12 4L17 9L12 14" stroke="currentColor" stroke-width="2" fill="none"/></svg>',
+            'mindmap': '<svg width="20" height="20" viewBox="0 0 20 20"><circle cx="4" cy="4" r="2" fill="currentColor"/><circle cx="16" cy="4" r="2" fill="currentColor"/><circle cx="4" cy="16" r="2" fill="currentColor"/><circle cx="16" cy="16" r="2" fill="currentColor"/><rect x="7" y="8" width="6" height="4" rx="2" fill="currentColor"/><path d="M6 5L8 8M14 8L16 5M8 12L6 15M12 12L14 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
         };
 
         return fallbacks[iconName] || fallbacks['select'];
