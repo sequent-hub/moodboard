@@ -5,7 +5,6 @@ import {
     createTextEditorWrapper,
 } from './TextEditorDomFactory.js';
 import {
-    hideGlobalTextEditorHandlesLayer,
     hideStaticTextDuringEditing,
     showStaticTextAfterEditing,
     updateGlobalTextEditorHandlesLayer,
@@ -170,7 +169,10 @@ export function openMindmapEditor(object, create = false) {
     if (!view || !world || !view.parentElement) return;
 
     this.eventBus.emit(Events.UI.TextEditStart, { objectId: objectId || null });
-    hideGlobalTextEditorHandlesLayer();
+    if (objectId && typeof this.setSelection === 'function') {
+        this.setSelection([objectId]);
+    }
+    updateGlobalTextEditorHandlesLayer();
 
     let objectWidth = properties.width || MINDMAP_LAYOUT.width;
     let objectHeight = properties.height || MINDMAP_LAYOUT.height;

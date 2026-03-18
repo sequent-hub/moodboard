@@ -185,6 +185,8 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
 
     const textarea = page.locator('.moodboard-text-input');
     await expect(textarea).toBeVisible();
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="left"]')).toBeVisible();
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toBeVisible();
 
     await expect
       .poll(async () => {
@@ -290,6 +292,52 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
         return obj?.properties?.content || '';
       })
       .toBe('Обновленный текст');
+  });
+
+  test('mindmap child edit mode keeps add buttons visible', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5);
+
+    const root = await getMindmapObject(page);
+    expect(root?.id).toBeTruthy();
+
+    await page.evaluate((rootId) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+      const tm = core.toolManager;
+      const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+      if (!selectTool) return;
+      selectTool.setSelection([rootId]);
+      if (typeof selectTool.updateResizeHandles === 'function') {
+        selectTool.updateResizeHandles();
+      }
+    }, root.id);
+
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toBeVisible();
+    await page.locator('.mb-mindmap-side-btn[data-side="right"]').click();
+
+    const child = await page.evaluate((rootId) => {
+      const board = window.moodboard.exportBoard();
+      const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+      return nodes.find((o) => o.id !== rootId) || null;
+    }, root.id);
+    expect(child?.id).toBeTruthy();
+
+    const childText = page.locator(`.mb-text--mindmap[data-id="${child.id}"] .mb-text--mindmap-content`);
+    const childTextBox = await childText.boundingBox();
+    expect(childTextBox).toBeTruthy();
+    await page.mouse.click(
+      childTextBox.x + childTextBox.width * 0.5,
+      childTextBox.y + childTextBox.height * 0.5
+    );
+
+    await expect(page.locator('.moodboard-text-input')).toBeVisible();
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toBeVisible();
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="bottom"]')).toBeVisible();
   });
 
   test('mindmap capsule width adapts while typing and keeps horizontal paddings', async ({ page }) => {
