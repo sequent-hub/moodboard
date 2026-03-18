@@ -42,6 +42,7 @@ export class HandlesDomRenderer {
         let isMindmapTarget = false;
         let isRevitScreenshotTarget = false;
         let revitViewPayload = null;
+        let sourceMindmapProperties = null;
         if (id !== '__group__') {
             const req = { objectId: id, pixiObject: null };
             this.host.eventBus.emit(Events.Tool.GetObjectPixi, req);
@@ -51,6 +52,9 @@ export class HandlesDomRenderer {
             isMindmapTarget = mbType === 'mindmap';
             isRevitScreenshotTarget = mbType === 'revit-screenshot-img';
             revitViewPayload = req.pixiObject?._mb?.properties?.view || null;
+            if (isMindmapTarget) {
+                sourceMindmapProperties = req.pixiObject?._mb?.properties || null;
+            }
         }
         const isNonResizableTarget = isFileTarget || isMindmapTarget;
 
@@ -222,6 +226,30 @@ export class HandlesDomRenderer {
                 btn.addEventListener('click', (evt) => {
                     evt.preventDefault();
                     evt.stopPropagation();
+                    const app = this.host.core?.pixi?.app;
+                    const worldLayer = this.host.core?.pixi?.worldLayer || app?.stage;
+                    const rendererRes = app?.renderer?.resolution || 1;
+                    const worldScale = worldLayer?.scale?.x || 1;
+                    const gapWorld = Math.max(1, Math.round((10 * rendererRes) / worldScale));
+                    const sourceWidth = Math.max(1, Math.round(sourceMindmapProperties?.width || worldBounds.width || 100));
+                    const sourceHeight = Math.max(1, Math.round(sourceMindmapProperties?.height || worldBounds.height || 100));
+                    const nextPosition = {
+                        x: (side === 'left')
+                            ? Math.round(worldBounds.x - sourceWidth - gapWorld)
+                            : Math.round(worldBounds.x + worldBounds.width + gapWorld),
+                        y: Math.round(worldBounds.y),
+                    };
+                    this.host.eventBus.emit(Events.UI.ToolbarAction, {
+                        type: 'mindmap',
+                        id: 'mindmap',
+                        position: nextPosition,
+                        properties: {
+                            ...(sourceMindmapProperties || {}),
+                            content: '',
+                            width: sourceWidth,
+                            height: sourceHeight,
+                        },
+                    });
                 });
                 return btn;
             };
