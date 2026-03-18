@@ -234,6 +234,20 @@
     letter-spacing: normal;
 }
 
+.mb-text--mindmap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    pointer-events: auto;
+    cursor: text;
+    color: #1e3a8a;
+    font-family: 'Roboto', Arial, sans-serif;
+    font-weight: 500;
+    padding-left: 12px;
+    padding-right: 12px;
+}
+
 /* HTML handles layer */
 .moodboard-html-handles {
     position: absolute;

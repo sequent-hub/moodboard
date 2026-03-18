@@ -199,7 +199,7 @@ export class HtmlTextLayer {
         el.dataset.id = objectId;
         // Получаем свойства из properties объекта
         const fontFamily = objectData.properties?.fontFamily || objectData.fontFamily || 'Caveat, Arial, cursive';
-        const color = objectData.color || objectData.properties?.color || '#000000';
+        const color = objectData.color || objectData.properties?.color || objectData.properties?.textColor || '#000000';
         const backgroundColor = objectData.backgroundColor || objectData.properties?.backgroundColor || 'transparent';
         
         // Базовый line-height исходя из стартового размера шрифта

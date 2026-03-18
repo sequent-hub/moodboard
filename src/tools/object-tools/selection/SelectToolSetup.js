@@ -93,6 +93,8 @@ export function registerSelectToolCoreSubscriptions(instance) {
         const objectType = object.type || (object.object && object.object.type) || 'text';
         if (objectType === 'file') {
             instance._openFileNameEditor(object, object.create || false);
+        } else if (objectType === 'mindmap') {
+            instance._openMindmapEditor(object, object.create || false);
         } else {
             if (object.create) {
                 instance._openTextEditor(object, true);

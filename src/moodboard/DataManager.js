@@ -76,6 +76,10 @@ export class DataManager {
                 window.moodboardHtmlTextLayer.rebuildFromState();
                 window.moodboardHtmlTextLayer.updateAll();
             }
+            if (window.moodboardMindmapHtmlTextLayer) {
+                window.moodboardMindmapHtmlTextLayer.rebuildFromState();
+                window.moodboardMindmapHtmlTextLayer.updateAll();
+            }
         }, 100);
 
     }

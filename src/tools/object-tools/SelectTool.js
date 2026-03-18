@@ -24,9 +24,11 @@ import {
 } from './selection/CloneFlowController.js';
 import {
     openTextEditor as openTextEditorViaController,
+    openMindmapEditor as openMindmapEditorViaController,
     openFileNameEditor as openFileNameEditorViaController,
     closeFileNameEditor as closeFileNameEditorViaController,
-    closeTextEditor as closeTextEditorViaController
+    closeTextEditor as closeTextEditorViaController,
+    closeMindmapEditor as closeMindmapEditorViaController
 } from './selection/InlineEditorController.js';
 import {
     hitTest as hitTestViaService,
@@ -325,6 +327,10 @@ export class SelectTool extends BaseTool {
         return openTextEditorViaController.call(this, object, create);
     }
 
+    _openMindmapEditor(object, create = false) {
+        return openMindmapEditorViaController.call(this, object, create);
+    }
+
     _openFileNameEditor(object, create = false) {
         return openFileNameEditorViaController.call(this, object, create);
     }
@@ -334,6 +340,10 @@ export class SelectTool extends BaseTool {
 
     _closeTextEditor(commit) {
         return closeTextEditorViaController.call(this, commit);
+    }
+
+    _closeMindmapEditor(commit) {
+        return closeMindmapEditorViaController.call(this, commit);
     }
 
     destroy() {

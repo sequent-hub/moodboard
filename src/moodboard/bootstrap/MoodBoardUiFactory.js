@@ -6,6 +6,7 @@ import { MapPanel } from '../../ui/MapPanel.js';
 import { DotGridDebugPanel } from '../../ui/DotGridDebugPanel.js';
 import { ContextMenu } from '../../ui/ContextMenu.js';
 import { HtmlTextLayer } from '../../ui/HtmlTextLayer.js';
+import { MindmapHtmlTextLayer } from '../../ui/mindmap/MindmapHtmlTextLayer.js';
 import { HtmlHandlesLayer } from '../../ui/HtmlHandlesLayer.js';
 import { CommentPopover } from '../../ui/CommentPopover.js';
 import { TextPropertiesPanel } from '../../ui/TextPropertiesPanel.js';
@@ -87,12 +88,15 @@ function initContextMenu(board) {
 function initHtmlLayersAndPanels(board) {
     board.htmlTextLayer = new HtmlTextLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
     board.htmlTextLayer.attach();
+    board.mindmapHtmlTextLayer = new MindmapHtmlTextLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
+    board.mindmapHtmlTextLayer.attach();
 
     board.htmlHandlesLayer = new HtmlHandlesLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
     board.htmlHandlesLayer.attach();
 
     if (typeof window !== 'undefined') {
         window.moodboardHtmlTextLayer = board.htmlTextLayer;
+        window.moodboardMindmapHtmlTextLayer = board.mindmapHtmlTextLayer;
         window.moodboardHtmlHandlesLayer = board.htmlHandlesLayer;
     }
 

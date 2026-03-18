@@ -26,6 +26,13 @@ async function triggerRedo(page) {
   }, EVENTS_KEYBOARD_REDO);
 }
 
+async function getMindmapObject(page) {
+  return page.evaluate(() => {
+    const board = window.moodboard.exportBoard();
+    return (board?.objects || []).find((o) => o.type === 'mindmap') || null;
+  });
+}
+
 test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/test-moodboard.html');
@@ -123,5 +130,41 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
         return (board?.objects || []).some((o) => o.type === 'mindmap');
       })
       .toBe(true);
+  });
+
+  test('mindmap text enters edit mode on click and closes on outside click', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return !!obj?.id;
+      })
+      .toBe(true);
+    const mindmapObject = await getMindmapObject(page);
+    const mindmapId = mindmapObject.id;
+
+    const textEl = page.locator(`.mb-text--mindmap[data-id="${mindmapId}"]`);
+    await expect(textEl).toBeVisible();
+    await textEl.click();
+
+    const textarea = page.locator('.moodboard-text-input');
+    await expect(textarea).toBeVisible();
+    await textarea.fill('Обновленный текст');
+
+    // Клик мимо текста закрывает редактор.
+    await page.mouse.click(canvasBox.x + 20, canvasBox.y + 20);
+    await expect(textarea).toHaveCount(0);
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return obj?.properties?.content || '';
+      })
+      .toBe('Обновленный текст');
   });
 });

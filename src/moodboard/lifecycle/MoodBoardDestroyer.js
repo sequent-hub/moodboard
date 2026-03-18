@@ -49,6 +49,9 @@ export function destroyMoodBoard(board) {
     safeDestroy(board.htmlTextLayer, 'htmlTextLayer');
     board.htmlTextLayer = null;
 
+    safeDestroy(board.mindmapHtmlTextLayer, 'mindmapHtmlTextLayer');
+    board.mindmapHtmlTextLayer = null;
+
     safeDestroy(board.htmlHandlesLayer, 'htmlHandlesLayer');
     board.htmlHandlesLayer = null;
 
@@ -84,6 +87,9 @@ export function destroyMoodBoard(board) {
     if (typeof window !== 'undefined') {
         if (window.moodboardHtmlTextLayer === board.htmlTextLayer) {
             window.moodboardHtmlTextLayer = null;
+        }
+        if (window.moodboardMindmapHtmlTextLayer === board.mindmapHtmlTextLayer) {
+            window.moodboardMindmapHtmlTextLayer = null;
         }
         if (window.moodboardHtmlHandlesLayer === board.htmlHandlesLayer) {
             window.moodboardHtmlHandlesLayer = null;

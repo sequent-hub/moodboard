@@ -20,31 +20,27 @@ export function updateGlobalTextEditorHandlesLayer() {
 export function hideStaticTextDuringEditing(controller, objectId) {
     if (!objectId) return;
 
-    if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
-        const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
-        if (el) {
-            controller.eventBus.emit(Events.Tool.HideObjectText, { objectId });
-        } else {
-            console.warn(`❌ SelectTool: HTML-элемент для объекта ${objectId} не найден, пропускаем HideObjectText`);
+    if (typeof window !== 'undefined') {
+        const textEl = window.moodboardHtmlTextLayer?.idToEl?.get?.(objectId);
+        const mindmapEl = window.moodboardMindmapHtmlTextLayer?.idToEl?.get?.(objectId);
+        if (!textEl && !mindmapEl) {
+            console.warn(`❌ SelectTool: HTML-элемент для объекта ${objectId} не найден, fallback через событие`);
         }
-    } else {
-        controller.eventBus.emit(Events.Tool.HideObjectText, { objectId });
     }
+    controller.eventBus.emit(Events.Tool.HideObjectText, { objectId });
 }
 
 export function showStaticTextAfterEditing(controller, objectId) {
     if (!objectId) return;
 
-    if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
-        const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
-        if (el) {
-            controller.eventBus.emit(Events.Tool.ShowObjectText, { objectId });
-        } else {
-            console.warn(`❌ SelectTool: HTML-элемент для объекта ${objectId} не найден, пропускаем ShowObjectText`);
+    if (typeof window !== 'undefined') {
+        const textEl = window.moodboardHtmlTextLayer?.idToEl?.get?.(objectId);
+        const mindmapEl = window.moodboardMindmapHtmlTextLayer?.idToEl?.get?.(objectId);
+        if (!textEl && !mindmapEl) {
+            console.warn(`❌ SelectTool: HTML-элемент для объекта ${objectId} не найден, fallback через событие`);
         }
-    } else {
-        controller.eventBus.emit(Events.Tool.ShowObjectText, { objectId });
     }
+    controller.eventBus.emit(Events.Tool.ShowObjectText, { objectId });
 }
 
 export function hideNotePixiText(controller, objectId) {
