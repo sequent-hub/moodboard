@@ -23,6 +23,35 @@ function applyMindmapCaretFromClick({ create, objectId, object, textarea }) {
     } catch (_) {}
 }
 
+function measureMindmapTextWidthPx(textarea, measureEl) {
+    if (!textarea || !measureEl) return 0;
+    const text = String(textarea.value || '');
+    if (text.length === 0) return 0;
+
+    const style = (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function')
+        ? window.getComputedStyle(textarea)
+        : null;
+    if (style) {
+        measureEl.style.fontFamily = style.fontFamily || '';
+        measureEl.style.fontSize = style.fontSize || '';
+        measureEl.style.fontWeight = style.fontWeight || '';
+        measureEl.style.fontStyle = style.fontStyle || '';
+        measureEl.style.letterSpacing = style.letterSpacing || 'normal';
+    }
+
+    const lines = text.split('\n');
+    let maxWidth = 0;
+    for (const rawLine of lines) {
+        const line = rawLine.length > 0 ? rawLine : ' ';
+        measureEl.textContent = line;
+        const rect = measureEl.getBoundingClientRect();
+        if (Number.isFinite(rect.width)) {
+            maxWidth = Math.max(maxWidth, rect.width);
+        }
+    }
+    return Math.max(0, Math.ceil(maxWidth));
+}
+
 /**
  * Изолированный входной контроллер редактирования mindmap.
  * Не зависит от TextInlineEditorController.
@@ -94,6 +123,21 @@ export function openMindmapEditor(object, create = false) {
     textarea.style.paddingBottom = '0px';
     textarea.setAttribute('rows', '1');
 
+    const measureEl = (typeof document !== 'undefined')
+        ? document.createElement('span')
+        : null;
+    if (measureEl) {
+        measureEl.style.position = 'fixed';
+        measureEl.style.left = '-99999px';
+        measureEl.style.top = '-99999px';
+        measureEl.style.visibility = 'hidden';
+        measureEl.style.pointerEvents = 'none';
+        measureEl.style.whiteSpace = 'pre';
+        measureEl.style.margin = '0';
+        measureEl.style.padding = '0';
+        document.body.appendChild(measureEl);
+    }
+
     const containerRect = view.parentElement.getBoundingClientRect();
     const viewRect = view.getBoundingClientRect();
     const offsetLeft = viewRect.left - containerRect.left;
@@ -151,6 +195,16 @@ export function openMindmapEditor(object, create = false) {
     textarea.style.height = 'auto';
     textarea.style.minHeight = '0';
 
+    const initialCssWidth = targetWidth;
+    const initialWorldWidth = objectWidth;
+    const resizeSession = {
+        started: false,
+        oldSize: null,
+        newSize: null,
+        oldPosition: null,
+        newPosition: null,
+    };
+
     const getSingleLineTextareaHeight = () => {
         if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return 1;
         const style = window.getComputedStyle(textarea);
@@ -193,7 +247,82 @@ export function openMindmapEditor(object, create = false) {
         }
     };
 
-    textarea.addEventListener('input', syncTextareaHeight);
+    const getEditorHorizontalPaddingPx = () => {
+        if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') {
+            return { left: 0, right: 0 };
+        }
+        const style = window.getComputedStyle(textarea);
+        const left = parseFloat(style.paddingLeft || '0');
+        const right = parseFloat(style.paddingRight || '0');
+        return {
+            left: Number.isFinite(left) ? left : 0,
+            right: Number.isFinite(right) ? right : 0,
+        };
+    };
+
+    const getCssToWorldScale = () => {
+        const viewRes = (this.app?.renderer?.resolution)
+            || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
+        const worldScale = world?.scale?.x || 1;
+        if (!Number.isFinite(viewRes) || !Number.isFinite(worldScale) || worldScale === 0) {
+            return 1;
+        }
+        return viewRes / worldScale;
+    };
+
+    const syncMindmapWidth = () => {
+        if (!objectId) return;
+
+        const value = String(textarea.value || '');
+        const hasText = value.length > 0;
+        const textWidth = hasText ? measureMindmapTextWidthPx(textarea, measureEl) : 0;
+        const padding = getEditorHorizontalPaddingPx();
+        const nextCssWidth = hasText
+            ? Math.max(1, Math.ceil(textWidth + padding.left + padding.right))
+            : initialCssWidth;
+
+        const currentCssWidth = Math.max(1, Math.round(parseFloat(wrapper.style.width || `${initialCssWidth}`)));
+        if (Math.abs(nextCssWidth - currentCssWidth) <= 0) return;
+
+        wrapper.style.width = `${nextCssWidth}px`;
+
+        const cssToWorld = getCssToWorldScale();
+        const nextWorldWidth = hasText
+            ? Math.max(1, Math.round(nextCssWidth * cssToWorld))
+            : Math.max(1, Math.round(initialWorldWidth));
+
+        const sizeData = { objectId, size: null };
+        this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+        const currentSize = sizeData.size || { width: initialWorldWidth, height: objectHeight };
+        const currentWorldWidth = Math.max(1, Math.round(currentSize.width || initialWorldWidth));
+        if (nextWorldWidth === currentWorldWidth) return;
+
+        const posData = { objectId, position: null };
+        this.eventBus.emit(Events.Tool.GetObjectPosition, posData);
+        const currentPosition = posData.position || position;
+
+        if (!resizeSession.started) {
+            resizeSession.started = true;
+            resizeSession.oldSize = { width: currentWorldWidth, height: currentSize.height };
+            resizeSession.oldPosition = { x: currentPosition.x, y: currentPosition.y };
+        }
+
+        resizeSession.newSize = { width: nextWorldWidth, height: currentSize.height };
+        resizeSession.newPosition = { x: currentPosition.x, y: currentPosition.y };
+
+        this.eventBus.emit(Events.Tool.ResizeUpdate, {
+            object: objectId,
+            size: resizeSession.newSize,
+            position: resizeSession.newPosition,
+        });
+    };
+
+    const onInput = () => {
+        syncMindmapWidth();
+        syncTextareaHeight(false);
+    };
+
+    textarea.addEventListener('input', onInput);
     wrapper.appendChild(textarea);
     view.parentElement.appendChild(wrapper);
     syncTextareaHeight(true);
@@ -208,16 +337,33 @@ export function openMindmapEditor(object, create = false) {
 
         textarea.removeEventListener('blur', onBlur);
         textarea.removeEventListener('keydown', onKeyDown);
-        textarea.removeEventListener('input', syncTextareaHeight);
+        textarea.removeEventListener('input', onInput);
 
         const value = textarea.value.trim();
         const commitValue = commit;
+
+        if (objectId && resizeSession.started && resizeSession.oldSize && resizeSession.newSize) {
+            const widthChanged = resizeSession.oldSize.width !== resizeSession.newSize.width;
+            const heightChanged = resizeSession.oldSize.height !== resizeSession.newSize.height;
+            if (widthChanged || heightChanged) {
+                this.eventBus.emit(Events.Tool.ResizeEnd, {
+                    object: objectId,
+                    oldSize: resizeSession.oldSize,
+                    newSize: resizeSession.newSize,
+                    oldPosition: resizeSession.oldPosition,
+                    newPosition: resizeSession.newPosition,
+                });
+            }
+        }
 
         if (objectId) {
             showStaticTextAfterEditing(this, objectId);
         }
 
         wrapper.remove();
+        if (measureEl && typeof measureEl.remove === 'function') {
+            measureEl.remove();
+        }
         this.textEditor = {
             active: false,
             objectId: null,

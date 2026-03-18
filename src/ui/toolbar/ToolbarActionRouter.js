@@ -77,6 +77,8 @@ export class ToolbarActionRouter {
         }
 
         if (toolType === 'mindmap-add') {
+            const mindmapWidth = 306;
+            const mindmapHeight = 100;
             this.toolbar.animateButton(button);
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
@@ -86,11 +88,11 @@ export class ToolbarActionRouter {
             this.toolbar.setActiveToolbarButton('place');
             this.toolbar.eventBus.emit(Events.Place.Set, {
                 type: 'mindmap',
-                size: { width: 320, height: 125 },
+                size: { width: mindmapWidth, height: mindmapHeight },
                 properties: {
                     fontSize: 20,
-                    width: 306,
-                    height: 100,
+                    width: mindmapWidth,
+                    height: mindmapHeight,
                     strokeColor: 0x2563EB,
                     fillColor: 0x3B82F6,
                     fillAlpha: 0.25,

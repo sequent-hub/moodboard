@@ -146,6 +146,7 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       })
       .toBe(true);
     const mindmapObject = await getMindmapObject(page);
+    expect(mindmapObject).toBeTruthy();
     const mindmapId = mindmapObject.id;
     expect((mindmapObject?.properties?.content || '')).toBe('');
 
@@ -289,5 +290,88 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
         return obj?.properties?.content || '';
       })
       .toBe('Обновленный текст');
+  });
+
+  test('mindmap capsule width adapts while typing and keeps horizontal paddings', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return !!obj?.id;
+      })
+      .toBe(true);
+
+    const mindmapObject = await getMindmapObject(page);
+    const mindmapId = mindmapObject.id;
+    const initialWidth = Math.round(mindmapObject.width || 0);
+    expect(initialWidth).toBeGreaterThan(0);
+
+    const textEl = page.locator(`.mb-text--mindmap[data-id="${mindmapId}"] .mb-text--mindmap-content`);
+    const textContentBox = await textEl.boundingBox();
+    expect(textContentBox).toBeTruthy();
+    await page.mouse.click(
+      textContentBox.x + textContentBox.width * 0.5,
+      textContentBox.y + textContentBox.height * 0.5
+    );
+
+    const textarea = page.locator('.moodboard-text-input');
+    await expect(textarea).toBeVisible();
+
+    await textarea.fill('А');
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        const width = Math.round(obj?.width || 0);
+        return width < initialWidth;
+      })
+      .toBe(true);
+
+    const widthAfterFirstChar = Math.round((await getMindmapObject(page))?.width || 0);
+    expect(widthAfterFirstChar).toBeGreaterThan(0);
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(() => {
+          const ta = document.querySelector('.moodboard-text-input');
+          if (!ta) return null;
+          const cs = window.getComputedStyle(ta);
+          const pl = parseFloat(cs.paddingLeft || '0');
+          const pr = parseFloat(cs.paddingRight || '0');
+          if (!Number.isFinite(pl) || !Number.isFinite(pr)) return null;
+          return { pl, pr };
+        });
+      })
+      .toMatchObject({
+        pl: expect.any(Number),
+        pr: expect.any(Number),
+      });
+
+    const paddingState = await page.evaluate(() => {
+      const ta = document.querySelector('.moodboard-text-input');
+      if (!ta) return null;
+      const cs = window.getComputedStyle(ta);
+      return {
+        pl: Math.round(parseFloat(cs.paddingLeft || '0')),
+        pr: Math.round(parseFloat(cs.paddingRight || '0')),
+      };
+    });
+    expect(paddingState).toBeTruthy();
+    expect(paddingState.pl).toBe(paddingState.pr);
+
+    await textarea.fill('Очень длинный текст для проверки резиновой ширины капсулы mindmap');
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        const width = Math.round(obj?.width || 0);
+        return width > widthAfterFirstChar;
+      })
+      .toBe(true);
   });
 });
