@@ -1055,6 +1055,20 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
     }, rootObject.id);
     expect(firstChild?.id).toBeTruthy();
 
+    // After connecting root->right child, right plus for root must be hidden.
+    await page.evaluate((rootId) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      const tm = core.toolManager;
+      const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+      if (!selectTool) return;
+      selectTool.setSelection([rootId]);
+      if (typeof selectTool.updateResizeHandles === 'function') {
+        selectTool.updateResizeHandles();
+      }
+    }, rootObject.id);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toHaveCount(0);
+
     await page.evaluate((childId) => {
       const core = window.moodboard?.coreMoodboard;
       if (!core) return;
@@ -1068,6 +1082,9 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       }
     }, firstChild.id);
 
+    // Child has incoming line from left, so left plus is hidden.
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="left"]')).toHaveCount(0);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toBeVisible();
     const downBtn = page.locator('.mb-mindmap-side-btn[data-side="bottom"]');
     await expect(downBtn).toBeVisible();
     await downBtn.click();
@@ -1102,6 +1119,52 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
             (nestedNode.properties?.content || '') === ''
           );
         }, { rootId: rootObject.id, firstChildId: firstChild.id });
+      })
+      .toBe(true);
+
+    // Bottom side becomes occupied after nested child creation.
+    await page.evaluate((childId) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      const tm = core.toolManager;
+      const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+      if (!selectTool) return;
+      selectTool.setSelection([childId]);
+      if (typeof selectTool.updateResizeHandles === 'function') {
+        selectTool.updateResizeHandles();
+      }
+    }, firstChild.id);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="bottom"]')).toHaveCount(0);
+
+    // Connection remains attached and updates when node moves.
+    const lineBefore = await page.evaluate((childId) => {
+      const layer = window.moodboardMindmapConnectionLayer;
+      if (!layer) return null;
+      const segment = (layer._lastSegments || []).find((s) => s.childId === childId) || null;
+      return segment ? { x: segment.end.x, y: segment.end.y } : null;
+    }, firstChild.id);
+    expect(lineBefore).toBeTruthy();
+    await page.evaluate((childId) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      const board = window.moodboard.exportBoard();
+      const node = (board?.objects || []).find((o) => o.id === childId);
+      if (!node) return;
+      core.updateObjectPositionDirect(childId, {
+        x: (node.position?.x || 0) + 70,
+        y: (node.position?.y || 0) + 35,
+      }, { snap: false });
+      core.eventBus.emit('tool:drag:update', { object: childId });
+    }, firstChild.id);
+    await expect
+      .poll(async () => {
+        return page.evaluate(({ childId, prev }) => {
+          const layer = window.moodboardMindmapConnectionLayer;
+          if (!layer) return false;
+          const segment = (layer._lastSegments || []).find((s) => s.childId === childId) || null;
+          if (!segment) return false;
+          return segment.end.x !== prev.x || segment.end.y !== prev.y;
+        }, { childId: firstChild.id, prev: lineBefore });
       })
       .toBe(true);
   });

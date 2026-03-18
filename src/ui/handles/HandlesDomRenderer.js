@@ -52,6 +52,8 @@ export class HandlesDomRenderer {
         let isRevitScreenshotTarget = false;
         let revitViewPayload = null;
         let sourceMindmapProperties = null;
+        const occupiedOutgoingSides = new Set();
+        const hiddenIncomingSide = { value: null };
         if (id !== '__group__') {
             const req = { objectId: id, pixiObject: null };
             this.host.eventBus.emit(Events.Tool.GetObjectPixi, req);
@@ -63,6 +65,17 @@ export class HandlesDomRenderer {
             revitViewPayload = req.pixiObject?._mb?.properties?.view || null;
             if (isMindmapTarget) {
                 sourceMindmapProperties = req.pixiObject?._mb?.properties || null;
+                const allObjects = this.host.core?.state?.state?.objects || [];
+                allObjects.forEach((obj) => {
+                    if (!obj || obj.type !== 'mindmap') return;
+                    const meta = obj.properties?.mindmap || {};
+                    if (meta?.role === 'child' && meta?.parentId === id && typeof meta?.side === 'string') {
+                        occupiedOutgoingSides.add(meta.side);
+                    }
+                });
+                const incoming = sourceMindmapProperties?.mindmap?.side || null;
+                if (incoming === 'left') hiddenIncomingSide.value = 'right';
+                else if (incoming === 'right') hiddenIncomingSide.value = 'left';
             }
         }
         const isNonResizableTarget = isFileTarget || isMindmapTarget;
@@ -317,10 +330,13 @@ export class HandlesDomRenderer {
                 });
                 return btn;
             };
-            this.host.layer.appendChild(createMindmapSideButton('left'));
-            this.host.layer.appendChild(createMindmapSideButton('right'));
+            const canShowLeft = !occupiedOutgoingSides.has('left') && hiddenIncomingSide.value !== 'left';
+            const canShowRight = !occupiedOutgoingSides.has('right') && hiddenIncomingSide.value !== 'right';
+            if (canShowLeft) this.host.layer.appendChild(createMindmapSideButton('left'));
+            if (canShowRight) this.host.layer.appendChild(createMindmapSideButton('right'));
             const role = sourceMindmapProperties?.mindmap?.role || null;
-            if (role === 'child') {
+            const canShowBottom = !occupiedOutgoingSides.has('bottom');
+            if (role === 'child' && canShowBottom) {
                 this.host.layer.appendChild(createMindmapBottomButton());
             }
         }

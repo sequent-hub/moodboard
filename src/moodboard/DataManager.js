@@ -112,6 +112,9 @@ export class DataManager {
                 window.moodboardMindmapHtmlTextLayer.rebuildFromState();
                 window.moodboardMindmapHtmlTextLayer.updateAll();
             }
+            if (window.moodboardMindmapConnectionLayer) {
+                window.moodboardMindmapConnectionLayer.updateAll();
+            }
         }, 100);
 
     }
