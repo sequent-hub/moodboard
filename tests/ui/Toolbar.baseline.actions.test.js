@@ -123,6 +123,27 @@ describe('Toolbar baseline: action routing contracts', () => {
         expect(eventBus.emit).toHaveBeenCalledWith(Events.Keyboard.ToolSelect, { tool: 'place' });
     });
 
+    it('mindmap-add click emits place setup payload contract', () => {
+        const button = container.querySelector('.moodboard-toolbar__button--mindmap');
+        button.click();
+
+        const placeCalls = getEmits(eventBus.emit, Events.Place.Set);
+        expect(placeCalls).toHaveLength(1);
+        expect(placeCalls[0]).toEqual(
+            expect.objectContaining({
+                type: 'mindmap',
+                properties: expect.objectContaining({
+                    width: expect.any(Number),
+                    height: expect.any(Number),
+                    strokeColor: expect.any(Number),
+                    fillColor: expect.any(Number),
+                    fillAlpha: expect.any(Number),
+                }),
+            })
+        );
+        expect(eventBus.emit).toHaveBeenCalledWith(Events.Keyboard.ToolSelect, { tool: 'place' });
+    });
+
     it('undo/redo do not emit when disabled and emit when enabled', () => {
         const undo = container.querySelector('.moodboard-toolbar__button--undo');
         const redo = container.querySelector('.moodboard-toolbar__button--redo');

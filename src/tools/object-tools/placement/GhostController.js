@@ -501,4 +501,43 @@ export class GhostController {
 
         host.world.addChild(host.ghostContainer);
     }
+
+    showMindmapGhost() {
+        const host = this.host;
+        if (!host.pending || host.pending.type !== 'mindmap' || !host.world) return;
+
+        this.hideGhost();
+
+        host.ghostContainer = new PIXI.Container();
+        host.ghostContainer.alpha = 0.75;
+
+        const width = Math.max(1, Math.round(host.pending.properties?.width || 220));
+        const height = Math.max(1, Math.round(host.pending.properties?.height || 140));
+        const strokeColor = (typeof host.pending.properties?.strokeColor === 'number')
+            ? host.pending.properties.strokeColor
+            : 0x2563EB;
+        const fillColor = (typeof host.pending.properties?.fillColor === 'number')
+            ? host.pending.properties.fillColor
+            : 0x3B82F6;
+        const fillAlpha = (typeof host.pending.properties?.fillAlpha === 'number')
+            ? host.pending.properties.fillAlpha
+            : 0.25;
+        const strokeWidth = (typeof host.pending.properties?.strokeWidth === 'number')
+            ? host.pending.properties.strokeWidth
+            : 2;
+        const cornerRadius = (typeof host.pending.properties?.cornerRadius === 'number')
+            ? host.pending.properties.cornerRadius
+            : 8;
+
+        const graphics = new PIXI.Graphics();
+        graphics.lineStyle(strokeWidth, strokeColor, 1);
+        graphics.beginFill(fillColor, fillAlpha);
+        graphics.drawRoundedRect(0, 0, width, height, cornerRadius);
+        graphics.endFill();
+
+        host.ghostContainer.addChild(graphics);
+        host.ghostContainer.pivot.x = width / 2;
+        host.ghostContainer.pivot.y = height / 2;
+        host.world.addChild(host.ghostContainer);
+    }
 }

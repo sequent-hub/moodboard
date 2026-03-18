@@ -76,6 +76,30 @@ export class ToolbarActionRouter {
             return true;
         }
 
+        if (toolType === 'mindmap-add') {
+            this.toolbar.animateButton(button);
+            this.toolbar.closeShapesPopup();
+            this.toolbar.closeDrawPopup();
+            this.toolbar.closeEmojiPopup();
+            this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+            this.toolbar.placeSelectedButtonId = 'mindmap';
+            this.toolbar.setActiveToolbarButton('place');
+            this.toolbar.eventBus.emit(Events.Place.Set, {
+                type: 'mindmap',
+                size: { width: 220, height: 140 },
+                properties: {
+                    width: 220,
+                    height: 140,
+                    strokeColor: 0x2563EB,
+                    fillColor: 0x3B82F6,
+                    fillAlpha: 0.25,
+                    strokeWidth: 2,
+                    cornerRadius: 8
+                }
+            });
+            return true;
+        }
+
         if (toolType === 'frame') {
             this.toolbar.animateButton(button);
             this.toolbar.toggleFramePopup(button);

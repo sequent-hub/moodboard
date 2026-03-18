@@ -23,6 +23,7 @@ export class ActionHandler {
             case 'revit-screenshot-img':
             case 'comment':
             case 'file':
+            case 'mindmap':
                 // Передаем imageId как extraData для изображений, fileId для файлов
                 const extraData = action.imageId ? { imageId: action.imageId } : 
                                  action.fileId ? { fileId: action.fileId } : {};

@@ -8,6 +8,7 @@ import { RevitScreenshotImageObject } from './RevitScreenshotImageObject.js';
 import { CommentObject } from './CommentObject.js';
 import { NoteObject } from './NoteObject.js';
 import { FileObject } from './FileObject.js';
+import { MindmapObject } from './MindmapObject.js';
 
 /**
  * Фабрика объектов холста
@@ -25,7 +26,8 @@ export class ObjectFactory {
         ['revit-screenshot-img', RevitScreenshotImageObject],
         ['comment', CommentObject],
         ['note', NoteObject],
-        ['file', FileObject]
+        ['file', FileObject],
+        ['mindmap', MindmapObject]
     ]);
 
     /**

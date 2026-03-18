@@ -32,6 +32,8 @@ export class PlacementEventsBridge {
                     this.host.startFrameDrawMode();
                 } else if (this.host.pending.type === 'shape') {
                     this.host.showShapeGhost();
+                } else if (this.host.pending.type === 'mindmap') {
+                    this.host.showMindmapGhost();
                 }
                 if (this.host.pending.placeOnMouseUp && this.host.app && this.host.app.view) {
                     const onUp = (ev) => {

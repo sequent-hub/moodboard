@@ -81,6 +81,8 @@ export class PlacementTool extends BaseTool {
                 this.showFrameGhost();
             } else if (this.pending.type === 'shape') {
                 this.showShapeGhost();
+            } else if (this.pending.type === 'mindmap') {
+                this.showMindmapGhost();
             }
         }
     }
@@ -290,6 +292,13 @@ export class PlacementTool extends BaseTool {
      */
     showShapeGhost() {
         return this.ghostController.showShapeGhost();
+    }
+
+    /**
+     * Показать "призрак" mindmap-объекта
+     */
+    showMindmapGhost() {
+        return this.ghostController.showMindmapGhost();
     }
 
     /**
