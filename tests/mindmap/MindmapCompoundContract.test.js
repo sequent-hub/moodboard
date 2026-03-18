@@ -33,6 +33,18 @@ describe('MindmapCompoundContract', () => {
         });
     });
 
+    it('supports bottom direction for nested child intent', () => {
+        const meta = createChildMindmapIntentMetadata({
+            sourceObjectId: 'node-child',
+            sourceProperties: { mindmap: { compoundId: 'compound-a' } },
+            side: 'bottom',
+        });
+
+        expect(meta.side).toBe('bottom');
+        expect(meta.parentId).toBe('node-child');
+        expect(meta.compoundId).toBe('compound-a');
+    });
+
     it('normalizes legacy mindmap to standalone root compound', () => {
         const normalized = normalizeMindmapPropertiesForCreate({
             type: 'mindmap',

@@ -210,6 +210,59 @@ export class HandlesDomRenderer {
         box.appendChild(rotateHandle);
 
         if (isMindmapTarget) {
+            const emitChildMindmapFromSource = (direction) => {
+                const app = this.host.core?.pixi?.app;
+                const worldLayer = this.host.core?.pixi?.worldLayer || app?.stage;
+                const rendererRes = app?.renderer?.resolution || 1;
+                const worldScale = worldLayer?.scale?.x || 1;
+                const baseGapWorld = Math.max(1, Math.round((10 * rendererRes) / worldScale));
+                const gapWorld = Math.max(1, Math.round(baseGapWorld * MINDMAP_CHILD_GAP_MULTIPLIER));
+                const sourceWidth = Math.max(1, Math.round(sourceMindmapProperties?.width || worldBounds.width || 100));
+                const sourceHeight = Math.max(1, Math.round(sourceMindmapProperties?.height || worldBounds.height || 100));
+                const sourceRole = sourceMindmapProperties?.mindmap?.role || null;
+                const sourcePaddingX = Math.max(1, Math.round(sourceMindmapProperties?.paddingX || MINDMAP_LAYOUT.paddingX));
+                const sourcePaddingY = Math.max(1, Math.round(sourceMindmapProperties?.paddingY || MINDMAP_LAYOUT.paddingY));
+                const childWidth = sourceRole === 'child'
+                    ? sourceWidth
+                    : Math.max(1, Math.round(sourceWidth * MINDMAP_CHILD_WIDTH_FACTOR));
+                const childHeight = sourceRole === 'child'
+                    ? sourceHeight
+                    : Math.max(1, Math.round(sourceHeight * MINDMAP_CHILD_HEIGHT_FACTOR));
+                const childPaddingX = sourceRole === 'child'
+                    ? sourcePaddingX
+                    : Math.max(1, Math.round(sourcePaddingX * MINDMAP_CHILD_PADDING_FACTOR));
+                const childPaddingY = sourceRole === 'child'
+                    ? sourcePaddingY
+                    : Math.max(1, Math.round(sourcePaddingY * MINDMAP_CHILD_PADDING_FACTOR));
+                const nextPosition = direction === 'left'
+                    ? { x: Math.round(worldBounds.x - childWidth - gapWorld), y: Math.round(worldBounds.y) }
+                    : direction === 'right'
+                        ? { x: Math.round(worldBounds.x + worldBounds.width + gapWorld), y: Math.round(worldBounds.y) }
+                        : { x: Math.round(worldBounds.x), y: Math.round(worldBounds.y + worldBounds.height + gapWorld) };
+                const childMindmapMeta = createChildMindmapIntentMetadata({
+                    sourceObjectId: id,
+                    sourceProperties: sourceMindmapProperties || {},
+                    side: direction,
+                });
+                this.host.eventBus.emit(Events.UI.ToolbarAction, {
+                    type: 'mindmap',
+                    id: 'mindmap',
+                    position: nextPosition,
+                    properties: {
+                        ...(sourceMindmapProperties || {}),
+                        mindmap: childMindmapMeta,
+                        content: '',
+                        width: childWidth,
+                        height: childHeight,
+                        capsuleBaseHeight: childHeight,
+                        paddingX: childPaddingX,
+                        paddingY: childPaddingY,
+                        strokeColor: MINDMAP_CHILD_STROKE_COLOR,
+                        fillColor: MINDMAP_CHILD_FILL_COLOR,
+                        fillAlpha: MINDMAP_CHILD_FILL_ALPHA,
+                    },
+                });
+            };
             const createMindmapSideButton = (side) => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
@@ -235,63 +288,41 @@ export class HandlesDomRenderer {
                 btn.addEventListener('click', (evt) => {
                     evt.preventDefault();
                     evt.stopPropagation();
-                    const app = this.host.core?.pixi?.app;
-                    const worldLayer = this.host.core?.pixi?.worldLayer || app?.stage;
-                    const rendererRes = app?.renderer?.resolution || 1;
-                    const worldScale = worldLayer?.scale?.x || 1;
-                    const baseGapWorld = Math.max(1, Math.round((10 * rendererRes) / worldScale));
-                    const gapWorld = Math.max(1, Math.round(baseGapWorld * MINDMAP_CHILD_GAP_MULTIPLIER));
-                    const sourceWidth = Math.max(1, Math.round(sourceMindmapProperties?.width || worldBounds.width || 100));
-                    const sourceHeight = Math.max(1, Math.round(sourceMindmapProperties?.height || worldBounds.height || 100));
-                    const sourceRole = sourceMindmapProperties?.mindmap?.role || null;
-                    const sourcePaddingX = Math.max(1, Math.round(sourceMindmapProperties?.paddingX || MINDMAP_LAYOUT.paddingX));
-                    const sourcePaddingY = Math.max(1, Math.round(sourceMindmapProperties?.paddingY || MINDMAP_LAYOUT.paddingY));
-                    const childWidth = sourceRole === 'child'
-                        ? sourceWidth
-                        : Math.max(1, Math.round(sourceWidth * MINDMAP_CHILD_WIDTH_FACTOR));
-                    const childHeight = sourceRole === 'child'
-                        ? sourceHeight
-                        : Math.max(1, Math.round(sourceHeight * MINDMAP_CHILD_HEIGHT_FACTOR));
-                    const childPaddingX = sourceRole === 'child'
-                        ? sourcePaddingX
-                        : Math.max(1, Math.round(sourcePaddingX * MINDMAP_CHILD_PADDING_FACTOR));
-                    const childPaddingY = sourceRole === 'child'
-                        ? sourcePaddingY
-                        : Math.max(1, Math.round(sourcePaddingY * MINDMAP_CHILD_PADDING_FACTOR));
-                    const nextPosition = {
-                        x: (side === 'left')
-                            ? Math.round(worldBounds.x - childWidth - gapWorld)
-                            : Math.round(worldBounds.x + worldBounds.width + gapWorld),
-                        y: Math.round(worldBounds.y),
-                    };
-                    const childMindmapMeta = createChildMindmapIntentMetadata({
-                        sourceObjectId: id,
-                        sourceProperties: sourceMindmapProperties || {},
-                        side,
-                    });
-                    this.host.eventBus.emit(Events.UI.ToolbarAction, {
-                        type: 'mindmap',
-                        id: 'mindmap',
-                        position: nextPosition,
-                        properties: {
-                            ...(sourceMindmapProperties || {}),
-                            mindmap: childMindmapMeta,
-                            content: '',
-                            width: childWidth,
-                            height: childHeight,
-                            capsuleBaseHeight: childHeight,
-                            paddingX: childPaddingX,
-                            paddingY: childPaddingY,
-                            strokeColor: MINDMAP_CHILD_STROKE_COLOR,
-                            fillColor: MINDMAP_CHILD_FILL_COLOR,
-                            fillAlpha: MINDMAP_CHILD_FILL_ALPHA,
-                        },
-                    });
+                    emitChildMindmapFromSource(side);
+                });
+                return btn;
+            };
+            const createMindmapBottomButton = () => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'mb-mindmap-side-btn mb-mindmap-side-btn--down';
+                btn.dataset.side = 'bottom';
+                btn.dataset.id = id;
+                btn.textContent = '';
+                btn.setAttribute('aria-label', 'Добавить дочерний узел вниз');
+                const centerX = left + Math.round(width / 2);
+                const edgeGap = 10;
+                const buttonRadius = 12;
+                const centerOffset = edgeGap + buttonRadius;
+                btn.style.left = `${centerX}px`;
+                btn.style.top = `${Math.round(top + height + centerOffset)}px`;
+                btn.addEventListener('mousedown', (evt) => {
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                });
+                btn.addEventListener('click', (evt) => {
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                    emitChildMindmapFromSource('bottom');
                 });
                 return btn;
             };
             this.host.layer.appendChild(createMindmapSideButton('left'));
             this.host.layer.appendChild(createMindmapSideButton('right'));
+            const role = sourceMindmapProperties?.mindmap?.role || null;
+            if (role === 'child') {
+                this.host.layer.appendChild(createMindmapBottomButton());
+            }
         }
 
         if (isRevitScreenshotTarget && typeof revitViewPayload === 'string' && revitViewPayload.length > 0) {

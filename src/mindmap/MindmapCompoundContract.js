@@ -2,6 +2,7 @@ const ROOT_ROLE = 'root';
 const CHILD_ROLE = 'child';
 const LEFT_SIDE = 'left';
 const RIGHT_SIDE = 'right';
+const BOTTOM_SIDE = 'bottom';
 const DEBUG_STORAGE_KEY = 'mb:mindmap:compound:debug';
 
 function asObject(value) {
@@ -17,7 +18,7 @@ function asValidRole(value) {
 }
 
 function asValidSide(value) {
-    return value === LEFT_SIDE || value === RIGHT_SIDE ? value : null;
+    return value === LEFT_SIDE || value === RIGHT_SIDE || value === BOTTOM_SIDE ? value : null;
 }
 
 function asOrder(value) {

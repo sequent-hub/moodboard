@@ -371,6 +371,32 @@
     height: 12px;
 }
 
+.mb-mindmap-side-btn--down {
+    font-size: 0;
+}
+
+.mb-mindmap-side-btn--down::before,
+.mb-mindmap-side-btn--down::after {
+    display: block;
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 8px;
+    height: 2px;
+    background: #ffffff;
+    border-radius: 999px;
+    transform-origin: center;
+}
+
+.mb-mindmap-side-btn--down::before {
+    transform: translate(-88%, -36%) rotate(35deg);
+}
+
+.mb-mindmap-side-btn--down::after {
+    transform: translate(-12%, -36%) rotate(-35deg);
+}
+
 .mb-revit-show-in-model {
     position: absolute;
     transform: translate(-50%, -100%);
