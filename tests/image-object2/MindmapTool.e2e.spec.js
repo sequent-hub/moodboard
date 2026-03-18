@@ -523,4 +523,201 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       })
       .toBe(true);
   });
+
+  test('mindmap keeps same font size after leaving edit mode', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return !!obj?.id;
+      })
+      .toBe(true);
+
+    const mindmapObject = await getMindmapObject(page);
+    expect(mindmapObject).toBeTruthy();
+    const mindmapId = mindmapObject.id;
+
+    const textEl = page.locator(`.mb-text--mindmap[data-id="${mindmapId}"] .mb-text--mindmap-content`);
+    const textContentBox = await textEl.boundingBox();
+    expect(textContentBox).toBeTruthy();
+    await page.mouse.click(
+      textContentBox.x + textContentBox.width * 0.5,
+      textContentBox.y + textContentBox.height * 0.5
+    );
+
+    const textarea = page.locator('.moodboard-text-input');
+    await expect(textarea).toBeVisible();
+
+    await textarea.fill('1234567890'.repeat(6));
+
+    const editorFontSize = await page.evaluate(() => {
+      const ta = document.querySelector('.moodboard-text-input');
+      if (!ta) return null;
+      const cs = window.getComputedStyle(ta);
+      return parseFloat(cs.fontSize || '0');
+    });
+    expect(editorFontSize).toBeTruthy();
+
+    await page.mouse.click(canvasBox.x + 20, canvasBox.y + 20);
+    await expect(textarea).toHaveCount(0);
+
+    await expect
+      .poll(async () => {
+        return page.evaluate((objectId) => {
+          const el = document.querySelector(`.mb-text--mindmap[data-id="${objectId}"]`);
+          if (!el) return null;
+          const cs = window.getComputedStyle(el);
+          return parseFloat(cs.fontSize || '0');
+        }, mindmapId);
+      })
+      .toBeTruthy();
+
+    const staticFontSize = await page.evaluate((objectId) => {
+      const el = document.querySelector(`.mb-text--mindmap[data-id="${objectId}"]`);
+      if (!el) return null;
+      const cs = window.getComputedStyle(el);
+      return parseFloat(cs.fontSize || '0');
+    }, mindmapId);
+    expect(staticFontSize).toBeTruthy();
+    expect(Math.abs(staticFontSize - editorFontSize)).toBeLessThanOrEqual(1);
+  });
+
+  test('mindmap keeps multiline text visible when switching to edit mode', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return !!obj?.id;
+      })
+      .toBe(true);
+
+    const textEl = page.locator('.mb-text--mindmap-content').first();
+    const textContentBox = await textEl.boundingBox();
+    expect(textContentBox).toBeTruthy();
+    await page.mouse.click(
+      textContentBox.x + textContentBox.width * 0.5,
+      textContentBox.y + textContentBox.height * 0.5
+    );
+
+    const textarea = page.locator('.moodboard-text-input');
+    await expect(textarea).toBeVisible();
+    await textarea.fill('1234567890'.repeat(6)); // force 2 lines by 50-char rule
+
+    const metricsBeforeClose = await page.evaluate(() => {
+      const ta = document.querySelector('.moodboard-text-input');
+      if (!ta) return null;
+      const lineCount = String(ta.value || '').split('\n').length;
+      return {
+        lineCount,
+        scrollHeight: ta.scrollHeight,
+      };
+    });
+    expect(metricsBeforeClose).toBeTruthy();
+    expect(metricsBeforeClose.lineCount).toBeGreaterThan(1);
+
+    await page.mouse.click(canvasBox.x + 20, canvasBox.y + 20);
+    await expect(textarea).toHaveCount(0);
+
+    const textContentBox2 = await textEl.boundingBox();
+    expect(textContentBox2).toBeTruthy();
+    await page.mouse.click(
+      textContentBox2.x + textContentBox2.width * 0.5,
+      textContentBox2.y + textContentBox2.height * 0.5
+    );
+    await expect(textarea).toBeVisible();
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(() => {
+          const ta = document.querySelector('.moodboard-text-input');
+          if (!ta) return null;
+          const lineCount = String(ta.value || '').split('\n').length;
+          return {
+            lineCount,
+            clientHeight: ta.clientHeight,
+            scrollHeight: ta.scrollHeight,
+          };
+        });
+      })
+      .toMatchObject({
+        lineCount: expect.any(Number),
+        clientHeight: expect.any(Number),
+        scrollHeight: expect.any(Number),
+      });
+
+    const metricsOnReopen = await page.evaluate(() => {
+      const ta = document.querySelector('.moodboard-text-input');
+      if (!ta) return null;
+      return {
+        lineCount: String(ta.value || '').split('\n').length,
+        clientHeight: ta.clientHeight,
+        scrollHeight: ta.scrollHeight,
+      };
+    });
+    expect(metricsOnReopen).toBeTruthy();
+    expect(metricsOnReopen.lineCount).toBeGreaterThan(1);
+    expect(metricsOnReopen.clientHeight).toBeGreaterThanOrEqual(metricsOnReopen.scrollHeight - 1);
+  });
+
+  test('mindmap repeated edits do not accumulate extra height jump', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return !!obj?.id;
+      })
+      .toBe(true);
+
+    const textEl = page.locator('.mb-text--mindmap-content').first();
+    const clickText = async () => {
+      const box = await textEl.boundingBox();
+      expect(box).toBeTruthy();
+      await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5);
+    };
+    const closeEditor = async () => {
+      await page.mouse.click(canvasBox.x + 20, canvasBox.y + 20);
+      await expect(page.locator('.moodboard-text-input')).toHaveCount(0);
+    };
+
+    await clickText();
+    const textarea = page.locator('.moodboard-text-input');
+    await expect(textarea).toBeVisible();
+    await textarea.fill('1234567890'.repeat(6)); // 2 lines
+    await closeEditor();
+
+    const h2 = Math.round((await getMindmapObject(page))?.height || 0);
+    expect(h2).toBeGreaterThan(0);
+
+    await clickText();
+    await expect(textarea).toBeVisible();
+    await textarea.type('A'); // should add one line step
+    const h3 = Math.round((await getMindmapObject(page))?.height || 0);
+    const d1 = h3 - h2;
+    expect(d1).toBeGreaterThanOrEqual(20);
+    expect(d1).toBeLessThanOrEqual(30);
+    await closeEditor();
+
+    await clickText();
+    await expect(textarea).toBeVisible();
+    await textarea.type('B'); // should add one more line step, not double jump
+    const h4 = Math.round((await getMindmapObject(page))?.height || 0);
+    const d2 = h4 - h3;
+    expect(d2).toBeGreaterThanOrEqual(20);
+    expect(d2).toBeLessThanOrEqual(30);
+  });
 });

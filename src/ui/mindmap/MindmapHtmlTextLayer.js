@@ -216,13 +216,9 @@ export class MindmapHtmlTextLayer {
             : (objectData.rotation || objectData.transform?.rotation || 0);
 
         const baseFS = parseFloat(el.dataset.baseFontSize || '20') || 20;
-        const baseW = parseFloat(el.dataset.baseW || '320') || 320;
-        const baseH = parseFloat(el.dataset.baseH || '125') || 125;
-        const scaleX = w && baseW ? (w / baseW) : 1;
-        const scaleY = h && baseH ? (h / baseH) : 1;
         const worldScale = world?.scale?.x || 1;
         const sCss = worldScale / res;
-        const fontSizePx = Math.max(1, baseFS * Math.min(scaleX, scaleY) * sCss);
+        const fontSizePx = Math.max(1, baseFS * sCss);
         el.style.fontSize = `${fontSizePx}px`;
         el.style.lineHeight = `${Math.round(fontSizePx * 1.24)}px`;
 

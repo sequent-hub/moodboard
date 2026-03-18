@@ -226,6 +226,14 @@ export function openMindmapEditor(object, create = false) {
     const initialCssHeight = targetHeight;
     const initialWorldWidth = objectWidth;
     const initialWorldHeight = objectHeight;
+    const stableBaseWorldHeight = Math.max(
+        1,
+        Math.round(
+            (typeof properties.capsuleBaseHeight === 'number' && properties.capsuleBaseHeight > 0)
+                ? properties.capsuleBaseHeight
+                : ((typeof properties.height === 'number' && properties.height > 0) ? properties.height : 100)
+        )
+    );
     const resizeSession = {
         started: false,
         oldSize: null,
@@ -264,13 +272,11 @@ export function openMindmapEditor(object, create = false) {
         textarea.style.transform = `translateY(${deltaY}px)`;
     };
 
-    const syncTextareaHeight = (isInitial = false) => {
+    const syncTextareaHeight = () => {
         textarea.style.height = 'auto';
         const singleLineHeight = getSingleLineTextareaHeight();
         const scrollHeight = Math.max(1, Math.ceil(textarea.scrollHeight));
-        const nextHeight = isInitial
-            ? singleLineHeight
-            : Math.max(singleLineHeight, scrollHeight);
+        const nextHeight = Math.max(singleLineHeight, scrollHeight);
         textarea.style.height = `${nextHeight}px`;
         textarea.style.marginTop = '0px';
         textarea.style.transform = 'translateY(0px)';
@@ -305,6 +311,12 @@ export function openMindmapEditor(object, create = false) {
         return viewRes / worldScale;
     };
 
+    const getWorldToCssScale = () => {
+        const cssToWorld = getCssToWorldScale();
+        if (!Number.isFinite(cssToWorld) || cssToWorld === 0) return 1;
+        return 1 / cssToWorld;
+    };
+
     const getEditorLineCount = () => {
         const value = String(textarea.value || '');
         return Math.max(1, value.split('\n').length);
@@ -329,7 +341,8 @@ export function openMindmapEditor(object, create = false) {
             : initialCssWidth;
         const lineCount = getEditorLineCount();
         const lineHeightPx = getEditorLineHeightPx();
-        const nextCssHeight = Math.max(1, Math.ceil(initialCssHeight + (Math.max(1, lineCount) - 1) * lineHeightPx));
+        const baseCssHeight = Math.max(1, Math.round(stableBaseWorldHeight * getWorldToCssScale()));
+        const nextCssHeight = Math.max(1, Math.ceil(baseCssHeight + (Math.max(1, lineCount) - 1) * lineHeightPx));
 
         const currentCssWidth = Math.max(1, Math.round(parseFloat(wrapper.style.width || `${initialCssWidth}`)));
         const currentCssHeight = Math.max(1, Math.round(parseFloat(wrapper.style.height || `${initialCssHeight}`)));
@@ -385,13 +398,13 @@ export function openMindmapEditor(object, create = false) {
             textarea.selectionStart = textarea.selectionEnd = normalizedCaret;
         }
         syncMindmapSize();
-        syncTextareaHeight(false);
+        syncTextareaHeight();
     };
 
     textarea.addEventListener('input', onInput);
     wrapper.appendChild(textarea);
     view.parentElement.appendChild(wrapper);
-    syncTextareaHeight(true);
+    syncTextareaHeight();
 
     hideStaticTextDuringEditing(this, objectId);
 
