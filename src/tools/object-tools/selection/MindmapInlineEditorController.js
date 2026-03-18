@@ -11,6 +11,57 @@ import {
     updateGlobalTextEditorHandlesLayer,
 } from './TextEditorLifecycleRegistry.js';
 
+function applyMindmapCaretFromClick({ create, objectId, object, textarea }) {
+    try {
+        const click = object?.caretClick || null;
+        if (create || !objectId || !click || typeof window === 'undefined') return;
+        setTimeout(() => {
+            try {
+                const el = window.moodboardMindmapHtmlTextLayer?.idToEl?.get?.(objectId) || null;
+                const fullText = (typeof textarea.value === 'string') ? textarea.value : '';
+                if (!el || !fullText || !el.firstChild) return;
+                const textNode = el.firstChild;
+                const len = textNode.textContent.length;
+                if (len === 0) {
+                    textarea.selectionStart = textarea.selectionEnd = 0;
+                    return;
+                }
+                const doc = el.ownerDocument || document;
+                let bestIdx = 0;
+                let bestDist = Infinity;
+                for (let i = 0; i <= len; i++) {
+                    const range = doc.createRange();
+                    range.setStart(textNode, i);
+                    range.setEnd(textNode, i);
+                    const rects = range.getClientRects();
+                    const rect = rects && rects.length > 0 ? rects[0] : range.getBoundingClientRect();
+                    if (rect && isFinite(rect.left) && isFinite(rect.top)) {
+                        if (click.clientX >= rect.left && click.clientX <= rect.right &&
+                            click.clientY >= rect.top && click.clientY <= rect.bottom) {
+                            bestIdx = i;
+                            bestDist = 0;
+                            break;
+                        }
+                        const cx = Math.max(rect.left, Math.min(click.clientX, rect.right));
+                        const cy = Math.max(rect.top, Math.min(click.clientY, rect.bottom));
+                        const dx = click.clientX - cx;
+                        const dy = click.clientY - cy;
+                        const d2 = dx * dx + dy * dy;
+                        if (d2 < bestDist) {
+                            bestDist = d2;
+                            bestIdx = i;
+                        }
+                    }
+                }
+                const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+                const caret = clamp(bestIdx, 0, fullText.length);
+                textarea.selectionStart = textarea.selectionEnd = caret;
+                if (typeof textarea.scrollTop === 'number') textarea.scrollTop = 0;
+            } catch (_) {}
+        }, 0);
+    } catch (_) {}
+}
+
 /**
  * Изолированный входной контроллер редактирования mindmap.
  * Не зависит от TextInlineEditorController.
@@ -271,6 +322,12 @@ export function openMindmapEditor(object, create = false) {
     };
 
     textarea.focus();
+    applyMindmapCaretFromClick({
+        create,
+        objectId,
+        object,
+        textarea,
+    });
 }
 
 export function closeMindmapEditor(commit) {

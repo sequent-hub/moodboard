@@ -163,10 +163,45 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
     }, mindmapId);
     expect(staticTextMetrics).toBeTruthy();
 
-    await textEl.click();
+    const textBox = await textEl.boundingBox();
+    expect(textBox).toBeTruthy();
+    await page.mouse.click(
+      textBox.x + textBox.width * 0.5,
+      textBox.y + textBox.height * 0.5
+    );
 
     const textarea = page.locator('.moodboard-text-input');
     await expect(textarea).toBeVisible();
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(() => {
+          const ta = document.querySelector('.moodboard-text-input');
+          if (!ta) return null;
+          const value = typeof ta.value === 'string' ? ta.value : '';
+          const caret = typeof ta.selectionStart === 'number' ? ta.selectionStart : null;
+          if (!value || caret === null) return null;
+          return {
+            caret,
+            len: value.length,
+          };
+        });
+      })
+      .toMatchObject({
+        caret: expect.any(Number),
+        len: expect.any(Number),
+      });
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(() => {
+          const ta = document.querySelector('.moodboard-text-input');
+          if (!ta || typeof ta.value !== 'string' || ta.value.length < 2) return false;
+          const caret = typeof ta.selectionStart === 'number' ? ta.selectionStart : -1;
+          return caret > 0 && caret < ta.value.length;
+        });
+      })
+      .toBe(true);
 
     await expect
       .poll(async () => {
