@@ -1183,7 +1183,7 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
             nestedMeta.parentId === levelMeta.parentId &&
             nestedMeta.compoundId === levelMeta.compoundId &&
             nestedMeta.side === levelMeta.side &&
-            nestedMeta.parentId === rootNode.id &&
+            nestedMeta.branchRootId === levelMeta.parentId &&
             rootMeta.role === 'root' &&
             Number(nestedNode.properties?.width || nestedNode.width || 0) === Number(levelNode.properties?.width || levelNode.width || 0) &&
             Number(nestedNode.properties?.height || nestedNode.height || 0) === Number(levelNode.properties?.height || levelNode.height || 0) &&
@@ -1195,7 +1195,7 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       })
       .toBe(true);
 
-    // Bottom side remains available because this action creates a sibling branch node.
+    // Bottom side remains available because this action does not occupy bottom side.
     await page.evaluate((childId) => {
       const core = window.moodboard?.coreMoodboard;
       if (!core) return;
@@ -1208,6 +1208,54 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       }
     }, firstChild.id);
     await expect(page.locator('.mb-mindmap-side-btn[data-side="bottom"]')).toBeVisible();
+
+    const nestedChild = await page.evaluate(({ rootId, firstChildId }) => {
+      const board = window.moodboard.exportBoard();
+      const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+      return nodes.find((o) => o.id !== rootId && o.id !== firstChildId) || null;
+    }, { rootId: rootObject.id, firstChildId: firstChild.id });
+    expect(nestedChild?.id).toBeTruthy();
+
+    await page.evaluate((childId) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      const tm = core.toolManager;
+      const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+      if (!selectTool) return;
+      selectTool.setSelection([childId]);
+      if (typeof selectTool.updateResizeHandles === 'function') {
+        selectTool.updateResizeHandles();
+      }
+    }, nestedChild.id);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="bottom"]')).toBeVisible();
+    await page.locator('.mb-mindmap-side-btn[data-side="bottom"]').click();
+
+    await expect
+      .poll(async () => {
+        const board = await page.evaluate(() => window.moodboard.exportBoard());
+        return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+      })
+      .toBe(4);
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(({ rootId, firstChildId, nestedChildId }) => {
+          const board = window.moodboard.exportBoard();
+          const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+          const nested = nodes.find((o) => o.id === nestedChildId);
+          if (!nested) return false;
+          const nestedMeta = nested.properties?.mindmap || {};
+          const newest = nodes.find((o) => o.id !== rootId && o.id !== firstChildId && o.id !== nestedChildId && o.id !== null);
+          if (!newest || !nestedMeta) return false;
+          const meta = newest.properties?.mindmap || {};
+          return (
+            meta.parentId === nestedMeta.parentId &&
+            meta.branchRootId === nestedMeta.parentId &&
+            meta.parentId !== nestedChildId
+          );
+        }, { rootId: rootObject.id, firstChildId: firstChild.id, nestedChildId: nestedChild.id });
+      })
+      .toBe(true);
 
     // Connection remains attached and updates when node moves.
     const lineBefore = await page.evaluate((childId) => {

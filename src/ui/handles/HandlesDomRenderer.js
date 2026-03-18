@@ -1,6 +1,6 @@
 import { Events } from '../../core/events/Events.js';
 import { createRotatedResizeCursor } from '../../tools/object-tools/selection/CursorController.js';
-import { createChildMindmapIntentMetadata } from '../../mindmap/MindmapCompoundContract.js';
+import { createChildMindmapIntentMetadata, logMindmapCompoundDebug } from '../../mindmap/MindmapCompoundContract.js';
 import { MINDMAP_LAYOUT } from '../mindmap/MindmapLayoutConfig.js';
 
 const HANDLES_ACCENT_COLOR = '#80D8FF';
@@ -13,45 +13,17 @@ const MINDMAP_CHILD_FILL_COLOR = 0x16A34A;
 const MINDMAP_CHILD_FILL_ALPHA = 0.25;
 const MINDMAP_CHILD_GAP_MULTIPLIER = 10;
 
-function resolveBranchParentId(allObjects, sourceObjectId, sourceMeta) {
-    const map = new Map((Array.isArray(allObjects) ? allObjects : []).map((obj) => [obj?.id, obj]));
-    const sourceCompoundId = sourceMeta?.compoundId || null;
-    const rootFromCompound = (() => {
-        if (!sourceCompoundId) return null;
-        for (const obj of map.values()) {
-            if (!obj || obj.type !== 'mindmap') continue;
-            const meta = obj.properties?.mindmap || {};
-            if (meta?.role === 'root' && meta?.compoundId === sourceCompoundId) {
-                return obj.id;
-            }
-        }
-        return null;
-    })();
-    const visited = new Set();
-    let currentParentId = sourceMeta?.parentId || sourceObjectId;
-    let fallback = sourceObjectId;
-    while (typeof currentParentId === 'string' && currentParentId.length > 0) {
-        if (visited.has(currentParentId)) break;
-        visited.add(currentParentId);
-        const parent = map.get(currentParentId);
-        if (!parent || parent.type !== 'mindmap') {
-            fallback = currentParentId;
-            break;
-        }
-        const parentMeta = parent.properties?.mindmap || {};
-        fallback = parent.id;
-        if (parentMeta?.role !== 'child' || !parentMeta?.parentId || parentMeta.parentId === parent.id) {
-            if (parentMeta?.role === 'child' && (!parentMeta?.parentId || parentMeta.parentId === parent.id) && rootFromCompound) {
-                fallback = rootFromCompound;
-            }
-            break;
-        }
-        currentParentId = parentMeta.parentId;
+function resolveBottomSiblingParentId(sourceObjectId, sourceMeta) {
+    if (typeof sourceMeta?.parentId === 'string' && sourceMeta.parentId.length > 0) {
+        return sourceMeta.parentId;
     }
-    if (fallback === sourceObjectId && rootFromCompound && rootFromCompound !== sourceObjectId) {
-        return rootFromCompound;
+    if (typeof sourceMeta?.branchRootId === 'string' && sourceMeta.branchRootId.length > 0) {
+        return sourceMeta.branchRootId;
     }
-    return fallback;
+    if (typeof sourceObjectId === 'string' && sourceObjectId.length > 0) {
+        return sourceObjectId;
+    }
+    return sourceMeta?.parentId || null;
 }
 
 export class HandlesDomRenderer {
@@ -112,7 +84,7 @@ export class HandlesDomRenderer {
                     const meta = obj.properties?.mindmap || {};
                     const isOutgoingFromCurrent = meta?.role === 'child'
                         && typeof meta?.side === 'string'
-                        && (meta?.parentId === id || meta?.branchRootId === id);
+                        && meta?.parentId === id;
                     if (isOutgoingFromCurrent) {
                         occupiedOutgoingSides.add(meta.side);
                     }
@@ -285,13 +257,21 @@ export class HandlesDomRenderer {
                         : { x: Math.round(worldBounds.x), y: Math.round(worldBounds.y + worldBounds.height + gapWorld) };
                 const sourceMeta = sourceMindmapProperties?.mindmap || {};
                 const isBottomSiblingClone = direction === 'bottom' && sourceMeta?.role === 'child';
-                const allObjects = this.host.core?.state?.state?.objects || [];
                 const metaParentId = isBottomSiblingClone
-                    ? resolveBranchParentId(allObjects, id, sourceMeta)
+                    ? resolveBottomSiblingParentId(id, sourceMeta)
                     : id;
                 const metaSide = isBottomSiblingClone
                     ? (sourceMeta?.side || 'right')
                     : direction;
+                if (isBottomSiblingClone) {
+                    logMindmapCompoundDebug('handles:bottom-branch-parent-resolve', {
+                        sourceId: id,
+                        sourceParentId: sourceMeta?.parentId || null,
+                        sourceBranchRootId: sourceMeta?.branchRootId || null,
+                        resolvedParentId: metaParentId || null,
+                        resolvedSide: metaSide || null,
+                    });
+                }
                 const childMindmapMeta = createChildMindmapIntentMetadata({
                     sourceObjectId: metaParentId,
                     sourceProperties: sourceMindmapProperties || {},

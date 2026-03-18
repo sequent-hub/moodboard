@@ -85,7 +85,7 @@ describe('MindmapCompoundContract', () => {
             parentId: 'root-1',
             side: 'left',
             order: 0,
-            branchRootId: 'root-1',
+            branchRootId: 'child-1',
         });
     });
 

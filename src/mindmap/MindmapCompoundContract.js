@@ -137,7 +137,9 @@ export function normalizeMindmapPropertiesForCreate({
             parentId: role === ROOT_ROLE ? null : parentId,
             side: role === CHILD_ROLE ? sideRaw : null,
             order,
-            branchRootId: role === CHILD_ROLE ? (branchRootIdRaw || parentId) : null,
+            branchRootId: role === CHILD_ROLE
+                ? (branchRootIdRaw || asNonEmptyString(objectId) || null)
+                : null,
         },
     };
 }

@@ -75,58 +75,21 @@ function getBezierControls(start, end, side) {
     };
 }
 
-function isLikelyLegacyBottomSibling(child, parent) {
-    if (!child || !parent) return false;
-    const childMeta = asMindmapMeta(child);
-    const parentMeta = asMindmapMeta(parent);
-    if (childMeta?.role !== 'child' || parentMeta?.role !== 'child') return false;
-    if (!childMeta?.side || !parentMeta?.side) return false;
-    if (childMeta.side !== parentMeta.side) return false;
-
-    const childRect = getNodeRect(child);
-    const parentRect = getNodeRect(parent);
-    const dx = Math.abs(childRect.x - parentRect.x);
-    const minDownShift = Math.max(12, Math.round(parentRect.height * 0.5));
-    const dy = childRect.y - parentRect.y;
-    const sameColumnThreshold = Math.max(24, Math.round(parentRect.width * 0.25));
-    return dy >= minDownShift && dx <= sameColumnThreshold;
-}
-
 function resolveLegacyLink(child, byId, rootByCompoundId) {
     const childMeta = asMindmapMeta(child);
     const compoundId = childMeta?.compoundId || null;
-    let parentId = childMeta?.branchRootId || childMeta?.parentId || null;
+    let parentId = childMeta?.parentId || null;
     let side = childMeta?.side || null;
     const childId = child?.id || null;
 
     if (!parentId || parentId === childId) {
-        parentId = compoundId ? rootByCompoundId.get(compoundId) || null : null;
+        parentId = childMeta?.branchRootId || null;
     }
 
     let parent = parentId ? byId.get(parentId) : null;
     if (!parent && compoundId) {
         parentId = rootByCompoundId.get(compoundId) || null;
         parent = parentId ? byId.get(parentId) : null;
-    }
-
-    const shouldPromoteToBranchRoot = side === SIDE_BOTTOM || isLikelyLegacyBottomSibling(child, parent);
-    if (shouldPromoteToBranchRoot) {
-        // Legacy data could save bottom sibling clones as child->child.
-        // Keep a branch-level relation: connect to top parent of that branch.
-        const visited = new Set();
-        while (parent && asMindmapMeta(parent)?.role === 'child') {
-            if (visited.has(parent.id)) break;
-            visited.add(parent.id);
-            const ppId = asMindmapMeta(parent)?.parentId || null;
-            if (!ppId || ppId === parent.id) break;
-            const pp = byId.get(ppId);
-            if (!pp) break;
-            parent = pp;
-            parentId = pp.id;
-        }
-        if (asMindmapMeta(parent)?.role === 'root' && side === SIDE_BOTTOM) {
-            side = asMindmapMeta(child)?.side === SIDE_BOTTOM ? (asMindmapMeta(parent)?.side || null) : side;
-        }
     }
 
     if (![SIDE_LEFT, SIDE_RIGHT, SIDE_BOTTOM].includes(side)) {
