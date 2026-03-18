@@ -534,14 +534,35 @@ export class GhostController {
         const cornerRadius = Math.min(dynamicRadius, baseRadius);
 
         const graphics = new PIXI.Graphics();
+        const drawGhostCapsule = (lineWidth, alpha = 1) => {
+            try {
+                graphics.lineStyle({
+                    width: lineWidth,
+                    color: strokeColor,
+                    alpha,
+                    alignment: 0,
+                    cap: 'round',
+                    join: 'round',
+                    miterLimit: 2,
+                });
+            } catch (_) {
+                graphics.lineStyle(lineWidth, strokeColor, alpha, 0);
+            }
+            graphics.drawRoundedRect(0, 0, width, height, cornerRadius);
+        };
+
         try {
-            graphics.lineStyle({ width: strokeWidth, color: strokeColor, alpha: 1, alignment: 0 });
+            graphics.beginFill(fillColor, fillAlpha);
+            graphics.drawRoundedRect(0, 0, width, height, cornerRadius);
+            graphics.endFill();
         } catch (_) {
-            graphics.lineStyle(strokeWidth, strokeColor, 1, 0);
+            graphics.beginFill(fillColor, fillAlpha);
+            graphics.drawRoundedRect(0, 0, width, height, cornerRadius);
+            graphics.endFill();
         }
-        graphics.beginFill(fillColor, fillAlpha);
-        graphics.drawRoundedRect(0, 0, width, height, cornerRadius);
-        graphics.endFill();
+
+        drawGhostCapsule(strokeWidth + 1, 0.35);
+        drawGhostCapsule(strokeWidth, 1);
 
         host.ghostContainer.addChild(graphics);
         host.ghostContainer.pivot.x = width / 2;

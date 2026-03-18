@@ -51,13 +51,40 @@ export class MindmapObject {
         const dynamicRadius = Math.max(0, Math.floor(Math.min(this.width, this.height) / 2));
         const fixedBaseRadius = Math.max(0, Math.floor(this.capsuleBaseHeight / 2));
         const capsuleRadius = Math.min(dynamicRadius, fixedBaseRadius);
-        try {
-            g.lineStyle({ width: this.strokeWidth, color: this.strokeColor, alpha: 1, alignment: 0 });
-        } catch (_) {
-            g.lineStyle(this.strokeWidth, this.strokeColor, 1, 0);
-        }
+
         g.beginFill(this.fillColor, this.fillAlpha);
         g.drawRoundedRect(0, 0, this.width, this.height, capsuleRadius);
         g.endFill();
+
+        // Soft under-stroke visually reduces edge stair-stepping on capsule curves.
+        try {
+            g.lineStyle({
+                width: this.strokeWidth + 1,
+                color: this.strokeColor,
+                alpha: 0.35,
+                alignment: 0,
+                cap: 'round',
+                join: 'round',
+                miterLimit: 2,
+            });
+        } catch (_) {
+            g.lineStyle(this.strokeWidth + 1, this.strokeColor, 0.35, 0);
+        }
+        g.drawRoundedRect(0, 0, this.width, this.height, capsuleRadius);
+
+        try {
+            g.lineStyle({
+                width: this.strokeWidth,
+                color: this.strokeColor,
+                alpha: 1,
+                alignment: 0,
+                cap: 'round',
+                join: 'round',
+                miterLimit: 2,
+            });
+        } catch (_) {
+            g.lineStyle(this.strokeWidth, this.strokeColor, 1, 0);
+        }
+        g.drawRoundedRect(0, 0, this.width, this.height, capsuleRadius);
     }
 }
