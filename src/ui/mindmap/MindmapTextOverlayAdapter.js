@@ -109,11 +109,21 @@ export class MindmapTextOverlayAdapter {
                 : (objectData?.properties?.content || objectData?.content || '');
             const posData = { objectId, position: null };
             eventBus.emit(Events.Tool.GetObjectPosition, posData);
+            const mergedProperties = {
+                ...(objectData?.properties || {}),
+                content: actualContent,
+            };
+            if (Number.isFinite(objectData?.width) && !Number.isFinite(mergedProperties.width)) {
+                mergedProperties.width = objectData.width;
+            }
+            if (Number.isFinite(objectData?.height) && !Number.isFinite(mergedProperties.height)) {
+                mergedProperties.height = objectData.height;
+            }
             eventBus.emit(Events.Tool.ObjectEdit, {
                 id: objectId,
                 type: 'mindmap',
                 position: posData.position || objectData?.position || { x: 0, y: 0 },
-                properties: { content: actualContent },
+                properties: mergedProperties,
                 caretClick: {
                     clientX: event.clientX,
                     clientY: event.clientY,

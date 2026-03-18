@@ -285,7 +285,9 @@ export function openMindmapEditor(object, create = false) {
         Math.round(
             (typeof properties.capsuleBaseHeight === 'number' && properties.capsuleBaseHeight > 0)
                 ? properties.capsuleBaseHeight
-                : ((typeof properties.height === 'number' && properties.height > 0) ? properties.height : MINDMAP_LAYOUT.height)
+                : ((typeof objectHeight === 'number' && objectHeight > 0)
+                    ? objectHeight
+                    : ((typeof properties.height === 'number' && properties.height > 0) ? properties.height : MINDMAP_LAYOUT.height))
         )
     );
     const resizeSession = {

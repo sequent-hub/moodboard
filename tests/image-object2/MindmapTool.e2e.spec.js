@@ -338,6 +338,41 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
     await expect(page.locator('.moodboard-text-input')).toBeVisible();
     await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toBeVisible();
     await expect(page.locator('.mb-mindmap-side-btn[data-side="bottom"]')).toBeVisible();
+
+    const childBeforeType = await page.evaluate((childId) => {
+      const board = window.moodboard.exportBoard();
+      const node = (board?.objects || []).find((o) => o.id === childId) || null;
+      const ta = document.querySelector('.moodboard-text-input');
+      const rect = ta?.getBoundingClientRect();
+      return {
+        height: Math.round(Number(node?.height || node?.properties?.height || 0)),
+        top: rect ? rect.top : null,
+      };
+    }, child.id);
+    expect(childBeforeType?.height).toBeGreaterThan(0);
+    expect(childBeforeType?.top).not.toBeNull();
+
+    await page.locator('.moodboard-text-input').fill('A');
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(({ childId, beforeTop, beforeHeight }) => {
+          const board = window.moodboard.exportBoard();
+          const node = (board?.objects || []).find((o) => o.id === childId) || null;
+          const currentHeight = Math.round(Number(node?.height || node?.properties?.height || 0));
+          const ta = document.querySelector('.moodboard-text-input');
+          const rect = ta?.getBoundingClientRect();
+          if (!rect || currentHeight <= 0) return false;
+          const topDelta = Math.abs(rect.top - beforeTop);
+          const heightDelta = Math.abs(currentHeight - beforeHeight);
+          return topDelta <= 1 && heightDelta <= 1;
+        }, {
+          childId: child.id,
+          beforeTop: childBeforeType.top,
+          beforeHeight: childBeforeType.height,
+        });
+      })
+      .toBe(true);
   });
 
   test('mindmap capsule width adapts while typing and keeps horizontal paddings', async ({ page }) => {
