@@ -525,9 +525,7 @@ export class GhostController {
         const strokeWidth = (typeof host.pending.properties?.strokeWidth === 'number')
             ? host.pending.properties.strokeWidth
             : 2;
-        const cornerRadius = (typeof host.pending.properties?.cornerRadius === 'number')
-            ? host.pending.properties.cornerRadius
-            : 8;
+        const cornerRadius = Math.max(0, Math.floor(Math.min(width, height) / 2));
 
         const graphics = new PIXI.Graphics();
         try {

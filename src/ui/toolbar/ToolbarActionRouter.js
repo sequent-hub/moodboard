@@ -93,8 +93,7 @@ export class ToolbarActionRouter {
                     strokeColor: 0x2563EB,
                     fillColor: 0x3B82F6,
                     fillAlpha: 0.25,
-                    strokeWidth: 2,
-                    cornerRadius: 8
+                    strokeWidth: 2
                 }
             });
             return true;

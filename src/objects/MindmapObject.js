@@ -13,7 +13,6 @@ export class MindmapObject {
         this.fillColor = (typeof props.fillColor === 'number') ? props.fillColor : 0x3B82F6;
         this.fillAlpha = (typeof props.fillAlpha === 'number') ? props.fillAlpha : 0.25;
         this.strokeWidth = (typeof props.strokeWidth === 'number') ? props.strokeWidth : 2;
-        this.cornerRadius = (typeof props.cornerRadius === 'number') ? props.cornerRadius : 8;
 
         this.graphics = new PIXI.Graphics();
         this._draw();
@@ -46,13 +45,14 @@ export class MindmapObject {
     _draw() {
         const g = this.graphics;
         g.clear();
+        const capsuleRadius = Math.max(0, Math.floor(Math.min(this.width, this.height) / 2));
         try {
             g.lineStyle({ width: this.strokeWidth, color: this.strokeColor, alpha: 1, alignment: 0 });
         } catch (_) {
             g.lineStyle(this.strokeWidth, this.strokeColor, 1, 0);
         }
         g.beginFill(this.fillColor, this.fillAlpha);
-        g.drawRoundedRect(0, 0, this.width, this.height, this.cornerRadius);
+        g.drawRoundedRect(0, 0, this.width, this.height, capsuleRadius);
         g.endFill();
     }
 }
