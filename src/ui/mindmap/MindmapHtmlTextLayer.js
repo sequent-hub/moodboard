@@ -146,7 +146,7 @@ export class MindmapHtmlTextLayer {
         const initialContent = objectData.content || objectData.properties?.content || '';
         this._applyContentValue(el, contentEl, initialContent);
         el.dataset.baseFontSize = String(baseFontSize);
-        el.dataset.baseW = String(Math.max(1, objectData.width || objectData.properties?.width || 220));
+        el.dataset.baseW = String(Math.max(1, objectData.width || objectData.properties?.width || 320));
         el.dataset.baseH = String(Math.max(1, objectData.height || objectData.properties?.height || 125));
 
         const cleanup = this.overlayAdapter.attachEditOnClick({
@@ -199,7 +199,7 @@ export class MindmapHtmlTextLayer {
             : (objectData.rotation || objectData.transform?.rotation || 0);
 
         const baseFS = parseFloat(el.dataset.baseFontSize || '20') || 20;
-        const baseW = parseFloat(el.dataset.baseW || '220') || 220;
+        const baseW = parseFloat(el.dataset.baseW || '320') || 320;
         const baseH = parseFloat(el.dataset.baseH || '125') || 125;
         const scaleX = w && baseW ? (w / baseW) : 1;
         const scaleY = h && baseH ? (h / baseH) : 1;

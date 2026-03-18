@@ -511,7 +511,7 @@ export class GhostController {
         host.ghostContainer = new PIXI.Container();
         host.ghostContainer.alpha = 0.75;
 
-        const width = Math.max(1, Math.round(host.pending.properties?.width || 220));
+        const width = Math.max(1, Math.round(host.pending.properties?.width || 320));
         const height = Math.max(1, Math.round(host.pending.properties?.height || 125));
         const strokeColor = (typeof host.pending.properties?.strokeColor === 'number')
             ? host.pending.properties.strokeColor

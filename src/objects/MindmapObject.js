@@ -6,7 +6,7 @@ import * as PIXI from 'pixi.js';
 export class MindmapObject {
     constructor(objectData = {}) {
         this.objectData = objectData;
-        this.width = objectData.width || objectData.properties?.width || 220;
+        this.width = objectData.width || objectData.properties?.width || 320;
         this.height = objectData.height || objectData.properties?.height || 125;
         const props = objectData.properties || {};
         this.strokeColor = (typeof props.strokeColor === 'number') ? props.strokeColor : 0x2563EB;
