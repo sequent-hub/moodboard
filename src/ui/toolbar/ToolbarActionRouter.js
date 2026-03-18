@@ -1,5 +1,6 @@
 import { Events } from '../../core/events/Events.js';
 import { MINDMAP_LAYOUT } from '../mindmap/MindmapLayoutConfig.js';
+import { createRootMindmapIntentMetadata } from '../../mindmap/MindmapCompoundContract.js';
 
 export class ToolbarActionRouter {
     constructor(toolbar) {
@@ -91,6 +92,7 @@ export class ToolbarActionRouter {
                 type: 'mindmap',
                 size: { width: mindmapWidth, height: mindmapHeight },
                 properties: {
+                    mindmap: createRootMindmapIntentMetadata(),
                     fontSize: MINDMAP_LAYOUT.fontSize,
                     width: mindmapWidth,
                     height: mindmapHeight,

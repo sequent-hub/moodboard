@@ -1,7 +1,15 @@
 import { Events } from '../../core/events/Events.js';
+import { logMindmapCompoundDebug } from '../../mindmap/MindmapCompoundContract.js';
 
 export function bindToolbarEvents(board) {
     board.coreMoodboard.eventBus.on(Events.UI.ToolbarAction, (action) => {
+        if (action?.type === 'mindmap') {
+            logMindmapCompoundDebug('toolbar:action', {
+                type: action.type,
+                position: action.position || null,
+                mindmap: action.properties?.mindmap || null,
+            });
+        }
         board.actionHandler.handleToolbarAction(action);
     });
 }

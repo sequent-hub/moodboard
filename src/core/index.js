@@ -18,6 +18,10 @@ import { setupObjectLifecycleFlow } from './flows/ObjectLifecycleFlow.js';
 import { setupLayerAndViewportFlow } from './flows/LayerAndViewportFlow.js';
 import { setupRevitFlow } from './flows/RevitFlow.js';
 import { setupSaveFlow } from './flows/SaveFlow.js';
+import {
+    logMindmapCompoundDebug,
+    normalizeMindmapPropertiesForCreate,
+} from '../mindmap/MindmapCompoundContract.js';
 
 export class CoreMoodBoard {
     constructor(container, options = {}) {
@@ -214,6 +218,14 @@ export class CoreMoodBoard {
         this._historyEventsInitialized = true;
         // Следим за изменениями истории для обновления UI
         this.eventBus.on(Events.History.Changed, (data) => {
+            if (typeof data?.currentCommand === 'string' && data.currentCommand.toLowerCase().includes('mindmap')) {
+                logMindmapCompoundDebug('history:changed', {
+                    currentCommand: data.currentCommand,
+                    canUndo: !!data.canUndo,
+                    canRedo: !!data.canRedo,
+                    historySize: data.historySize,
+                });
+            }
 
             
             // Можно здесь обновить состояние кнопок Undo/Redo в UI
@@ -399,13 +411,32 @@ export class CoreMoodBoard {
             position: snappedCreatePos,
             width: initialWidth,
             height: initialHeight,
-            properties,
+            properties: normalizeMindmapPropertiesForCreate({
+                type,
+                objectId: null,
+                properties,
+                existingObjects: this.state?.state?.objects || [],
+            }),
             created: new Date().toISOString(),
             transform: {
                 pivotCompensated: false  // Новые объекты еще не скомпенсированы
             },
             ...extraData  // Добавляем дополнительные данные (например, imageId)
         };
+        objectData.properties = normalizeMindmapPropertiesForCreate({
+            type,
+            objectId: objectData.id,
+            properties: objectData.properties,
+            existingObjects: this.state?.state?.objects || [],
+        });
+        if (type === 'mindmap') {
+            logMindmapCompoundDebug('core:create-object', {
+                id: objectData.id,
+                role: objectData.properties?.mindmap?.role || null,
+                compoundId: objectData.properties?.mindmap?.compoundId || null,
+                parentId: objectData.properties?.mindmap?.parentId || null,
+            });
+        }
 
         // Создаем и выполняем команду создания объекта
         const command = new CreateObjectCommand(this, objectData);
@@ -459,6 +490,20 @@ export class CoreMoodBoard {
         }
         if (objectData.transform.pivotCompensated === undefined) {
             objectData.transform.pivotCompensated = false;
+        }
+        objectData.properties = normalizeMindmapPropertiesForCreate({
+            type: objectData.type,
+            objectId: objectData.id || null,
+            properties: objectData.properties || {},
+            existingObjects: this.state?.state?.objects || [],
+        });
+        if (objectData.type === 'mindmap') {
+            logMindmapCompoundDebug('core:load-object', {
+                id: objectData.id,
+                role: objectData.properties?.mindmap?.role || null,
+                compoundId: objectData.properties?.mindmap?.compoundId || null,
+                parentId: objectData.properties?.mindmap?.parentId || null,
+            });
         }
 
         // Используем существующие данные объекта (с его ID, размерами и т.д.)

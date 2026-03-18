@@ -133,6 +133,10 @@ describe('Toolbar baseline: action routing contracts', () => {
             expect.objectContaining({
                 type: 'mindmap',
                 properties: expect.objectContaining({
+                    mindmap: expect.objectContaining({
+                        role: 'root',
+                        parentId: null,
+                    }),
                     width: expect.any(Number),
                     height: expect.any(Number),
                     strokeColor: expect.any(Number),

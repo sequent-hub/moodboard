@@ -2,6 +2,7 @@
  * Менеджер автоматического сохранения данных
  */
 import { Events } from './events/Events.js';
+import { logMindmapCompoundDebug } from '../mindmap/MindmapCompoundContract.js';
 export class SaveManager {
     constructor(eventBus, options = {}) {
         this.eventBus = eventBus;
@@ -190,6 +191,23 @@ export class SaveManager {
                 this.updateSaveStatus('idle');
                 return;
             }
+            const objects = Array.isArray(saveData?.boardData?.objects)
+                ? saveData.boardData.objects
+                : Array.isArray(saveData?.objects) ? saveData.objects : [];
+            const mindmapNodes = objects
+                .filter((obj) => obj?.type === 'mindmap')
+                .map((obj) => ({
+                    id: obj.id || null,
+                    compoundId: obj.properties?.mindmap?.compoundId || null,
+                    role: obj.properties?.mindmap?.role || null,
+                    parentId: obj.properties?.mindmap?.parentId || null,
+                }));
+            if (mindmapNodes.length > 0) {
+                logMindmapCompoundDebug('save:roundtrip:before-send', {
+                    totalMindmapNodes: mindmapNodes.length,
+                    sample: mindmapNodes.slice(0, 5),
+                });
+            }
             
             // Проверяем, изменились ли данные с последнего сохранения
             if (this.lastSavedData && JSON.stringify(saveData) === JSON.stringify(this.lastSavedData)) {
@@ -206,6 +224,12 @@ export class SaveManager {
             const isSuccess = response.success === true || (response.data !== undefined);
             
             if (isSuccess) {
+                if (mindmapNodes.length > 0) {
+                    logMindmapCompoundDebug('save:roundtrip:success', {
+                        totalMindmapNodes: mindmapNodes.length,
+                        sample: mindmapNodes.slice(0, 5),
+                    });
+                }
                 this.lastSavedData = JSON.parse(JSON.stringify(saveData));
                 this.hasUnsavedChanges = false;
                 this.retryCount = 0;

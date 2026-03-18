@@ -1,6 +1,7 @@
 /**
  * Управляет загрузкой и сохранением данных MoodBoard
  */
+import { logMindmapCompoundDebug } from '../mindmap/MindmapCompoundContract.js';
 export class DataManager {
     constructor(coreMoodboard) {
         this.coreMoodboard = coreMoodboard;
@@ -11,6 +12,22 @@ export class DataManager {
      */
     loadData(data) {
         if (!data) return;
+        const incomingMindmap = Array.isArray(data?.objects)
+            ? data.objects
+                .filter((obj) => obj?.type === 'mindmap')
+                .map((obj) => ({
+                    id: obj.id || null,
+                    compoundId: obj.properties?.mindmap?.compoundId || null,
+                    role: obj.properties?.mindmap?.role || null,
+                    parentId: obj.properties?.mindmap?.parentId || null,
+                }))
+            : [];
+        if (incomingMindmap.length > 0) {
+            logMindmapCompoundDebug('load:roundtrip:input', {
+                totalMindmapNodes: incomingMindmap.length,
+                sample: incomingMindmap.slice(0, 5),
+            });
+        }
         
 
         
@@ -59,6 +76,21 @@ export class DataManager {
                 } catch (error) {
                     console.error(`❌ Ошибка загрузки объекта ${index + 1}:`, error, objectData);
                 }
+            });
+        }
+        if (incomingMindmap.length > 0) {
+            const stateObjects = this.coreMoodboard?.state?.state?.objects || [];
+            const loadedMindmap = stateObjects
+                .filter((obj) => obj?.type === 'mindmap')
+                .map((obj) => ({
+                    id: obj.id || null,
+                    compoundId: obj.properties?.mindmap?.compoundId || null,
+                    role: obj.properties?.mindmap?.role || null,
+                    parentId: obj.properties?.mindmap?.parentId || null,
+                }));
+            logMindmapCompoundDebug('load:roundtrip:state-after-load', {
+                totalMindmapNodes: loadedMindmap.length,
+                sample: loadedMindmap.slice(0, 5),
             });
         }
         
