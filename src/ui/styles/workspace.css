@@ -381,7 +381,7 @@
     content: '';
     position: absolute;
     left: 50%;
-    top: 50%;
+    top: calc(50% + 1px);
     width: 8px;
     height: 2px;
     background: #ffffff;
