@@ -11,6 +11,7 @@ const MINDMAP_CHILD_PADDING_FACTOR = 0.5;
 const MINDMAP_CHILD_STROKE_COLOR = 0x16A34A;
 const MINDMAP_CHILD_FILL_COLOR = 0x16A34A;
 const MINDMAP_CHILD_FILL_ALPHA = 0.25;
+const MINDMAP_CHILD_GAP_MULTIPLIER = 10;
 
 export class HandlesDomRenderer {
     constructor(host, rotateIconSvg) {
@@ -238,7 +239,8 @@ export class HandlesDomRenderer {
                     const worldLayer = this.host.core?.pixi?.worldLayer || app?.stage;
                     const rendererRes = app?.renderer?.resolution || 1;
                     const worldScale = worldLayer?.scale?.x || 1;
-                    const gapWorld = Math.max(1, Math.round((10 * rendererRes) / worldScale));
+                    const baseGapWorld = Math.max(1, Math.round((10 * rendererRes) / worldScale));
+                    const gapWorld = Math.max(1, Math.round(baseGapWorld * MINDMAP_CHILD_GAP_MULTIPLIER));
                     const sourceWidth = Math.max(1, Math.round(sourceMindmapProperties?.width || worldBounds.width || 100));
                     const sourceHeight = Math.max(1, Math.round(sourceMindmapProperties?.height || worldBounds.height || 100));
                     const sourceRole = sourceMindmapProperties?.mindmap?.role || null;
