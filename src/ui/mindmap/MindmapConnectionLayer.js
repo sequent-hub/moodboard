@@ -25,8 +25,8 @@ function asNumber(value, fallback = 0) {
 function getNodeRect(node) {
     const x = asNumber(node?.position?.x, 0);
     const y = asNumber(node?.position?.y, 0);
-    const width = Math.max(1, Math.round(asNumber(node?.properties?.width, asNumber(node?.width, 1))));
-    const height = Math.max(1, Math.round(asNumber(node?.properties?.height, asNumber(node?.height, 1))));
+    const width = Math.max(1, Math.round(asNumber(node?.width, asNumber(node?.properties?.width, 1))));
+    const height = Math.max(1, Math.round(asNumber(node?.height, asNumber(node?.properties?.height, 1))));
     return { x, y, width, height };
 }
 
@@ -42,6 +42,14 @@ function getAnchorPoint(node, side) {
         return { x: rect.x + rect.width / 2, y: rect.y + rect.height };
     }
     return { x: rect.x + rect.width / 2, y: rect.y };
+}
+
+function nudgeStartOutsideNode(point, side) {
+    const px = 1;
+    if (side === SIDE_LEFT) return { x: point.x - px, y: point.y };
+    if (side === SIDE_RIGHT) return { x: point.x + px, y: point.y };
+    if (side === SIDE_BOTTOM) return { x: point.x, y: point.y + px };
+    return point;
 }
 
 function getChildAttachSide(parentSide) {
@@ -65,6 +73,70 @@ function getBezierControls(start, end, side) {
         cp1: { x: start.x + spanX * dir, y: start.y },
         cp2: { x: end.x - spanX * dir, y: end.y },
     };
+}
+
+function isLikelyLegacyBottomSibling(child, parent) {
+    if (!child || !parent) return false;
+    const childMeta = asMindmapMeta(child);
+    const parentMeta = asMindmapMeta(parent);
+    if (childMeta?.role !== 'child' || parentMeta?.role !== 'child') return false;
+    if (!childMeta?.side || !parentMeta?.side) return false;
+    if (childMeta.side !== parentMeta.side) return false;
+
+    const childRect = getNodeRect(child);
+    const parentRect = getNodeRect(parent);
+    const dx = Math.abs(childRect.x - parentRect.x);
+    const minDownShift = Math.max(12, Math.round(parentRect.height * 0.5));
+    const dy = childRect.y - parentRect.y;
+    const sameColumnThreshold = Math.max(24, Math.round(parentRect.width * 0.25));
+    return dy >= minDownShift && dx <= sameColumnThreshold;
+}
+
+function resolveLegacyLink(child, byId, rootByCompoundId) {
+    const childMeta = asMindmapMeta(child);
+    const compoundId = childMeta?.compoundId || null;
+    let parentId = childMeta?.branchRootId || childMeta?.parentId || null;
+    let side = childMeta?.side || null;
+    const childId = child?.id || null;
+
+    if (!parentId || parentId === childId) {
+        parentId = compoundId ? rootByCompoundId.get(compoundId) || null : null;
+    }
+
+    let parent = parentId ? byId.get(parentId) : null;
+    if (!parent && compoundId) {
+        parentId = rootByCompoundId.get(compoundId) || null;
+        parent = parentId ? byId.get(parentId) : null;
+    }
+
+    const shouldPromoteToBranchRoot = side === SIDE_BOTTOM || isLikelyLegacyBottomSibling(child, parent);
+    if (shouldPromoteToBranchRoot) {
+        // Legacy data could save bottom sibling clones as child->child.
+        // Keep a branch-level relation: connect to top parent of that branch.
+        const visited = new Set();
+        while (parent && asMindmapMeta(parent)?.role === 'child') {
+            if (visited.has(parent.id)) break;
+            visited.add(parent.id);
+            const ppId = asMindmapMeta(parent)?.parentId || null;
+            if (!ppId || ppId === parent.id) break;
+            const pp = byId.get(ppId);
+            if (!pp) break;
+            parent = pp;
+            parentId = pp.id;
+        }
+        if (asMindmapMeta(parent)?.role === 'root' && side === SIDE_BOTTOM) {
+            side = asMindmapMeta(child)?.side === SIDE_BOTTOM ? (asMindmapMeta(parent)?.side || null) : side;
+        }
+    }
+
+    if (![SIDE_LEFT, SIDE_RIGHT, SIDE_BOTTOM].includes(side)) {
+        side = SIDE_RIGHT;
+    }
+    if (parentId === childId && compoundId) {
+        const rootId = rootByCompoundId.get(compoundId) || null;
+        if (rootId && rootId !== childId) parentId = rootId;
+    }
+    return { parentId, side };
 }
 
 export class MindmapConnectionLayer {
@@ -137,6 +209,13 @@ export class MindmapConnectionLayer {
         const objects = asArray(this.core?.state?.state?.objects);
         const mindmaps = objects.filter(isMindmap);
         const byId = new Map(mindmaps.map((obj) => [obj.id, obj]));
+        const rootByCompoundId = new Map();
+        mindmaps.forEach((obj) => {
+            const meta = asMindmapMeta(obj);
+            if (meta?.role === 'root' && typeof meta?.compoundId === 'string' && meta.compoundId.length > 0) {
+                rootByCompoundId.set(meta.compoundId, obj.id);
+            }
+        });
         const children = mindmaps.filter((obj) => {
             const meta = asMindmapMeta(obj);
             return meta.role === 'child' && typeof meta.parentId === 'string' && meta.parentId.length > 0;
@@ -148,8 +227,8 @@ export class MindmapConnectionLayer {
 
         children.forEach((child) => {
             const childMeta = asMindmapMeta(child);
-            const side = childMeta.side;
-            const parent = byId.get(childMeta.parentId);
+            const { parentId, side } = resolveLegacyLink(child, byId, rootByCompoundId);
+            const parent = parentId ? byId.get(parentId) : null;
             if (!parent || ![SIDE_LEFT, SIDE_RIGHT, SIDE_BOTTOM].includes(side)) return;
 
             const parentMeta = asMindmapMeta(parent);
@@ -157,7 +236,8 @@ export class MindmapConnectionLayer {
                 return;
             }
 
-            const start = getAnchorPoint(parent, side);
+            const startBase = getAnchorPoint(parent, side);
+            const start = nudgeStartOutsideNode(startBase, side);
             const end = getAnchorPoint(child, getChildAttachSide(side));
             const { cp1, cp2 } = getBezierControls(start, end, side);
             const color = Number(child?.properties?.strokeColor || parent?.properties?.strokeColor || 0x2563EB);

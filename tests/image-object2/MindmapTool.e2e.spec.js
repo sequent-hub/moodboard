@@ -1015,6 +1015,76 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       .toBe(2);
   });
 
+  test('mindmap keeps root anchor and hides root plus after root text resize', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.45, canvasBox.y + canvasBox.height * 0.5);
+
+    const rootObject = await getMindmapObject(page);
+    expect(rootObject?.id).toBeTruthy();
+
+    const clickPoint = await page.evaluate(() => {
+      const el = document.querySelector('.mb-text--mindmap .mb-text--mindmap-content');
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.left + r.width * 0.5, y: r.top + r.height * 0.5 };
+    });
+    expect(clickPoint).toBeTruthy();
+    await page.mouse.click(clickPoint.x, clickPoint.y);
+    await expect(page.locator('.moodboard-text-input')).toBeVisible();
+    await page.keyboard.type('ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ');
+    await page.mouse.click(canvasBox.x + 24, canvasBox.y + 24);
+    await expect(page.locator('.moodboard-text-input')).toHaveCount(0);
+
+    await page.evaluate((rootId) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+      const tm = core.toolManager;
+      const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+      if (!selectTool) return;
+      selectTool.setSelection([rootId]);
+      if (typeof selectTool.updateResizeHandles === 'function') {
+        selectTool.updateResizeHandles();
+      }
+    }, rootObject.id);
+
+    const rightBtn = page.locator('.mb-mindmap-side-btn[data-side="right"]');
+    await expect(rightBtn).toBeVisible();
+    await rightBtn.click();
+
+    await expect
+      .poll(async () => {
+        return page.evaluate((rootId) => {
+          const board = window.moodboard.exportBoard();
+          const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+          const rootNode = nodes.find((o) => o.id === rootId);
+          const childNode = nodes.find((o) => o.id !== rootId);
+          const seg = (window.moodboardMindmapConnectionLayer?._lastSegments || [])
+            .find((s) => s.childId === childNode?.id);
+          if (!rootNode || !childNode || !seg) return false;
+          const rootRight = Math.round((rootNode.position?.x || 0) + (rootNode.width || rootNode.properties?.width || 0));
+          return seg.parentId === rootId && Math.abs(seg.start.x - rootRight) <= 2;
+        }, rootObject.id);
+      })
+      .toBe(true);
+
+    await page.evaluate((rootId) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      const tm = core.toolManager;
+      const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+      if (!selectTool) return;
+      selectTool.setSelection([rootId]);
+      if (typeof selectTool.updateResizeHandles === 'function') {
+        selectTool.updateResizeHandles();
+      }
+    }, rootObject.id);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toHaveCount(0);
+  });
+
   test('mindmap child bottom chevron creates nested child from same level style', async ({ page }) => {
     await page.click('.moodboard-toolbar__button--mindmap');
     const canvas = page.locator('.moodboard-workspace__canvas canvas');
@@ -1103,15 +1173,18 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
           const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
           const rootNode = nodes.find((o) => o.id === rootId);
           const levelNode = nodes.find((o) => o.id === firstChildId);
-          const nestedNode = nodes.find((o) => o.id !== rootId && o.id !== firstChildId && o.properties?.mindmap?.parentId === firstChildId);
+          const nestedNode = nodes.find((o) => o.id !== rootId && o.id !== firstChildId);
           if (!rootNode || !levelNode || !nestedNode) return false;
+          const rootMeta = rootNode.properties?.mindmap || {};
           const levelMeta = levelNode.properties?.mindmap || {};
           const nestedMeta = nestedNode.properties?.mindmap || {};
           return (
             nestedMeta.role === 'child' &&
-            nestedMeta.parentId === firstChildId &&
+            nestedMeta.parentId === levelMeta.parentId &&
             nestedMeta.compoundId === levelMeta.compoundId &&
-            nestedMeta.side === 'bottom' &&
+            nestedMeta.side === levelMeta.side &&
+            nestedMeta.parentId === rootNode.id &&
+            rootMeta.role === 'root' &&
             Number(nestedNode.properties?.width || nestedNode.width || 0) === Number(levelNode.properties?.width || levelNode.width || 0) &&
             Number(nestedNode.properties?.height || nestedNode.height || 0) === Number(levelNode.properties?.height || levelNode.height || 0) &&
             Number(nestedNode.properties?.paddingX || 0) === Number(levelNode.properties?.paddingX || 0) &&
@@ -1122,7 +1195,7 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       })
       .toBe(true);
 
-    // Bottom side becomes occupied after nested child creation.
+    // Bottom side remains available because this action creates a sibling branch node.
     await page.evaluate((childId) => {
       const core = window.moodboard?.coreMoodboard;
       if (!core) return;
@@ -1134,7 +1207,7 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
         selectTool.updateResizeHandles();
       }
     }, firstChild.id);
-    await expect(page.locator('.mb-mindmap-side-btn[data-side="bottom"]')).toHaveCount(0);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="bottom"]')).toBeVisible();
 
     // Connection remains attached and updates when node moves.
     const lineBefore = await page.evaluate((childId) => {

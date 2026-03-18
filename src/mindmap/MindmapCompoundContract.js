@@ -27,6 +27,10 @@ function asOrder(value) {
     return normalized >= 0 ? normalized : null;
 }
 
+function asOptionalNodeId(value) {
+    return asNonEmptyString(value);
+}
+
 function getMindmapMetadataFromProperties(properties) {
     const props = asObject(properties);
     return asObject(props.mindmap);
@@ -88,6 +92,7 @@ export function normalizeMindmapPropertiesForCreate({
     const meta = getMindmapMetadataFromProperties(props);
     let role = asValidRole(meta.role);
     const parentIdRaw = asNonEmptyString(meta.parentId);
+    const branchRootIdRaw = asOptionalNodeId(meta.branchRootId);
     const sideRaw = asValidSide(meta.side);
     let compoundId = asNonEmptyString(meta.compoundId);
     let order = asOrder(meta.order);
@@ -132,6 +137,7 @@ export function normalizeMindmapPropertiesForCreate({
             parentId: role === ROOT_ROLE ? null : parentId,
             side: role === CHILD_ROLE ? sideRaw : null,
             order,
+            branchRootId: role === CHILD_ROLE ? (branchRootIdRaw || parentId) : null,
         },
     };
 }

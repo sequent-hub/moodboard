@@ -18,6 +18,7 @@ export class HandlesEventBridge {
                 this.host._endGroupRotationPreview();
                 this.host.hide();
             }],
+            [Events.Object.Created, () => this.host.update()],
             [Events.Tool.DragUpdate, () => this.host.update()],
             [Events.Object.Deleted, (data) => {
                 const objectId = data?.objectId || data;
