@@ -170,6 +170,8 @@ export class MindmapHtmlTextLayer {
         el.dataset.baseFontSize = String(baseFontSize);
         el.dataset.baseW = String(Math.max(1, objectData.width || objectData.properties?.width || MINDMAP_LAYOUT.width));
         el.dataset.baseH = String(Math.max(1, objectData.height || objectData.properties?.height || MINDMAP_LAYOUT.height));
+        el.dataset.basePaddingX = String(paddingX);
+        el.dataset.basePaddingY = String(paddingY);
         el.dataset.maxLineChars = String(maxLineChars);
 
         const cleanup = this.overlayAdapter.attachEditOnClick({
@@ -227,6 +229,20 @@ export class MindmapHtmlTextLayer {
         const fontSizePx = Math.max(1, baseFS * sCss);
         el.style.fontSize = `${fontSizePx}px`;
         el.style.lineHeight = `${Math.round(fontSizePx * 1.24)}px`;
+        const basePaddingX = Math.max(
+            0,
+            Math.round(objectData.properties?.paddingX ?? parseFloat(el.dataset.basePaddingX || `${MINDMAP_LAYOUT.paddingX}`))
+        );
+        const basePaddingY = Math.max(
+            0,
+            Math.round(objectData.properties?.paddingY ?? parseFloat(el.dataset.basePaddingY || `${MINDMAP_LAYOUT.paddingY}`))
+        );
+        const paddingXCss = Math.max(0, Math.round(basePaddingX * sCss));
+        const paddingYCss = Math.max(0, Math.round(basePaddingY * sCss));
+        el.style.paddingTop = `${paddingYCss}px`;
+        el.style.paddingBottom = `${paddingYCss}px`;
+        el.style.paddingLeft = `${paddingXCss}px`;
+        el.style.paddingRight = `${paddingXCss}px`;
 
         const worldLayer = this.core.pixi.worldLayer || this.core.pixi.app.stage;
         const view = this.core.pixi.app.view;

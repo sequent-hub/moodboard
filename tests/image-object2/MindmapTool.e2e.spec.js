@@ -375,6 +375,145 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       .toBe(true);
   });
 
+  test('mindmap text keeps horizontal alignment inside capsule on zoom', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5);
+
+    const mindmap = await expect
+      .poll(async () => getMindmapObject(page))
+      .toMatchObject({ id: expect.any(String) });
+    const object = await getMindmapObject(page);
+    expect(object?.id).toBeTruthy();
+
+    const getRatio = async () => page.evaluate((objectId) => {
+      const host = document.querySelector(`.mb-text--mindmap[data-id="${objectId}"]`);
+      const content = document.querySelector(`.mb-text--mindmap[data-id="${objectId}"] .mb-text--mindmap-content`);
+      const core = window.moodboard?.coreMoodboard;
+      if (!host || !content || !core) return null;
+      const hostRect = host.getBoundingClientRect();
+      const contentRect = content.getBoundingClientRect();
+      const worldScale = core?.pixi?.worldLayer?.scale?.x || 1;
+      if (!hostRect.width) return null;
+      return {
+        ratio: (contentRect.left - hostRect.left) / hostRect.width,
+        worldScale,
+      };
+    }, object.id);
+
+    const before = await getRatio();
+    expect(before).toBeTruthy();
+
+    await page.evaluate(() => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      core.eventBus.emit('ui:zoom:in');
+      core.eventBus.emit('ui:zoom:in');
+    });
+
+    await expect
+      .poll(async () => {
+        const next = await getRatio();
+        if (!next || !before) return false;
+        return next.worldScale > before.worldScale;
+      })
+      .toBe(true);
+
+    const after = await getRatio();
+    expect(after).toBeTruthy();
+    expect(Math.abs(after.ratio - before.ratio)).toBeLessThanOrEqual(0.03);
+  });
+
+  test('mindmap child text keeps horizontal alignment inside capsule on zoom', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5);
+
+    const root = await getMindmapObject(page);
+    expect(root?.id).toBeTruthy();
+
+    await page.evaluate((rootId) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+      const tm = core.toolManager;
+      const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+      if (!selectTool) return;
+      selectTool.setSelection([rootId]);
+      if (typeof selectTool.updateResizeHandles === 'function') {
+        selectTool.updateResizeHandles();
+      }
+    }, root.id);
+
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toBeVisible();
+    await page.locator('.mb-mindmap-side-btn[data-side="right"]').click();
+
+    await expect
+      .poll(async () => {
+        return page.evaluate((rootId) => {
+          const board = window.moodboard.exportBoard();
+          const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+          const childNode = nodes.find((o) => o.id !== rootId) || null;
+          return childNode?.id || null;
+        }, root.id);
+      })
+      .toEqual(expect.any(String));
+    const child = await page.evaluate((rootId) => {
+      const board = window.moodboard.exportBoard();
+      const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+      const childNode = nodes.find((o) => o.id !== rootId) || null;
+      return childNode?.id || null;
+    }, root.id);
+    expect(child).toBeTruthy();
+
+    const getChildRatio = async () => page.evaluate((childId) => {
+      const host = document.querySelector(`.mb-text--mindmap[data-id="${childId}"]`);
+      const content = document.querySelector(`.mb-text--mindmap[data-id="${childId}"] .mb-text--mindmap-content`);
+      const core = window.moodboard?.coreMoodboard;
+      if (!host || !content || !core) return null;
+      const hostRect = host.getBoundingClientRect();
+      const contentRect = content.getBoundingClientRect();
+      const worldScale = core?.pixi?.worldLayer?.scale?.x || 1;
+      if (!hostRect.width) return null;
+      return {
+        ratio: (contentRect.left - hostRect.left) / hostRect.width,
+        worldScale,
+      };
+    }, child);
+
+    await expect
+      .poll(async () => {
+        const ratio = await getChildRatio();
+        return ratio ? true : false;
+      })
+      .toBe(true);
+    const before = await getChildRatio();
+    expect(before).toBeTruthy();
+
+    await page.evaluate(() => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      core.eventBus.emit('ui:zoom:in');
+      core.eventBus.emit('ui:zoom:in');
+    });
+
+    await expect
+      .poll(async () => {
+        const next = await getChildRatio();
+        if (!next || !before) return false;
+        return next.worldScale > before.worldScale;
+      })
+      .toBe(true);
+
+    const after = await getChildRatio();
+    expect(after).toBeTruthy();
+    expect(Math.abs(after.ratio - before.ratio)).toBeLessThanOrEqual(0.03);
+  });
+
   test('mindmap capsule width adapts while typing and keeps horizontal paddings', async ({ page }) => {
     await page.click('.moodboard-toolbar__button--mindmap');
     const canvas = page.locator('.moodboard-workspace__canvas canvas');
