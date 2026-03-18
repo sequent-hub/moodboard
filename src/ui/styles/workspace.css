@@ -258,6 +258,10 @@
     cursor: default;
 }
 
+.mb-text--mindmap-content.is-placeholder {
+    opacity: 0.45;
+}
+
 .moodboard-text-input--mindmap-debug {
     outline: 1px solid #ef4444 !important;
 }

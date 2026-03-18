@@ -2,6 +2,8 @@ import { Events } from '../../core/events/Events.js';
 import * as PIXI from 'pixi.js';
 import { MindmapTextOverlayAdapter } from './MindmapTextOverlayAdapter.js';
 
+const MINDMAP_PLACEHOLDER = 'Напишите что-нибудь';
+
 /**
  * Отдельный HTML-слой только для текста mindmap-объектов.
  * Изолирован от общего HtmlTextLayer (text/simple-text).
@@ -55,8 +57,9 @@ export class MindmapHtmlTextLayer {
 
         this.eventBus.on(Events.Tool.UpdateObjectContent, ({ objectId, content }) => {
             const contentEl = this.idToContentEl.get(objectId);
-            if (contentEl && typeof content === 'string') {
-                contentEl.textContent = content;
+            const containerEl = this.idToEl.get(objectId);
+            if (contentEl && containerEl && typeof content === 'string') {
+                this._applyContentValue(containerEl, contentEl, content);
             }
         });
 
@@ -141,7 +144,8 @@ export class MindmapHtmlTextLayer {
 
         this.overlayAdapter.applyElementStyles(el);
 
-        contentEl.textContent = objectData.content || objectData.properties?.content || '';
+        const initialContent = objectData.content || objectData.properties?.content || '';
+        this._applyContentValue(el, contentEl, initialContent);
         el.dataset.baseFontSize = String(baseFontSize);
         el.dataset.baseW = String(Math.max(1, objectData.width || objectData.properties?.width || 220));
         el.dataset.baseH = String(Math.max(1, objectData.height || objectData.properties?.height || 140));
@@ -225,11 +229,19 @@ export class MindmapHtmlTextLayer {
         if (typeof content === 'string') {
             const contentEl = this.idToContentEl.get(objectId);
             if (contentEl) {
-                contentEl.textContent = content;
+                this._applyContentValue(el, contentEl, content);
             }
         }
 
         el.style.transformOrigin = 'center center';
         el.style.transform = angle ? `rotate(${angle}deg)` : '';
+    }
+
+    _applyContentValue(containerEl, contentEl, rawContent) {
+        const actual = (typeof rawContent === 'string') ? rawContent : '';
+        const isPlaceholder = actual.trim().length === 0;
+        containerEl.dataset.mbContent = actual;
+        contentEl.textContent = isPlaceholder ? MINDMAP_PLACEHOLDER : actual;
+        contentEl.classList.toggle('is-placeholder', isPlaceholder);
     }
 }

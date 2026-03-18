@@ -88,7 +88,6 @@ export class ToolbarActionRouter {
                 type: 'mindmap',
                 size: { width: 220, height: 140 },
                 properties: {
-                    content: 'Новый блок',
                     fontSize: 20,
                     width: 220,
                     height: 140,

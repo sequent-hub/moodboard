@@ -147,11 +147,13 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       .toBe(true);
     const mindmapObject = await getMindmapObject(page);
     const mindmapId = mindmapObject.id;
+    expect((mindmapObject?.properties?.content || '')).toBe('');
 
     const textBoxEl = page.locator(`.mb-text--mindmap[data-id="${mindmapId}"]`);
     const textEl = page.locator(`.mb-text--mindmap[data-id="${mindmapId}"] .mb-text--mindmap-content`);
     await expect(textBoxEl).toBeVisible();
     await expect(textEl).toBeVisible();
+    await expect(textEl).toHaveText('Напишите что-нибудь');
 
     const staticTextMetrics = await page.evaluate((objectId) => {
       const el = document.querySelector(`.mb-text--mindmap[data-id="${objectId}"]`);
@@ -168,8 +170,8 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
     const textBox = await textBoxEl.boundingBox();
     expect(textBox).toBeTruthy();
     await page.mouse.click(
-      textBox.x + 8,
-      textBox.y + textBox.height * 0.5
+      textBox.x + 2,
+      textBox.y + 2
     );
     await expect(page.locator('.moodboard-text-input')).toHaveCount(0);
 
@@ -190,10 +192,10 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
           if (!ta) return null;
           const value = typeof ta.value === 'string' ? ta.value : '';
           const caret = typeof ta.selectionStart === 'number' ? ta.selectionStart : null;
-          if (!value || caret === null) return null;
+          if (caret === null) return null;
           return {
             caret,
-            len: value.length,
+            len: value.length
           };
         });
       })
@@ -206,8 +208,9 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       .poll(async () => {
         return page.evaluate(() => {
           const ta = document.querySelector('.moodboard-text-input');
-          if (!ta || typeof ta.value !== 'string' || ta.value.length < 2) return false;
+          if (!ta || typeof ta.value !== 'string') return false;
           const caret = typeof ta.selectionStart === 'number' ? ta.selectionStart : -1;
+          if (ta.value.length === 0) return caret === 0;
           return caret > 0 && caret < ta.value.length;
         });
       })

@@ -19,9 +19,13 @@ function applyMindmapCaretFromClick({ create, objectId, object, textarea }) {
             try {
                 const el = window.moodboardMindmapHtmlTextLayer?.idToEl?.get?.(objectId) || null;
                 const fullText = (typeof textarea.value === 'string') ? textarea.value : '';
+                if (!fullText) {
+                    textarea.selectionStart = textarea.selectionEnd = 0;
+                    return;
+                }
                 const contentEl = el?.querySelector?.('.mb-text--mindmap-content') || null;
                 const textNode = contentEl?.firstChild || null;
-                if (!el || !fullText || !textNode) return;
+                if (!el || !textNode) return;
                 const len = textNode.textContent.length;
                 if (len === 0) {
                     textarea.selectionStart = textarea.selectionEnd = 0;
@@ -122,7 +126,7 @@ export function openMindmapEditor(object, create = false) {
     const textarea = createTextEditorTextarea(properties.content || '');
     wrapper.classList.add('moodboard-text-editor--mindmap-debug');
     textarea.classList.add('moodboard-text-input--mindmap-debug');
-    textarea.placeholder = 'Введите текст';
+    textarea.placeholder = 'Напишите что-нибудь';
     textarea.style.fontFamily = properties.fontFamily || 'Roboto, Arial, sans-serif';
     textarea.style.textAlign = 'center';
     textarea.style.resize = 'none';
@@ -251,7 +255,7 @@ export function openMindmapEditor(object, create = false) {
         textarea.removeEventListener('input', syncTextareaHeight);
 
         const value = textarea.value.trim();
-        const commitValue = commit && value.length > 0;
+        const commitValue = commit;
 
         if (objectId) {
             showStaticTextAfterEditing(this, objectId);
@@ -272,12 +276,7 @@ export function openMindmapEditor(object, create = false) {
         this.eventBus.emit(Events.UI.TextEditEnd, { objectId: objectId || null });
         updateGlobalTextEditorHandlesLayer();
 
-        if (!commitValue) {
-            if (create && objectId) {
-                this.eventBus.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
-            }
-            return;
-        }
+        if (!commitValue) return;
 
         if (objectId) {
             this.eventBus.emit(Events.Object.ContentChange, {

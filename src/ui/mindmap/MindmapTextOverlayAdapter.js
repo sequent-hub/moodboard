@@ -26,13 +26,16 @@ export class MindmapTextOverlayAdapter {
         const onTextClick = (event) => {
             event.preventDefault();
             event.stopPropagation();
+            const actualContent = (typeof el?.dataset?.mbContent === 'string')
+                ? el.dataset.mbContent
+                : (objectData?.properties?.content || objectData?.content || '');
             const posData = { objectId, position: null };
             eventBus.emit(Events.Tool.GetObjectPosition, posData);
             eventBus.emit(Events.Tool.ObjectEdit, {
                 id: objectId,
                 type: 'mindmap',
                 position: posData.position || objectData?.position || { x: 0, y: 0 },
-                properties: { content: contentEl.textContent || '' },
+                properties: { content: actualContent },
                 caretClick: {
                     clientX: event.clientX,
                     clientY: event.clientY,
