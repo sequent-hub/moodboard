@@ -86,11 +86,11 @@ export class ToolbarActionRouter {
             this.toolbar.setActiveToolbarButton('place');
             this.toolbar.eventBus.emit(Events.Place.Set, {
                 type: 'mindmap',
-                size: { width: 220, height: 140 },
+                size: { width: 220, height: 125 },
                 properties: {
                     fontSize: 20,
                     width: 220,
-                    height: 140,
+                    height: 125,
                     strokeColor: 0x2563EB,
                     fillColor: 0x3B82F6,
                     fillAlpha: 0.25,

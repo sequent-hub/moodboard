@@ -7,7 +7,7 @@ export class MindmapObject {
     constructor(objectData = {}) {
         this.objectData = objectData;
         this.width = objectData.width || objectData.properties?.width || 220;
-        this.height = objectData.height || objectData.properties?.height || 140;
+        this.height = objectData.height || objectData.properties?.height || 125;
         const props = objectData.properties || {};
         this.strokeColor = (typeof props.strokeColor === 'number') ? props.strokeColor : 0x2563EB;
         this.fillColor = (typeof props.fillColor === 'number') ? props.fillColor : 0x3B82F6;

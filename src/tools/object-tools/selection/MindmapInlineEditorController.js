@@ -68,7 +68,7 @@ export function openMindmapEditor(object, create = false) {
     hideGlobalTextEditorHandlesLayer();
 
     let objectWidth = properties.width || 220;
-    let objectHeight = properties.height || 140;
+    let objectHeight = properties.height || 125;
     if (objectId) {
         const sizeData = { objectId, size: null };
         this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
