@@ -330,8 +330,8 @@
 
 .mb-mindmap-side-btn {
     position: absolute;
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     border: none;
     border-radius: 50%;
     transform: translate(-50%, -50%);
@@ -362,13 +362,13 @@
 }
 
 .mb-mindmap-side-btn::before {
-    width: 10px;
+    width: 12px;
     height: 2px;
 }
 
 .mb-mindmap-side-btn::after {
     width: 2px;
-    height: 10px;
+    height: 12px;
 }
 
 .mb-revit-show-in-model {

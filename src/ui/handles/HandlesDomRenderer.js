@@ -207,7 +207,7 @@ export class HandlesDomRenderer {
                 btn.setAttribute('aria-label', 'Добавить узел mindmap');
                 const centerY = top + Math.round(height / 2);
                 const edgeGap = 10;
-                const buttonRadius = 10;
+                const buttonRadius = 12;
                 const centerOffset = edgeGap + buttonRadius;
                 if (side === 'left') {
                     btn.style.left = `${Math.round(left - centerOffset)}px`;
