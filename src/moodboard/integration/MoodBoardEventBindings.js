@@ -10,7 +10,24 @@ export function bindToolbarEvents(board) {
                 mindmap: action.properties?.mindmap || null,
             });
         }
-        board.actionHandler.handleToolbarAction(action);
+        const createdObject = board.actionHandler.handleToolbarAction(action);
+        if (action?.type === 'mindmap' && createdObject?.id) {
+            const content = String(createdObject?.properties?.content || '');
+            if (content.trim().length === 0) {
+                setTimeout(() => {
+                    board.coreMoodboard.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+                    board.coreMoodboard.eventBus.emit(Events.Tool.ObjectEdit, {
+                        object: {
+                            id: createdObject.id,
+                            type: 'mindmap',
+                            position: createdObject.position || null,
+                            properties: createdObject.properties || {},
+                        },
+                        create: true,
+                    });
+                }, 20);
+            }
+        }
     });
 }
 

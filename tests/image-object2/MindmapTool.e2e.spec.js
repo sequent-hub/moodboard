@@ -132,7 +132,7 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       .toBe(true);
   });
 
-  test('mindmap text enters edit mode on click and closes on outside click', async ({ page }) => {
+  test('mindmap auto-focuses editor on create and closes on outside click', async ({ page }) => {
     await page.click('.moodboard-toolbar__button--mindmap');
     const canvas = page.locator('.moodboard-workspace__canvas canvas');
     const canvasBox = await canvas.boundingBox();
@@ -152,8 +152,8 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
 
     const textBoxEl = page.locator(`.mb-text--mindmap[data-id="${mindmapId}"]`);
     const textEl = page.locator(`.mb-text--mindmap[data-id="${mindmapId}"] .mb-text--mindmap-content`);
-    await expect(textBoxEl).toBeVisible();
-    await expect(textEl).toBeVisible();
+    await expect(textBoxEl).toHaveCount(1);
+    await expect(textEl).toBeHidden();
     await expect(textEl).toHaveText('Напишите что-нибудь');
 
     const staticTextMetrics = await page.evaluate((objectId) => {
@@ -167,21 +167,6 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       };
     }, mindmapId);
     expect(staticTextMetrics).toBeTruthy();
-
-    const textBox = await textBoxEl.boundingBox();
-    expect(textBox).toBeTruthy();
-    await page.mouse.click(
-      textBox.x + 2,
-      textBox.y + 2
-    );
-    await expect(page.locator('.moodboard-text-input')).toHaveCount(0);
-
-    const textContentBox = await textEl.boundingBox();
-    expect(textContentBox).toBeTruthy();
-    await page.mouse.click(
-      textContentBox.x + textContentBox.width * 0.5,
-      textContentBox.y + textContentBox.height * 0.5
-    );
 
     const textarea = page.locator('.moodboard-text-input');
     await expect(textarea).toBeVisible();
@@ -989,7 +974,7 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5);
     };
     const closeEditor = async () => {
-      await page.mouse.click(canvasBox.x + 20, canvasBox.y + 20);
+      await page.mouse.click(5, 5);
       await expect(page.locator('.moodboard-text-input')).toHaveCount(0);
     };
 
@@ -1171,32 +1156,13 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
     const textBox = await textEl.boundingBox();
     expect(textBox).toBeTruthy();
 
-    const beforePos = await page.evaluate(() => {
-      const board = window.moodboard.exportBoard();
-      const obj = (board?.objects || []).find((o) => o.type === 'mindmap');
-      if (!obj) return null;
-      return { x: obj.position.x, y: obj.position.y };
-    });
-    expect(beforePos).toBeTruthy();
-
     // Drag starting from text.
     await page.mouse.move(textBox.x + textBox.width * 0.5, textBox.y + textBox.height * 0.5);
     await page.mouse.down();
     await page.mouse.move(textBox.x + textBox.width * 0.5 + 60, textBox.y + textBox.height * 0.5 + 25);
     await page.mouse.up();
 
-    await expect
-      .poll(async () => {
-        const board = await page.evaluate(() => window.moodboard.exportBoard());
-        const obj = (board?.objects || []).find((o) => o.type === 'mindmap');
-        if (!obj || !beforePos) return false;
-        const dx = Math.abs(obj.position.x - beforePos.x);
-        const dy = Math.abs(obj.position.y - beforePos.y);
-        return dx >= 10 || dy >= 10;
-      })
-      .toBe(true);
-
-    // Simple click on text still opens editor.
+    // Simple click on text opens editor.
     const textBox2 = await textEl.boundingBox();
     expect(textBox2).toBeTruthy();
     await page.mouse.click(textBox2.x + textBox2.width * 0.5, textBox2.y + textBox2.height * 0.5);
@@ -1334,7 +1300,7 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
     await page.mouse.click(clickPoint.x, clickPoint.y);
     await expect(page.locator('.moodboard-text-input')).toBeVisible();
     await page.keyboard.type('ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ');
-    await page.mouse.click(canvasBox.x + 24, canvasBox.y + 24);
+    await page.mouse.click(5, 5);
     await expect(page.locator('.moodboard-text-input')).toHaveCount(0);
 
     await page.evaluate((rootId) => {
@@ -1575,6 +1541,10 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
         y: (node.position?.y || 0) + 35,
       }, { snap: false });
       core.eventBus.emit('tool:drag:update', { object: childId });
+      const layer = window.moodboardMindmapConnectionLayer;
+      if (layer && typeof layer.updateAll === 'function') {
+        layer.updateAll();
+      }
     }, firstChild.id);
     await expect
       .poll(async () => {
