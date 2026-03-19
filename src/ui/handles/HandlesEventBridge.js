@@ -5,6 +5,7 @@ export class HandlesEventBridge {
         this.host = host;
         this.subscriptions = [];
         this.isAttached = false;
+        this._mindmapDragSnapshot = null;
     }
 
     attach() {
@@ -29,8 +30,21 @@ export class HandlesEventBridge {
                     this.host.update();
                 }, 10);
             }],
-            [Events.Tool.DragStart, () => { this.host._handlesSuppressed = true; this.host._setHandlesVisibility(false); }],
-            [Events.Tool.DragEnd, () => { this.host._handlesSuppressed = false; this.host._setHandlesVisibility(true); }],
+            [Events.Tool.DragStart, () => {
+                this._mindmapDragSnapshot = this.host.domRenderer?.captureMindmapSnapshot?.() || null;
+                this.host._handlesSuppressed = true;
+                this.host._setHandlesVisibility(false);
+            }],
+            [Events.Tool.DragEnd, (data) => {
+                this.host.domRenderer?.enforceMindmapAutoLayoutAfterDragEnd?.({
+                    draggedIds: [data?.object].filter(Boolean),
+                    snapshot: this._mindmapDragSnapshot,
+                });
+                this._mindmapDragSnapshot = null;
+                this.host._handlesSuppressed = false;
+                this.host._setHandlesVisibility(true);
+                this.host.update();
+            }],
             [Events.Tool.ResizeUpdate, () => this.host.update()],
             [Events.Tool.ResizeStart, () => { this.host._handlesSuppressed = true; this.host._setHandlesVisibility(false); }],
             [Events.Tool.ResizeEnd, () => { this.host._handlesSuppressed = false; this.host._setHandlesVisibility(true); }],
@@ -41,8 +55,22 @@ export class HandlesEventBridge {
                 this.host._syncGroupRotationPreviewTranslation();
                 this.host.update();
             }],
-            [Events.Tool.GroupDragStart, () => { this.host._handlesSuppressed = true; this.host._setHandlesVisibility(false); }],
-            [Events.Tool.GroupDragEnd, () => { this.host._handlesSuppressed = false; this.host._setHandlesVisibility(true); }],
+            [Events.Tool.GroupDragStart, () => {
+                this._mindmapDragSnapshot = this.host.domRenderer?.captureMindmapSnapshot?.() || null;
+                this.host._handlesSuppressed = true;
+                this.host._setHandlesVisibility(false);
+            }],
+            [Events.Tool.GroupDragEnd, (data) => {
+                const draggedIds = Array.isArray(data?.objects) ? data.objects : [];
+                this.host.domRenderer?.enforceMindmapAutoLayoutAfterDragEnd?.({
+                    draggedIds,
+                    snapshot: this._mindmapDragSnapshot,
+                });
+                this._mindmapDragSnapshot = null;
+                this.host._handlesSuppressed = false;
+                this.host._setHandlesVisibility(true);
+                this.host.update();
+            }],
             [Events.Tool.GroupResizeUpdate, (data) => {
                 this.host._updateGroupResizePreview(data);
                 this.host.update();

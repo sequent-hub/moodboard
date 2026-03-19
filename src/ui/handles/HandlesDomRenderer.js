@@ -269,6 +269,90 @@ export class HandlesDomRenderer {
         this.rotateIconSvg = rotateIconSvg;
     }
 
+    captureMindmapSnapshot() {
+        const objects = this.host.core?.state?.state?.objects || [];
+        const snapshot = {};
+        (Array.isArray(objects) ? objects : []).forEach((obj) => {
+            if (!obj || obj.type !== 'mindmap' || !obj.id) return;
+            snapshot[obj.id] = {
+                x: Math.round(obj?.position?.x || 0),
+                y: Math.round(obj?.position?.y || 0),
+            };
+        });
+        return snapshot;
+    }
+
+    enforceMindmapAutoLayoutAfterDragEnd({ draggedIds = [], snapshot = null } = {}) {
+        const ids = Array.isArray(draggedIds) ? draggedIds.filter((id) => typeof id === 'string' && id.length > 0) : [];
+        if (!ids.length) return;
+        const core = this.host.core;
+        const eventBus = this.host.eventBus;
+        if (!core || !eventBus) return;
+
+        const objects = core?.state?.state?.objects || [];
+        const mindmaps = (Array.isArray(objects) ? objects : []).filter((obj) => obj?.type === 'mindmap');
+        if (!mindmaps.length) return;
+        const byId = new Map(mindmaps.map((obj) => [obj.id, obj]));
+        const draggedMindmapIds = ids.filter((id) => byId.has(id));
+        if (!draggedMindmapIds.length) return;
+
+        const compoundToAllIds = new Map();
+        const compoundOf = (obj) => {
+            const c = obj?.properties?.mindmap?.compoundId;
+            return (typeof c === 'string' && c.length > 0) ? c : obj?.id;
+        };
+        mindmaps.forEach((obj) => {
+            const key = compoundOf(obj);
+            if (!compoundToAllIds.has(key)) compoundToAllIds.set(key, new Set());
+            compoundToAllIds.get(key).add(obj.id);
+        });
+        const touchedCompounds = new Set(draggedMindmapIds.map((id) => compoundOf(byId.get(id))));
+
+        touchedCompounds.forEach((compoundId) => {
+            const allIds = compoundToAllIds.get(compoundId) || new Set();
+            const selectedIds = draggedMindmapIds.filter((id) => allIds.has(id));
+            const isWholeTreeMove = selectedIds.length > 0 && selectedIds.length === allIds.size;
+            if (isWholeTreeMove) return;
+
+            allIds.forEach((nodeId) => {
+                const snap = snapshot && snapshot[nodeId];
+                if (!snap || !Number.isFinite(snap.x) || !Number.isFinite(snap.y)) return;
+                const nextPos = { x: Math.round(snap.x), y: Math.round(snap.y) };
+                core.updateObjectPositionDirect(nodeId, nextPos, { snap: false });
+                eventBus.emit(Events.Object.TransformUpdated, { objectId: nodeId });
+                eventBus.emit(Events.Tool.DragUpdate, { object: nodeId });
+            });
+            logMindmapCompoundDebug('layout:drag-end-restore-compound', {
+                compoundId,
+                selectedCount: selectedIds.length,
+                totalCount: allIds.size,
+            });
+        });
+
+        touchedCompounds.forEach((compoundId) => {
+            const compoundNodes = mindmaps.filter((obj) => compoundOf(obj) === compoundId);
+            const roots = compoundNodes.filter((obj) => {
+                const meta = obj?.properties?.mindmap || {};
+                if (meta?.role === 'root') return true;
+                return !meta?.parentId;
+            });
+            roots.forEach((root) => {
+                relayoutMindmapBranchCascade({
+                    core,
+                    eventBus,
+                    startParentId: root.id,
+                    startSide: 'left',
+                });
+                relayoutMindmapBranchCascade({
+                    core,
+                    eventBus,
+                    startParentId: root.id,
+                    startSide: 'right',
+                });
+            });
+        });
+    }
+
     setHandlesVisibility(show) {
         if (!this.host.layer) return;
         const box = this.host.layer.querySelector('.mb-handles-box');
