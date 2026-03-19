@@ -51,6 +51,44 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
     const gapWorld = Math.max(1, Math.round(baseGapWorld * MINDMAP_CHILD_GAP_MULTIPLIER));
     const verticalGapWorld = Math.max(1, Math.round(baseGapWorld * MINDMAP_CHILD_VERTICAL_GAP_MULTIPLIER));
 
+    const byParentBySide = new Map();
+    mindmaps.forEach((obj) => {
+        const meta = obj?.properties?.mindmap || {};
+        if (meta?.role !== 'child') return;
+        const key = `${meta.parentId || ''}::${meta.side || ''}`;
+        if (!byParentBySide.has(key)) byParentBySide.set(key, []);
+        byParentBySide.get(key).push(obj.id);
+    });
+
+    const subtreeSpanCache = new Map();
+    const getNodeHeight = (node) => Math.max(1, Math.round(node?.height || node?.properties?.height || 1));
+    const getGroupSpan = (ownerId, branchSide, visiting) => {
+        const key = `${ownerId}::${branchSide}`;
+        const children = byParentBySide.get(key) || [];
+        if (!children.length) return 0;
+        let total = 0;
+        children.forEach((childId, index) => {
+            const childNode = byId.get(childId);
+            if (!childNode) return;
+            total += getSubtreeSpan(childNode, visiting);
+            if (index > 0) total += verticalGapWorld;
+        });
+        return Math.max(0, Math.round(total));
+    };
+    const getSubtreeSpan = (node, visiting = new Set()) => {
+        if (!node?.id) return 1;
+        if (subtreeSpanCache.has(node.id)) return subtreeSpanCache.get(node.id);
+        if (visiting.has(node.id)) return getNodeHeight(node);
+        visiting.add(node.id);
+        const ownHeight = getNodeHeight(node);
+        const leftSpan = getGroupSpan(node.id, 'left', visiting);
+        const rightSpan = getGroupSpan(node.id, 'right', visiting);
+        const span = Math.max(ownHeight, leftSpan, rightSpan);
+        subtreeSpanCache.set(node.id, span);
+        visiting.delete(node.id);
+        return span;
+    };
+
     const parentX = Math.round(parent?.position?.x || 0);
     const parentWidth = Math.max(1, Math.round(parent?.width || parent?.properties?.width || 1));
     const anchorLeftX = side === 'right'
@@ -60,7 +98,8 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
         ? Math.round(parentX - gapWorld)
         : null;
 
-    const siblingHeights = siblings.map((node) => Math.max(1, Math.round(node?.height || node?.properties?.height || 1)));
+    const siblingHeights = siblings.map((node) => getNodeHeight(node));
+    const siblingSpans = siblings.map((node) => getSubtreeSpan(node));
     const avgHeight = Math.max(
         1,
         Math.round(
@@ -70,7 +109,7 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
     const verticalStep = Math.max(1, avgHeight + verticalGapWorld);
     const parentHeight = Math.max(1, Math.round(parent?.height || parent?.properties?.height || 1));
     const parentCenterY = Math.round(parent?.position?.y || 0) + Math.round(parentHeight / 2);
-    const totalStackHeight = siblingHeights.reduce((acc, h) => acc + h, 0)
+    const totalStackHeight = siblingSpans.reduce((acc, h) => acc + h, 0)
         + Math.max(0, siblings.length - 1) * verticalGapWorld;
     const startY = Math.round(parentCenterY - totalStackHeight / 2);
 
@@ -81,10 +120,11 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
         const currentY = Math.round(node?.position?.y || 0);
         const nodeWidth = Math.max(1, Math.round(node?.width || node?.properties?.width || 1));
         const nodeHeight = siblingHeights[index] || Math.max(1, Math.round(node?.height || node?.properties?.height || 1));
+        const nodeSpan = siblingSpans[index] || nodeHeight;
         const targetX = side === 'right'
             ? anchorLeftX
             : Math.round((anchorRightX || 0) - nodeWidth);
-        const targetY = Math.round(cursorY);
+        const targetY = Math.round(cursorY + Math.max(0, nodeSpan - nodeHeight) / 2);
 
         if (!(targetX === currentX && targetY === currentY)) {
             core.updateObjectPositionDirect(node.id, { x: targetX, y: targetY }, { snap: false });
@@ -92,7 +132,7 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
             eventBus.emit(Events.Tool.DragUpdate, { object: node.id });
             movedCount += 1;
         }
-        cursorY += nodeHeight + verticalGapWorld;
+        cursorY += nodeSpan + verticalGapWorld;
     });
 
     logMindmapCompoundDebug('layout:branch-level-align', {
@@ -102,7 +142,29 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
         movedCount,
         verticalStep,
         parentCenterY,
+        totalStackHeight,
     });
+}
+
+function relayoutMindmapBranchCascade({ core, eventBus, startParentId, startSide }) {
+    if (!core || !eventBus || !startParentId || (startSide !== 'left' && startSide !== 'right')) return;
+    const objects = core?.state?.state?.objects || [];
+    const mindmaps = Array.isArray(objects) ? objects.filter((obj) => obj?.type === 'mindmap') : [];
+    const byId = new Map(mindmaps.map((obj) => [obj.id, obj]));
+
+    let parentId = startParentId;
+    let side = startSide;
+    const visited = new Set();
+
+    while (parentId && !visited.has(`${parentId}:${side}`)) {
+        visited.add(`${parentId}:${side}`);
+        relayoutMindmapBranchLevel({ core, eventBus, parentId, side });
+        const parentNode = byId.get(parentId);
+        const parentMeta = parentNode?.properties?.mindmap || {};
+        if (parentMeta?.role !== 'child') break;
+        parentId = parentMeta.parentId || null;
+        side = (parentMeta.side === 'left' || parentMeta.side === 'right') ? parentMeta.side : side;
+    }
 }
 
 export class HandlesDomRenderer {
@@ -394,19 +456,19 @@ export class HandlesDomRenderer {
                     },
                 });
                 setTimeout(() => {
-                    relayoutMindmapBranchLevel({
+                    relayoutMindmapBranchCascade({
                         core: this.host.core,
                         eventBus: this.host.eventBus,
-                        parentId: metaParentId,
-                        side: metaSide,
+                        startParentId: metaParentId,
+                        startSide: metaSide,
                     });
                 }, 0);
                 setTimeout(() => {
-                    relayoutMindmapBranchLevel({
+                    relayoutMindmapBranchCascade({
                         core: this.host.core,
                         eventBus: this.host.eventBus,
-                        parentId: metaParentId,
-                        side: metaSide,
+                        startParentId: metaParentId,
+                        startSide: metaSide,
                     });
                 }, 24);
             };
