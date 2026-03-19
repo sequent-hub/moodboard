@@ -5,6 +5,10 @@ import {
     createTextEditorWrapper,
 } from './TextEditorDomFactory.js';
 import {
+    registerEditorListeners,
+    unregisterEditorListeners,
+} from './InlineEditorListenersRegistry.js';
+import {
     hideStaticTextDuringEditing,
     showStaticTextAfterEditing,
     updateGlobalTextEditorHandlesLayer,
@@ -465,11 +469,73 @@ export function openMindmapEditor(object, create = false) {
 
     hideStaticTextDuringEditing(this, objectId);
 
+    const syncEditorBoundsToObject = () => {
+        if (!objectId || !wrapper || !view || !view.parentElement || !world) return;
+        const staticEl = (typeof window !== 'undefined')
+            ? window.moodboardMindmapHtmlTextLayer?.idToEl?.get?.(objectId)
+            : null;
+        if (staticEl) {
+            const cssLeft = parseFloat(staticEl.style.left || 'NaN');
+            const cssTop = parseFloat(staticEl.style.top || 'NaN');
+            const cssWidth = parseFloat(staticEl.style.width || 'NaN');
+            const cssHeight = parseFloat(staticEl.style.height || 'NaN');
+            if (Number.isFinite(cssLeft)) wrapper.style.left = `${Math.round(cssLeft)}px`;
+            if (Number.isFinite(cssTop)) wrapper.style.top = `${Math.round(cssTop)}px`;
+            if (Number.isFinite(cssWidth) && cssWidth > 0) wrapper.style.width = `${Math.max(1, Math.round(cssWidth))}px`;
+            if (Number.isFinite(cssHeight) && cssHeight > 0) wrapper.style.height = `${Math.max(1, Math.round(cssHeight))}px`;
+            syncTextareaHeight();
+            return;
+        }
+
+        const posData = { objectId, position: null };
+        const sizeData = { objectId, size: null };
+        this.eventBus.emit(Events.Tool.GetObjectPosition, posData);
+        this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+        const pos = posData.position || position;
+        const size = sizeData.size || { width: objectWidth, height: objectHeight };
+
+        const containerRectNow = view.parentElement.getBoundingClientRect();
+        const viewRectNow = view.getBoundingClientRect();
+        const offsetLeftNow = viewRectNow.left - containerRectNow.left;
+        const offsetTopNow = viewRectNow.top - containerRectNow.top;
+        const tlNow = world.toGlobal(new PIXI.Point(pos.x, pos.y));
+        const brNow = world.toGlobal(new PIXI.Point(pos.x + size.width, pos.y + size.height));
+        wrapper.style.left = `${Math.round(offsetLeftNow + tlNow.x)}px`;
+        wrapper.style.top = `${Math.round(offsetTopNow + tlNow.y)}px`;
+        wrapper.style.width = `${Math.max(1, Math.round(brNow.x - tlNow.x))}px`;
+        wrapper.style.height = `${Math.max(1, Math.round(brNow.y - tlNow.y))}px`;
+        syncTextareaHeight();
+    };
+
+    const onObjectSync = (data) => {
+        const changedId = data?.objectId || data?.object || data;
+        if (changedId !== objectId) return;
+        syncEditorBoundsToObject();
+    };
+    const onGroupSync = (data) => {
+        const ids = Array.isArray(data?.objects) ? data.objects : [];
+        if (!ids.includes(objectId)) return;
+        syncEditorBoundsToObject();
+    };
+    const editorListeners = registerEditorListeners(this.eventBus, [
+        [Events.Object.TransformUpdated, onObjectSync],
+        [Events.Tool.DragUpdate, onObjectSync],
+        [Events.Tool.ResizeUpdate, onObjectSync],
+        [Events.Tool.RotateUpdate, onObjectSync],
+        [Events.Tool.GroupDragUpdate, onGroupSync],
+        [Events.Tool.GroupResizeUpdate, onGroupSync],
+        [Events.Tool.GroupRotateUpdate, onGroupSync],
+        [Events.UI.ZoomPercent, () => syncEditorBoundsToObject()],
+        [Events.Tool.PanUpdate, () => syncEditorBoundsToObject()],
+    ]);
+
     const initialContent = String(properties.content || '');
     let finalized = false;
     const finalize = (commit) => {
         if (finalized) return;
         finalized = true;
+
+        unregisterEditorListeners(this.eventBus, editorListeners);
 
         textarea.removeEventListener('blur', onBlur);
         textarea.removeEventListener('keydown', onKeyDown);
@@ -557,6 +623,7 @@ export function openMindmapEditor(object, create = false) {
         objectType: 'mindmap',
         isResizing: false,
         _finalize: finalize,
+        _listeners: editorListeners,
     };
 
     textarea.focus();

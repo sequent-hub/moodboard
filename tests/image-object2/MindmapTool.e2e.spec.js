@@ -375,6 +375,83 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       .toBe(true);
   });
 
+  test('mindmap active editor follows child after bottom-branch relayout', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5);
+
+    const root = await getMindmapObject(page);
+    expect(root?.id).toBeTruthy();
+
+    await page.evaluate((rootId) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+      const tm = core.toolManager;
+      const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+      if (!selectTool) return;
+      selectTool.setSelection([rootId]);
+      if (typeof selectTool.updateResizeHandles === 'function') {
+        selectTool.updateResizeHandles();
+      }
+    }, root.id);
+
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toBeVisible();
+    await page.locator('.mb-mindmap-side-btn[data-side="right"]').click();
+
+    const child = await page.evaluate((rootId) => {
+      const board = window.moodboard.exportBoard();
+      const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+      return nodes.find((o) => o.id !== rootId) || null;
+    }, root.id);
+    expect(child?.id).toBeTruthy();
+
+    const childText = page.locator(`.mb-text--mindmap[data-id="${child.id}"] .mb-text--mindmap-content`);
+    const childTextBox = await childText.boundingBox();
+    expect(childTextBox).toBeTruthy();
+    await page.mouse.click(
+      childTextBox.x + childTextBox.width * 0.5,
+      childTextBox.y + childTextBox.height * 0.5
+    );
+    await expect(page.locator('.moodboard-text-input')).toBeVisible();
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="bottom"]')).toBeVisible();
+
+    const getEditorDelta = async () => page.evaluate((childId) => {
+      const wrapper = document.querySelector('.moodboard-text-editor');
+      const staticEl = document.querySelector(`.mb-text--mindmap[data-id="${childId}"]`);
+      if (!wrapper || !staticEl) return null;
+      const w = wrapper.getBoundingClientRect();
+      const s = staticEl.getBoundingClientRect();
+      return {
+        dx: Math.abs(w.left - s.left),
+        dy: Math.abs(w.top - s.top),
+      };
+    }, child.id);
+
+    const before = await getEditorDelta();
+    expect(before).toBeTruthy();
+    expect(before.dx).toBeLessThanOrEqual(1);
+    expect(before.dy).toBeLessThanOrEqual(1);
+
+    await page.locator('.mb-mindmap-side-btn[data-side="bottom"]').click();
+    await expect
+      .poll(async () => {
+        const board = await page.evaluate(() => window.moodboard.exportBoard());
+        return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+      })
+      .toBe(3);
+
+    await expect
+      .poll(async () => {
+        const delta = await getEditorDelta();
+        if (!delta) return false;
+        return delta.dx <= 1 && delta.dy <= 1;
+      })
+      .toBe(true);
+  });
+
   test('mindmap text keeps horizontal alignment inside capsule on zoom', async ({ page }) => {
     await page.click('.moodboard-toolbar__button--mindmap');
     const canvas = page.locator('.moodboard-workspace__canvas canvas');
