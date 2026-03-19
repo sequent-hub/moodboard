@@ -27,6 +27,11 @@ function asOrder(value) {
     return normalized >= 0 ? normalized : null;
 }
 
+function asBranchOrder(value) {
+    if (!Number.isFinite(value)) return null;
+    return Number(value);
+}
+
 function asOptionalNodeId(value) {
     return asNonEmptyString(value);
 }
@@ -64,6 +69,7 @@ export function createRootMindmapIntentMetadata() {
         parentId: null,
         side: null,
         order: 0,
+        branchOrder: 0,
     };
 }
 
@@ -77,6 +83,7 @@ export function createChildMindmapIntentMetadata({ sourceObjectId, sourcePropert
         parentId: sourceId,
         side: asValidSide(side),
         order: null,
+        branchOrder: null,
     };
 }
 
@@ -96,6 +103,7 @@ export function normalizeMindmapPropertiesForCreate({
     const sideRaw = asValidSide(meta.side);
     let compoundId = asNonEmptyString(meta.compoundId);
     let order = asOrder(meta.order);
+    const branchOrder = asBranchOrder(meta.branchOrder);
 
     if (!role) {
         role = parentIdRaw ? CHILD_ROLE : ROOT_ROLE;
@@ -137,6 +145,7 @@ export function normalizeMindmapPropertiesForCreate({
             parentId: role === ROOT_ROLE ? null : parentId,
             side: role === CHILD_ROLE ? sideRaw : null,
             order,
+            branchOrder: role === CHILD_ROLE ? branchOrder : 0,
             branchRootId: role === CHILD_ROLE
                 ? (branchRootIdRaw || asNonEmptyString(objectId) || null)
                 : null,

@@ -35,12 +35,26 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
     const parent = byId.get(parentId);
     if (!parent) return;
 
+    const getBranchOrder = (obj) => {
+        const raw = obj?.properties?.mindmap?.branchOrder;
+        return Number.isFinite(raw) ? Number(raw) : null;
+    };
     const siblings = mindmaps
         .filter((obj) => {
             const meta = obj?.properties?.mindmap || {};
             return meta?.role === 'child' && meta?.parentId === parentId && meta?.side === side;
         })
-        .sort((a, b) => (a?.position?.y || 0) - (b?.position?.y || 0));
+        .sort((a, b) => {
+            const ao = getBranchOrder(a);
+            const bo = getBranchOrder(b);
+            if (ao !== null && bo !== null && ao !== bo) return ao - bo;
+            if (ao !== null && bo === null) return -1;
+            if (ao === null && bo !== null) return 1;
+            const ay = a?.position?.y || 0;
+            const by = b?.position?.y || 0;
+            if (ay !== by) return ay - by;
+            return String(a?.id || '').localeCompare(String(b?.id || ''));
+        });
     if (siblings.length === 0) return;
 
     const app = core?.pixi?.app;
@@ -115,6 +129,20 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
     const totalStackHeight = siblingSpans.reduce((acc, h) => acc + h, 0)
         + Math.max(0, siblings.length - 1) * verticalGapWorld;
     const startY = Math.round(parentCenterY - totalStackHeight / 2);
+    logMindmapCompoundDebug('layout:branch-level-start', {
+        parentId,
+        side,
+        siblings: siblings.map((node, index) => ({
+            id: node?.id || null,
+            index,
+            y: Math.round(node?.position?.y || 0),
+            height: siblingHeights[index] || null,
+            span: siblingSpans[index] || null,
+        })),
+        parentCenterY,
+        totalStackHeight,
+        verticalGapWorld,
+    });
     const movedPositions = new Map();
     const getCurrentPos = (nodeId) => {
         if (movedPositions.has(nodeId)) return movedPositions.get(nodeId);
@@ -154,6 +182,18 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
             ? anchorLeftX
             : Math.round((anchorRightX || 0) - nodeWidth);
         const targetY = Math.round(cursorY + Math.max(0, nodeSpan - nodeHeight) / 2);
+        logMindmapCompoundDebug('layout:branch-level-node-target', {
+            parentId,
+            side,
+            nodeId: node?.id || null,
+            index,
+            currentX,
+            currentY,
+            targetX,
+            targetY,
+            nodeHeight,
+            nodeSpan,
+        });
 
         if (!(targetX === currentX && targetY === currentY)) {
             core.updateObjectPositionDirect(node.id, { x: targetX, y: targetY }, { snap: false });
@@ -165,6 +205,15 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
             const dy = Math.round(targetY - currentY);
             if (dx !== 0 || dy !== 0) {
                 const descendants = getDescendants(node.id);
+                logMindmapCompoundDebug('layout:branch-level-node-shift', {
+                    parentId,
+                    side,
+                    nodeId: node?.id || null,
+                    index,
+                    dx,
+                    dy,
+                    descendantsCount: descendants.length,
+                });
                 descendants.forEach((descId) => {
                     const pos = getCurrentPos(descId);
                     const nextPos = {
@@ -454,11 +503,6 @@ export class HandlesDomRenderer {
                 const childHeight = Math.max(1, Math.round(MINDMAP_LAYOUT.height * MINDMAP_CHILD_HEIGHT_FACTOR));
                 const childPaddingX = Math.max(1, Math.round(MINDMAP_LAYOUT.paddingX * MINDMAP_CHILD_PADDING_FACTOR));
                 const childPaddingY = Math.max(1, Math.round(MINDMAP_LAYOUT.paddingY * MINDMAP_CHILD_PADDING_FACTOR));
-                const nextPosition = direction === 'left'
-                    ? { x: Math.round(worldBounds.x - childWidth - gapWorld), y: Math.round(worldBounds.y) }
-                    : direction === 'right'
-                        ? { x: Math.round(worldBounds.x + worldBounds.width + gapWorld), y: Math.round(worldBounds.y) }
-                        : { x: Math.round(worldBounds.x), y: Math.round(worldBounds.y + worldBounds.height + gapWorld) };
                 const sourceMeta = sourceMindmapProperties?.mindmap || {};
                 const isBottomSiblingClone = direction === 'bottom' && sourceMeta?.role === 'child';
                 const metaParentId = isBottomSiblingClone
@@ -467,6 +511,73 @@ export class HandlesDomRenderer {
                 const metaSide = isBottomSiblingClone
                     ? (sourceMeta?.side || 'right')
                     : direction;
+                const normalizeBranchOrderForBottomInsert = () => {
+                    if (!isBottomSiblingClone || !metaParentId || !metaSide) {
+                        return { sourceIndex: -1, siblings: [] };
+                    }
+                    const objects = this.host.core?.state?.state?.objects || [];
+                    const siblings = (Array.isArray(objects) ? objects : [])
+                        .filter((obj) => {
+                            if (!obj || obj.type !== 'mindmap') return false;
+                            const meta = obj.properties?.mindmap || {};
+                            return meta?.role === 'child' && meta?.parentId === metaParentId && meta?.side === metaSide;
+                        })
+                        .sort((a, b) => (a?.position?.y || 0) - (b?.position?.y || 0));
+                    siblings.forEach((obj, index) => {
+                        if (!obj.properties) obj.properties = {};
+                        const meta = obj.properties.mindmap || {};
+                        if (!Number.isFinite(meta.branchOrder) || Number(meta.branchOrder) !== index) {
+                            obj.properties.mindmap = {
+                                ...meta,
+                                branchOrder: index,
+                            };
+                        }
+                    });
+                    const sourceIndex = siblings.findIndex((obj) => obj?.id === id);
+                    if (sourceIndex >= 0) {
+                        for (let idx = sourceIndex + 1; idx < siblings.length; idx += 1) {
+                            const node = siblings[idx];
+                            if (!node?.properties) continue;
+                            const meta = node.properties.mindmap || {};
+                            const nextOrder = idx + 1;
+                            if (!Number.isFinite(meta.branchOrder) || Number(meta.branchOrder) !== nextOrder) {
+                                node.properties.mindmap = {
+                                    ...meta,
+                                    branchOrder: nextOrder,
+                                };
+                            }
+                        }
+                    }
+                    this.host.core?.state?.markDirty?.();
+                    return { sourceIndex, siblings };
+                };
+                const bottomInsertData = normalizeBranchOrderForBottomInsert();
+                const resolveBottomInsertY = () => {
+                    if (!isBottomSiblingClone || !metaParentId || !metaSide) {
+                        return Math.round(worldBounds.y + worldBounds.height + gapWorld);
+                    }
+                    const siblings = bottomInsertData.siblings;
+                    const sourceIndex = bottomInsertData.sourceIndex;
+                    if (sourceIndex < 0) {
+                        return Math.round(worldBounds.y + worldBounds.height + gapWorld);
+                    }
+                    const sourceY = Math.round(siblings[sourceIndex]?.position?.y || worldBounds.y);
+                    const nextSibling = siblings[sourceIndex + 1] || null;
+                    if (!nextSibling) {
+                        return Math.round(sourceY + Math.max(1, childHeight + 1));
+                    }
+                    const nextY = Math.round(nextSibling?.position?.y || sourceY + childHeight + 1);
+                    if (nextY <= sourceY) return Math.round(sourceY + 1);
+                    const midY = Math.round((sourceY + nextY) / 2);
+                    if (midY <= sourceY) return Math.round(sourceY + 1);
+                    if (midY >= nextY) return Math.round(nextY - 1);
+                    return midY;
+                };
+                const nextPosition = direction === 'left'
+                    ? { x: Math.round(worldBounds.x - childWidth - gapWorld), y: Math.round(worldBounds.y) }
+                    : direction === 'right'
+                        ? { x: Math.round(worldBounds.x + worldBounds.width + gapWorld), y: Math.round(worldBounds.y) }
+                        : { x: Math.round(worldBounds.x), y: resolveBottomInsertY() };
                 if (isBottomSiblingClone) {
                     logMindmapCompoundDebug('handles:bottom-branch-parent-resolve', {
                         sourceId: id,
@@ -476,6 +587,23 @@ export class HandlesDomRenderer {
                         resolvedSide: metaSide || null,
                     });
                 }
+                logMindmapCompoundDebug('handles:child-create-intent', {
+                    sourceId: id,
+                    direction,
+                    sourceRole: sourceMeta?.role || null,
+                    sourceParentId: sourceMeta?.parentId || null,
+                    sourceSide: sourceMeta?.side || null,
+                    isBottomSiblingClone,
+                    metaParentId: metaParentId || null,
+                    metaSide: metaSide || null,
+                    sourceBounds: {
+                        x: Math.round(worldBounds.x || 0),
+                        y: Math.round(worldBounds.y || 0),
+                        width: Math.round(worldBounds.width || 0),
+                        height: Math.round(worldBounds.height || 0),
+                    },
+                    nextPosition,
+                });
                 const childMindmapMeta = createChildMindmapIntentMetadata({
                     sourceObjectId: metaParentId,
                     sourceProperties: sourceMindmapProperties || {},
@@ -483,6 +611,9 @@ export class HandlesDomRenderer {
                 });
                 if (isBottomSiblingClone && metaParentId) {
                     childMindmapMeta.branchRootId = metaParentId;
+                    if (bottomInsertData.sourceIndex >= 0) {
+                        childMindmapMeta.branchOrder = bottomInsertData.sourceIndex + 1;
+                    }
                 }
                 this.host.eventBus.emit(Events.UI.ToolbarAction, {
                     type: 'mindmap',
