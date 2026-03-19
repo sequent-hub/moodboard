@@ -6,6 +6,12 @@ import { test, expect } from '@playwright/test';
 
 const EVENTS_KEYBOARD_UNDO = 'keyboard:undo';
 const EVENTS_KEYBOARD_REDO = 'keyboard:redo';
+const MINDMAP_BRANCH_PALETTE = [
+  0xD50000, 0xC51162, 0xAA00FF, 0x6200EA,
+  0x304FFE, 0x2962FF, 0x0091EA, 0x00B8D4,
+  0x00BFA5, 0x00C853, 0x64DD17, 0xAEEA00,
+  0xFFD600, 0xFFAB00, 0xFF6D00, 0xDD2C00
+];
 
 async function getObjectCount(page) {
   return page.evaluate(() => {
@@ -1484,12 +1490,13 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
 
     await expect
       .poll(async () => {
-        return page.evaluate((rootId) => {
+        return page.evaluate(({ rootId, palette }) => {
           const board = window.moodboard.exportBoard();
           const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
           const rootNode = nodes.find((o) => o.id === rootId);
           const childNode = nodes.find((o) => o.id !== rootId);
           if (!rootNode || !childNode) return false;
+          const childMeta = childNode.properties?.mindmap || {};
           const rootPaddingX = Number(rootNode.properties?.paddingX || 0);
           const rootPaddingY = Number(rootNode.properties?.paddingY || 0);
           const childPaddingX = Number(childNode.properties?.paddingX || 0);
@@ -1501,6 +1508,7 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
           const childStroke = Number(childNode.properties?.strokeColor || 0);
           const childFill = Number(childNode.properties?.fillColor || 0);
           const childFillAlpha = Number(childNode.properties?.fillAlpha || 0);
+          const childBranchColor = Number(childMeta?.branchColor);
           return (
             childWidth < rootWidth &&
             childHeight < rootHeight &&
@@ -1508,12 +1516,14 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
             childPaddingX === Math.round(rootPaddingX / 2) &&
             childPaddingY > 0 &&
             childPaddingY === Math.round(rootPaddingY / 2) &&
-            childStroke === 0x16A34A &&
-            childFill === 0x16A34A &&
+            Number.isFinite(childBranchColor) &&
+            childStroke === childBranchColor &&
+            childFill === childBranchColor &&
+            palette.includes(childBranchColor) &&
             childFillAlpha > 0 &&
             childFillAlpha < 1
           );
-        }, rootObject.id);
+        }, { rootId: rootObject.id, palette: MINDMAP_BRANCH_PALETTE });
       })
       .toBe(true);
 
@@ -1607,6 +1617,135 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       }
     }, rootObject.id);
     await expect(page.locator(`.mb-mindmap-side-btn[data-side="right"][data-id="${rootObject.id}"]`)).toHaveCount(0);
+  });
+
+  test('mindmap assigns branch color from palette and inherits to descendants', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5);
+
+    const root = await getMindmapObject(page);
+    expect(root?.id).toBeTruthy();
+
+    const selectNode = async (nodeId) => {
+      await page.evaluate((id) => {
+        const core = window.moodboard?.coreMoodboard;
+        if (!core) return;
+        core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+        const tm = core.toolManager;
+        const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+        if (!selectTool) return;
+        selectTool.setSelection([id]);
+        if (typeof selectTool.updateResizeHandles === 'function') {
+          selectTool.updateResizeHandles();
+        }
+      }, nodeId);
+    };
+    const clickSideForNode = async (nodeId, side) => {
+      await selectNode(nodeId);
+      await expect
+        .poll(async () => {
+          return page.evaluate(({ id, nextSide }) => {
+            const core = window.moodboard?.coreMoodboard;
+            if (core) {
+              core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+              const tm = core.toolManager;
+              const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+              if (selectTool) {
+                selectTool.setSelection([id]);
+                if (typeof selectTool.updateResizeHandles === 'function') {
+                  selectTool.updateResizeHandles();
+                }
+              }
+            }
+            const btn = document.querySelector(`.mb-mindmap-side-btn[data-side="${nextSide}"][data-id="${id}"]`);
+            if (!btn) return null;
+            btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
+            return btn.getAttribute('data-id');
+          }, { id: nodeId, nextSide: side });
+        }, { timeout: 10000 })
+        .toBe(nodeId);
+    };
+
+    await clickSideForNode(root.id, 'right');
+    await expect.poll(async () => {
+      const board = await page.evaluate(() => window.moodboard.exportBoard());
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+    }).toBe(2);
+
+    const rightChildId = await page.evaluate((rootId) => {
+      const board = window.moodboard.exportBoard();
+      const child = (board?.objects || []).find((o) => {
+        if (o.type !== 'mindmap' || o.id === rootId) return false;
+        const m = o.properties?.mindmap || {};
+        return m.role === 'child' && m.parentId === rootId && m.side === 'right';
+      });
+      return child?.id || null;
+    }, root.id);
+    expect(rightChildId).toBeTruthy();
+
+    await clickSideForNode(rightChildId, 'right');
+    await expect.poll(async () => {
+      const board = await page.evaluate(() => window.moodboard.exportBoard());
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+    }).toBe(3);
+
+    await clickSideForNode(root.id, 'left');
+    await expect.poll(async () => {
+      const board = await page.evaluate(() => window.moodboard.exportBoard());
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+    }).toBe(4);
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(({ rootId, parentRightId, palette }) => {
+          const board = window.moodboard.exportBoard();
+          const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+          const byId = new Map(nodes.map((o) => [o.id, o]));
+          const rightChild = byId.get(parentRightId);
+          if (!rightChild) return false;
+          const leftChild = nodes.find((o) => {
+            const m = o.properties?.mindmap || {};
+            return m.role === 'child' && m.parentId === rootId && m.side === 'left';
+          });
+          if (!leftChild) return false;
+          const rightGrand = nodes.find((o) => {
+            const m = o.properties?.mindmap || {};
+            return m.role === 'child' && m.parentId === parentRightId && m.side === 'right';
+          });
+          if (!rightGrand) return false;
+
+          const rightMeta = rightChild.properties?.mindmap || {};
+          const leftMeta = leftChild.properties?.mindmap || {};
+          const grandMeta = rightGrand.properties?.mindmap || {};
+
+          const rightColor = Number(rightMeta.branchColor);
+          const leftColor = Number(leftMeta.branchColor);
+          const grandColor = Number(grandMeta.branchColor);
+          if (!Number.isFinite(rightColor) || !Number.isFinite(leftColor) || !Number.isFinite(grandColor)) return false;
+          if (!palette.includes(rightColor) || !palette.includes(leftColor)) return false;
+          if (grandColor !== rightColor) return false;
+
+          const rightStroke = Number(rightChild.properties?.strokeColor);
+          const leftStroke = Number(leftChild.properties?.strokeColor);
+          const grandStroke = Number(rightGrand.properties?.strokeColor);
+          const rightFill = Number(rightChild.properties?.fillColor);
+          const leftFill = Number(leftChild.properties?.fillColor);
+          const grandFill = Number(rightGrand.properties?.fillColor);
+
+          return (
+            rightStroke === rightColor &&
+            rightFill === rightColor &&
+            leftStroke === leftColor &&
+            leftFill === leftColor &&
+            grandStroke === rightColor &&
+            grandFill === rightColor
+          );
+        }, { rootId: root.id, parentRightId: rightChildId, palette: MINDMAP_BRANCH_PALETTE });
+      }, { timeout: 10000 })
+      .toBe(true);
   });
 
   test('mindmap child bottom chevron creates nested child from same level style', async ({ page }) => {
@@ -1810,6 +1949,98 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
           if (!after) return false;
           return after.x !== before.x || after.y !== before.y;
         }, firstChild.id);
+      }, { timeout: 10000 })
+      .toBe(true);
+  });
+
+  test('mindmap root-level siblings created via bottom get new palette colors', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5);
+
+    const root = await getMindmapObject(page);
+    expect(root?.id).toBeTruthy();
+
+    const selectNode = async (nodeId) => {
+      await page.evaluate((id) => {
+        const core = window.moodboard?.coreMoodboard;
+        if (!core) return;
+        core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+        const tm = core.toolManager;
+        const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+        if (!selectTool) return;
+        selectTool.setSelection([id]);
+        if (typeof selectTool.updateResizeHandles === 'function') {
+          selectTool.updateResizeHandles();
+        }
+      }, nodeId);
+    };
+    const clickSideForNode = async (nodeId, side) => {
+      await selectNode(nodeId);
+      await expect
+        .poll(async () => {
+          return page.evaluate(({ id, nextSide }) => {
+            const core = window.moodboard?.coreMoodboard;
+            if (core) {
+              core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+              const tm = core.toolManager;
+              const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+              if (selectTool) {
+                selectTool.setSelection([id]);
+                if (typeof selectTool.updateResizeHandles === 'function') {
+                  selectTool.updateResizeHandles();
+                }
+              }
+            }
+            const btn = document.querySelector(`.mb-mindmap-side-btn[data-side="${nextSide}"][data-id="${id}"]`);
+            if (!btn) return null;
+            btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
+            return btn.getAttribute('data-id');
+          }, { id: nodeId, nextSide: side });
+        }, { timeout: 10000 })
+        .toBe(nodeId);
+    };
+
+    await clickSideForNode(root.id, 'right');
+    await expect.poll(async () => {
+      const board = await page.evaluate(() => window.moodboard.exportBoard());
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+    }).toBe(2);
+
+    const firstChildId = await page.evaluate((rootId) => {
+      const board = window.moodboard.exportBoard();
+      const child = (board?.objects || []).find((o) => {
+        if (o.type !== 'mindmap' || o.id === rootId) return false;
+        const m = o.properties?.mindmap || {};
+        return m.role === 'child' && m.parentId === rootId;
+      });
+      return child?.id || null;
+    }, root.id);
+    expect(firstChildId).toBeTruthy();
+
+    await clickSideForNode(firstChildId, 'bottom');
+    await expect.poll(async () => {
+      const board = await page.evaluate(() => window.moodboard.exportBoard());
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+    }).toBe(3);
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(({ rootId, palette }) => {
+          const board = window.moodboard.exportBoard();
+          const siblings = (board?.objects || [])
+            .filter((o) => o.type === 'mindmap')
+            .filter((o) => {
+              const m = o.properties?.mindmap || {};
+              return m.role === 'child' && m.parentId === rootId;
+            });
+          if (siblings.length !== 2) return false;
+          const colors = siblings.map((node) => Number(node.properties?.mindmap?.branchColor));
+          if (!colors.every((color) => Number.isFinite(color) && palette.includes(color))) return false;
+          return colors[0] !== colors[1];
+        }, { rootId: root.id, palette: MINDMAP_BRANCH_PALETTE });
       }, { timeout: 10000 })
       .toBe(true);
   });

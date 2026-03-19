@@ -1,6 +1,10 @@
 import { Events } from '../../core/events/Events.js';
 import { createRotatedResizeCursor } from '../../tools/object-tools/selection/CursorController.js';
-import { createChildMindmapIntentMetadata, logMindmapCompoundDebug } from '../../mindmap/MindmapCompoundContract.js';
+import {
+    createChildMindmapIntentMetadata,
+    logMindmapCompoundDebug,
+    pickRandomMindmapBranchColorExcluding,
+} from '../../mindmap/MindmapCompoundContract.js';
 import { MINDMAP_LAYOUT } from '../mindmap/MindmapLayoutConfig.js';
 
 const HANDLES_ACCENT_COLOR = '#80D8FF';
@@ -9,10 +13,16 @@ const MINDMAP_CHILD_WIDTH_FACTOR = 0.9;
 const MINDMAP_CHILD_HEIGHT_FACTOR = 0.8;
 const MINDMAP_CHILD_PADDING_FACTOR = 0.5;
 const MINDMAP_CHILD_STROKE_COLOR = 0x16A34A;
-const MINDMAP_CHILD_FILL_COLOR = 0x16A34A;
 const MINDMAP_CHILD_FILL_ALPHA = 0.25;
 const MINDMAP_CHILD_GAP_MULTIPLIER = 10;
 const MINDMAP_CHILD_VERTICAL_GAP_MULTIPLIER = 2;
+
+function asBranchColor(value) {
+    if (!Number.isFinite(value)) return null;
+    const normalized = Math.floor(Number(value));
+    if (normalized < 0 || normalized > 0xFFFFFF) return null;
+    return normalized;
+}
 
 function resolveBottomSiblingParentId(sourceObjectId, sourceMeta) {
     if (typeof sourceMeta?.parentId === 'string' && sourceMeta.parentId.length > 0) {
@@ -386,6 +396,10 @@ function tryReparentMindmapOnDrop({ core, draggedId }) {
     const nextCompoundId = (typeof targetMeta?.compoundId === 'string' && targetMeta.compoundId.length > 0)
         ? targetMeta.compoundId
         : target.id;
+    const nextBranchColor = asBranchColor(targetMeta?.branchColor)
+        ?? asBranchColor(target?.properties?.strokeColor)
+        ?? asBranchColor(draggedMeta?.branchColor)
+        ?? asBranchColor(dragged?.properties?.strokeColor);
 
     const prevParentId = draggedMeta?.parentId || null;
     const prevSide = draggedMeta?.side || null;
@@ -405,7 +419,15 @@ function tryReparentMindmapOnDrop({ core, draggedId }) {
         compoundId: nextCompoundId,
         branchRootId: nextParentId,
         branchOrder: null,
+        branchColor: nextBranchColor,
     };
+    if (Number.isFinite(nextBranchColor)) {
+        dragged.properties.strokeColor = nextBranchColor;
+        dragged.properties.fillColor = nextBranchColor;
+        if (!Number.isFinite(dragged.properties.fillAlpha)) {
+            dragged.properties.fillAlpha = MINDMAP_CHILD_FILL_ALPHA;
+        }
+    }
 
     const movedIds = [draggedId, ...descendantIds];
     descendantIds.forEach((id) => {
@@ -416,7 +438,17 @@ function tryReparentMindmapOnDrop({ core, draggedId }) {
         node.properties.mindmap = {
             ...meta,
             compoundId: nextCompoundId,
+            branchColor: Number.isFinite(nextBranchColor)
+                ? nextBranchColor
+                : (asBranchColor(meta?.branchColor) ?? null),
         };
+        if (Number.isFinite(nextBranchColor)) {
+            node.properties.strokeColor = nextBranchColor;
+            node.properties.fillColor = nextBranchColor;
+            if (!Number.isFinite(node.properties.fillAlpha)) {
+                node.properties.fillAlpha = MINDMAP_CHILD_FILL_ALPHA;
+            }
+        }
     });
     core?.state?.markDirty?.();
 
@@ -1105,6 +1137,37 @@ export class HandlesDomRenderer {
                     sourceProperties: sourceMindmapProperties || {},
                     side: metaSide,
                 });
+                const allObjects = this.host.core?.state?.state?.objects || [];
+                const parentNode = (Array.isArray(allObjects) ? allObjects : [])
+                    .find((obj) => obj?.id === metaParentId && obj?.type === 'mindmap');
+                const parentMeta = parentNode?.properties?.mindmap || {};
+                const isDirectChildOfMainRoot = parentMeta?.role === 'root'
+                    && !parentMeta?.parentId;
+                const siblingBranchColors = isDirectChildOfMainRoot
+                    ? (Array.isArray(allObjects) ? allObjects : [])
+                        .filter((obj) => obj?.type === 'mindmap')
+                        .filter((obj) => {
+                            const meta = obj?.properties?.mindmap || {};
+                            return meta?.role === 'child' && meta?.parentId === metaParentId;
+                        })
+                        .map((obj) => {
+                            const meta = obj?.properties?.mindmap || {};
+                            return asBranchColor(meta?.branchColor)
+                                ?? asBranchColor(obj?.properties?.strokeColor);
+                        })
+                        .filter((value) => Number.isFinite(value))
+                    : [];
+                const branchColor = isDirectChildOfMainRoot
+                    ? pickRandomMindmapBranchColorExcluding({
+                        excludedColors: siblingBranchColors,
+                    })
+                    : (
+                        asBranchColor(childMindmapMeta?.branchColor)
+                        ?? asBranchColor(sourceMeta?.branchColor)
+                        ?? asBranchColor(sourceMindmapProperties?.strokeColor)
+                        ?? MINDMAP_CHILD_STROKE_COLOR
+                    );
+                childMindmapMeta.branchColor = branchColor;
                 if (isBottomSiblingClone && metaParentId) {
                     childMindmapMeta.branchRootId = metaParentId;
                     if (bottomInsertData.sourceIndex >= 0) {
@@ -1124,8 +1187,8 @@ export class HandlesDomRenderer {
                         capsuleBaseHeight: childHeight,
                         paddingX: childPaddingX,
                         paddingY: childPaddingY,
-                        strokeColor: MINDMAP_CHILD_STROKE_COLOR,
-                        fillColor: MINDMAP_CHILD_FILL_COLOR,
+                        strokeColor: branchColor,
+                        fillColor: branchColor,
                         fillAlpha: MINDMAP_CHILD_FILL_ALPHA,
                     },
                 });

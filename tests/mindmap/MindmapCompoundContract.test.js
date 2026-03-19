@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    MINDMAP_BRANCH_COLOR_PALETTE,
     createChildMindmapIntentMetadata,
     createRootMindmapIntentMetadata,
+    pickRandomMindmapBranchColor,
+    pickRandomMindmapBranchColorExcluding,
     normalizeMindmapPropertiesForCreate,
 } from '../../src/mindmap/MindmapCompoundContract.js';
 
@@ -14,6 +17,8 @@ describe('MindmapCompoundContract', () => {
             parentId: null,
             side: null,
             order: 0,
+            branchOrder: 0,
+            branchColor: null,
         });
     });
 
@@ -30,6 +35,8 @@ describe('MindmapCompoundContract', () => {
             parentId: 'node-root',
             side: 'right',
             order: null,
+            branchOrder: null,
+            branchColor: null,
         });
     });
 
@@ -43,6 +50,34 @@ describe('MindmapCompoundContract', () => {
         expect(meta.side).toBe('bottom');
         expect(meta.parentId).toBe('node-child');
         expect(meta.compoundId).toBe('compound-a');
+        expect(meta.branchColor).toBe(null);
+    });
+
+    it('assigns random palette color for root-based child intent', () => {
+        const meta = createChildMindmapIntentMetadata({
+            sourceObjectId: 'root-node',
+            sourceProperties: {
+                strokeColor: 0x2563EB,
+                mindmap: { role: 'root', compoundId: 'compound-a' },
+            },
+            side: 'right',
+        });
+        expect(MINDMAP_BRANCH_COLOR_PALETTE).toContain(meta.branchColor);
+    });
+
+    it('returns color from branch palette helper', () => {
+        const color = pickRandomMindmapBranchColor(() => 0.5);
+        expect(MINDMAP_BRANCH_COLOR_PALETTE).toContain(color);
+    });
+
+    it('returns color excluding already used palette entries', () => {
+        const used = MINDMAP_BRANCH_COLOR_PALETTE.slice(0, 3);
+        const color = pickRandomMindmapBranchColorExcluding({
+            excludedColors: used,
+            randomFn: () => 0,
+        });
+        expect(used).not.toContain(color);
+        expect(MINDMAP_BRANCH_COLOR_PALETTE).toContain(color);
     });
 
     it('normalizes legacy mindmap to standalone root compound', () => {
@@ -59,7 +94,9 @@ describe('MindmapCompoundContract', () => {
             parentId: null,
             side: null,
             order: 0,
+            branchOrder: 0,
             branchRootId: null,
+            branchColor: null,
         });
     });
 
@@ -85,8 +122,11 @@ describe('MindmapCompoundContract', () => {
             parentId: 'root-1',
             side: 'left',
             order: 0,
+            branchOrder: null,
             branchRootId: 'child-1',
+            branchColor: normalized.mindmap.branchColor,
         });
+        expect(MINDMAP_BRANCH_COLOR_PALETTE).toContain(normalized.mindmap.branchColor);
     });
 
     it('falls back to root when child has no parent', () => {

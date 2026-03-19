@@ -4,6 +4,15 @@ const LEFT_SIDE = 'left';
 const RIGHT_SIDE = 'right';
 const BOTTOM_SIDE = 'bottom';
 const DEBUG_STORAGE_KEY = 'mb:mindmap:compound:debug';
+const BRANCH_COLOR_HEX = Object.freeze([
+    'D50000', 'C51162', 'AA00FF', '6200EA',
+    '304FFE', '2962FF', '0091EA', '00B8D4',
+    '00BFA5', '00C853', '64DD17', 'AEEA00',
+    'FFD600', 'FFAB00', 'FF6D00', 'DD2C00',
+]);
+export const MINDMAP_BRANCH_COLOR_PALETTE = Object.freeze(
+    BRANCH_COLOR_HEX.map((hex) => Number.parseInt(hex, 16))
+);
 
 function asObject(value) {
     return value && typeof value === 'object' ? value : {};
@@ -34,6 +43,41 @@ function asBranchOrder(value) {
 
 function asOptionalNodeId(value) {
     return asNonEmptyString(value);
+}
+
+function asBranchColor(value) {
+    if (!Number.isFinite(value)) return null;
+    const normalized = Math.floor(Number(value));
+    if (normalized < 0 || normalized > 0xFFFFFF) return null;
+    return normalized;
+}
+
+export function pickRandomMindmapBranchColor(randomFn = Math.random) {
+    const rand = typeof randomFn === 'function' ? randomFn : Math.random;
+    const palette = MINDMAP_BRANCH_COLOR_PALETTE;
+    if (!Array.isArray(palette) || palette.length === 0) return null;
+    const raw = Number(rand());
+    const safe = Number.isFinite(raw) ? raw : 0;
+    const idx = Math.max(0, Math.min(palette.length - 1, Math.floor(safe * palette.length)));
+    return palette[idx];
+}
+
+export function pickRandomMindmapBranchColorExcluding({
+    excludedColors = [],
+    randomFn = Math.random,
+} = {}) {
+    const excluded = new Set(
+        (Array.isArray(excludedColors) ? excludedColors : [])
+            .filter((value) => Number.isFinite(value))
+            .map((value) => Math.floor(Number(value)))
+    );
+    const palette = MINDMAP_BRANCH_COLOR_PALETTE.filter((color) => !excluded.has(color));
+    if (palette.length === 0) return pickRandomMindmapBranchColor(randomFn);
+    const rand = typeof randomFn === 'function' ? randomFn : Math.random;
+    const raw = Number(rand());
+    const safe = Number.isFinite(raw) ? raw : 0;
+    const idx = Math.max(0, Math.min(palette.length - 1, Math.floor(safe * palette.length)));
+    return palette[idx];
 }
 
 function getMindmapMetadataFromProperties(properties) {
@@ -70,6 +114,7 @@ export function createRootMindmapIntentMetadata() {
         side: null,
         order: 0,
         branchOrder: 0,
+        branchColor: null,
     };
 }
 
@@ -77,6 +122,12 @@ export function createChildMindmapIntentMetadata({ sourceObjectId, sourcePropert
     const sourceMeta = getMindmapMetadataFromProperties(sourceProperties);
     const sourceId = asNonEmptyString(sourceObjectId);
     const sourceCompoundId = asNonEmptyString(sourceMeta.compoundId);
+    const sourceRole = asValidRole(sourceMeta.role);
+    const inheritedColor = asBranchColor(sourceMeta.branchColor)
+        ?? asBranchColor(sourceProperties?.strokeColor);
+    const branchColor = sourceRole === ROOT_ROLE
+        ? pickRandomMindmapBranchColor()
+        : inheritedColor;
     return {
         compoundId: sourceCompoundId || sourceId,
         role: CHILD_ROLE,
@@ -84,6 +135,7 @@ export function createChildMindmapIntentMetadata({ sourceObjectId, sourcePropert
         side: asValidSide(side),
         order: null,
         branchOrder: null,
+        branchColor,
     };
 }
 
@@ -104,6 +156,8 @@ export function normalizeMindmapPropertiesForCreate({
     let compoundId = asNonEmptyString(meta.compoundId);
     let order = asOrder(meta.order);
     const branchOrder = asBranchOrder(meta.branchOrder);
+    let branchColor = asBranchColor(meta.branchColor)
+        ?? asBranchColor(props.strokeColor);
 
     if (!role) {
         role = parentIdRaw ? CHILD_ROLE : ROOT_ROLE;
@@ -137,6 +191,18 @@ export function normalizeMindmapPropertiesForCreate({
         order = role === ROOT_ROLE ? 0 : nextChildOrder(existingObjects, compoundId);
     }
 
+    if (role === CHILD_ROLE && branchColor === null && parentId) {
+        const parent = Array.isArray(existingObjects)
+            ? existingObjects.find((obj) => obj && obj.id === parentId && obj.type === 'mindmap')
+            : null;
+        const parentMeta = getMindmapMetadataFromProperties(parent?.properties);
+        branchColor = asBranchColor(parentMeta.branchColor)
+            ?? asBranchColor(parent?.properties?.strokeColor);
+        if (branchColor === null && asValidRole(parentMeta.role) === ROOT_ROLE) {
+            branchColor = pickRandomMindmapBranchColor();
+        }
+    }
+
     return {
         ...props,
         mindmap: {
@@ -149,6 +215,7 @@ export function normalizeMindmapPropertiesForCreate({
             branchRootId: role === CHILD_ROLE
                 ? (branchRootIdRaw || asNonEmptyString(objectId) || null)
                 : null,
+            branchColor: role === CHILD_ROLE ? branchColor : null,
         },
     };
 }
