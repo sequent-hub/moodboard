@@ -263,6 +263,180 @@ function relayoutMindmapBranchCascade({ core, eventBus, startParentId, startSide
     }
 }
 
+function collectMindmapChildrenByParent(mindmaps) {
+    const childrenByParent = new Map();
+    (Array.isArray(mindmaps) ? mindmaps : []).forEach((obj) => {
+        if (!obj || obj.type !== 'mindmap') return;
+        const meta = obj?.properties?.mindmap || {};
+        if (meta?.role !== 'child' || !meta?.parentId) return;
+        if (!childrenByParent.has(meta.parentId)) childrenByParent.set(meta.parentId, []);
+        childrenByParent.get(meta.parentId).push(obj.id);
+    });
+    return childrenByParent;
+}
+
+function collectMindmapDescendants(childrenByParent, rootId) {
+    const result = [];
+    const queue = [...(childrenByParent.get(rootId) || [])];
+    const seen = new Set();
+    while (queue.length > 0) {
+        const nextId = queue.shift();
+        if (!nextId || seen.has(nextId)) continue;
+        seen.add(nextId);
+        result.push(nextId);
+        const nested = childrenByParent.get(nextId) || [];
+        nested.forEach((id) => {
+            if (!seen.has(id)) queue.push(id);
+        });
+    }
+    return result;
+}
+
+function getMindmapRect(obj) {
+    const x = Math.round(obj?.position?.x || 0);
+    const y = Math.round(obj?.position?.y || 0);
+    const width = Math.max(1, Math.round(obj?.width || obj?.properties?.width || 1));
+    const height = Math.max(1, Math.round(obj?.height || obj?.properties?.height || 1));
+    return { x, y, width, height };
+}
+
+function isPointInsideRect(point, rect) {
+    if (!point || !rect) return false;
+    return point.x >= rect.x
+        && point.x <= rect.x + rect.width
+        && point.y >= rect.y
+        && point.y <= rect.y + rect.height;
+}
+
+function normalizeBranchOrderByCurrentY({ core, parentId, side }) {
+    if (!core || !parentId || (side !== 'left' && side !== 'right')) return { changed: 0, count: 0 };
+    const objects = core?.state?.state?.objects || [];
+    const siblings = (Array.isArray(objects) ? objects : [])
+        .filter((obj) => {
+            if (!obj || obj.type !== 'mindmap') return false;
+            const meta = obj?.properties?.mindmap || {};
+            return meta?.role === 'child' && meta?.parentId === parentId && meta?.side === side;
+        })
+        .sort((a, b) => {
+            const ay = Math.round(a?.position?.y || 0);
+            const by = Math.round(b?.position?.y || 0);
+            if (ay !== by) return ay - by;
+            return String(a?.id || '').localeCompare(String(b?.id || ''));
+        });
+    let changed = 0;
+    siblings.forEach((obj, index) => {
+        if (!obj.properties) obj.properties = {};
+        const meta = obj.properties.mindmap || {};
+        const prev = Number.isFinite(meta.branchOrder) ? Number(meta.branchOrder) : null;
+        if (prev === index) return;
+        obj.properties.mindmap = {
+            ...meta,
+            branchOrder: index,
+        };
+        changed += 1;
+    });
+    if (changed > 0) core?.state?.markDirty?.();
+    return { changed, count: siblings.length };
+}
+
+function tryReparentMindmapOnDrop({ core, draggedId }) {
+    if (!core || !draggedId) return null;
+    const objects = core?.state?.state?.objects || [];
+    const mindmaps = Array.isArray(objects) ? objects.filter((obj) => obj?.type === 'mindmap') : [];
+    const byId = new Map(mindmaps.map((obj) => [obj.id, obj]));
+    const dragged = byId.get(draggedId);
+    if (!dragged) return null;
+
+    const childrenByParent = collectMindmapChildrenByParent(mindmaps);
+    const descendantIds = collectMindmapDescendants(childrenByParent, draggedId);
+    const blockedTargetIds = new Set([draggedId, ...descendantIds]);
+    const draggedRect = getMindmapRect(dragged);
+    const draggedCenter = {
+        x: draggedRect.x + Math.round(draggedRect.width / 2),
+        y: draggedRect.y + Math.round(draggedRect.height / 2),
+    };
+    const candidates = mindmaps.filter((obj) => !blockedTargetIds.has(obj?.id));
+    if (!candidates.length) return null;
+
+    let best = null;
+    candidates.forEach((target) => {
+        const targetRect = getMindmapRect(target);
+        if (!isPointInsideRect(draggedCenter, targetRect)) return;
+        const targetCenter = {
+            x: targetRect.x + Math.round(targetRect.width / 2),
+            y: targetRect.y + Math.round(targetRect.height / 2),
+        };
+        const dx = draggedCenter.x - targetCenter.x;
+        const dy = draggedCenter.y - targetCenter.y;
+        const dist2 = dx * dx + dy * dy;
+        if (!best || dist2 < best.dist2) {
+            best = { target, dist2 };
+        }
+    });
+    if (!best?.target?.id) return null;
+
+    const target = best.target;
+    const targetMeta = target?.properties?.mindmap || {};
+    const draggedMeta = dragged?.properties?.mindmap || {};
+    const targetRect = getMindmapRect(target);
+    const draggedCenterX = draggedRect.x + Math.round(draggedRect.width / 2);
+    const targetCenterX = targetRect.x + Math.round(targetRect.width / 2);
+    const nextSide = draggedCenterX < targetCenterX ? 'left' : 'right';
+    const nextParentId = target.id;
+    const nextCompoundId = (typeof targetMeta?.compoundId === 'string' && targetMeta.compoundId.length > 0)
+        ? targetMeta.compoundId
+        : target.id;
+
+    const prevParentId = draggedMeta?.parentId || null;
+    const prevSide = draggedMeta?.side || null;
+    const prevCompoundId = draggedMeta?.compoundId || null;
+    const unchanged = prevParentId === nextParentId
+        && prevSide === nextSide
+        && prevCompoundId === nextCompoundId
+        && draggedMeta?.role === 'child';
+    if (unchanged) return null;
+
+    if (!dragged.properties) dragged.properties = {};
+    dragged.properties.mindmap = {
+        ...draggedMeta,
+        role: 'child',
+        parentId: nextParentId,
+        side: nextSide,
+        compoundId: nextCompoundId,
+        branchRootId: nextParentId,
+        branchOrder: null,
+    };
+
+    const movedIds = [draggedId, ...descendantIds];
+    descendantIds.forEach((id) => {
+        const node = byId.get(id);
+        if (!node) return;
+        if (!node.properties) node.properties = {};
+        const meta = node.properties.mindmap || {};
+        node.properties.mindmap = {
+            ...meta,
+            compoundId: nextCompoundId,
+        };
+    });
+    core?.state?.markDirty?.();
+
+    normalizeBranchOrderByCurrentY({ core, parentId: nextParentId, side: nextSide });
+    if (prevParentId && (prevSide === 'left' || prevSide === 'right')) {
+        normalizeBranchOrderByCurrentY({ core, parentId: prevParentId, side: prevSide });
+    }
+    return {
+        changed: true,
+        draggedId,
+        movedIds,
+        prevParentId,
+        prevSide,
+        prevCompoundId,
+        nextParentId,
+        nextSide,
+        nextCompoundId,
+    };
+}
+
 function tryReorderMindmapBranchByDraggedNode({ core, draggedId }) {
     if (!core || !draggedId) return null;
     const objects = core?.state?.state?.objects || [];
@@ -379,6 +553,35 @@ export class HandlesDomRenderer {
         const draggedMindmapIds = ids.filter((id) => byId.has(id));
         if (!draggedMindmapIds.length) return;
         const singleDraggedId = draggedMindmapIds.length === 1 ? draggedMindmapIds[0] : null;
+        const reparentResult = singleDraggedId
+            ? tryReparentMindmapOnDrop({ core, draggedId: singleDraggedId })
+            : null;
+        if (reparentResult?.changed) {
+            logMindmapCompoundDebug('layout:drag-end-reparent', {
+                draggedId: reparentResult.draggedId,
+                prevParentId: reparentResult.prevParentId || null,
+                prevSide: reparentResult.prevSide || null,
+                nextParentId: reparentResult.nextParentId || null,
+                nextSide: reparentResult.nextSide || null,
+                prevCompoundId: reparentResult.prevCompoundId || null,
+                nextCompoundId: reparentResult.nextCompoundId || null,
+            });
+            relayoutMindmapBranchCascade({
+                core,
+                eventBus,
+                startParentId: reparentResult.nextParentId,
+                startSide: reparentResult.nextSide,
+            });
+            if (reparentResult.prevParentId && (reparentResult.prevSide === 'left' || reparentResult.prevSide === 'right')) {
+                relayoutMindmapBranchCascade({
+                    core,
+                    eventBus,
+                    startParentId: reparentResult.prevParentId,
+                    startSide: reparentResult.prevSide,
+                });
+            }
+            return;
+        }
         const reorderResult = singleDraggedId
             ? tryReorderMindmapBranchByDraggedNode({ core, draggedId: singleDraggedId })
             : null;

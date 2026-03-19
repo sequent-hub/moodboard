@@ -2684,6 +2684,323 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       .toBe(true);
   });
 
+  test('mindmap drop on another node reparents dragged node as child', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5);
+
+    const root = await getMindmapObject(page);
+    expect(root?.id).toBeTruthy();
+
+    const selectNode = async (nodeId) => {
+      await page.evaluate((id) => {
+        const core = window.moodboard?.coreMoodboard;
+        if (!core) return;
+        core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+        const tm = core.toolManager;
+        const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+        if (!selectTool) return;
+        selectTool.setSelection([id]);
+        if (typeof selectTool.updateResizeHandles === 'function') {
+          selectTool.updateResizeHandles();
+        }
+      }, nodeId);
+    };
+    const clickBottomForNode = async (nodeId) => {
+      await selectNode(nodeId);
+      await expect
+        .poll(async () => {
+          return page.evaluate((id) => {
+            const core = window.moodboard?.coreMoodboard;
+            if (core) {
+              core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+              const tm = core.toolManager;
+              const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+              if (selectTool) {
+                selectTool.setSelection([id]);
+                if (typeof selectTool.updateResizeHandles === 'function') {
+                  selectTool.updateResizeHandles();
+                }
+              }
+            }
+            const btn = document.querySelector(`.mb-mindmap-side-btn[data-side="bottom"][data-id="${id}"]`);
+            if (!btn) return null;
+            btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
+            return btn.getAttribute('data-id');
+          }, nodeId);
+        }, { timeout: 10000 })
+        .toBe(nodeId);
+    };
+
+    await selectNode(root.id);
+    await expect(page.locator(`.mb-mindmap-side-btn[data-side="right"][data-id="${root.id}"]`)).toBeVisible();
+    await page.locator(`.mb-mindmap-side-btn[data-side="right"][data-id="${root.id}"]`).click();
+    await expect.poll(async () => {
+      const board = await page.evaluate(() => window.moodboard.exportBoard());
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+    }).toBe(2);
+
+    const childAId = await page.evaluate((rootId) => {
+      const board = window.moodboard.exportBoard();
+      const node = (board?.objects || []).find((o) => o.type === 'mindmap' && o.id !== rootId);
+      return node?.id || null;
+    }, root.id);
+    expect(childAId).toBeTruthy();
+
+    await clickBottomForNode(childAId);
+    await expect.poll(async () => {
+      const board = await page.evaluate(() => window.moodboard.exportBoard());
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+    }).toBe(3);
+
+    const before = await page.evaluate(({ rootId, childId }) => {
+      const board = window.moodboard.exportBoard();
+      const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+      const dragged = nodes.find((o) => o.id !== rootId && o.id !== childId) || null;
+      const target = nodes.find((o) => o.id === childId) || null;
+      return {
+        dragged: dragged ? {
+          id: dragged.id,
+          parentId: dragged.properties?.mindmap?.parentId || null,
+          x: Math.round(dragged.position?.x || 0),
+          y: Math.round(dragged.position?.y || 0),
+          width: Math.round(dragged.width || dragged.properties?.width || 0),
+          height: Math.round(dragged.height || dragged.properties?.height || 0),
+        } : null,
+        target: target ? {
+          id: target.id,
+          x: Math.round(target.position?.x || 0),
+          y: Math.round(target.position?.y || 0),
+          width: Math.round(target.width || target.properties?.width || 0),
+          height: Math.round(target.height || target.properties?.height || 0),
+        } : null,
+      };
+    }, { rootId: root.id, childId: childAId });
+    expect(before?.dragged?.id).toBeTruthy();
+    expect(before?.target?.id).toBeTruthy();
+    expect(before.dragged.parentId).toBe(root.id);
+
+    const dropPos = {
+      x: Math.round(
+        before.target.x
+        + Math.round(before.target.width / 2)
+        - Math.round((before.dragged.width || 0) / 2)
+      ),
+      y: Math.round(
+        before.target.y
+        + Math.round(before.target.height / 2)
+        - Math.round((before.dragged.height || 0) / 2)
+      ),
+    };
+    await page.evaluate(({ draggedId, pos }) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      core.eventBus.emit('tool:group:drag:start', { objects: [draggedId] });
+      core.updateObjectPositionDirect(draggedId, { x: pos.x, y: pos.y }, { snap: false });
+      core.eventBus.emit('tool:group:drag:end', { objects: [draggedId] });
+    }, { draggedId: before.dragged.id, pos: dropPos });
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(({ draggedId, targetId }) => {
+          const board = window.moodboard.exportBoard();
+          const dragged = (board?.objects || []).find((o) => o.id === draggedId);
+          if (!dragged) return false;
+          const meta = dragged.properties?.mindmap || {};
+          if (meta.parentId !== targetId || meta.role !== 'child') return false;
+          const seg = (window.moodboardMindmapConnectionLayer?._lastSegments || []).find((s) => s.childId === draggedId) || null;
+          return !!seg && seg.parentId === targetId;
+        }, { draggedId: before.dragged.id, targetId: before.target.id });
+      }, { timeout: 10000 })
+      .toBe(true);
+  });
+
+  test('mindmap reparent across compounds updates subtree compoundId', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.35, canvasBox.y + canvasBox.height * 0.5);
+
+    const closeEditor = async () => {
+      await page.keyboard.press('Escape');
+      await page.mouse.click(canvasBox.x + canvasBox.width - 8, canvasBox.y + 8);
+      await expect
+        .poll(async () => page.evaluate(() => document.querySelectorAll('.moodboard-text-input').length))
+        .toBe(0);
+    };
+    const selectNode = async (nodeId) => {
+      await page.evaluate((id) => {
+        const core = window.moodboard?.coreMoodboard;
+        if (!core) return;
+        core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+        const tm = core.toolManager;
+        const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+        if (!selectTool) return;
+        selectTool.setSelection([id]);
+        if (typeof selectTool.updateResizeHandles === 'function') {
+          selectTool.updateResizeHandles();
+        }
+      }, nodeId);
+    };
+    const clickBottomForNode = async (nodeId) => {
+      await closeEditor();
+      await selectNode(nodeId);
+      await expect
+        .poll(async () => {
+          return page.evaluate((id) => {
+            const core = window.moodboard?.coreMoodboard;
+            if (core) {
+              core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+              const tm = core.toolManager;
+              const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+              if (selectTool) {
+                selectTool.setSelection([id]);
+                if (typeof selectTool.updateResizeHandles === 'function') {
+                  selectTool.updateResizeHandles();
+                }
+              }
+            }
+            const btn = document.querySelector(`.mb-mindmap-side-btn[data-side="bottom"][data-id="${id}"]`);
+            if (!btn) return null;
+            btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
+            return btn.getAttribute('data-id');
+          }, nodeId);
+        }, { timeout: 10000 })
+        .toBe(nodeId);
+    };
+
+    const rootA = await getMindmapObject(page);
+    expect(rootA?.id).toBeTruthy();
+
+    await closeEditor();
+    await selectNode(rootA.id);
+    await expect(page.locator(`.mb-mindmap-side-btn[data-side="right"][data-id="${rootA.id}"]`)).toBeVisible();
+    await page.locator(`.mb-mindmap-side-btn[data-side="right"][data-id="${rootA.id}"]`).click();
+    await expect.poll(async () => {
+      const board = await page.evaluate(() => window.moodboard.exportBoard());
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+    }).toBe(2);
+
+    const childAId = await page.evaluate((rootId) => {
+      const board = window.moodboard.exportBoard();
+      const node = (board?.objects || []).find((o) => o.type === 'mindmap' && o.id !== rootId);
+      return node?.id || null;
+    }, rootA.id);
+    expect(childAId).toBeTruthy();
+
+    await closeEditor();
+    await selectNode(childAId);
+    await expect(page.locator(`.mb-mindmap-side-btn[data-side="right"][data-id="${childAId}"]`)).toBeVisible();
+    await page.locator(`.mb-mindmap-side-btn[data-side="right"][data-id="${childAId}"]`).click();
+    await expect.poll(async () => {
+      const board = await page.evaluate(() => window.moodboard.exportBoard());
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+    }).toBe(3);
+
+    const beforeCreateRootB = await page.evaluate(({ rootId, childId }) => {
+      const board = window.moodboard.exportBoard();
+      const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+      const grand = nodes.find((o) => {
+        if (o.id === rootId || o.id === childId) return false;
+        const m = o.properties?.mindmap || {};
+        return m.parentId === childId;
+      }) || null;
+      const root = nodes.find((o) => o.id === rootId) || null;
+      const child = nodes.find((o) => o.id === childId) || null;
+      return {
+        grandId: grand?.id || null,
+        rootCompound: root?.properties?.mindmap?.compoundId || null,
+        childCompound: child?.properties?.mindmap?.compoundId || null,
+      };
+    }, { rootId: rootA.id, childId: childAId });
+    expect(beforeCreateRootB.grandId).toBeTruthy();
+    expect(beforeCreateRootB.rootCompound).toBeTruthy();
+    expect(beforeCreateRootB.childCompound).toBe(beforeCreateRootB.rootCompound);
+
+    await closeEditor();
+    await page.click('.moodboard-toolbar__button--mindmap');
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.75, canvasBox.y + canvasBox.height * 0.5);
+    await closeEditor();
+
+    const roots = await page.evaluate(() => {
+      const board = window.moodboard.exportBoard();
+      return (board?.objects || [])
+        .filter((o) => o.type === 'mindmap')
+        .filter((o) => (o.properties?.mindmap?.role || null) === 'root')
+        .map((o) => ({
+          id: o.id,
+          x: Math.round(o.position?.x || 0),
+          y: Math.round(o.position?.y || 0),
+          width: Math.round(o.width || o.properties?.width || 0),
+          height: Math.round(o.height || o.properties?.height || 0),
+          compoundId: o.properties?.mindmap?.compoundId || null,
+        }));
+    });
+    expect(roots.length).toBe(2);
+    const rootB = roots.find((r) => r.id !== rootA.id);
+    expect(rootB?.id).toBeTruthy();
+
+    const childAState = await page.evaluate((id) => {
+      const board = window.moodboard.exportBoard();
+      const node = (board?.objects || []).find((o) => o.id === id);
+      if (!node) return null;
+      return {
+        x: Math.round(node.position?.x || 0),
+        y: Math.round(node.position?.y || 0),
+        width: Math.round(node.width || node.properties?.width || 0),
+        height: Math.round(node.height || node.properties?.height || 0),
+      };
+    }, childAId);
+    expect(childAState).toBeTruthy();
+
+    const dropPos = {
+      x: Math.round(
+        rootB.x
+        + Math.round((rootB.width || 0) / 2)
+        - Math.round((childAState.width || 0) / 2)
+      ),
+      y: Math.round(
+        rootB.y
+        + Math.round((rootB.height || 0) / 2)
+        - Math.round((childAState.height || 0) / 2)
+      ),
+    };
+    await page.evaluate(({ draggedId, pos }) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      core.eventBus.emit('tool:group:drag:start', { objects: [draggedId] });
+      core.updateObjectPositionDirect(draggedId, { x: pos.x, y: pos.y }, { snap: false });
+      core.eventBus.emit('tool:group:drag:end', { objects: [draggedId] });
+    }, { draggedId: childAId, pos: dropPos });
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(({ draggedId, grandId, targetRootId }) => {
+          const board = window.moodboard.exportBoard();
+          const dragged = (board?.objects || []).find((o) => o.id === draggedId);
+          const grand = (board?.objects || []).find((o) => o.id === grandId);
+          const targetRoot = (board?.objects || []).find((o) => o.id === targetRootId);
+          if (!dragged || !grand || !targetRoot) return false;
+          const draggedMeta = dragged.properties?.mindmap || {};
+          const grandMeta = grand.properties?.mindmap || {};
+          const targetCompound = targetRoot.properties?.mindmap?.compoundId || null;
+          if (!targetCompound) return false;
+          const seg = (window.moodboardMindmapConnectionLayer?._lastSegments || []).find((s) => s.childId === draggedId) || null;
+          return (
+            draggedMeta.parentId === targetRootId &&
+            draggedMeta.compoundId === targetCompound &&
+            grandMeta.compoundId === targetCompound &&
+            !!seg &&
+            seg.parentId === targetRootId
+          );
+        }, { draggedId: childAId, grandId: beforeCreateRootB.grandId, targetRootId: rootB.id });
+      }, { timeout: 10000 })
+      .toBe(true);
+  });
+
   test('mindmap full-tree drag keeps moved position and structure', async ({ page }) => {
     await page.click('.moodboard-toolbar__button--mindmap');
     const canvas = page.locator('.moodboard-workspace__canvas canvas');
