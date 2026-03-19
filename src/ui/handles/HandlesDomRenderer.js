@@ -52,12 +52,15 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
     const verticalGapWorld = Math.max(1, Math.round(baseGapWorld * MINDMAP_CHILD_VERTICAL_GAP_MULTIPLIER));
 
     const byParentBySide = new Map();
+    const childrenByParent = new Map();
     mindmaps.forEach((obj) => {
         const meta = obj?.properties?.mindmap || {};
         if (meta?.role !== 'child') return;
         const key = `${meta.parentId || ''}::${meta.side || ''}`;
         if (!byParentBySide.has(key)) byParentBySide.set(key, []);
         byParentBySide.get(key).push(obj.id);
+        if (!childrenByParent.has(meta.parentId)) childrenByParent.set(meta.parentId, []);
+        childrenByParent.get(meta.parentId).push(obj.id);
     });
 
     const subtreeSpanCache = new Map();
@@ -112,12 +115,38 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
     const totalStackHeight = siblingSpans.reduce((acc, h) => acc + h, 0)
         + Math.max(0, siblings.length - 1) * verticalGapWorld;
     const startY = Math.round(parentCenterY - totalStackHeight / 2);
+    const movedPositions = new Map();
+    const getCurrentPos = (nodeId) => {
+        if (movedPositions.has(nodeId)) return movedPositions.get(nodeId);
+        const node = byId.get(nodeId);
+        return {
+            x: Math.round(node?.position?.x || 0),
+            y: Math.round(node?.position?.y || 0),
+        };
+    };
+    const getDescendants = (rootId) => {
+        const result = [];
+        const queue = [...(childrenByParent.get(rootId) || [])];
+        const seen = new Set();
+        while (queue.length > 0) {
+            const nextId = queue.shift();
+            if (!nextId || seen.has(nextId)) continue;
+            seen.add(nextId);
+            result.push(nextId);
+            const nested = childrenByParent.get(nextId) || [];
+            nested.forEach((nestedId) => {
+                if (!seen.has(nestedId)) queue.push(nestedId);
+            });
+        }
+        return result;
+    };
 
     let movedCount = 0;
     let cursorY = startY;
     siblings.forEach((node, index) => {
-        const currentX = Math.round(node?.position?.x || 0);
-        const currentY = Math.round(node?.position?.y || 0);
+        const currentPos = getCurrentPos(node.id);
+        const currentX = currentPos.x;
+        const currentY = currentPos.y;
         const nodeWidth = Math.max(1, Math.round(node?.width || node?.properties?.width || 1));
         const nodeHeight = siblingHeights[index] || Math.max(1, Math.round(node?.height || node?.properties?.height || 1));
         const nodeSpan = siblingSpans[index] || nodeHeight;
@@ -130,6 +159,24 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
             core.updateObjectPositionDirect(node.id, { x: targetX, y: targetY }, { snap: false });
             eventBus.emit(Events.Object.TransformUpdated, { objectId: node.id });
             eventBus.emit(Events.Tool.DragUpdate, { object: node.id });
+            movedPositions.set(node.id, { x: targetX, y: targetY });
+
+            const dx = Math.round(targetX - currentX);
+            const dy = Math.round(targetY - currentY);
+            if (dx !== 0 || dy !== 0) {
+                const descendants = getDescendants(node.id);
+                descendants.forEach((descId) => {
+                    const pos = getCurrentPos(descId);
+                    const nextPos = {
+                        x: Math.round(pos.x + dx),
+                        y: Math.round(pos.y + dy),
+                    };
+                    core.updateObjectPositionDirect(descId, nextPos, { snap: false });
+                    eventBus.emit(Events.Object.TransformUpdated, { objectId: descId });
+                    eventBus.emit(Events.Tool.DragUpdate, { object: descId });
+                    movedPositions.set(descId, nextPos);
+                });
+            }
             movedCount += 1;
         }
         cursorY += nodeSpan + verticalGapWorld;

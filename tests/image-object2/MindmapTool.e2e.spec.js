@@ -288,6 +288,8 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
 
     const root = await getMindmapObject(page);
     expect(root?.id).toBeTruthy();
+    await page.mouse.click(5, 5);
+    await expect(page.locator('.moodboard-text-input')).toHaveCount(0);
 
     await page.evaluate((rootId) => {
       const core = window.moodboard?.coreMoodboard;
