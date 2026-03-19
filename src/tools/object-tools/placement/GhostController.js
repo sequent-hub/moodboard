@@ -234,7 +234,7 @@ export class GhostController {
                 }
             } catch (_) {}
         } else if (host.app && host.app.view) {
-            host.cursor = 'crosshair';
+            host.cursor = 'default';
             host.app.view.style.cursor = host.cursor;
         }
     }
