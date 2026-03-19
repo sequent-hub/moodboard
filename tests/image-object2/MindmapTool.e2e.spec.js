@@ -1686,6 +1686,8 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
         return page.evaluate((rootId) => {
           const board = window.moodboard.exportBoard();
           const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+          const rootNode = nodes.find((o) => o.id === rootId);
+          if (!rootNode) return false;
           const branchNodes = nodes
             .filter((o) => {
               const m = o.properties?.mindmap || {};
@@ -1695,12 +1697,23 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
           if (branchNodes.length < 3) return false;
           const lefts = branchNodes.map((n) => Math.round(n.position?.x || 0));
           const leftSpread = Math.max(...lefts) - Math.min(...lefts);
-          const dY = [];
+          const dGaps = [];
           for (let i = 1; i < branchNodes.length; i += 1) {
-            dY.push(Math.round((branchNodes[i].position?.y || 0) - (branchNodes[i - 1].position?.y || 0)));
+            const prev = branchNodes[i - 1];
+            const next = branchNodes[i];
+            const prevBottom = Math.round((prev.position?.y || 0) + (prev.height || prev.properties?.height || 0));
+            const nextTop = Math.round(next.position?.y || 0);
+            dGaps.push(nextTop - prevBottom);
           }
-          const dySpread = Math.max(...dY) - Math.min(...dY);
-          return leftSpread <= 1 && dySpread <= 1;
+          const gapSpread = Math.max(...dGaps) - Math.min(...dGaps);
+          const branchTop = Math.min(...branchNodes.map((n) => Math.round(n.position?.y || 0)));
+          const branchBottom = Math.max(
+            ...branchNodes.map((n) => Math.round((n.position?.y || 0) + (n.height || n.properties?.height || 0)))
+          );
+          const branchCenterY = Math.round((branchTop + branchBottom) / 2);
+          const rootCenterY = Math.round((rootNode.position?.y || 0) + ((rootNode.height || rootNode.properties?.height || 0) / 2));
+          const centerDelta = Math.abs(branchCenterY - rootCenterY);
+          return leftSpread <= 1 && gapSpread <= 1 && centerDelta <= 1;
         }, root.id);
       })
       .toBe(true);

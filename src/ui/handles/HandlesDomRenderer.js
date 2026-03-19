@@ -60,33 +60,39 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
         ? Math.round(parentX - gapWorld)
         : null;
 
+    const siblingHeights = siblings.map((node) => Math.max(1, Math.round(node?.height || node?.properties?.height || 1)));
     const avgHeight = Math.max(
         1,
         Math.round(
-            siblings.reduce((acc, node) => {
-                const h = Math.max(1, Math.round(node?.height || node?.properties?.height || 1));
-                return acc + h;
-            }, 0) / siblings.length
+            siblingHeights.reduce((acc, h) => acc + h, 0) / siblings.length
         )
     );
     const verticalStep = Math.max(1, avgHeight + verticalGapWorld);
-    const startY = Math.round(siblings[0]?.position?.y || 0);
+    const parentHeight = Math.max(1, Math.round(parent?.height || parent?.properties?.height || 1));
+    const parentCenterY = Math.round(parent?.position?.y || 0) + Math.round(parentHeight / 2);
+    const totalStackHeight = siblingHeights.reduce((acc, h) => acc + h, 0)
+        + Math.max(0, siblings.length - 1) * verticalGapWorld;
+    const startY = Math.round(parentCenterY - totalStackHeight / 2);
 
     let movedCount = 0;
+    let cursorY = startY;
     siblings.forEach((node, index) => {
         const currentX = Math.round(node?.position?.x || 0);
         const currentY = Math.round(node?.position?.y || 0);
         const nodeWidth = Math.max(1, Math.round(node?.width || node?.properties?.width || 1));
+        const nodeHeight = siblingHeights[index] || Math.max(1, Math.round(node?.height || node?.properties?.height || 1));
         const targetX = side === 'right'
             ? anchorLeftX
             : Math.round((anchorRightX || 0) - nodeWidth);
-        const targetY = Math.round(startY + index * verticalStep);
+        const targetY = Math.round(cursorY);
 
-        if (targetX === currentX && targetY === currentY) return;
-        core.updateObjectPositionDirect(node.id, { x: targetX, y: targetY }, { snap: false });
-        eventBus.emit(Events.Object.TransformUpdated, { objectId: node.id });
-        eventBus.emit(Events.Tool.DragUpdate, { object: node.id });
-        movedCount += 1;
+        if (!(targetX === currentX && targetY === currentY)) {
+            core.updateObjectPositionDirect(node.id, { x: targetX, y: targetY }, { snap: false });
+            eventBus.emit(Events.Object.TransformUpdated, { objectId: node.id });
+            eventBus.emit(Events.Tool.DragUpdate, { object: node.id });
+            movedCount += 1;
+        }
+        cursorY += nodeHeight + verticalGapWorld;
     });
 
     logMindmapCompoundDebug('layout:branch-level-align', {
@@ -95,6 +101,7 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
         siblingsCount: siblings.length,
         movedCount,
         verticalStep,
+        parentCenterY,
     });
 }
 
