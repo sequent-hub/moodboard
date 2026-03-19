@@ -667,14 +667,57 @@ export class HandlesDomRenderer {
             compoundToAllIds.get(key).add(obj.id);
         });
         const touchedCompounds = new Set(draggedMindmapIds.map((id) => compoundOf(byId.get(id))));
+        const childrenByParent = collectMindmapChildrenByParent(mindmaps);
+        const translatedScopeByCompound = new Map();
+
+        if (!reorderResult?.changed && primaryDraggedId && snapshot) {
+            const primaryNode = byId.get(primaryDraggedId);
+            const primarySnap = snapshot[primaryDraggedId];
+            const primaryMeta = primaryNode?.properties?.mindmap || {};
+            const currentX = Math.round(primaryNode?.position?.x || 0);
+            const currentY = Math.round(primaryNode?.position?.y || 0);
+            const dx = Number.isFinite(primarySnap?.x) ? Math.round(currentX - Number(primarySnap.x)) : 0;
+            const dy = Number.isFinite(primarySnap?.y) ? Math.round(currentY - Number(primarySnap.y)) : 0;
+            if (primaryNode && (dx !== 0 || dy !== 0)) {
+                const compoundId = compoundOf(primaryNode);
+                const allIds = compoundToAllIds.get(compoundId) || new Set();
+                const moveScopeIds = (() => {
+                    if (primaryMeta?.role === 'root' || !primaryMeta?.parentId) {
+                        return new Set(allIds);
+                    }
+                    const descendants = collectMindmapDescendants(childrenByParent, primaryDraggedId);
+                    return new Set([primaryDraggedId, ...descendants]);
+                })();
+                moveScopeIds.forEach((nodeId) => {
+                    const snap = snapshot[nodeId];
+                    if (!snap || !Number.isFinite(snap.x) || !Number.isFinite(snap.y)) return;
+                    const nextPos = { x: Math.round(Number(snap.x) + dx), y: Math.round(Number(snap.y) + dy) };
+                    core.updateObjectPositionDirect(nodeId, nextPos, { snap: false });
+                    eventBus.emit(Events.Object.TransformUpdated, { objectId: nodeId });
+                    eventBus.emit(Events.Tool.DragUpdate, { object: nodeId });
+                });
+                translatedScopeByCompound.set(compoundId, moveScopeIds);
+                logMindmapCompoundDebug('layout:drag-end-translate-scope', {
+                    primaryDraggedId,
+                    compoundId,
+                    role: primaryMeta?.role || null,
+                    parentId: primaryMeta?.parentId || null,
+                    dx,
+                    dy,
+                    movedIds: Array.from(moveScopeIds),
+                });
+            }
+        }
 
         touchedCompounds.forEach((compoundId) => {
             const allIds = compoundToAllIds.get(compoundId) || new Set();
             const selectedIds = draggedMindmapIds.filter((id) => allIds.has(id));
             const isWholeTreeMove = selectedIds.length > 0 && selectedIds.length === allIds.size;
             if (isWholeTreeMove) return;
+            const translatedIds = translatedScopeByCompound.get(compoundId) || new Set();
 
             allIds.forEach((nodeId) => {
+                if (translatedIds.has(nodeId)) return;
                 const snap = snapshot && snapshot[nodeId];
                 if (!snap || !Number.isFinite(snap.x) || !Number.isFinite(snap.y)) return;
                 const nextPos = { x: Math.round(snap.x), y: Math.round(snap.y) };
@@ -690,6 +733,7 @@ export class HandlesDomRenderer {
         });
 
         touchedCompounds.forEach((compoundId) => {
+            if (!reorderResult?.changed && translatedScopeByCompound.has(compoundId)) return;
             const compoundNodes = mindmaps.filter((obj) => compoundOf(obj) === compoundId);
             const roots = compoundNodes.filter((obj) => {
                 const meta = obj?.properties?.mindmap || {};

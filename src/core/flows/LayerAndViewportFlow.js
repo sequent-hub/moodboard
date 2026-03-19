@@ -6,6 +6,35 @@ import {
     MoveObjectCommand
 } from '../commands/index.js';
 
+function collectMindmapChildrenByParent(objects) {
+    const childrenByParent = new Map();
+    (Array.isArray(objects) ? objects : []).forEach((obj) => {
+        if (!obj || obj.type !== 'mindmap') return;
+        const meta = obj?.properties?.mindmap || {};
+        if (meta?.role !== 'child' || !meta?.parentId) return;
+        if (!childrenByParent.has(meta.parentId)) childrenByParent.set(meta.parentId, []);
+        childrenByParent.get(meta.parentId).push(obj.id);
+    });
+    return childrenByParent;
+}
+
+function collectMindmapDescendants(childrenByParent, rootId) {
+    const result = [];
+    const queue = [...(childrenByParent.get(rootId) || [])];
+    const seen = new Set();
+    while (queue.length > 0) {
+        const nextId = queue.shift();
+        if (!nextId || seen.has(nextId)) continue;
+        seen.add(nextId);
+        result.push(nextId);
+        const nested = childrenByParent.get(nextId) || [];
+        nested.forEach((id) => {
+            if (!seen.has(id)) queue.push(id);
+        });
+    }
+    return result;
+}
+
 export function setupLayerAndViewportFlow(core) {
     const applyZOrderFromState = () => {
         const arr = core.state.state.objects || [];
@@ -95,6 +124,43 @@ export function setupLayerAndViewportFlow(core) {
     });
 
     core.eventBus.on(Events.Tool.DragStart, (data) => {
+        const objects = core?.state?.state?.objects || [];
+        const byId = new Map((Array.isArray(objects) ? objects : []).map((obj) => [obj?.id, obj]));
+        const dragged = byId.get(data.object);
+        const draggedMeta = dragged?.properties?.mindmap || {};
+        if (dragged?.type === 'mindmap') {
+            const compoundId = (typeof draggedMeta?.compoundId === 'string' && draggedMeta.compoundId.length > 0)
+                ? draggedMeta.compoundId
+                : dragged?.id;
+            const scopeIds = (() => {
+                if (draggedMeta?.role === 'root' || !draggedMeta?.parentId) {
+                    return (Array.isArray(objects) ? objects : [])
+                        .filter((obj) => obj?.type === 'mindmap')
+                        .filter((obj) => (obj?.properties?.mindmap?.compoundId || obj?.id) === compoundId)
+                        .map((obj) => obj.id);
+                }
+                const childrenByParent = collectMindmapChildrenByParent(objects);
+                return [dragged.id, ...collectMindmapDescendants(childrenByParent, dragged.id)];
+            })();
+            const startById = new Map();
+            scopeIds.forEach((id) => {
+                const obj = byId.get(id);
+                if (!obj) return;
+                startById.set(id, {
+                    x: Math.round(obj?.position?.x || 0),
+                    y: Math.round(obj?.position?.y || 0),
+                });
+            });
+            const rootStart = startById.get(dragged.id);
+            core._mindmapLiveDrag = {
+                draggedId: dragged.id,
+                scopeIds,
+                startById,
+                rootStart,
+            };
+        } else {
+            core._mindmapLiveDrag = null;
+        }
         const pixiObject = core.pixi.objects.get(data.object);
         if (pixiObject) {
             const halfW = (pixiObject.width || 0) / 2;
@@ -229,6 +295,19 @@ export function setupLayerAndViewportFlow(core) {
 
     core.eventBus.on(Events.Tool.DragUpdate, (data) => {
         core.updateObjectPositionDirect(data.object, data.position, { snap: false });
+        const ctx = core._mindmapLiveDrag;
+        if (ctx && ctx.draggedId === data.object && ctx.rootStart && ctx.startById instanceof Map) {
+            const dx = Math.round((data?.position?.x || 0) - ctx.rootStart.x);
+            const dy = Math.round((data?.position?.y || 0) - ctx.rootStart.y);
+            (Array.isArray(ctx.scopeIds) ? ctx.scopeIds : []).forEach((id) => {
+                if (id === data.object) return;
+                const start = ctx.startById.get(id);
+                if (!start) return;
+                const nextPos = { x: Math.round(start.x + dx), y: Math.round(start.y + dy) };
+                core.updateObjectPositionDirect(id, nextPos, { snap: false });
+                core.eventBus.emit(Events.Object.TransformUpdated, { objectId: id });
+            });
+        }
     });
 
     core.eventBus.on(Events.Tool.DragEnd, (data) => {
@@ -272,5 +351,6 @@ export function setupLayerAndViewportFlow(core) {
             }
             core.dragStartPosition = null;
         }
+        core._mindmapLiveDrag = null;
     });
 }
