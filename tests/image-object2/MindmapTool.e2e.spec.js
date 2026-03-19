@@ -1613,6 +1613,99 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       .toBe(true);
   });
 
+  test('mindmap branch siblings align by edge and keep equal vertical spacing', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5);
+
+    const root = await getMindmapObject(page);
+    expect(root?.id).toBeTruthy();
+
+    const selectNode = async (nodeId) => {
+      await page.evaluate((id) => {
+        const core = window.moodboard?.coreMoodboard;
+        if (!core) return;
+        core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+        const tm = core.toolManager;
+        const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+        if (!selectTool) return;
+        selectTool.setSelection([id]);
+        if (typeof selectTool.updateResizeHandles === 'function') {
+          selectTool.updateResizeHandles();
+        }
+      }, nodeId);
+    };
+
+    await selectNode(root.id);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="right"]')).toBeVisible();
+    await page.locator('.mb-mindmap-side-btn[data-side="right"]').click();
+
+    await expect
+      .poll(async () => {
+        return page.evaluate((rootId) => {
+          const board = window.moodboard.exportBoard();
+          const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+          const child = nodes.find((o) => o.id !== rootId) || null;
+          return child?.id || null;
+        }, root.id);
+      })
+      .toEqual(expect.any(String));
+
+    const childId = await page.evaluate((rootId) => {
+      const board = window.moodboard.exportBoard();
+      const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+      const child = nodes.find((o) => o.id !== rootId) || null;
+      return child?.id || null;
+    }, root.id);
+    expect(childId).toBeTruthy();
+
+    await selectNode(childId);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="bottom"]')).toBeVisible();
+    await page.locator('.mb-mindmap-side-btn[data-side="bottom"]').click();
+    await expect
+      .poll(async () => {
+        const board = await page.evaluate(() => window.moodboard.exportBoard());
+        return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+      })
+      .toBe(3);
+
+    await selectNode(childId);
+    await expect(page.locator('.mb-mindmap-side-btn[data-side="bottom"]')).toBeVisible();
+    await page.locator('.mb-mindmap-side-btn[data-side="bottom"]').click();
+    await expect
+      .poll(async () => {
+        const board = await page.evaluate(() => window.moodboard.exportBoard());
+        return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+      })
+      .toBe(4);
+
+    await expect
+      .poll(async () => {
+        return page.evaluate((rootId) => {
+          const board = window.moodboard.exportBoard();
+          const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+          const branchNodes = nodes
+            .filter((o) => {
+              const m = o.properties?.mindmap || {};
+              return m.role === 'child' && m.parentId === rootId && m.side === 'right';
+            })
+            .sort((a, b) => (a.position?.y || 0) - (b.position?.y || 0));
+          if (branchNodes.length < 3) return false;
+          const lefts = branchNodes.map((n) => Math.round(n.position?.x || 0));
+          const leftSpread = Math.max(...lefts) - Math.min(...lefts);
+          const dY = [];
+          for (let i = 1; i < branchNodes.length; i += 1) {
+            dY.push(Math.round((branchNodes[i].position?.y || 0) - (branchNodes[i - 1].position?.y || 0)));
+          }
+          const dySpread = Math.max(...dY) - Math.min(...dY);
+          return leftSpread <= 1 && dySpread <= 1;
+        }, root.id);
+      })
+      .toBe(true);
+  });
+
   test('mindmap mixed plus-and-bottom keeps operation semantics on next level', async ({ page }) => {
     await page.click('.moodboard-toolbar__button--mindmap');
     const canvas = page.locator('.moodboard-workspace__canvas canvas');

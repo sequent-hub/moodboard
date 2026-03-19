@@ -12,6 +12,7 @@ const MINDMAP_CHILD_STROKE_COLOR = 0x16A34A;
 const MINDMAP_CHILD_FILL_COLOR = 0x16A34A;
 const MINDMAP_CHILD_FILL_ALPHA = 0.25;
 const MINDMAP_CHILD_GAP_MULTIPLIER = 10;
+const MINDMAP_CHILD_VERTICAL_GAP_MULTIPLIER = 2;
 
 function resolveBottomSiblingParentId(sourceObjectId, sourceMeta) {
     if (typeof sourceMeta?.parentId === 'string' && sourceMeta.parentId.length > 0) {
@@ -24,6 +25,77 @@ function resolveBottomSiblingParentId(sourceObjectId, sourceMeta) {
         return sourceObjectId;
     }
     return sourceMeta?.parentId || null;
+}
+
+function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
+    if (!core || !eventBus || !parentId || (side !== 'left' && side !== 'right')) return;
+    const objects = core?.state?.state?.objects || [];
+    const mindmaps = Array.isArray(objects) ? objects.filter((obj) => obj?.type === 'mindmap') : [];
+    const byId = new Map(mindmaps.map((obj) => [obj.id, obj]));
+    const parent = byId.get(parentId);
+    if (!parent) return;
+
+    const siblings = mindmaps
+        .filter((obj) => {
+            const meta = obj?.properties?.mindmap || {};
+            return meta?.role === 'child' && meta?.parentId === parentId && meta?.side === side;
+        })
+        .sort((a, b) => (a?.position?.y || 0) - (b?.position?.y || 0));
+    if (siblings.length === 0) return;
+
+    const app = core?.pixi?.app;
+    const worldLayer = core?.pixi?.worldLayer || app?.stage;
+    const rendererRes = app?.renderer?.resolution || 1;
+    const worldScale = worldLayer?.scale?.x || 1;
+    const baseGapWorld = Math.max(1, Math.round((10 * rendererRes) / worldScale));
+    const gapWorld = Math.max(1, Math.round(baseGapWorld * MINDMAP_CHILD_GAP_MULTIPLIER));
+    const verticalGapWorld = Math.max(1, Math.round(baseGapWorld * MINDMAP_CHILD_VERTICAL_GAP_MULTIPLIER));
+
+    const parentX = Math.round(parent?.position?.x || 0);
+    const parentWidth = Math.max(1, Math.round(parent?.width || parent?.properties?.width || 1));
+    const anchorLeftX = side === 'right'
+        ? Math.round(parentX + parentWidth + gapWorld)
+        : null;
+    const anchorRightX = side === 'left'
+        ? Math.round(parentX - gapWorld)
+        : null;
+
+    const avgHeight = Math.max(
+        1,
+        Math.round(
+            siblings.reduce((acc, node) => {
+                const h = Math.max(1, Math.round(node?.height || node?.properties?.height || 1));
+                return acc + h;
+            }, 0) / siblings.length
+        )
+    );
+    const verticalStep = Math.max(1, avgHeight + verticalGapWorld);
+    const startY = Math.round(siblings[0]?.position?.y || 0);
+
+    let movedCount = 0;
+    siblings.forEach((node, index) => {
+        const currentX = Math.round(node?.position?.x || 0);
+        const currentY = Math.round(node?.position?.y || 0);
+        const nodeWidth = Math.max(1, Math.round(node?.width || node?.properties?.width || 1));
+        const targetX = side === 'right'
+            ? anchorLeftX
+            : Math.round((anchorRightX || 0) - nodeWidth);
+        const targetY = Math.round(startY + index * verticalStep);
+
+        if (targetX === currentX && targetY === currentY) return;
+        core.updateObjectPositionDirect(node.id, { x: targetX, y: targetY }, { snap: false });
+        eventBus.emit(Events.Object.TransformUpdated, { objectId: node.id });
+        eventBus.emit(Events.Tool.DragUpdate, { object: node.id });
+        movedCount += 1;
+    });
+
+    logMindmapCompoundDebug('layout:branch-level-align', {
+        parentId,
+        side,
+        siblingsCount: siblings.length,
+        movedCount,
+        verticalStep,
+    });
 }
 
 export class HandlesDomRenderer {
@@ -314,6 +386,22 @@ export class HandlesDomRenderer {
                         fillAlpha: MINDMAP_CHILD_FILL_ALPHA,
                     },
                 });
+                setTimeout(() => {
+                    relayoutMindmapBranchLevel({
+                        core: this.host.core,
+                        eventBus: this.host.eventBus,
+                        parentId: metaParentId,
+                        side: metaSide,
+                    });
+                }, 0);
+                setTimeout(() => {
+                    relayoutMindmapBranchLevel({
+                        core: this.host.core,
+                        eventBus: this.host.eventBus,
+                        parentId: metaParentId,
+                        side: metaSide,
+                    });
+                }, 24);
             };
             const createMindmapSideButton = (side) => {
                 const btn = document.createElement('button');
