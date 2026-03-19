@@ -100,10 +100,11 @@ export class ToolbarActionRouter {
                     paddingX: MINDMAP_LAYOUT.paddingX,
                     paddingY: MINDMAP_LAYOUT.paddingY,
                     maxLineChars: MINDMAP_LAYOUT.maxLineChars,
+                    textColor: 0x212121,
                     strokeColor: 0x2563EB,
                     fillColor: 0x3B82F6,
                     fillAlpha: 0.25,
-                    strokeWidth: 2
+                    strokeWidth: 1
                 }
             });
             return true;

@@ -525,10 +525,10 @@ export class GhostController {
             : 0.25;
         const strokeWidth = (typeof host.pending.properties?.strokeWidth === 'number')
             ? host.pending.properties.strokeWidth
-            : 2;
+            : 1;
         const fontSize = Math.max(1, Math.round(host.pending.properties?.fontSize || MINDMAP_LAYOUT.fontSize));
         const fontFamily = host.pending.properties?.fontFamily || 'Roboto, Arial, sans-serif';
-        const textColor = host.pending.properties?.textColor || 0x1e3a8a;
+        const textColor = host.pending.properties?.textColor || 0x212121;
         const paddingX = Math.max(0, Math.round(host.pending.properties?.paddingX ?? MINDMAP_LAYOUT.paddingX));
         const placeholderText = 'Напишите что-нибудь';
         const dynamicRadius = Math.max(0, Math.floor(Math.min(width, height) / 2));
@@ -567,7 +567,6 @@ export class GhostController {
             graphics.endFill();
         }
 
-        drawGhostCapsule(strokeWidth + 1, 0.35);
         drawGhostCapsule(strokeWidth, 1);
 
         host.ghostContainer.addChild(graphics);

@@ -207,7 +207,7 @@ export class MindmapConnectionLayer {
 
             try {
                 g.lineStyle({
-                    width: 2,
+                    width: 1,
                     color,
                     alpha: 0.95,
                     alignment: 0.5,
@@ -216,7 +216,7 @@ export class MindmapConnectionLayer {
                     miterLimit: 2,
                 });
             } catch (_) {
-                g.lineStyle(2, color, 0.95, 0.5);
+                g.lineStyle(1, color, 0.95, 0.5);
             }
             g.moveTo(Math.round(start.x), Math.round(start.y));
             g.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, Math.round(end.x), Math.round(end.y));

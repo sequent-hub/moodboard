@@ -1190,6 +1190,7 @@ export class HandlesDomRenderer {
                         strokeColor: branchColor,
                         fillColor: branchColor,
                         fillAlpha: MINDMAP_CHILD_FILL_ALPHA,
+                        strokeWidth: 1,
                     },
                 });
                 setTimeout(() => {

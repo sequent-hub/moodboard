@@ -141,7 +141,7 @@ export class MindmapHtmlTextLayer {
         contentEl.className = 'mb-text--mindmap-content';
 
         const fontFamily = this.overlayAdapter.getDefaultFontFamily(objectData);
-        const color = objectData.color || objectData.properties?.color || objectData.properties?.textColor || '#000000';
+        const color = objectData.color || objectData.properties?.color || objectData.properties?.textColor || '#212121';
         const baseFontSize = objectData.fontSize || objectData.properties?.fontSize || MINDMAP_LAYOUT.fontSize;
         const baseLineHeight = Math.round(baseFontSize * 1.24);
         const paddingX = Math.max(0, Math.round(objectData.properties?.paddingX ?? MINDMAP_LAYOUT.paddingX));
