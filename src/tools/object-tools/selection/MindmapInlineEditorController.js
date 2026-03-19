@@ -389,6 +389,8 @@ export function openMindmapEditor(object, create = false) {
         return Math.max(1, Math.ceil(Number.isFinite(lineHeight) ? lineHeight : 1));
     };
 
+    const shouldAnchorRightEdge = String(properties?.mindmap?.side || '') === 'left';
+
     const syncMindmapSize = () => {
         if (!objectId) return;
 
@@ -410,7 +412,17 @@ export function openMindmapEditor(object, create = false) {
         const heightChangedCss = nextCssHeight !== currentCssHeight;
         if (!widthChangedCss && !heightChangedCss) return;
 
-        if (widthChangedCss) wrapper.style.width = `${nextCssWidth}px`;
+        const currentCssLeft = Math.round(parseFloat(wrapper.style.left || '0'));
+        const nextCssLeft = shouldAnchorRightEdge
+            ? (currentCssLeft + (currentCssWidth - nextCssWidth))
+            : currentCssLeft;
+
+        if (widthChangedCss) {
+            wrapper.style.width = `${nextCssWidth}px`;
+            if (shouldAnchorRightEdge) {
+                wrapper.style.left = `${nextCssLeft}px`;
+            }
+        }
         if (heightChangedCss) wrapper.style.height = `${nextCssHeight}px`;
 
         const cssToWorld = getCssToWorldScale();
@@ -438,8 +450,11 @@ export function openMindmapEditor(object, create = false) {
             resizeSession.oldPosition = { x: currentPosition.x, y: currentPosition.y };
         }
 
+        const nextWorldPositionX = shouldAnchorRightEdge
+            ? Math.round(currentPosition.x + (currentWorldWidth - nextWorldWidth))
+            : Math.round(currentPosition.x);
         resizeSession.newSize = { width: nextWorldWidth, height: nextWorldHeight };
-        resizeSession.newPosition = { x: currentPosition.x, y: currentPosition.y };
+        resizeSession.newPosition = { x: nextWorldPositionX, y: Math.round(currentPosition.y) };
 
         this.eventBus.emit(Events.Tool.ResizeUpdate, {
             object: objectId,

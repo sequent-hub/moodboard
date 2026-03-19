@@ -659,6 +659,225 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       .toBe(true);
   });
 
+  test('mindmap left child keeps right edge anchor while width changes', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5);
+
+    await expect
+      .poll(async () => {
+        const board = await page.evaluate(() => window.moodboard.exportBoard());
+        return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+      })
+      .toBe(1);
+
+    await page.mouse.click(5, 5);
+    await expect(page.locator('.moodboard-text-input')).toHaveCount(0);
+
+    const root = await getMindmapObject(page);
+    expect(root?.id).toBeTruthy();
+
+    await page.evaluate((rootId) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+      const tm = core.toolManager;
+      const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+      if (!selectTool) return;
+      selectTool.setSelection([rootId]);
+      if (typeof selectTool.updateResizeHandles === 'function') {
+        selectTool.updateResizeHandles();
+      }
+    }, root.id);
+
+    const leftBtn = page.locator('.mb-mindmap-side-btn[data-side="left"]');
+    await expect(leftBtn).toBeVisible();
+    await leftBtn.click();
+
+    await expect
+      .poll(async () => {
+        const board = await page.evaluate(() => window.moodboard.exportBoard());
+        return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+      })
+      .toBe(2);
+
+    const childBefore = await page.evaluate((rootId) => {
+      const board = window.moodboard.exportBoard();
+      const child = (board?.objects || []).find((o) => {
+        if (o.type !== 'mindmap' || o.id === rootId) return false;
+        const meta = o.properties?.mindmap || {};
+        return meta.role === 'child' && meta.side === 'left';
+      });
+      if (!child) return null;
+      const x = Math.round(child.position?.x || 0);
+      const width = Math.round(child.width || 0);
+      return { id: child.id, x, width, right: x + width };
+    }, root.id);
+    expect(childBefore).toBeTruthy();
+
+    const textarea = page.locator('.moodboard-text-input');
+    await expect(textarea).toBeVisible();
+    await textarea.fill('W'.repeat(50));
+
+    await expect
+      .poll(async () => {
+        const board = await page.evaluate(() => window.moodboard.exportBoard());
+        const child = (board?.objects || []).find((o) => o.id === childBefore.id);
+        if (!child) return false;
+        return Math.round(child.width || 0) > childBefore.width;
+      })
+      .toBe(true);
+
+    const childAfter = await page.evaluate((childId) => {
+      const board = window.moodboard.exportBoard();
+      const child = (board?.objects || []).find((o) => o.id === childId);
+      if (!child) return null;
+      const x = Math.round(child.position?.x || 0);
+      const width = Math.round(child.width || 0);
+      return { x, width, right: x + width };
+    }, childBefore.id);
+    expect(childAfter).toBeTruthy();
+    expect(childAfter.x).toBeLessThan(childBefore.x);
+    expect(Math.abs(childAfter.right - childBefore.right)).toBeLessThanOrEqual(2);
+  });
+
+  test('mindmap bottom clone on left branch keeps right edge anchor while width changes', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.5, canvasBox.y + canvasBox.height * 0.5);
+
+    await expect
+      .poll(async () => {
+        const board = await page.evaluate(() => window.moodboard.exportBoard());
+        return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+      })
+      .toBe(1);
+
+    await page.mouse.click(5, 5);
+    await expect(page.locator('.moodboard-text-input')).toHaveCount(0);
+
+    const root = await getMindmapObject(page);
+    expect(root?.id).toBeTruthy();
+
+    const selectNode = async (nodeId) => {
+      await page.evaluate((id) => {
+        const core = window.moodboard?.coreMoodboard;
+        if (!core) return;
+        core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+        const tm = core.toolManager;
+        const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+        if (!selectTool) return;
+        selectTool.setSelection([id]);
+        if (typeof selectTool.updateResizeHandles === 'function') {
+          selectTool.updateResizeHandles();
+        }
+      }, nodeId);
+    };
+
+    await selectNode(root.id);
+    const leftBtn = page.locator('.mb-mindmap-side-btn[data-side="left"]');
+    await expect(leftBtn).toBeVisible();
+    await leftBtn.click();
+
+    await expect
+      .poll(async () => {
+        const board = await page.evaluate(() => window.moodboard.exportBoard());
+        return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+      })
+      .toBe(2);
+
+    const firstChild = await page.evaluate((rootId) => {
+      const board = window.moodboard.exportBoard();
+      return (board?.objects || []).find((o) => {
+        if (o.type !== 'mindmap' || o.id === rootId) return false;
+        const meta = o.properties?.mindmap || {};
+        return meta.role === 'child' && meta.side === 'left' && meta.parentId === rootId;
+      }) || null;
+    }, root.id);
+    expect(firstChild?.id).toBeTruthy();
+
+    await selectNode(firstChild.id);
+    const bottomBtn = page.locator('.mb-mindmap-side-btn[data-side="bottom"]');
+    await expect(bottomBtn).toBeVisible();
+
+    const beforeBottomIds = await page.evaluate(() => {
+      const board = window.moodboard.exportBoard();
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').map((o) => o.id);
+    });
+    await bottomBtn.click();
+
+    await expect
+      .poll(async () => {
+        const board = await page.evaluate(() => window.moodboard.exportBoard());
+        return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+      })
+      .toBe(3);
+
+    const bottomCloneBefore = await page.evaluate(({ rootId, firstChildId, knownIds }) => {
+      const known = new Set(knownIds);
+      const board = window.moodboard.exportBoard();
+      const clone = (board?.objects || []).find((o) => {
+        if (o.type !== 'mindmap' || o.id === rootId || o.id === firstChildId || known.has(o.id)) return false;
+        const meta = o.properties?.mindmap || {};
+        return meta.role === 'child' && meta.side === 'left';
+      });
+      if (!clone) return null;
+      const meta = clone.properties?.mindmap || {};
+      const x = Math.round(clone.position?.x || 0);
+      const width = Math.round(clone.width || 0);
+      return {
+        id: clone.id,
+        x,
+        width,
+        right: x + width,
+        parentId: meta.parentId || null,
+      };
+    }, { rootId: root.id, firstChildId: firstChild.id, knownIds: beforeBottomIds });
+    expect(bottomCloneBefore).toBeTruthy();
+    expect(bottomCloneBefore.parentId).toBe(root.id);
+
+    const textarea = page.locator('.moodboard-text-input');
+    await expect(textarea).toBeVisible();
+    await textarea.fill('Z');
+
+    const bottomCloneAfterShort = await page.evaluate((cloneId) => {
+      const board = window.moodboard.exportBoard();
+      const node = (board?.objects || []).find((o) => o.id === cloneId);
+      if (!node) return null;
+      const x = Math.round(node.position?.x || 0);
+      const width = Math.round(node.width || 0);
+      return { x, width, right: x + width };
+    }, bottomCloneBefore.id);
+    expect(bottomCloneAfterShort).toBeTruthy();
+
+    await textarea.fill('QWERTYUIOPASDFGHJKLZXCVBNM1234567890QWERTYUIOPAS');
+
+    await expect
+      .poll(async () => {
+        const board = await page.evaluate(() => window.moodboard.exportBoard());
+        const node = (board?.objects || []).find((o) => o.id === bottomCloneBefore.id);
+        if (!node) return false;
+        return Math.round(node.width || 0) > bottomCloneAfterShort.width;
+      })
+      .toBe(true);
+
+    const bottomCloneAfterLong = await page.evaluate((cloneId) => {
+      const board = window.moodboard.exportBoard();
+      const node = (board?.objects || []).find((o) => o.id === cloneId);
+      if (!node) return null;
+      const x = Math.round(node.position?.x || 0);
+      const width = Math.round(node.width || 0);
+      return { x, width, right: x + width };
+    }, bottomCloneBefore.id);
+    expect(bottomCloneAfterLong).toBeTruthy();
+    expect(bottomCloneAfterLong.x).toBeLessThan(bottomCloneAfterShort.x);
+    expect(Math.abs(bottomCloneAfterLong.right - bottomCloneAfterShort.right)).toBeLessThanOrEqual(2);
+  });
+
   test('mindmap enforces max 50 chars per line and keeps same line breaks in display mode', async ({ page }) => {
     await page.click('.moodboard-toolbar__button--mindmap');
     const canvas = page.locator('.moodboard-workspace__canvas canvas');
@@ -974,7 +1193,7 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
       await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5);
     };
     const closeEditor = async () => {
-      await page.mouse.click(5, 5);
+      await page.mouse.click(canvasBox.x + canvasBox.width - 8, canvasBox.y + 8);
       await expect(page.locator('.moodboard-text-input')).toHaveCount(0);
     };
 
