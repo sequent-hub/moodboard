@@ -476,6 +476,7 @@ function tryReorderMindmapBranchByDraggedNode({ core, draggedId }) {
     const orderedCurrent = [...branchNodes].sort(sortByOrderThenY);
     const currentIndex = orderedCurrent.findIndex((obj) => obj?.id === draggedId);
     if (currentIndex < 0) return null;
+    const orderedBeforeIds = orderedCurrent.map((obj) => obj?.id).filter(Boolean);
 
     const siblings = orderedCurrent.filter((obj) => obj?.id !== draggedId);
     const draggedCenterY = Math.round(dragged?.position?.y || 0) + Math.round((dragged?.height || dragged?.properties?.height || 0) / 2);
@@ -489,6 +490,16 @@ function tryReorderMindmapBranchByDraggedNode({ core, draggedId }) {
         }
         return idx;
     })();
+    logMindmapCompoundDebug('layout:branch-reorder-eval', {
+        draggedId,
+        parentId,
+        side,
+        branchSize: branchNodes.length,
+        draggedCenterY,
+        fromIndex: currentIndex,
+        toIndex: insertionIndex,
+        orderedBeforeIds,
+    });
     if (insertionIndex === currentIndex) {
         return { changed: false, parentId, side, fromIndex: currentIndex, toIndex: insertionIndex };
     }
@@ -510,6 +521,16 @@ function tryReorderMindmapBranchByDraggedNode({ core, draggedId }) {
     if (changedCount > 0) {
         core?.state?.markDirty?.();
     }
+    const orderedAfterIds = nextOrder.map((obj) => obj?.id).filter(Boolean);
+    logMindmapCompoundDebug('layout:branch-reorder-apply', {
+        draggedId,
+        parentId,
+        side,
+        fromIndex: currentIndex,
+        toIndex: insertionIndex,
+        changedCount,
+        orderedAfterIds,
+    });
     return {
         changed: changedCount > 0,
         changedCount,
@@ -518,6 +539,27 @@ function tryReorderMindmapBranchByDraggedNode({ core, draggedId }) {
         fromIndex: currentIndex,
         toIndex: insertionIndex,
     };
+}
+
+function resolvePrimaryDraggedMindmapId({ byId, draggedMindmapIds = [] }) {
+    const ids = Array.isArray(draggedMindmapIds) ? draggedMindmapIds.filter((id) => typeof id === 'string' && id.length > 0) : [];
+    if (!ids.length) return null;
+    if (ids.length === 1) return ids[0];
+    const idSet = new Set(ids);
+    const topLevelCandidates = ids.filter((id) => {
+        const node = byId.get(id);
+        const meta = node?.properties?.mindmap || {};
+        const parentId = meta?.parentId || null;
+        return !parentId || !idSet.has(parentId);
+    });
+    if (topLevelCandidates.length === 1) return topLevelCandidates[0];
+    const childCandidate = topLevelCandidates.find((id) => {
+        const node = byId.get(id);
+        const role = node?.properties?.mindmap?.role || null;
+        return role === 'child';
+    });
+    if (childCandidate) return childCandidate;
+    return topLevelCandidates[0] || ids[0];
 }
 
 export class HandlesDomRenderer {
@@ -552,9 +594,27 @@ export class HandlesDomRenderer {
         const byId = new Map(mindmaps.map((obj) => [obj.id, obj]));
         const draggedMindmapIds = ids.filter((id) => byId.has(id));
         if (!draggedMindmapIds.length) return;
-        const singleDraggedId = draggedMindmapIds.length === 1 ? draggedMindmapIds[0] : null;
-        const reparentResult = singleDraggedId
-            ? tryReparentMindmapOnDrop({ core, draggedId: singleDraggedId })
+        const primaryDraggedId = resolvePrimaryDraggedMindmapId({ byId, draggedMindmapIds });
+        if (draggedMindmapIds.length > 1) {
+            const dragMeta = draggedMindmapIds.map((id) => {
+                const node = byId.get(id);
+                const meta = node?.properties?.mindmap || {};
+                return {
+                    id,
+                    role: meta.role || null,
+                    parentId: meta.parentId || null,
+                    side: meta.side || null,
+                    branchOrder: Number.isFinite(meta.branchOrder) ? Number(meta.branchOrder) : null,
+                };
+            });
+            logMindmapCompoundDebug('layout:drag-end-skip-reorder-multi', {
+                draggedIds: draggedMindmapIds,
+                dragMeta,
+                primaryDraggedId: primaryDraggedId || null,
+            });
+        }
+        const reparentResult = primaryDraggedId
+            ? tryReparentMindmapOnDrop({ core, draggedId: primaryDraggedId })
             : null;
         if (reparentResult?.changed) {
             logMindmapCompoundDebug('layout:drag-end-reparent', {
@@ -582,12 +642,12 @@ export class HandlesDomRenderer {
             }
             return;
         }
-        const reorderResult = singleDraggedId
-            ? tryReorderMindmapBranchByDraggedNode({ core, draggedId: singleDraggedId })
+        const reorderResult = primaryDraggedId
+            ? tryReorderMindmapBranchByDraggedNode({ core, draggedId: primaryDraggedId })
             : null;
         if (reorderResult?.changed) {
             logMindmapCompoundDebug('layout:drag-end-branch-reorder', {
-                draggedId: singleDraggedId,
+                draggedId: primaryDraggedId,
                 parentId: reorderResult.parentId || null,
                 side: reorderResult.side || null,
                 fromIndex: reorderResult.fromIndex,
@@ -651,6 +711,14 @@ export class HandlesDomRenderer {
                 });
             });
         });
+        if (reorderResult?.changed && reorderResult.parentId && (reorderResult.side === 'left' || reorderResult.side === 'right')) {
+            relayoutMindmapBranchCascade({
+                core,
+                eventBus,
+                startParentId: reorderResult.parentId,
+                startSide: reorderResult.side,
+            });
+        }
     }
 
     setHandlesVisibility(show) {
