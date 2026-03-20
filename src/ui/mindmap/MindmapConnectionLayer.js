@@ -109,17 +109,14 @@ export class MindmapConnectionLayer {
         this.graphics = null;
         this.subscriptions = [];
         this._lastSegments = [];
+        this._eventsAttached = false;
     }
 
     attach() {
         if (!this.core?.pixi) return;
-        if (this.graphics) return;
-        this.graphics = new PIXI.Graphics();
-        this.graphics.name = 'mindmap-connection-layer';
-        this.graphics.zIndex = 2;
-        const world = this.core.pixi.worldLayer || this.core.pixi.app?.stage;
-        world?.addChild?.(this.graphics);
-        this._attachEvents();
+        if (!this._eventsAttached) {
+            this._attachEvents();
+        }
         this.updateAll();
     }
 
@@ -135,6 +132,7 @@ export class MindmapConnectionLayer {
     }
 
     _attachEvents() {
+        if (this._eventsAttached) return;
         const bindings = [
             [Events.Object.Created, () => this.updateAll()],
             [Events.Object.Deleted, () => this.updateAll()],
@@ -156,6 +154,7 @@ export class MindmapConnectionLayer {
             this.eventBus.on(event, handler);
             this.subscriptions.push([event, handler]);
         });
+        this._eventsAttached = true;
     }
 
     _detachEvents() {
@@ -165,10 +164,10 @@ export class MindmapConnectionLayer {
         }
         this.subscriptions.forEach(([event, handler]) => this.eventBus.off(event, handler));
         this.subscriptions = [];
+        this._eventsAttached = false;
     }
 
     updateAll() {
-        if (!this.graphics) return;
         const objects = asArray(this.core?.state?.state?.objects);
         const mindmaps = objects.filter(isMindmap);
         const byId = new Map(mindmaps.map((obj) => [obj.id, obj]));
@@ -183,6 +182,22 @@ export class MindmapConnectionLayer {
             const meta = asMindmapMeta(obj);
             return meta.role === 'child' && typeof meta.parentId === 'string' && meta.parentId.length > 0;
         });
+
+        if (children.length === 0) {
+            if (this.graphics) {
+                this.graphics.clear();
+            }
+            this._lastSegments = [];
+            return;
+        }
+
+        if (!this.graphics) {
+            this.graphics = new PIXI.Graphics();
+            this.graphics.name = 'mindmap-connection-layer';
+            this.graphics.zIndex = 2;
+            const world = this.core?.pixi?.worldLayer || this.core?.pixi?.app?.stage;
+            world?.addChild?.(this.graphics);
+        }
 
         const g = this.graphics;
         g.clear();
