@@ -1,6 +1,21 @@
 import { Events } from '../../core/events/Events.js';
 import { logMindmapCompoundDebug } from '../../mindmap/MindmapCompoundContract.js';
 
+function getSelectTool(board) {
+    const toolManager = board?.coreMoodboard?.toolManager;
+    if (!toolManager) return null;
+    return toolManager?.tools?.get?.('select')
+        || toolManager?.registry?.get?.('select')
+        || null;
+}
+
+function hasOpenTextEditorInDom(board) {
+    const doc = board?.workspaceElement?.ownerDocument
+        || (typeof document !== 'undefined' ? document : null);
+    if (!doc || typeof doc.querySelector !== 'function') return false;
+    return Boolean(doc.querySelector('.moodboard-text-input'));
+}
+
 export function bindToolbarEvents(board) {
     board.coreMoodboard.eventBus.on(Events.UI.ToolbarAction, (action) => {
         if (action?.type === 'mindmap') {
@@ -13,8 +28,49 @@ export function bindToolbarEvents(board) {
         const createdObject = board.actionHandler.handleToolbarAction(action);
         if (action?.type === 'mindmap' && createdObject?.id) {
             const content = String(createdObject?.properties?.content || '');
-            if (content.trim().length === 0) {
+            const createdMeta = createdObject?.properties?.mindmap || {};
+            const isRootMindmap = createdMeta?.role === 'root';
+            const mindmapObjects = (board?.coreMoodboard?.state?.state?.objects || [])
+                .filter((obj) => obj?.type === 'mindmap');
+            const rootCount = mindmapObjects.filter((obj) => (obj?.properties?.mindmap?.role || null) === 'root').length;
+            const shouldAutoOpenForRoot = !isRootMindmap || rootCount <= 1;
+            const selectTool = getSelectTool(board);
+            const hasActiveEditor = Boolean(selectTool?.textEditor?.active);
+            const hasEditorDom = hasOpenTextEditorInDom(board);
+            const shouldBlockAutoOpen = hasActiveEditor && hasEditorDom;
+            if (content.trim().length === 0 && !shouldBlockAutoOpen && shouldAutoOpenForRoot) {
+                const doc = board?.workspaceElement?.ownerDocument
+                    || (typeof document !== 'undefined' ? document : null);
+                const closeSeqAtSchedule = Number(selectTool?._mindmapEditorCloseSeq || 0);
+                let cancelledByPointer = false;
+                const cancelOnPointerDown = () => {
+                    cancelledByPointer = true;
+                };
+                const cancelOnEscape = (event) => {
+                    if (event?.key === 'Escape') {
+                        cancelledByPointer = true;
+                    }
+                };
+                if (doc && typeof doc.addEventListener === 'function') {
+                    doc.addEventListener('pointerdown', cancelOnPointerDown, true);
+                    doc.addEventListener('keydown', cancelOnEscape, true);
+                }
                 setTimeout(() => {
+                    if (doc && typeof doc.removeEventListener === 'function') {
+                        doc.removeEventListener('pointerdown', cancelOnPointerDown, true);
+                        doc.removeEventListener('keydown', cancelOnEscape, true);
+                    }
+                    if (cancelledByPointer) return;
+                    const latestSelectTool = getSelectTool(board);
+                    const latestCloseSeq = Number(latestSelectTool?._mindmapEditorCloseSeq || 0);
+                    if (latestCloseSeq !== closeSeqAtSchedule) return;
+
+                    const nextSelectTool = getSelectTool(board);
+                    const nextHasActiveEditor = Boolean(nextSelectTool?.textEditor?.active);
+                    const nextHasEditorDom = hasOpenTextEditorInDom(board);
+                    if (nextHasActiveEditor || nextHasEditorDom) {
+                        return;
+                    }
                     board.coreMoodboard.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
                     board.coreMoodboard.eventBus.emit(Events.Tool.ObjectEdit, {
                         object: {
@@ -25,7 +81,7 @@ export function bindToolbarEvents(board) {
                         },
                         create: true,
                     });
-                }, 20);
+                }, 0);
             }
         }
     });

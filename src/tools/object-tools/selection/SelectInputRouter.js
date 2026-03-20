@@ -250,7 +250,20 @@ export function onContextMenu(event) {
 export function onKeyDown(event) {
     // Проверяем, не активен ли текстовый редактор (редактирование названия файла или текста)
     if (this.textEditor && this.textEditor.active) {
-        return; // Не обрабатываем клавиши во время редактирования
+        if (event.key === 'Escape') {
+            if (this.textEditor.objectType === 'file') {
+                this._closeFileNameEditor(false);
+            } else {
+                this._closeTextEditor(false);
+            }
+            if (this.textEditor.objectType === 'mindmap') {
+                this.clearSelection();
+            }
+            if (event?.originalEvent?.preventDefault) {
+                event.originalEvent.preventDefault();
+            }
+        }
+        return; // Не обрабатываем остальные клавиши во время редактирования
     }
 
     switch (event.key) {

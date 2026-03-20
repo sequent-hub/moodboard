@@ -48,6 +48,13 @@ export function hasSelection() {
 }
 
 export function setSelection(objectIds) {
+    if (this.textEditor?.active && !this._selectionSyncFromEditor) {
+        if (this.textEditor.objectType === 'file' && typeof this._closeFileNameEditor === 'function') {
+            this._closeFileNameEditor(true);
+        } else if (typeof this._closeTextEditor === 'function') {
+            this._closeTextEditor(true);
+        }
+    }
     const prev = this.selection.toArray();
     this.selection.clear();
     this.selection.addMany(objectIds);

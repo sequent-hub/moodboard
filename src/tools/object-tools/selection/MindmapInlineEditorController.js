@@ -175,7 +175,12 @@ export function openMindmapEditor(object, create = false) {
 
     this.eventBus.emit(Events.UI.TextEditStart, { objectId: objectId || null });
     if (objectId && typeof this.setSelection === 'function') {
-        this.setSelection([objectId]);
+        this._selectionSyncFromEditor = true;
+        try {
+            this.setSelection([objectId]);
+        } finally {
+            this._selectionSyncFromEditor = false;
+        }
     }
     updateGlobalTextEditorHandlesLayer();
 
@@ -496,6 +501,36 @@ export function openMindmapEditor(object, create = false) {
 
     hideStaticTextDuringEditing(this, objectId);
 
+    const ownerDoc = view?.ownerDocument || (typeof document !== 'undefined' ? document : null);
+    const onOutsideDocumentPointerDown = (event) => {
+        if (!this.textEditor?.active || this.textEditor.objectType !== 'mindmap') return;
+        const target = event?.target;
+        if (!target) return;
+        if (wrapper.contains(target)) return;
+        const sideButton = (typeof target.closest === 'function')
+            ? target.closest('.mb-mindmap-side-btn')
+            : null;
+        if (sideButton?.dataset?.side === 'bottom') return;
+        finalize(true);
+        if (typeof this.clearSelection === 'function') {
+            this.clearSelection();
+        }
+    };
+    const onEscapeDocumentKeyDown = (event) => {
+        if (!this.textEditor?.active || this.textEditor.objectType !== 'mindmap') return;
+        if (event?.key !== 'Escape') return;
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+        finalize(false);
+        if (typeof this.clearSelection === 'function') {
+            this.clearSelection();
+        }
+    };
+    if (ownerDoc && typeof ownerDoc.addEventListener === 'function') {
+        ownerDoc.addEventListener('pointerdown', onOutsideDocumentPointerDown, true);
+        ownerDoc.addEventListener('keydown', onEscapeDocumentKeyDown, true);
+    }
+
     const syncEditorBoundsToObject = () => {
         if (!objectId || !wrapper || !view || !view.parentElement || !world) return;
         const staticEl = (typeof window !== 'undefined')
@@ -561,8 +596,14 @@ export function openMindmapEditor(object, create = false) {
     const finalize = (commit) => {
         if (finalized) return;
         finalized = true;
+        this._mindmapEditorLastClosedAt = Date.now();
+        this._mindmapEditorCloseSeq = Number(this._mindmapEditorCloseSeq || 0) + 1;
 
         unregisterEditorListeners(this.eventBus, editorListeners);
+        if (ownerDoc && typeof ownerDoc.removeEventListener === 'function') {
+            ownerDoc.removeEventListener('pointerdown', onOutsideDocumentPointerDown, true);
+            ownerDoc.removeEventListener('keydown', onEscapeDocumentKeyDown, true);
+        }
 
         textarea.removeEventListener('blur', onBlur);
         textarea.removeEventListener('keydown', onKeyDown);
