@@ -7,10 +7,9 @@ import { test, expect } from '@playwright/test';
 const EVENTS_KEYBOARD_UNDO = 'keyboard:undo';
 const EVENTS_KEYBOARD_REDO = 'keyboard:redo';
 const MINDMAP_BRANCH_PALETTE = [
-  0xD50000, 0xC51162, 0xAA00FF, 0x6200EA,
-  0x304FFE, 0x2962FF, 0x0091EA, 0x00B8D4,
-  0x00BFA5, 0x00C853, 0x64DD17, 0xAEEA00,
-  0xFFD600, 0xFFAB00, 0xFF6D00, 0xDD2C00
+  0xEF9A9A, 0xCE93D8, 0x90CAF9,
+  0x80DEEA, 0xA5D6A7, 0xE6EE9C,
+  0xFFE082, 0xBCAAA4, 0xB0BEC5
 ];
 
 async function getObjectCount(page) {
