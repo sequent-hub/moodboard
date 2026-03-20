@@ -273,6 +273,32 @@ function relayoutMindmapBranchCascade({ core, eventBus, startParentId, startSide
     }
 }
 
+function relayoutMindmapSubtreeLevels({ core, eventBus, rootIds = [] }) {
+    if (!core || !eventBus) return;
+    const queue = Array.isArray(rootIds) ? [...rootIds] : [];
+    const visited = new Set();
+    while (queue.length > 0) {
+        const nodeId = queue.shift();
+        if (!nodeId || visited.has(nodeId)) continue;
+        visited.add(nodeId);
+
+        relayoutMindmapBranchLevel({ core, eventBus, parentId: nodeId, side: 'left' });
+        relayoutMindmapBranchLevel({ core, eventBus, parentId: nodeId, side: 'right' });
+
+        const objects = core?.state?.state?.objects || [];
+        const children = (Array.isArray(objects) ? objects : [])
+            .filter((obj) => {
+                if (!obj || obj.type !== 'mindmap') return false;
+                const meta = obj?.properties?.mindmap || {};
+                return meta?.role === 'child' && meta?.parentId === nodeId;
+            })
+            .map((obj) => obj.id);
+        children.forEach((id) => {
+            if (!visited.has(id)) queue.push(id);
+        });
+    }
+}
+
 function collectMindmapChildrenByParent(mindmaps) {
     const childrenByParent = new Map();
     (Array.isArray(mindmaps) ? mindmaps : []).forEach((obj) => {
@@ -431,11 +457,20 @@ function tryReparentMindmapOnDrop({ core, draggedId, draggedIds = [] }) {
     const targetRect = getMindmapRect(target);
     const draggedCenterX = draggedRect.x + Math.round(draggedRect.width / 2);
     const targetCenterX = targetRect.x + Math.round(targetRect.width / 2);
-    const nextSide = draggedCenterX < targetCenterX ? 'left' : 'right';
     const nextParentId = target.id;
     const nextCompoundId = (typeof targetMeta?.compoundId === 'string' && targetMeta.compoundId.length > 0)
         ? targetMeta.compoundId
         : target.id;
+    const compoundRoot = mindmaps.find((obj) => {
+        if (!obj || obj.type !== 'mindmap') return false;
+        const meta = obj?.properties?.mindmap || {};
+        return meta?.role === 'root' && meta?.compoundId === nextCompoundId && !meta?.parentId;
+    }) || null;
+    const rootRect = compoundRoot ? getMindmapRect(compoundRoot) : null;
+    const rootCenterX = rootRect
+        ? Math.round(rootRect.x + Math.round(rootRect.width / 2))
+        : targetCenterX;
+    const nextSide = draggedCenterX < rootCenterX ? 'left' : 'right';
     const nextBranchColor = asBranchColor(targetMeta?.branchColor)
         ?? asBranchColor(target?.properties?.strokeColor)
         ?? asBranchColor(draggedMeta?.branchColor)
@@ -463,6 +498,10 @@ function tryReparentMindmapOnDrop({ core, draggedId, draggedIds = [] }) {
             && prevCompoundId === nextCompoundId
             && nodeMeta?.role === 'child';
         if (unchanged) return;
+
+        const shouldMirrorOrientation = (nodeMeta?.side === 'left' || nodeMeta?.side === 'right')
+            && nodeMeta.side !== nextSide;
+        const mirrorSide = (value) => (value === 'left' ? 'right' : (value === 'right' ? 'left' : value));
 
         if (!node.properties) node.properties = {};
         node.properties.mindmap = {
@@ -493,6 +532,7 @@ function tryReparentMindmapOnDrop({ core, draggedId, draggedIds = [] }) {
             descendant.properties.mindmap = {
                 ...meta,
                 compoundId: nextCompoundId,
+                side: shouldMirrorOrientation ? mirrorSide(meta?.side) : meta?.side,
                 branchColor: Number.isFinite(nextBranchColor)
                     ? nextBranchColor
                     : (asBranchColor(meta?.branchColor) ?? null),
@@ -771,6 +811,13 @@ export class HandlesDomRenderer {
                     startParentId: parentId,
                     startSide: side,
                 });
+            });
+            relayoutMindmapSubtreeLevels({
+                core,
+                eventBus,
+                rootIds: Array.isArray(reparentResult.reparentedIds)
+                    ? reparentResult.reparentedIds
+                    : [reparentResult.draggedId].filter(Boolean),
             });
             return;
         }
@@ -1183,7 +1230,57 @@ export class HandlesDomRenderer {
                     this.host.core?.state?.markDirty?.();
                     return { sourceIndex, siblings };
                 };
+                const normalizeBranchOrderForSideCenterInsert = () => {
+                    if (isBottomSiblingClone || !metaParentId || (metaSide !== 'left' && metaSide !== 'right')) {
+                        return { insertIndex: null, siblings: [] };
+                    }
+                    const objects = this.host.core?.state?.state?.objects || [];
+                    const siblings = (Array.isArray(objects) ? objects : [])
+                        .filter((obj) => {
+                            if (!obj || obj.type !== 'mindmap') return false;
+                            const meta = obj.properties?.mindmap || {};
+                            return meta?.role === 'child' && meta?.parentId === metaParentId && meta?.side === metaSide;
+                        })
+                        .sort((a, b) => {
+                            const ao = Number.isFinite(a?.properties?.mindmap?.branchOrder)
+                                ? Number(a.properties.mindmap.branchOrder)
+                                : null;
+                            const bo = Number.isFinite(b?.properties?.mindmap?.branchOrder)
+                                ? Number(b.properties.mindmap.branchOrder)
+                                : null;
+                            if (ao !== null && bo !== null && ao !== bo) return ao - bo;
+                            if (ao !== null && bo === null) return -1;
+                            if (ao === null && bo !== null) return 1;
+                            return (a?.position?.y || 0) - (b?.position?.y || 0);
+                        });
+                    siblings.forEach((obj, index) => {
+                        if (!obj.properties) obj.properties = {};
+                        const meta = obj.properties.mindmap || {};
+                        if (!Number.isFinite(meta.branchOrder) || Number(meta.branchOrder) !== index) {
+                            obj.properties.mindmap = {
+                                ...meta,
+                                branchOrder: index,
+                            };
+                        }
+                    });
+                    const insertIndex = Math.floor(siblings.length / 2);
+                    for (let idx = insertIndex; idx < siblings.length; idx += 1) {
+                        const node = siblings[idx];
+                        if (!node?.properties) continue;
+                        const meta = node.properties.mindmap || {};
+                        const nextOrder = idx + 1;
+                        if (!Number.isFinite(meta.branchOrder) || Number(meta.branchOrder) !== nextOrder) {
+                            node.properties.mindmap = {
+                                ...meta,
+                                branchOrder: nextOrder,
+                            };
+                        }
+                    }
+                    this.host.core?.state?.markDirty?.();
+                    return { insertIndex, siblings };
+                };
                 const bottomInsertData = normalizeBranchOrderForBottomInsert();
+                const sideCenterInsertData = normalizeBranchOrderForSideCenterInsert();
                 const resolveBottomInsertY = () => {
                     if (!isBottomSiblingClone || !metaParentId || !metaSide) {
                         return Math.round(worldBounds.y + worldBounds.height + gapWorld);
@@ -1205,10 +1302,28 @@ export class HandlesDomRenderer {
                     if (midY >= nextY) return Math.round(nextY - 1);
                     return midY;
                 };
+                const resolveSideInsertY = () => {
+                    if (isBottomSiblingClone || !metaParentId || (metaSide !== 'left' && metaSide !== 'right')) {
+                        return Math.round(worldBounds.y);
+                    }
+                    const siblings = sideCenterInsertData.siblings || [];
+                    const insertIndex = Number.isFinite(sideCenterInsertData.insertIndex)
+                        ? Number(sideCenterInsertData.insertIndex)
+                        : 0;
+                    if (siblings.length === 0) return Math.round(worldBounds.y);
+                    if (insertIndex <= 0) return Math.round(siblings[0]?.position?.y || worldBounds.y);
+                    if (insertIndex >= siblings.length) {
+                        const last = siblings[siblings.length - 1];
+                        return Math.round((last?.position?.y || worldBounds.y) + Math.max(1, childHeight + 1));
+                    }
+                    const prevY = Math.round(siblings[insertIndex - 1]?.position?.y || worldBounds.y);
+                    const nextY = Math.round(siblings[insertIndex]?.position?.y || prevY + childHeight + 1);
+                    return Math.round((prevY + nextY) / 2);
+                };
                 const nextPosition = direction === 'left'
-                    ? { x: Math.round(worldBounds.x - childWidth - gapWorld), y: Math.round(worldBounds.y) }
+                    ? { x: Math.round(worldBounds.x - childWidth - gapWorld), y: resolveSideInsertY() }
                     : direction === 'right'
-                        ? { x: Math.round(worldBounds.x + worldBounds.width + gapWorld), y: Math.round(worldBounds.y) }
+                        ? { x: Math.round(worldBounds.x + worldBounds.width + gapWorld), y: resolveSideInsertY() }
                         : { x: Math.round(worldBounds.x), y: resolveBottomInsertY() };
                 if (isBottomSiblingClone) {
                     logMindmapCompoundDebug('handles:bottom-branch-parent-resolve', {
@@ -1272,6 +1387,9 @@ export class HandlesDomRenderer {
                         ?? MINDMAP_CHILD_STROKE_COLOR
                     );
                 childMindmapMeta.branchColor = branchColor;
+                if (!isBottomSiblingClone && Number.isFinite(sideCenterInsertData.insertIndex)) {
+                    childMindmapMeta.branchOrder = Number(sideCenterInsertData.insertIndex);
+                }
                 if (isBottomSiblingClone && metaParentId) {
                     childMindmapMeta.branchRootId = metaParentId;
                     if (bottomInsertData.sourceIndex >= 0) {
@@ -1368,8 +1486,8 @@ export class HandlesDomRenderer {
                 });
                 return btn;
             };
-            const canShowLeft = !occupiedOutgoingSides.has('left') && hiddenIncomingSide.value !== 'left';
-            const canShowRight = !occupiedOutgoingSides.has('right') && hiddenIncomingSide.value !== 'right';
+            const canShowLeft = hiddenIncomingSide.value !== 'left';
+            const canShowRight = hiddenIncomingSide.value !== 'right';
             if (canShowLeft) this.host.layer.appendChild(createMindmapSideButton('left'));
             if (canShowRight) this.host.layer.appendChild(createMindmapSideButton('right'));
             const role = sourceMindmapProperties?.mindmap?.role || null;
