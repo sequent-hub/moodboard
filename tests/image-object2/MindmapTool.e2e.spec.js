@@ -275,6 +275,24 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
     // Клик мимо текста закрывает редактор.
     await page.mouse.click(canvasBox.x + 20, canvasBox.y + 20);
     await expect(textarea).toHaveCount(0);
+    await expect
+      .poll(async () => {
+        return page.evaluate(() => {
+          const core = window.moodboard?.coreMoodboard;
+          const tm = core?.toolManager;
+          const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+          const selection = selectTool?.selection?.toArray?.() || [];
+          const sideButtons = document.querySelectorAll('.mb-mindmap-side-btn').length;
+          return {
+            selectionCount: selection.length,
+            sideButtons,
+          };
+        });
+      })
+      .toEqual({
+        selectionCount: 0,
+        sideButtons: 0,
+      });
 
     await expect
       .poll(async () => {

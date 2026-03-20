@@ -3,10 +3,16 @@ import { Events } from '../../../core/events/Events.js';
 export function onMouseDown(event) {
     // Если активен текстовый редактор, закрываем его при клике вне
     if (this.textEditor.active) {
+        const activeEditorType = this.textEditor.objectType;
         if (this.textEditor.objectType === 'file') {
             this._closeFileNameEditor(true);
         } else {
             this._closeTextEditor(true);
+        }
+        // Mindmap UX: outside click should fully reset on first click
+        // (editor close + selection clear + handles/buttons hidden).
+        if (activeEditorType === 'mindmap') {
+            this.clearSelection();
         }
         return; // Прерываем выполнение, чтобы не обрабатывать клик дальше
     }
