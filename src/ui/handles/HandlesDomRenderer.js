@@ -706,11 +706,15 @@ export class HandlesDomRenderer {
             const primaryNode = byId.get(primaryDraggedId);
             const primarySnap = snapshot[primaryDraggedId];
             const primaryMeta = primaryNode?.properties?.mindmap || {};
+            const parentNode = primaryMeta?.parentId ? byId.get(primaryMeta.parentId) : null;
+            const parentRole = parentNode?.properties?.mindmap?.role || null;
+            const allowPersistentTranslate = primaryMeta?.role === 'root'
+                || (primaryMeta?.role === 'child' && parentRole === 'root');
             const currentX = Math.round(primaryNode?.position?.x || 0);
             const currentY = Math.round(primaryNode?.position?.y || 0);
             const dx = Number.isFinite(primarySnap?.x) ? Math.round(currentX - Number(primarySnap.x)) : 0;
             const dy = Number.isFinite(primarySnap?.y) ? Math.round(currentY - Number(primarySnap.y)) : 0;
-            if (primaryNode && (dx !== 0 || dy !== 0)) {
+            if (primaryNode && allowPersistentTranslate && (dx !== 0 || dy !== 0)) {
                 const compoundId = compoundOf(primaryNode);
                 const allIds = compoundToAllIds.get(compoundId) || new Set();
                 const moveScopeIds = (() => {
