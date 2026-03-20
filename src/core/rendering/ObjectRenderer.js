@@ -83,8 +83,9 @@ export class ObjectRenderer {
             pixiObject.anchor.set(0.5, 0.5);
         } else if (pixiObject instanceof PIXI.Graphics) {
             const bounds = pixiObject.getBounds();
-            const pivotX = bounds.width / 2;
-            const pivotY = bounds.height / 2;
+            const isMindmap = objectData?.type === 'mindmap';
+            const pivotX = isMindmap ? Math.floor(bounds.width / 2) : (bounds.width / 2);
+            const pivotY = isMindmap ? Math.floor(bounds.height / 2) : (bounds.height / 2);
             pixiObject.pivot.set(pivotX, pivotY);
             
             // Компенсируем смещение pivot
@@ -92,6 +93,10 @@ export class ObjectRenderer {
             if (needsCompensation) {
                 pixiObject.x += pivotX;
                 pixiObject.y += pivotY;
+                if (isMindmap) {
+                    pixiObject.x = Math.round(pixiObject.x);
+                    pixiObject.y = Math.round(pixiObject.y);
+                }
             }
         }
         

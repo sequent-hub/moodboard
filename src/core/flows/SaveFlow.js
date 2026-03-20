@@ -23,12 +23,15 @@ export function setupSaveFlow(core) {
     });
 
     core.eventBus.on(Events.Save.Success, async () => {
-        try {
-            const result = await core.cleanupUnusedImages();
-            if (result.deletedCount > 0) {
-            }
-        } catch (error) {
-            console.warn('⚠️ Не удалось выполнить автоматическую очистку изображений:', error.message);
-        }
+        // ВРЕМЕННО ОТКЛЮЧЕНО:
+        // cleanup-фича требует доработки контракта и серверной поддержки.
+        // Автоматический вызов удален, чтобы не запускать cleanup после сохранения.
+        // try {
+        //     const result = await core.cleanupUnusedImages();
+        //     if (result.deletedCount > 0) {
+        //     }
+        // } catch (error) {
+        //     console.warn('⚠️ Не удалось выполнить автоматическую очистку изображений:', error.message);
+        // }
     });
 }

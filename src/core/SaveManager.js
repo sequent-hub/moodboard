@@ -284,7 +284,7 @@ export class SaveManager {
         }
 
         const requestBody = {
-            boardId: boardId,
+            boardId,
             boardData: data
         };
 
@@ -322,6 +322,19 @@ export class SaveManager {
         }
         
         return await response.json();
+    }
+
+    /**
+     * Строит единый payload сохранения для всех каналов отправки
+     * (обычный save, beacon, sync XHR fallback).
+     */
+    _buildSavePayload(boardId, data, csrfToken = undefined) {
+        return {
+            boardId,
+            boardData: data,
+            settings: data?.settings || undefined,
+            _token: csrfToken || undefined
+        };
     }
     
     /**
@@ -464,14 +477,11 @@ export class SaveManager {
         if (!data) return;
 
         const boardId = data.id || 'default';
-        const payload = {
-            boardId,
-            // отправляем «сырой» снимок; на серверной стороне допускается приём JSON
-            boardData: data,
-            settings: data.settings || undefined,
-            // CSRF токен добавим в тело (для серверов, которые принимают _token из JSON)
-            _token: (typeof document !== 'undefined') ? (document.querySelector('meta[name="csrf-token"]')?.value || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')) : undefined
-        };
+        // CSRF токен добавим в тело (для серверов, которые принимают _token из JSON)
+        const csrfToken = (typeof document !== 'undefined')
+            ? (document.querySelector('meta[name="csrf-token"]')?.value || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'))
+            : undefined;
+        const payload = this._buildSavePayload(boardId, data, csrfToken);
 
         const body = JSON.stringify(payload);
 
@@ -509,12 +519,7 @@ export class SaveManager {
             xhr.setRequestHeader('Accept', 'application/json');
             if (csrfToken) xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
 
-            const payload = {
-                b: boardId,
-                boardData: data,
-                settings: data.settings || undefined,
-                _token: csrfToken || undefined
-            };
+            const payload = this._buildSavePayload(boardId, data, csrfToken || undefined);
             try { xhr.send(JSON.stringify(payload)); } catch (_) { /* игнорируем */ }
         } catch (_) { /* игнорируем */ }
     }

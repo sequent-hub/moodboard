@@ -6,12 +6,30 @@ export class DataManager {
     constructor(coreMoodboard) {
         this.coreMoodboard = coreMoodboard;
     }
+
+    /**
+     * Проверяет, нужно ли блокировать подозрительную пустую загрузку.
+     * Блокируем только когда на доске уже есть объекты, а входящий snapshot пуст.
+     * Для явного разрешения пустой загрузки используем data.meta.allowEmptyLoad === true.
+     */
+    _shouldBlockSuspiciousEmptyLoad(data) {
+        const incomingObjects = Array.isArray(data?.objects) ? data.objects : [];
+        const incomingCount = incomingObjects.length;
+        const currentCount = Array.isArray(this.coreMoodboard?.objects) ? this.coreMoodboard.objects.length : 0;
+        const allowEmptyLoad = data?.meta?.allowEmptyLoad === true;
+
+        return incomingCount === 0 && currentCount > 0 && !allowEmptyLoad;
+    }
     
     /**
      * Загружает данные в MoodBoard
      */
     loadData(data) {
         if (!data) return;
+        if (this._shouldBlockSuspiciousEmptyLoad(data)) {
+            console.warn('⚠️ DataManager.loadData: пустой snapshot заблокирован защитой (доска не очищена).');
+            return;
+        }
         const incomingMindmap = Array.isArray(data?.objects)
             ? data.objects
                 .filter((obj) => obj?.type === 'mindmap')

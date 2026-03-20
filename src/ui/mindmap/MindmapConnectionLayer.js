@@ -210,16 +210,23 @@ export class MindmapConnectionLayer {
                     width: 1,
                     color,
                     alpha: 0.95,
-                    alignment: 0.5,
+                    alignment: 0,
                     cap: 'round',
                     join: 'round',
                     miterLimit: 2,
                 });
             } catch (_) {
-                g.lineStyle(1, color, 0.95, 0.5);
+                g.lineStyle(1, color, 0.95, 0);
             }
             g.moveTo(Math.round(start.x), Math.round(start.y));
-            g.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, Math.round(end.x), Math.round(end.y));
+            g.bezierCurveTo(
+                Math.round(cp1.x),
+                Math.round(cp1.y),
+                Math.round(cp2.x),
+                Math.round(cp2.y),
+                Math.round(end.x),
+                Math.round(end.y)
+            );
             this._lastSegments.push({
                 parentId: parent.id,
                 childId: child.id,

@@ -19,6 +19,7 @@ export class MindmapObject {
             : Math.max(1, Math.round(Math.min(this.height, MINDMAP_LAYOUT.height)));
 
         this.graphics = new PIXI.Graphics();
+        this.graphics.roundPixels = true;
         this._draw();
     }
 
@@ -40,9 +41,9 @@ export class MindmapObject {
         const rot = g.rotation || 0;
 
         this._draw();
-        g.pivot.set(this.width / 2, this.height / 2);
-        g.x = centerX;
-        g.y = centerY;
+        g.pivot.set(Math.floor(this.width / 2), Math.floor(this.height / 2));
+        g.x = Math.round(centerX);
+        g.y = Math.round(centerY);
         g.rotation = rot;
     }
 
