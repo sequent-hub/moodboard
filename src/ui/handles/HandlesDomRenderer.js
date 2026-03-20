@@ -349,13 +349,53 @@ function normalizeBranchOrderByCurrentY({ core, parentId, side }) {
     return { changed, count: siblings.length };
 }
 
-function tryReparentMindmapOnDrop({ core, draggedId }) {
+function syncMindmapVisualFromState({ core, eventBus, objectId }) {
+    if (!core || !objectId) return;
+    const stateObjects = core?.state?.state?.objects || [];
+    const objectData = (Array.isArray(stateObjects) ? stateObjects : []).find((obj) => obj?.id === objectId && obj?.type === 'mindmap');
+    if (!objectData) return;
+
+    const pixiObject = core?.pixi?.objects?.get?.(objectId);
+    const instance = pixiObject?._mb?.instance;
+    const props = objectData?.properties || {};
+    if (!instance) return;
+
+    if (Number.isFinite(props.strokeColor)) instance.strokeColor = Math.floor(Number(props.strokeColor));
+    if (Number.isFinite(props.fillColor)) instance.fillColor = Math.floor(Number(props.fillColor));
+    if (Number.isFinite(props.fillAlpha)) instance.fillAlpha = Number(props.fillAlpha);
+    if (Number.isFinite(props.strokeWidth)) instance.strokeWidth = Math.max(1, Math.round(Number(props.strokeWidth)));
+
+    if (pixiObject?._mb) {
+        pixiObject._mb.properties = props;
+    }
+    if (typeof instance._redrawPreserveTransform === 'function') {
+        instance._redrawPreserveTransform();
+    } else if (typeof instance._draw === 'function') {
+        instance._draw();
+    }
+    eventBus?.emit?.(Events.Object.Updated, { objectId });
+}
+
+function tryReparentMindmapOnDrop({ core, draggedId, draggedIds = [] }) {
     if (!core || !draggedId) return null;
     const objects = core?.state?.state?.objects || [];
     const mindmaps = Array.isArray(objects) ? objects.filter((obj) => obj?.type === 'mindmap') : [];
     const byId = new Map(mindmaps.map((obj) => [obj.id, obj]));
     const dragged = byId.get(draggedId);
     if (!dragged) return null;
+
+    const normalizedDraggedIds = Array.from(new Set(
+        [draggedId, ...(Array.isArray(draggedIds) ? draggedIds : [])]
+            .filter((id) => typeof id === 'string' && id.length > 0)
+            .filter((id) => byId.has(id))
+    ));
+    const selectedSet = new Set(normalizedDraggedIds);
+    const topLevelDraggedIds = normalizedDraggedIds.filter((id) => {
+        const node = byId.get(id);
+        const meta = node?.properties?.mindmap || {};
+        const parentId = meta?.parentId || null;
+        return !parentId || !selectedSet.has(parentId);
+    });
 
     const childrenByParent = collectMindmapChildrenByParent(mindmaps);
     const descendantIds = collectMindmapDescendants(childrenByParent, draggedId);
@@ -401,46 +441,39 @@ function tryReparentMindmapOnDrop({ core, draggedId }) {
         ?? asBranchColor(draggedMeta?.branchColor)
         ?? asBranchColor(dragged?.properties?.strokeColor);
 
-    const prevParentId = draggedMeta?.parentId || null;
-    const prevSide = draggedMeta?.side || null;
-    const prevCompoundId = draggedMeta?.compoundId || null;
-    const unchanged = prevParentId === nextParentId
-        && prevSide === nextSide
-        && prevCompoundId === nextCompoundId
-        && draggedMeta?.role === 'child';
-    if (unchanged) return null;
+    const reparentedIds = [];
+    const movedIdsSet = new Set();
+    const prevScopes = [];
+    let firstChanged = null;
+    let changed = false;
 
-    if (!dragged.properties) dragged.properties = {};
-    dragged.properties.mindmap = {
-        ...draggedMeta,
-        role: 'child',
-        parentId: nextParentId,
-        side: nextSide,
-        compoundId: nextCompoundId,
-        branchRootId: nextParentId,
-        branchOrder: null,
-        branchColor: nextBranchColor,
-    };
-    if (Number.isFinite(nextBranchColor)) {
-        dragged.properties.strokeColor = nextBranchColor;
-        dragged.properties.fillColor = nextBranchColor;
-        if (!Number.isFinite(dragged.properties.fillAlpha)) {
-            dragged.properties.fillAlpha = MINDMAP_CHILD_FILL_ALPHA;
-        }
-    }
-
-    const movedIds = [draggedId, ...descendantIds];
-    descendantIds.forEach((id) => {
-        const node = byId.get(id);
+    const applyReparentForNode = (nodeId) => {
+        const node = byId.get(nodeId);
         if (!node) return;
+        const nodeMeta = node?.properties?.mindmap || {};
+        const nodeDescendantIds = collectMindmapDescendants(childrenByParent, nodeId);
+        const blockedForNode = new Set([nodeId, ...nodeDescendantIds]);
+        if (blockedForNode.has(nextParentId)) return;
+
+        const prevParentId = nodeMeta?.parentId || null;
+        const prevSide = nodeMeta?.side || null;
+        const prevCompoundId = nodeMeta?.compoundId || null;
+        const unchanged = prevParentId === nextParentId
+            && prevSide === nextSide
+            && prevCompoundId === nextCompoundId
+            && nodeMeta?.role === 'child';
+        if (unchanged) return;
+
         if (!node.properties) node.properties = {};
-        const meta = node.properties.mindmap || {};
         node.properties.mindmap = {
-            ...meta,
+            ...nodeMeta,
+            role: 'child',
+            parentId: nextParentId,
+            side: nextSide,
             compoundId: nextCompoundId,
-            branchColor: Number.isFinite(nextBranchColor)
-                ? nextBranchColor
-                : (asBranchColor(meta?.branchColor) ?? null),
+            branchRootId: nextParentId,
+            branchOrder: null,
+            branchColor: nextBranchColor,
         };
         if (Number.isFinite(nextBranchColor)) {
             node.properties.strokeColor = nextBranchColor;
@@ -449,20 +482,73 @@ function tryReparentMindmapOnDrop({ core, draggedId }) {
                 node.properties.fillAlpha = MINDMAP_CHILD_FILL_ALPHA;
             }
         }
+        syncMindmapVisualFromState({ core, eventBus: core?.eventBus, objectId: nodeId });
+
+        movedIdsSet.add(nodeId);
+        nodeDescendantIds.forEach((id) => {
+            const descendant = byId.get(id);
+            if (!descendant) return;
+            if (!descendant.properties) descendant.properties = {};
+            const meta = descendant.properties.mindmap || {};
+            descendant.properties.mindmap = {
+                ...meta,
+                compoundId: nextCompoundId,
+                branchColor: Number.isFinite(nextBranchColor)
+                    ? nextBranchColor
+                    : (asBranchColor(meta?.branchColor) ?? null),
+            };
+            if (Number.isFinite(nextBranchColor)) {
+                descendant.properties.strokeColor = nextBranchColor;
+                descendant.properties.fillColor = nextBranchColor;
+                if (!Number.isFinite(descendant.properties.fillAlpha)) {
+                    descendant.properties.fillAlpha = MINDMAP_CHILD_FILL_ALPHA;
+                }
+            }
+            syncMindmapVisualFromState({ core, eventBus: core?.eventBus, objectId: id });
+            movedIdsSet.add(id);
+        });
+
+        reparentedIds.push(nodeId);
+        prevScopes.push({
+            parentId: prevParentId,
+            side: prevSide,
+            compoundId: prevCompoundId,
+        });
+        if (!firstChanged) {
+            firstChanged = { prevParentId, prevSide, prevCompoundId };
+        }
+        changed = true;
+    };
+
+    applyReparentForNode(draggedId);
+    topLevelDraggedIds.forEach((id) => {
+        if (id === draggedId) return;
+        applyReparentForNode(id);
     });
+
+    if (!changed) return null;
     core?.state?.markDirty?.();
 
     normalizeBranchOrderByCurrentY({ core, parentId: nextParentId, side: nextSide });
-    if (prevParentId && (prevSide === 'left' || prevSide === 'right')) {
-        normalizeBranchOrderByCurrentY({ core, parentId: prevParentId, side: prevSide });
-    }
+    const prevScopeKeys = new Set();
+    prevScopes.forEach((scope) => {
+        const parentId = scope?.parentId || null;
+        const side = scope?.side || null;
+        if (!parentId || (side !== 'left' && side !== 'right')) return;
+        const key = `${parentId}::${side}`;
+        if (prevScopeKeys.has(key)) return;
+        prevScopeKeys.add(key);
+        normalizeBranchOrderByCurrentY({ core, parentId, side });
+    });
     return {
         changed: true,
         draggedId,
-        movedIds,
-        prevParentId,
-        prevSide,
-        prevCompoundId,
+        reparentedIds,
+        movedIds: Array.from(movedIdsSet),
+        prevParentId: firstChanged?.prevParentId || null,
+        prevSide: firstChanged?.prevSide || null,
+        prevCompoundId: firstChanged?.prevCompoundId || null,
+        prevScopes,
         nextParentId,
         nextSide,
         nextCompoundId,
@@ -646,11 +732,12 @@ export class HandlesDomRenderer {
             });
         }
         const reparentResult = primaryDraggedId
-            ? tryReparentMindmapOnDrop({ core, draggedId: primaryDraggedId })
+            ? tryReparentMindmapOnDrop({ core, draggedId: primaryDraggedId, draggedIds: draggedMindmapIds })
             : null;
         if (reparentResult?.changed) {
             logMindmapCompoundDebug('layout:drag-end-reparent', {
                 draggedId: reparentResult.draggedId,
+                reparentedIds: Array.isArray(reparentResult.reparentedIds) ? reparentResult.reparentedIds : [],
                 prevParentId: reparentResult.prevParentId || null,
                 prevSide: reparentResult.prevSide || null,
                 nextParentId: reparentResult.nextParentId || null,
@@ -664,14 +751,27 @@ export class HandlesDomRenderer {
                 startParentId: reparentResult.nextParentId,
                 startSide: reparentResult.nextSide,
             });
-            if (reparentResult.prevParentId && (reparentResult.prevSide === 'left' || reparentResult.prevSide === 'right')) {
+            const prevScopes = Array.isArray(reparentResult.prevScopes)
+                ? reparentResult.prevScopes
+                : [{
+                    parentId: reparentResult.prevParentId || null,
+                    side: reparentResult.prevSide || null,
+                }];
+            const emittedPrev = new Set();
+            prevScopes.forEach((scope) => {
+                const parentId = scope?.parentId || null;
+                const side = scope?.side || null;
+                if (!parentId || (side !== 'left' && side !== 'right')) return;
+                const key = `${parentId}::${side}`;
+                if (emittedPrev.has(key)) return;
+                emittedPrev.add(key);
                 relayoutMindmapBranchCascade({
                     core,
                     eventBus,
-                    startParentId: reparentResult.prevParentId,
-                    startSide: reparentResult.prevSide,
+                    startParentId: parentId,
+                    startSide: side,
                 });
-            }
+            });
             return;
         }
         const reorderResult = primaryDraggedId

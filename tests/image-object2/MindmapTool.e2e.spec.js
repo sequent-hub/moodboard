@@ -1685,6 +1685,31 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
         }, { timeout: 10000 })
         .toBe(nodeId);
     };
+    const clickBottomForNode = async (nodeId) => {
+      await selectNode(nodeId);
+      await expect
+        .poll(async () => {
+          return page.evaluate((id) => {
+            const core = window.moodboard?.coreMoodboard;
+            if (core) {
+              core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+              const tm = core.toolManager;
+              const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+              if (selectTool) {
+                selectTool.setSelection([id]);
+                if (typeof selectTool.updateResizeHandles === 'function') {
+                  selectTool.updateResizeHandles();
+                }
+              }
+            }
+            const btn = document.querySelector(`.mb-mindmap-side-btn[data-side="bottom"][data-id="${id}"]`);
+            if (!btn) return null;
+            btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
+            return btn.getAttribute('data-id');
+          }, nodeId);
+        }, { timeout: 10000 })
+        .toBe(nodeId);
+    };
 
     await clickSideForNode(root.id, 'right');
     await expect.poll(async () => {
@@ -3810,6 +3835,242 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
           const seg = (window.moodboardMindmapConnectionLayer?._lastSegments || []).find((s) => s.childId === draggedId) || null;
           return !!seg && seg.parentId === targetId;
         }, { draggedId: before.dragged.id, targetId: before.target.id });
+      }, { timeout: 10000 })
+      .toBe(true);
+  });
+
+  test('mindmap group reparent recolors all dragged capsules to target branch color', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.35, canvasBox.y + canvasBox.height * 0.5);
+
+    const selectNode = async (nodeId) => {
+      await page.evaluate((id) => {
+        const core = window.moodboard?.coreMoodboard;
+        if (!core) return;
+        core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+        const tm = core.toolManager;
+        const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+        if (!selectTool) return;
+        selectTool.setSelection([id]);
+        if (typeof selectTool.updateResizeHandles === 'function') {
+          selectTool.updateResizeHandles();
+        }
+      }, nodeId);
+    };
+    const clickSideForNode = async (nodeId, side) => {
+      await selectNode(nodeId);
+      await expect
+        .poll(async () => {
+          return page.evaluate(({ id, nextSide }) => {
+            const core = window.moodboard?.coreMoodboard;
+            if (core) {
+              core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+              const tm = core.toolManager;
+              const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+              if (selectTool) {
+                selectTool.setSelection([id]);
+                if (typeof selectTool.updateResizeHandles === 'function') {
+                  selectTool.updateResizeHandles();
+                }
+              }
+            }
+            const btn = document.querySelector(`.mb-mindmap-side-btn[data-side="${nextSide}"][data-id="${id}"]`);
+            if (!btn) return null;
+            btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
+            return btn.getAttribute('data-id');
+          }, { id: nodeId, nextSide: side });
+        }, { timeout: 10000 })
+        .toBe(nodeId);
+    };
+    const clickBottomForNode = async (nodeId) => {
+      await selectNode(nodeId);
+      await expect
+        .poll(async () => {
+          return page.evaluate((id) => {
+            const core = window.moodboard?.coreMoodboard;
+            if (core) {
+              core.eventBus.emit('keyboard:tool-select', { tool: 'select' });
+              const tm = core.toolManager;
+              const selectTool = tm?.tools?.get?.('select') || tm?.registry?.get?.('select');
+              if (selectTool) {
+                selectTool.setSelection([id]);
+                if (typeof selectTool.updateResizeHandles === 'function') {
+                  selectTool.updateResizeHandles();
+                }
+              }
+            }
+            const btn = document.querySelector(`.mb-mindmap-side-btn[data-side="bottom"][data-id="${id}"]`);
+            if (!btn) return null;
+            btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
+            return btn.getAttribute('data-id');
+          }, nodeId);
+        }, { timeout: 10000 })
+        .toBe(nodeId);
+    };
+    const closeEditor = async () => {
+      await page.keyboard.press('Escape');
+      await page.mouse.click(canvasBox.x + canvasBox.width - 8, canvasBox.y + 8);
+      await expect
+        .poll(async () => page.evaluate(() => document.querySelectorAll('.moodboard-text-input').length))
+        .toBeLessThanOrEqual(1);
+    };
+
+    const rootA = await getMindmapObject(page);
+    expect(rootA?.id).toBeTruthy();
+    await closeEditor();
+    await clickSideForNode(rootA.id, 'right');
+    await expect.poll(async () => {
+      const board = await page.evaluate(() => window.moodboard.exportBoard());
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+    }).toBe(2);
+
+    const childAId = await page.evaluate((rootId) => {
+      const board = window.moodboard.exportBoard();
+      const node = (board?.objects || []).find((o) => {
+        if (o.type !== 'mindmap' || o.id === rootId) return false;
+        const m = o.properties?.mindmap || {};
+        return m.role === 'child' && m.parentId === rootId && m.side === 'right';
+      });
+      return node?.id || null;
+    }, rootA.id);
+    expect(childAId).toBeTruthy();
+
+    await closeEditor();
+    await page.click('.moodboard-toolbar__button--mindmap');
+    await page.mouse.click(canvasBox.x + canvasBox.width * 0.72, canvasBox.y + canvasBox.height * 0.5);
+
+    await expect.poll(async () => {
+      const board = await page.evaluate(() => window.moodboard.exportBoard());
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+    }).toBe(3);
+
+    const rootB = await page.evaluate((rootAId) => {
+      const board = window.moodboard.exportBoard();
+      return (board?.objects || []).find((o) => {
+        if (o.type !== 'mindmap' || o.id === rootAId) return false;
+        const m = o.properties?.mindmap || {};
+        return m.role === 'root' && !m.parentId;
+      }) || null;
+    }, rootA.id);
+    expect(rootB?.id).toBeTruthy();
+
+    await closeEditor();
+    await clickBottomForNode(childAId);
+    await expect.poll(async () => {
+      const board = await page.evaluate(() => window.moodboard.exportBoard());
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+    }).toBe(4);
+
+    await closeEditor();
+    await clickSideForNode(rootB.id, 'right');
+    await expect.poll(async () => {
+      const board = await page.evaluate(() => window.moodboard.exportBoard());
+      return (board?.objects || []).filter((o) => o.type === 'mindmap').length;
+    }).toBe(5);
+
+    const context = await page.evaluate(({ sourceRootId, targetRootId }) => {
+      const board = window.moodboard.exportBoard();
+      const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+      const sourceChildren = nodes.filter((o) => {
+        const m = o.properties?.mindmap || {};
+        return m.role === 'child' && m.parentId === sourceRootId && m.side === 'right';
+      });
+      const targetBranch = nodes.find((o) => {
+        const m = o.properties?.mindmap || {};
+        return m.role === 'child' && m.parentId === targetRootId && m.side === 'right';
+      }) || null;
+      if (sourceChildren.length < 2 || !targetBranch) return null;
+      return {
+        dragged: sourceChildren.slice(0, 2).map((n) => ({
+          id: n.id,
+          width: Math.round(n.width || n.properties?.width || 0),
+          height: Math.round(n.height || n.properties?.height || 0),
+        })),
+        targetId: targetBranch.id,
+        targetColor: Number(targetBranch.properties?.mindmap?.branchColor ?? targetBranch.properties?.strokeColor ?? null),
+        targetRect: {
+          x: Math.round(targetBranch.position?.x || 0),
+          y: Math.round(targetBranch.position?.y || 0),
+          width: Math.round(targetBranch.width || targetBranch.properties?.width || 0),
+          height: Math.round(targetBranch.height || targetBranch.properties?.height || 0),
+        },
+      };
+    }, { sourceRootId: rootA.id, targetRootId: rootB.id });
+    expect(context?.dragged?.length).toBe(2);
+    expect(context?.targetId).toBeTruthy();
+    expect(Number.isFinite(context?.targetColor)).toBe(true);
+    const draggedIds = context.dragged.map((item) => item.id);
+
+    await page.evaluate((ids) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      const forcedColor = 0x101010;
+      const objects = core?.state?.state?.objects || [];
+      ids.forEach((id) => {
+        const node = (objects || []).find((o) => o?.id === id);
+        if (!node) return;
+        if (!node.properties) node.properties = {};
+        const meta = node.properties.mindmap || {};
+        node.properties.mindmap = { ...meta, branchColor: forcedColor };
+        node.properties.strokeColor = forcedColor;
+        node.properties.fillColor = forcedColor;
+      });
+      core.state?.markDirty?.();
+      core.eventBus.emit('state:changed', {});
+    }, draggedIds);
+
+    await page.evaluate(({ dragged, targetRect }) => {
+      const core = window.moodboard?.coreMoodboard;
+      if (!core) return;
+      const cx = Math.round(targetRect.x + Math.round(targetRect.width / 2));
+      const cy = Math.round(targetRect.y + Math.round(targetRect.height / 2));
+      const ids = dragged.map((item) => item.id);
+      core.eventBus.emit('tool:group:drag:start', { objects: ids });
+      dragged.forEach((item, index) => {
+        const w = Math.max(1, Math.round(item.width || 1));
+        const h = Math.max(1, Math.round(item.height || 1));
+        core.updateObjectPositionDirect(item.id, {
+          x: Math.round(cx - Math.round(w / 2) - 2),
+          y: Math.round(cy - Math.round(h / 2) - 2 + index * 3),
+        }, { snap: false });
+      });
+      core.eventBus.emit('tool:group:drag:end', { objects: ids });
+    }, { dragged: context.dragged, targetRect: context.targetRect });
+
+    await expect
+      .poll(async () => {
+        return page.evaluate(({ draggedIds, targetId, targetColor }) => {
+          const board = window.moodboard.exportBoard();
+          const nodes = (board?.objects || []).filter((o) => o.type === 'mindmap');
+          const byId = new Map(nodes.map((o) => [o.id, o]));
+          const core = window.moodboard?.coreMoodboard;
+          const pixiMap = core?.pixi?.objects;
+          return draggedIds.every((id) => {
+            const node = byId.get(id);
+            if (!node) return false;
+            const m = node.properties?.mindmap || {};
+            const branchColor = Number(m.branchColor);
+            const stroke = Number(node.properties?.strokeColor);
+            const fill = Number(node.properties?.fillColor);
+            const pixiObject = pixiMap?.get?.(id);
+            const pixiInstance = pixiObject?._mb?.instance;
+            const pixiStroke = Number(pixiInstance?.strokeColor);
+            const pixiFill = Number(pixiInstance?.fillColor);
+            return (
+              m.role === 'child' &&
+              m.parentId === targetId &&
+              Number.isFinite(branchColor) &&
+              branchColor === targetColor &&
+              stroke === targetColor &&
+              fill === targetColor &&
+              pixiStroke === targetColor &&
+              pixiFill === targetColor
+            );
+          });
+        }, { draggedIds, targetId: context.targetId, targetColor: context.targetColor });
       }, { timeout: 10000 })
       .toBe(true);
   });
