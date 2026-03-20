@@ -96,6 +96,7 @@ export class ToolbarActionRouter {
                     fontSize: MINDMAP_LAYOUT.fontSize,
                     width: mindmapWidth,
                     height: mindmapHeight,
+                    capsuleBaseWidth: mindmapWidth,
                     capsuleBaseHeight: mindmapHeight,
                     paddingX: MINDMAP_LAYOUT.paddingX,
                     paddingY: MINDMAP_LAYOUT.paddingY,

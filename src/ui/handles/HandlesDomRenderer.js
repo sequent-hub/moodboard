@@ -1099,6 +1099,46 @@ export class HandlesDomRenderer {
         });
     }
 
+    relayoutAllMindmapCompounds() {
+        const core = this.host.core;
+        const eventBus = this.host.eventBus;
+        if (!core || !eventBus) return;
+        const objects = core?.state?.state?.objects || [];
+        const mindmaps = (Array.isArray(objects) ? objects : []).filter((obj) => obj?.type === 'mindmap');
+        if (!mindmaps.length) return;
+
+        const rootIds = mindmaps
+            .filter((obj) => {
+                const meta = obj?.properties?.mindmap || {};
+                if (meta?.role === 'root') return true;
+                return !meta?.parentId;
+            })
+            .map((obj) => obj.id)
+            .filter((id) => typeof id === 'string' && id.length > 0);
+        const uniqueRootIds = Array.from(new Set(rootIds));
+        if (!uniqueRootIds.length) return;
+
+        relayoutMindmapSubtreeLevels({
+            core,
+            eventBus,
+            rootIds: uniqueRootIds,
+        });
+        uniqueRootIds.forEach((rootId) => {
+            relayoutMindmapBranchCascade({
+                core,
+                eventBus,
+                startParentId: rootId,
+                startSide: 'left',
+            });
+            relayoutMindmapBranchCascade({
+                core,
+                eventBus,
+                startParentId: rootId,
+                startSide: 'right',
+            });
+        });
+    }
+
     showBounds(worldBounds, id, options = {}) {
         if (!this.host.layer) return;
 
@@ -1529,6 +1569,7 @@ export class HandlesDomRenderer {
                         content: '',
                         width: childWidth,
                         height: childHeight,
+                        capsuleBaseWidth: childWidth,
                         capsuleBaseHeight: childHeight,
                         paddingX: childPaddingX,
                         paddingY: childPaddingY,

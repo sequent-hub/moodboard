@@ -296,9 +296,14 @@ export function setupObjectLifecycleFlow(core) {
     });
 
     core.eventBus.on(Events.Object.ContentChange, (data) => {
-        const { objectId, oldContent, newContent } = data;
+        const { objectId, oldContent, newContent, oldSize, newSize, oldPosition, newPosition } = data;
         if (objectId && oldContent !== undefined && newContent !== undefined && oldContent !== newContent) {
-            const command = new UpdateContentCommand(core, objectId, oldContent, newContent);
+            const command = new UpdateContentCommand(core, objectId, oldContent, newContent, {
+                oldSize,
+                newSize,
+                oldPosition,
+                newPosition,
+            });
             command.setEventBus(core.eventBus);
             core.history.executeCommand(command);
         }

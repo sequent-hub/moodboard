@@ -82,9 +82,10 @@ function applyMindmapCaretFromClick({ create, objectId, object, textarea }) {
     } catch (_) {}
 }
 
-function measureMindmapTextWidthPx(textarea, measureEl) {
+function measureMindmapTextWidthPx(textarea, measureEl, valueOverride = null) {
     if (!textarea || !measureEl) return 0;
-    const text = String(textarea.value || '');
+    const rawValue = (typeof valueOverride === 'string') ? valueOverride : textarea.value;
+    const text = String(rawValue || '');
     if (text.length === 0) return 0;
 
     const style = (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function')
@@ -284,6 +285,16 @@ export function openMindmapEditor(object, create = false) {
     const initialCssHeight = targetHeight;
     const initialWorldWidth = objectWidth;
     const initialWorldHeight = objectHeight;
+    const stableBaseWorldWidth = Math.max(
+        1,
+        Math.round(
+            (typeof properties.capsuleBaseWidth === 'number' && properties.capsuleBaseWidth > 0)
+                ? properties.capsuleBaseWidth
+                : ((typeof objectWidth === 'number' && objectWidth > 0)
+                    ? objectWidth
+                    : ((typeof properties.width === 'number' && properties.width > 0) ? properties.width : MINDMAP_LAYOUT.width))
+        )
+    );
     const stableBaseWorldHeight = Math.max(
         1,
         Math.round(
@@ -398,9 +409,12 @@ export function openMindmapEditor(object, create = false) {
         const hasText = value.length > 0;
         const textWidth = hasText ? measureMindmapTextWidthPx(textarea, measureEl) : 0;
         const padding = getEditorHorizontalPaddingPx();
+        const placeholderWidth = measureMindmapTextWidthPx(textarea, measureEl, textarea.placeholder || '');
+        const baseCssWidth = Math.max(1, Math.round(stableBaseWorldWidth * getWorldToCssScale()));
+        const placeholderCssWidth = Math.max(1, Math.ceil(placeholderWidth + padding.left + padding.right));
         const nextCssWidth = hasText
             ? Math.max(1, Math.ceil(textWidth + padding.left + padding.right))
-            : initialCssWidth;
+            : Math.max(baseCssWidth, placeholderCssWidth);
         const lineCount = getEditorLineCount();
         const lineHeightPx = getEditorLineHeightPx();
         const baseCssHeight = Math.max(1, Math.round(stableBaseWorldHeight * getWorldToCssScale()));
@@ -426,9 +440,7 @@ export function openMindmapEditor(object, create = false) {
         if (heightChangedCss) wrapper.style.height = `${nextCssHeight}px`;
 
         const cssToWorld = getCssToWorldScale();
-        const nextWorldWidth = hasText
-            ? Math.max(1, Math.round(nextCssWidth * cssToWorld))
-            : Math.max(1, Math.round(initialWorldWidth));
+        const nextWorldWidth = Math.max(1, Math.round(nextCssWidth * cssToWorld));
         const nextWorldHeight = Math.max(1, Math.round(nextCssHeight * cssToWorld));
 
         const sizeData = { objectId, size: null };
@@ -598,10 +610,55 @@ export function openMindmapEditor(object, create = false) {
         if (!commitValue) return;
 
         if (objectId) {
+            const resolveCurrentObjectBox = () => {
+                const sizeData = { objectId, size: null };
+                const posData = { objectId, position: null };
+                this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+                this.eventBus.emit(Events.Tool.GetObjectPosition, posData);
+                return {
+                    size: {
+                        width: Math.max(1, Math.round(sizeData?.size?.width || objectWidth || initialWorldWidth || MINDMAP_LAYOUT.width)),
+                        height: Math.max(1, Math.round(sizeData?.size?.height || objectHeight || initialWorldHeight || MINDMAP_LAYOUT.height)),
+                    },
+                    position: {
+                        x: Math.round(posData?.position?.x || position?.x || 0),
+                        y: Math.round(posData?.position?.y || position?.y || 0),
+                    },
+                };
+            };
+            const currentBox = resolveCurrentObjectBox();
+            const oldBox = (resizeSession.started && resizeSession.oldSize)
+                ? {
+                    size: {
+                        width: Math.max(1, Math.round(resizeSession.oldSize.width)),
+                        height: Math.max(1, Math.round(resizeSession.oldSize.height)),
+                    },
+                    position: {
+                        x: Math.round(resizeSession.oldPosition?.x || currentBox.position.x),
+                        y: Math.round(resizeSession.oldPosition?.y || currentBox.position.y),
+                    },
+                }
+                : currentBox;
+            const newBox = (resizeSession.started && resizeSession.newSize)
+                ? {
+                    size: {
+                        width: Math.max(1, Math.round(resizeSession.newSize.width)),
+                        height: Math.max(1, Math.round(resizeSession.newSize.height)),
+                    },
+                    position: {
+                        x: Math.round(resizeSession.newPosition?.x || currentBox.position.x),
+                        y: Math.round(resizeSession.newPosition?.y || currentBox.position.y),
+                    },
+                }
+                : currentBox;
             this.eventBus.emit(Events.Object.ContentChange, {
                 objectId,
                 oldContent: initialContent,
                 newContent: value,
+                oldSize: oldBox.size,
+                oldPosition: oldBox.position,
+                newSize: newBox.size,
+                newPosition: newBox.position,
             });
         } else {
             this.eventBus.emit(Events.UI.ToolbarAction, {

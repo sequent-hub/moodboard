@@ -1449,6 +1449,128 @@ test.describe('MindmapTool E2E (mindmap-add instrument)', () => {
     expect(d2).toBeLessThanOrEqual(30);
   });
 
+  test('mindmap clearing content restores default width and keeps placeholder inside', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return !!obj?.id;
+      })
+      .toBe(true);
+
+    const root = await getMindmapObject(page);
+    expect(root?.id).toBeTruthy();
+    const initialWidth = Math.round(root.width || root.properties?.width || 0);
+    expect(initialWidth).toBeGreaterThan(0);
+
+    const textEl = page.locator(`.mb-text--mindmap[data-id="${root.id}"] .mb-text--mindmap-content`);
+    const clickText = async () => {
+      const box = await textEl.boundingBox();
+      expect(box).toBeTruthy();
+      await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5);
+    };
+    const closeEditor = async () => {
+      await page.mouse.click(canvasBox.x + canvasBox.width - 8, canvasBox.y + 8);
+      await expect
+        .poll(async () => page.evaluate(() => document.querySelectorAll('.moodboard-text-input').length))
+        .toBeLessThanOrEqual(1);
+    };
+
+    await clickText();
+    const textarea = page.locator('.moodboard-text-input');
+    await expect(textarea).toBeVisible();
+    await textarea.fill('ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ');
+    await closeEditor();
+
+    const expandedWidth = Math.round((await getMindmapObject(page))?.width || 0);
+    expect(expandedWidth).toBeGreaterThan(initialWidth);
+
+    await clickText();
+    await expect(textarea).toBeVisible();
+    await textarea.fill('');
+    await closeEditor();
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return Math.round(obj?.width || 0);
+      })
+      .toBeGreaterThanOrEqual(initialWidth);
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return Math.round(obj?.width || 0);
+      })
+      .toBeLessThanOrEqual(initialWidth + 8);
+
+  });
+
+  test('mindmap undo content change restores default width with placeholder', async ({ page }) => {
+    await page.click('.moodboard-toolbar__button--mindmap');
+    const canvas = page.locator('.moodboard-workspace__canvas canvas');
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).toBeTruthy();
+    await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        return !!obj?.id;
+      })
+      .toBe(true);
+
+    const root = await getMindmapObject(page);
+    expect(root?.id).toBeTruthy();
+    const initialWidth = Math.round(root.width || root.properties?.width || 0);
+    expect(initialWidth).toBeGreaterThan(0);
+
+    const textEl = page.locator(`.mb-text--mindmap[data-id="${root.id}"] .mb-text--mindmap-content`);
+    const clickText = async () => {
+      const box = await textEl.boundingBox();
+      expect(box).toBeTruthy();
+      await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5);
+    };
+    const closeEditor = async () => {
+      await page.mouse.click(canvasBox.x + canvasBox.width - 8, canvasBox.y + 8);
+      await expect
+        .poll(async () => page.evaluate(() => document.querySelectorAll('.moodboard-text-input').length))
+        .toBeLessThanOrEqual(1);
+    };
+
+    await clickText();
+    const textarea = page.locator('.moodboard-text-input');
+    await expect(textarea).toBeVisible();
+    await textarea.fill('ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ');
+    await closeEditor();
+
+    const expandedWidth = Math.round((await getMindmapObject(page))?.width || 0);
+    expect(expandedWidth).toBeGreaterThan(initialWidth);
+
+    await triggerUndo(page);
+
+    await expect
+      .poll(async () => {
+        const obj = await getMindmapObject(page);
+        const content = String(obj?.properties?.content || '');
+        const width = Math.round(obj?.width || 0);
+        return { content, width };
+      })
+      .toMatchObject({
+        content: '',
+        width: expect.any(Number),
+      });
+
+    const widthAfterUndo = Math.round((await getMindmapObject(page))?.width || 0);
+    expect(widthAfterUndo).toBeGreaterThanOrEqual(initialWidth);
+    expect(widthAfterUndo).toBeLessThanOrEqual(initialWidth + 8);
+
+  });
+
   test('mindmap places caret by click for non-empty text and at start for placeholder', async ({ page }) => {
     await page.click('.moodboard-toolbar__button--mindmap');
     const canvas = page.locator('.moodboard-workspace__canvas canvas');

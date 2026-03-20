@@ -116,6 +116,10 @@ export class HandlesEventBridge {
             [Events.History.Changed, (data) => {
                 if (data?.lastUndone || data?.lastRedone) {
                     this.host._endGroupRotationPreview();
+                    this.host.domRenderer?.relayoutAllMindmapCompounds?.();
+                    setTimeout(() => {
+                        this.host.domRenderer?.relayoutAllMindmapCompounds?.();
+                    }, 0);
                     this.host.update();
                 }
             }],
