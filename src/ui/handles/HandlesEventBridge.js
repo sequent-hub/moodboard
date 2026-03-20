@@ -45,7 +45,12 @@ export class HandlesEventBridge {
                 this.host._setHandlesVisibility(true);
                 this.host.update();
             }],
-            [Events.Tool.ResizeUpdate, () => this.host.update()],
+            [Events.Tool.ResizeUpdate, (data) => {
+                this.host.domRenderer?.relayoutMindmapAfterResize?.({
+                    objectId: data?.object || null,
+                });
+                this.host.update();
+            }],
             [Events.Tool.ResizeStart, () => { this.host._handlesSuppressed = true; this.host._setHandlesVisibility(false); }],
             [Events.Tool.ResizeEnd, () => { this.host._handlesSuppressed = false; this.host._setHandlesVisibility(true); }],
             [Events.Tool.RotateUpdate, () => this.host.update()],
@@ -72,6 +77,12 @@ export class HandlesEventBridge {
                 this.host.update();
             }],
             [Events.Tool.GroupResizeUpdate, (data) => {
+                const resizedIds = Array.isArray(data?.objects) ? data.objects : [];
+                resizedIds.forEach((id) => {
+                    this.host.domRenderer?.relayoutMindmapAfterResize?.({
+                        objectId: id,
+                    });
+                });
                 this.host._updateGroupResizePreview(data);
                 this.host.update();
             }],

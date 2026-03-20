@@ -976,6 +976,40 @@ export class HandlesDomRenderer {
         }
     }
 
+    relayoutMindmapAfterResize({ objectId } = {}) {
+        if (!objectId) return;
+        const core = this.host.core;
+        const eventBus = this.host.eventBus;
+        if (!core || !eventBus) return;
+        const objects = core?.state?.state?.objects || [];
+        const node = (Array.isArray(objects) ? objects : []).find((obj) => obj?.id === objectId && obj?.type === 'mindmap');
+        if (!node) return;
+        const meta = node?.properties?.mindmap || {};
+        const role = meta?.role || null;
+        const parentId = meta?.parentId || null;
+        const side = meta?.side || null;
+
+        if (role === 'root' || !parentId) {
+            relayoutMindmapBranchLevel({ core, eventBus, parentId: objectId, side: 'left' });
+            relayoutMindmapBranchLevel({ core, eventBus, parentId: objectId, side: 'right' });
+            return;
+        }
+
+        if (side === 'left' || side === 'right') {
+            relayoutMindmapBranchCascade({
+                core,
+                eventBus,
+                startParentId: parentId,
+                startSide: side,
+            });
+        }
+        relayoutMindmapSubtreeLevels({
+            core,
+            eventBus,
+            rootIds: [objectId],
+        });
+    }
+
     showBounds(worldBounds, id, options = {}) {
         if (!this.host.layer) return;
 
