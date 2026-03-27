@@ -51,6 +51,7 @@ function normalizeLoadedPayload(payload, moodboardIdFallback) {
 
 export async function loadExistingBoard(board, version = null, options = {}) {
     const fallbackToSeedOnError = options?.fallbackToSeedOnError !== false;
+    const historyNavigation = options?.historyNavigation === true;
     try {
         const boardId = board.options.boardId;
 
@@ -87,14 +88,20 @@ export async function loadExistingBoard(board, version = null, options = {}) {
 
         if (apiResponse?.success && payload) {
             const normalizedData = normalizeLoadedPayload(payload, boardId);
-            board.currentLoadedVersion = Number(normalizedData.version) || null;
+            const loadedVersion = Number(normalizedData.version) || null;
+            board.currentLoadedVersion = loadedVersion;
+            board.historyCursorVersion = loadedVersion;
+            if (!historyNavigation) {
+                board.historyHeadVersion = loadedVersion;
+            }
             console.log('✅ MoodBoard: данные загружены с сервера', normalizedData);
             board.dataManager.loadData(normalizedData);
             if (board?.coreMoodboard?.eventBus) {
+                const cursor = Number(board.historyCursorVersion);
+                const head = Number(board.historyHeadVersion);
                 board.coreMoodboard.eventBus.emit(Events.UI.UpdateHistoryButtons, {
-                    canUndo: Number(board.currentLoadedVersion) > 1,
-                    // Верхнюю границу версий backend не возвращает, поэтому оставляем переход вперед доступным.
-                    canRedo: true,
+                    canUndo: Number.isFinite(cursor) && cursor > 1,
+                    canRedo: Number.isFinite(cursor) && Number.isFinite(head) && cursor < head,
                 });
             }
             invokeOnLoad(board, { success: true, data: normalizedData });

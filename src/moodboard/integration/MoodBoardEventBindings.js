@@ -91,40 +91,25 @@ export function bindToolbarEvents(board) {
         if (!moodboardId) return;
         if (!Number.isFinite(targetVersion) || targetVersion < 1) return;
         try {
-            await board.loadFromApi(moodboardId, targetVersion, { fallbackToSeedOnError: false });
-
-            // В append-only модели откат/переход по версии фиксируем новой записью,
-            // чтобы дальнейшие изменения шли от нового head и не теряли "будущее".
-            const restoreSnapshot = board.coreMoodboard?.getBoardData?.();
-            if (restoreSnapshot && board.coreMoodboard?.apiClient) {
-                const saveResult = await board.coreMoodboard.apiClient.saveBoard(
-                    moodboardId,
-                    restoreSnapshot,
-                    { actionType: 'history_restore' }
-                );
-                const restoredVersion = Number(saveResult?.historyVersion);
-                if (Number.isFinite(restoredVersion) && restoredVersion > 0) {
-                    board.currentLoadedVersion = restoredVersion;
-                    board.coreMoodboard.eventBus.emit(Events.UI.UpdateHistoryButtons, {
-                        canUndo: restoredVersion > 1,
-                        canRedo: false,
-                    });
-                }
-            }
+            await board.loadFromApi(moodboardId, targetVersion, {
+                fallbackToSeedOnError: false,
+                historyNavigation: true,
+            });
         } catch (error) {
             console.warn(`⚠️ Не удалось загрузить версию ${targetVersion}:`, error?.message || error);
         }
     };
 
     board.coreMoodboard.eventBus.on(Events.UI.LoadPrevVersion, () => {
-        const current = Number(board.currentLoadedVersion);
+        const current = Number(board.historyCursorVersion);
         if (!Number.isFinite(current) || current <= 1) return;
         loadVersion(current - 1);
     });
 
     board.coreMoodboard.eventBus.on(Events.UI.LoadNextVersion, () => {
-        const current = Number(board.currentLoadedVersion);
-        if (!Number.isFinite(current)) return;
+        const current = Number(board.historyCursorVersion);
+        const head = Number(board.historyHeadVersion);
+        if (!Number.isFinite(current) || !Number.isFinite(head) || current >= head) return;
         loadVersion(current + 1);
     });
 }
@@ -158,6 +143,8 @@ export function bindSaveCallbacks(board) {
         const savedVersion = Number(data?.response?.historyVersion);
         if (Number.isFinite(savedVersion) && savedVersion > 0) {
             board.currentLoadedVersion = savedVersion;
+            board.historyHeadVersion = savedVersion;
+            board.historyCursorVersion = savedVersion;
             board.coreMoodboard.eventBus.emit(Events.UI.UpdateHistoryButtons, {
                 canUndo: savedVersion > 1,
                 canRedo: false,
