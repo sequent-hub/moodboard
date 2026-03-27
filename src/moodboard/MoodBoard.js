@@ -203,8 +203,8 @@ export class MoodBoard {
     /**
      * Публичный метод для загрузки данных из API
      */
-    async loadFromApi(boardId = null) {
-        await loadMoodBoardFromApi(this, boardId);
+    async loadFromApi(boardId = null, version = null, options = {}) {
+        await loadMoodBoardFromApi(this, boardId, version, options);
     }
     
     /**

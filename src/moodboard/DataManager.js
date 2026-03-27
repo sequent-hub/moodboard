@@ -49,8 +49,9 @@ export class DataManager {
         
 
         
-        // Очищаем доску перед загрузкой
-        this.clearBoard();
+        // Очищаем доску перед загрузкой без команд истории:
+        // загрузка снапшота не должна порождать новые записи истории.
+        this.clearBoard({ silent: true });
 
         // Применяем settings централизованно (если есть апплаер), иначе — старым способом
         try {
@@ -167,8 +168,41 @@ export class DataManager {
     /**
      * Очищает все объекты на доске
      */
-    clearBoard() {
+    clearBoard(options = {}) {
         if (!this.coreMoodboard) return;
+        const silent = options?.silent === true;
+
+        if (silent) {
+            try {
+                const objects = this.coreMoodboard?.state?.state?.objects || [];
+                const ids = objects.map((obj) => obj?.id).filter(Boolean);
+
+                ids.forEach((id) => {
+                    try { this.coreMoodboard.pixi?.removeObject?.(id); } catch (_) {}
+                });
+
+                // Страховка: убрать возможные "висячие" PIXI-объекты.
+                const pixiObjects = this.coreMoodboard?.pixi?.objects;
+                if (pixiObjects && pixiObjects.size > 0) {
+                    for (const [objectId] of pixiObjects) {
+                        try { this.coreMoodboard.pixi.removeObject(objectId); } catch (_) {}
+                    }
+                }
+
+                if (this.coreMoodboard?.state?.state) {
+                    this.coreMoodboard.state.state.objects = [];
+                    this.coreMoodboard.state.state.selectedObjects = [];
+                    this.coreMoodboard.state.state.isDirty = false;
+                }
+
+                if (this.coreMoodboard?.selectTool?.clearSelection) {
+                    this.coreMoodboard.selectTool.clearSelection();
+                }
+                return ids.length;
+            } catch (_) {
+                // fallback на командный путь ниже
+            }
+        }
         
         // 1) Удаляем все объекты, известные состоянию
         const objects = this.coreMoodboard.objects || [];

@@ -1,3 +1,5 @@
+import { Events } from '../../core/events/Events.js';
+
 function getSeedData(board) {
     return board.data || { objects: [] };
 }
@@ -15,7 +17,25 @@ export function getCsrfToken(board) {
         || '';
 }
 
-export async function loadExistingBoard(board) {
+function normalizeLoadedPayload(payload, moodboardIdFallback) {
+    const state = (payload?.state && typeof payload.state === 'object')
+        ? payload.state
+        : {};
+    return {
+        ...state,
+        objects: Array.isArray(state.objects) ? state.objects : [],
+        moodboardId: payload?.moodboardId || moodboardIdFallback,
+        name: payload?.name || null,
+        description: payload?.description || null,
+        settings: payload?.settings || {},
+        version: payload?.version || null,
+        // Это загрузка с сервера, поэтому пустое состояние допустимо.
+        meta: { allowEmptyLoad: true },
+    };
+}
+
+export async function loadExistingBoard(board, version = null, options = {}) {
+    const fallbackToSeedOnError = options?.fallbackToSeedOnError !== false;
     try {
         const boardId = board.options.boardId;
 
@@ -29,9 +49,10 @@ export async function loadExistingBoard(board) {
 
         console.log(`📦 MoodBoard: загружаем доску ${boardId} с ${board.options.apiUrl}`);
 
-        const loadUrl = board.options.apiUrl.endsWith('/')
+        const baseUrl = board.options.apiUrl.endsWith('/')
             ? `${board.options.apiUrl}${boardId}`
             : `${board.options.apiUrl}/${boardId}`;
+        const loadUrl = Number.isFinite(version) ? `${baseUrl}/${version}` : baseUrl;
 
         const response = await fetch(loadUrl, {
             method: 'GET',
@@ -47,27 +68,36 @@ export async function loadExistingBoard(board) {
 
         const apiResponse = await response.json();
         const payload = apiResponse?.data || null;
-        const state = payload?.state || null;
 
-        if (apiResponse?.success && payload && state) {
-            const normalizedData = {
-                ...state,
-                moodboardId: payload.moodboardId || boardId,
-                name: payload.name || null,
-                description: payload.description || null,
-                settings: payload.settings || {},
-                version: payload.version || null,
-            };
+        if (apiResponse?.success && payload) {
+            const normalizedData = normalizeLoadedPayload(payload, boardId);
+            board.currentLoadedVersion = Number(normalizedData.version) || null;
             console.log('✅ MoodBoard: данные загружены с сервера', normalizedData);
             board.dataManager.loadData(normalizedData);
+            if (board?.coreMoodboard?.eventBus) {
+                board.coreMoodboard.eventBus.emit(Events.UI.UpdateHistoryButtons, {
+                    canUndo: Number(board.currentLoadedVersion) > 1,
+                    // Верхнюю границу версий backend не возвращает, поэтому оставляем переход вперед доступным.
+                    canRedo: true,
+                });
+            }
             invokeOnLoad(board, { success: true, data: normalizedData });
         } else {
             console.log('📦 MoodBoard: нет данных с сервера, загружаем пустую доску');
             const seedData = getSeedData(board);
             board.dataManager.loadData(seedData);
+            if (board?.coreMoodboard?.eventBus) {
+                board.coreMoodboard.eventBus.emit(Events.UI.UpdateHistoryButtons, {
+                    canUndo: false,
+                    canRedo: false,
+                });
+            }
             invokeOnLoad(board, { success: true, data: seedData });
         }
     } catch (error) {
+        if (!fallbackToSeedOnError) {
+            throw error;
+        }
         console.warn('⚠️ MoodBoard: ошибка загрузки доски, создаем новую:', error.message);
         const seedData = getSeedData(board);
         board.dataManager.loadData(seedData);
@@ -75,7 +105,7 @@ export async function loadExistingBoard(board) {
     }
 }
 
-export async function loadFromApi(board, boardId = null) {
+export async function loadFromApi(board, boardId = null, version = null, options = {}) {
     const targetBoardId = boardId || board.options.boardId;
     if (!targetBoardId) {
         throw new Error('boardId не указан');
@@ -85,7 +115,7 @@ export async function loadFromApi(board, boardId = null) {
     board.options.boardId = targetBoardId;
 
     try {
-        await loadExistingBoard(board);
+        await loadExistingBoard(board, version, options);
     } finally {
         board.options.boardId = originalBoardId;
     }

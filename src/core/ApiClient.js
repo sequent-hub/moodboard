@@ -24,15 +24,19 @@ export class ApiClient {
             
             if (result.success) {
                 const payload = result.data || {};
-                const state = payload.state || {};
+                const state = (payload.state && typeof payload.state === 'object')
+                    ? payload.state
+                    : {};
                 return {
                     data: {
                         ...state,
+                        objects: Array.isArray(state.objects) ? state.objects : [],
                         moodboardId: payload.moodboardId || boardId,
                         name: payload.name || null,
                         description: payload.description || null,
                         settings: payload.settings || {},
                         version: payload.version || null,
+                        meta: { allowEmptyLoad: true },
                     }
                 };
             } else {
@@ -51,8 +55,9 @@ export class ApiClient {
         }
     }
 
-    async saveBoard(boardId, boardData) {
+    async saveBoard(boardId, boardData, options = {}) {
         try {
+            const actionType = options?.actionType || 'command_execute';
             // Поддержка формата core.getBoardData(): { id, boardData, settings }
             const payloadBoardData = boardData && boardData.boardData ? boardData.boardData : boardData;
             const payloadSettings = boardData && boardData.settings ? boardData.settings : {};
@@ -101,7 +106,7 @@ export class ApiClient {
                 body: JSON.stringify({
                     moodboardId: boardId,
                     state: cleanedData,
-                    actionType: 'command_execute'
+                    actionType
                 })
             });
 

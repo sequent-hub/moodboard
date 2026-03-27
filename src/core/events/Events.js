@@ -51,6 +51,8 @@ export const Events = {
 	UI: {
 		ToolbarAction: 'toolbar:action',
 		UpdateHistoryButtons: 'ui:update-history-buttons',
+		LoadPrevVersion: 'ui:load-prev-version',
+		LoadNextVersion: 'ui:load-next-version',
 		ContextMenuShow: 'ui:contextmenu:show',
 		GridChange: 'ui:grid:change',
 		GridCurrent: 'ui:grid:current',

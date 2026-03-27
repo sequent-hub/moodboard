@@ -9,13 +9,13 @@ export class ToolbarActionRouter {
 
     routeToolbarAction(button, toolType, toolId) {
         if (toolType === 'undo') {
-            this.toolbar.eventBus.emit(Events.Keyboard.Undo);
+            this.toolbar.eventBus.emit(Events.UI.LoadPrevVersion);
             this.toolbar.animateButton(button);
             return true;
         }
 
         if (toolType === 'redo') {
-            this.toolbar.eventBus.emit(Events.Keyboard.Redo);
+            this.toolbar.eventBus.emit(Events.UI.LoadNextVersion);
             this.toolbar.animateButton(button);
             return true;
         }
