@@ -37,7 +37,7 @@ export class MoodBoard {
         this.options = {
             theme: 'light',
             boardId: null,
-            apiUrl: '/api/moodboard',
+            apiUrl: '/api/v2/moodboard',
             autoLoad: true,
             onSave: null,
             onLoad: null,

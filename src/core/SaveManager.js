@@ -14,8 +14,8 @@ export class SaveManager {
             retryDelay: 1000,
 
             // Настраиваемые эндпоинты (берем из options)
-            saveEndpoint: options.saveEndpoint || '/api/moodboard/save',
-            loadEndpoint: options.loadEndpoint || '/api/moodboard/load'
+            saveEndpoint: options.saveEndpoint || '/api/v2/moodboard/history/save',
+            loadEndpoint: options.loadEndpoint || '/api/v2/moodboard'
         };
         
         this.saveTimer = null;
@@ -179,8 +179,9 @@ export class SaveManager {
         }
 
         const requestBody = {
-            boardId,
-            boardData: data
+            moodboardId: boardId,
+            state: data,
+            actionType: 'command_execute'
         };
 
         const response = await fetch(this.options.saveEndpoint, {
@@ -221,9 +222,9 @@ export class SaveManager {
 
     _buildSavePayload(boardId, data, csrfToken = undefined) {
         return {
-            boardId,
-            boardData: data,
-            settings: data?.settings || undefined,
+            moodboardId: boardId,
+            state: data,
+            actionType: 'command_execute',
             _token: csrfToken || undefined
         };
     }
@@ -272,16 +273,18 @@ export class SaveManager {
             const result = await response.json();
             
             if (result.success) {
-                this.lastSavedData = result.data;
+                const payload = result.data || {};
+                const state = payload.state || payload;
+                this.lastSavedData = state;
                 this.hasUnsavedChanges = false;
                 
                 // Эмитируем событие загрузки
                 this.eventBus.emit(Events.Save.Loaded, {
-                    data: result.data,
+                    data: state,
                     timestamp: new Date().toISOString()
                 });
                 
-                return result.data;
+                return state;
             } else {
                 throw new Error(result.message || 'Ошибка загрузки');
             }

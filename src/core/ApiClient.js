@@ -7,7 +7,7 @@ export class ApiClient {
 
     async getBoard(boardId) {
         try {
-            const response = await fetch(`/api/moodboard/${boardId}`, {
+            const response = await fetch(`/api/v2/moodboard/${boardId}`, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
@@ -23,7 +23,18 @@ export class ApiClient {
             const result = await response.json();
             
             if (result.success) {
-                return { data: result.data };
+                const payload = result.data || {};
+                const state = payload.state || {};
+                return {
+                    data: {
+                        ...state,
+                        moodboardId: payload.moodboardId || boardId,
+                        name: payload.name || null,
+                        description: payload.description || null,
+                        settings: payload.settings || {},
+                        version: payload.version || null,
+                    }
+                };
             } else {
                 throw new Error(result.message || 'Ошибка загрузки доски');
             }
@@ -42,16 +53,43 @@ export class ApiClient {
 
     async saveBoard(boardId, boardData) {
         try {
-            // Поддержка нового формата: { boardData: {...}, settings: {...} }
-            let payloadBoardData = boardData && boardData.boardData ? boardData.boardData : boardData;
-            let payloadSettings = boardData && boardData.settings ? boardData.settings : undefined;
+            // Поддержка формата core.getBoardData(): { id, boardData, settings }
+            const payloadBoardData = boardData && boardData.boardData ? boardData.boardData : boardData;
+            const payloadSettings = boardData && boardData.settings ? boardData.settings : {};
 
             // Фильтруем объекты изображений и файлов - убираем избыточные данные
             const cleanedData = this._cleanObjectData(payloadBoardData);
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-            const response = await fetch('/api/moodboard/save', {
+            // 1) Метаданные moodboard (settings/name/description) сохраняем отдельно.
+            // Ошибка метаданных не должна блокировать сохранение контента в истории.
+            try {
+                const metadataResponse = await fetch('/api/v2/moodboard/metadata/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        moodboardId: boardId,
+                        name: cleanedData?.name || null,
+                        description: cleanedData?.description ?? null,
+                        settings: payloadSettings || {}
+                    })
+                });
+                if (!metadataResponse.ok) {
+                    console.warn(`ApiClient: metadata/save вернул HTTP ${metadataResponse.status}`);
+                }
+            } catch (metadataError) {
+                console.warn('ApiClient: metadata/save завершился с ошибкой:', metadataError);
+            }
+
+            // 2) Контент (state) сохраняем append-only в history.
+            const response = await fetch('/api/v2/moodboard/history/save', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -61,9 +99,9 @@ export class ApiClient {
                 },
                 credentials: 'same-origin',
                 body: JSON.stringify({
-                    boardId: boardId,
-                    boardData: cleanedData,
-                    settings: payloadSettings
+                    moodboardId: boardId,
+                    state: cleanedData,
+                    actionType: 'command_execute'
                 })
             });
 
@@ -74,9 +112,15 @@ export class ApiClient {
             const result = await response.json();
             
             if (result.success) {
-                return { success: true, data: result };
+                return {
+                    success: true,
+                    deduplicated: !!result.deduplicated,
+                    historyVersion: result.historyVersion,
+                    moodboardId: result.moodboardId || boardId,
+                    data: result
+                };
             } else {
-                throw new Error(result.message || 'Ошибка сохранения доски');
+                throw new Error(result.message || 'Ошибка сохранения истории moodboard');
             }
         } catch (error) {
             console.error('ApiClient: Ошибка сохранения доски:', error);
