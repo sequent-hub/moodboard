@@ -8,18 +8,10 @@ export class SaveManager {
         this.eventBus = eventBus;
         this.apiClient = null; // Будет установлен позже через setApiClient
         this.options = {
-            // Фиксированные настройки автосохранения данных
+            // Сохранение выполняется только по событиям изменения контента.
             autoSave: true,
-            // Уменьшенная задержка, чтобы изменения чаще успевали сохраняться
-            // (раньше было 1500 мс)
-            saveDelay: 400,
             maxRetries: 3,
             retryDelay: 1000,
-            periodicSaveInterval: 30000, // Периодическое сохранение каждые 30 сек
-
-            // Фоновая отправка при закрытии вкладки/перезагрузке страницы
-            // (используется navigator.sendBeacon при поддержке браузером)
-            useBeaconOnUnload: true,
 
             // Настраиваемые эндпоинты (берем из options)
             saveEndpoint: options.saveEndpoint || '/api/moodboard/save',
@@ -31,10 +23,8 @@ export class SaveManager {
         this.retryCount = 0;
         this.lastSavedData = null;
         this.hasUnsavedChanges = false;
-        this.periodicSaveTimer = null;
         this._listenersAttached = false;
         this._handlers = {};
-        this._domHandlers = {};
         
         // Состояния сохранения
         this.saveStatus = 'idle'; // idle, saving, saved, error
@@ -72,10 +62,6 @@ export class SaveManager {
             this.markAsChanged();
         };
         
-        // Отслеживаем изменения сетки: не передаём частичные данные в сохранение,
-        // чтобы собрать полный snapshot через getBoardData()
-        this.eventBus.on(Events.Grid.BoardDataChanged, this._handlers.onGridBoardDataChanged);
-        
         // Отслеживаем создание объектов
         this.eventBus.on(Events.Object.Created, this._handlers.onObjectCreated);
         
@@ -87,64 +73,6 @@ export class SaveManager {
         
         // Отслеживаем прямые изменения состояния (для Undo/Redo)
         this.eventBus.on(Events.Object.StateChanged, this._handlers.onObjectStateChanged);
-        
-        // Отслеживание перемещений теперь происходит через команды и state:changed
-        
-        // Сохранение при закрытии страницы (в том числе при резком закрытии окна)
-        this._domHandlers.beforeUnload = (e) => {
-            if (!this.hasUnsavedChanges) return;
-            try {
-                if (this.options.useBeaconOnUnload) {
-                    this._flushOnUnload();
-                } else {
-                    this._flushSyncFallback();
-                }
-            } catch (_) { /* игнорируем, чтобы не блокировать закрытие */ }
-
-            // Сообщаем браузеру, что есть незафиксированные изменения
-            // (текст может быть проигнорирован, но событие задержит закрытие на доли секунды)
-            e.preventDefault();
-            e.returnedValue = '';
-            e.returnValue = '';
-            return '';
-        };
-        window.addEventListener('beforeunload', this._domHandlers.beforeUnload, { capture: true });
-
-        // Дополнительно: обработка быстрого ухода со страницы (pagehide надёжнее в части браузеров)
-        this._domHandlers.pageHide = () => {
-            if (!this.hasUnsavedChanges) return;
-            try {
-                if (!this.options || this.options.useBeaconOnUnload) {
-                    this._flushOnUnload();
-                } else {
-                    this._flushSyncFallback();
-                }
-            } catch (_) { /* игнорируем */ }
-        };
-        window.addEventListener('pagehide', this._domHandlers.pageHide, { capture: true });
-
-        // Подстраховка на случай, когда вкладка просто уходит в фон без beforeunload/pagehide
-        this._domHandlers.visibilityChange = () => {
-            if (document.visibilityState !== 'hidden') return;
-            if (!this.hasUnsavedChanges) return;
-            try {
-                if (!this.options || this.options.useBeaconOnUnload) {
-                    this._flushOnUnload();
-                } else {
-                    this._flushSyncFallback();
-                }
-            } catch (_) { /* игнорируем */ }
-        };
-        document.addEventListener('visibilitychange', this._domHandlers.visibilityChange);
-        
-        // Периодическое автосохранение
-        if (this.options.autoSave) {
-            this.periodicSaveTimer = setInterval(() => {
-                if (this.hasUnsavedChanges && !this.isRequestInProgress) {
-                    this.saveImmediately();
-                }
-            }, this.options.periodicSaveInterval);
-        }
     }
     
     /**
@@ -152,27 +80,14 @@ export class SaveManager {
      */
     markAsChanged() {
         this.hasUnsavedChanges = true;
-        this.scheduleAutoSave();
+        this.saveImmediately();
     }
     
     /**
-     * Запланировать автоматическое сохранение с задержкой
+     * Метод сохранён для совместимости; таймеры больше не используются.
      */
     scheduleAutoSave(data = null) {
-        if (!this.options.autoSave) return;
-        
-        // Отменяем предыдущий таймер
-        if (this.saveTimer) {
-            clearTimeout(this.saveTimer);
-        }
-        
-        // Устанавливаем новый таймер
-        this.saveTimer = setTimeout(() => {
-            this.saveImmediately(data);
-        }, this.options.saveDelay);
-        
-        // Обновляем статус
-        this.updateSaveStatus('pending');
+        this.saveImmediately(data);
     }
     
     /**
@@ -324,10 +239,6 @@ export class SaveManager {
         return await response.json();
     }
 
-    /**
-     * Строит единый payload сохранения для всех каналов отправки
-     * (обычный save, beacon, sync XHR fallback).
-     */
     _buildSavePayload(boardId, data, csrfToken = undefined) {
         return {
             boardId,
@@ -455,76 +366,6 @@ export class SaveManager {
     }
     
     /**
-     * Синхронно собирает текущие данные для сохранения через EventBus.
-     * Используется в обработчиках закрытия вкладки, где нет времени на ожидание async.
-     */
-    _collectCurrentDataSync() {
-        try {
-            const requestData = { data: null };
-            this.eventBus && this.eventBus.emit(Events.Save.GetBoardData, requestData);
-            return requestData.data || null;
-        } catch (_) {
-            return null;
-        }
-    }
-
-    /**
-     * Отправляет данные в фоне при закрытии вкладки (navigator.sendBeacon),
-     * а при отсутствии поддержки — выполняет синхронный XHR как запасной вариант.
-     */
-    _flushOnUnload() {
-        const data = this._collectCurrentDataSync();
-        if (!data) return;
-
-        const boardId = data.id || 'default';
-        // CSRF токен добавим в тело (для серверов, которые принимают _token из JSON)
-        const csrfToken = (typeof document !== 'undefined')
-            ? (document.querySelector('meta[name="csrf-token"]')?.value || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'))
-            : undefined;
-        const payload = this._buildSavePayload(boardId, data, csrfToken);
-
-        const body = JSON.stringify(payload);
-
-        let sent = false;
-        try {
-            if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
-                const blob = new Blob([body], { type: 'application/json' });
-                sent = navigator.sendBeacon(this.options.saveEndpoint, blob);
-            }
-        } catch (_) { /* игнорируем */ }
-
-        if (!sent) {
-            // Фолбэк: синхронный XHR (доступен в beforeunload, но может быть заблокирован политиками браузера)
-            this._flushSyncFallback(data);
-        }
-
-        // Считаем, что попытались сохранить; снимаем флаг, чтобы не спамить повторно
-        this.hasUnsavedChanges = false;
-    }
-
-    /**
-     * Синхронная отправка запроса на сохранение (fallback для устаревших браузеров).
-     */
-    _flushSyncFallback(existingData) {
-        try {
-            const data = existingData || this._collectCurrentDataSync();
-            if (!data) return;
-
-            const boardId = data.id || 'default';
-            const csrfToken = (typeof document !== 'undefined') ? (document.querySelector('meta[name="csrf-token"]').getAttribute('content')) : null;
-
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', this.options.saveEndpoint, false); // синхронно
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.setRequestHeader('Accept', 'application/json');
-            if (csrfToken) xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
-
-            const payload = this._buildSavePayload(boardId, data, csrfToken || undefined);
-            try { xhr.send(JSON.stringify(payload)); } catch (_) { /* игнорируем */ }
-        } catch (_) { /* игнорируем */ }
-    }
-
-    /**
      * Очистка ресурсов
      */
     destroy() {
@@ -532,29 +373,14 @@ export class SaveManager {
             clearTimeout(this.saveTimer);
             this.saveTimer = null;
         }
-        if (this.periodicSaveTimer) {
-            clearInterval(this.periodicSaveTimer);
-            this.periodicSaveTimer = null;
-        }
-        
-        // Финальное сохранение перед уничтожением
-        if (this.hasUnsavedChanges && this.options.autoSave) {
-            this.saveImmediately();
-        }
-        
+
         // Удаляем обработчики событий, передавая исходные callback-ссылки.
-        if (this._handlers.onGridBoardDataChanged) this.eventBus.off(Events.Grid.BoardDataChanged, this._handlers.onGridBoardDataChanged);
         if (this._handlers.onObjectCreated) this.eventBus.off(Events.Object.Created, this._handlers.onObjectCreated);
         if (this._handlers.onObjectUpdated) this.eventBus.off(Events.Object.Updated, this._handlers.onObjectUpdated);
         if (this._handlers.onObjectDeleted) this.eventBus.off(Events.Object.Deleted, this._handlers.onObjectDeleted);
         if (this._handlers.onObjectStateChanged) this.eventBus.off(Events.Object.StateChanged, this._handlers.onObjectStateChanged);
 
-        if (this._domHandlers.beforeUnload) window.removeEventListener('beforeunload', this._domHandlers.beforeUnload, { capture: true });
-        if (this._domHandlers.pageHide) window.removeEventListener('pagehide', this._domHandlers.pageHide, { capture: true });
-        if (this._domHandlers.visibilityChange) document.removeEventListener('visibilitychange', this._domHandlers.visibilityChange);
-
         this._listenersAttached = false;
         this._handlers = {};
-        this._domHandlers = {};
     }
 }
