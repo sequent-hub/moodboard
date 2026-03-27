@@ -10,11 +10,11 @@ export class KeyboardSelectionActions {
         switch (actionId) {
             case 'undo':
                 return () => {
-                    this.eventBus.emit(Events.Keyboard.Undo);
+                    this.eventBus.emit(Events.UI.LoadPrevVersion);
                 };
             case 'redo':
                 return () => {
-                    this.eventBus.emit(Events.Keyboard.Redo);
+                    this.eventBus.emit(Events.UI.LoadNextVersion);
                 };
             case 'select-all':
                 return () => {

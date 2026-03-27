@@ -226,13 +226,6 @@ export class CoreMoodBoard {
                     historySize: data.historySize,
                 });
             }
-
-            
-            // Можно здесь обновить состояние кнопок Undo/Redo в UI
-            this.eventBus.emit(Events.UI.UpdateHistoryButtons, {
-                canUndo: data.canUndo,
-                canRedo: data.canRedo
-            });
         });
     }
 

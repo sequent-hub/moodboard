@@ -17,6 +17,21 @@ export function getCsrfToken(board) {
         || '';
 }
 
+function resolveMoodboardApiBase(board) {
+    const raw = String(board?.options?.apiUrl || '').trim();
+    if (!raw) return '/api/v2/moodboard';
+
+    // Совместимость с legacy конфигом: /api/moodboard -> /api/v2/moodboard
+    if (raw.endsWith('/api/moodboard')) {
+        return raw.replace(/\/api\/moodboard$/, '/api/v2/moodboard');
+    }
+    if (raw.endsWith('/api/moodboard/')) {
+        return raw.replace(/\/api\/moodboard\/$/, '/api/v2/moodboard/');
+    }
+
+    return raw;
+}
+
 function normalizeLoadedPayload(payload, moodboardIdFallback) {
     const state = (payload?.state && typeof payload.state === 'object')
         ? payload.state
@@ -47,11 +62,12 @@ export async function loadExistingBoard(board, version = null, options = {}) {
             return;
         }
 
-        console.log(`📦 MoodBoard: загружаем доску ${boardId} с ${board.options.apiUrl}`);
+        const apiBase = resolveMoodboardApiBase(board);
+        console.log(`📦 MoodBoard: загружаем доску ${boardId} с ${apiBase}`);
 
-        const baseUrl = board.options.apiUrl.endsWith('/')
-            ? `${board.options.apiUrl}${boardId}`
-            : `${board.options.apiUrl}/${boardId}`;
+        const baseUrl = apiBase.endsWith('/')
+            ? `${apiBase}${boardId}`
+            : `${apiBase}/${boardId}`;
         const loadUrl = Number.isFinite(version) ? `${baseUrl}/${version}` : baseUrl;
 
         const response = await fetch(loadUrl, {

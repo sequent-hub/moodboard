@@ -133,6 +133,7 @@ export class SaveManager {
                 // Эмитируем событие успешного сохранения
                 this.eventBus.emit(Events.Save.Success, {
                     data: saveData,
+                    response,
                     timestamp: new Date().toISOString()
                 });
             } else {

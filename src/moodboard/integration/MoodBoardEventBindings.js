@@ -154,8 +154,17 @@ export function bindSaveCallbacks(board) {
         return;
     }
 
-    if (typeof board.options.onSave === 'function') {
-        board.coreMoodboard.eventBus.on('save:success', (data) => {
+    board.coreMoodboard.eventBus.on('save:success', (data) => {
+        const savedVersion = Number(data?.response?.historyVersion);
+        if (Number.isFinite(savedVersion) && savedVersion > 0) {
+            board.currentLoadedVersion = savedVersion;
+            board.coreMoodboard.eventBus.emit(Events.UI.UpdateHistoryButtons, {
+                canUndo: savedVersion > 1,
+                canRedo: false,
+            });
+        }
+
+        if (typeof board.options.onSave === 'function') {
             try {
                 let screenshot = null;
                 if (board.coreMoodboard.pixi && board.coreMoodboard.pixi.app && board.coreMoodboard.pixi.app.view) {
@@ -171,9 +180,11 @@ export function bindSaveCallbacks(board) {
             } catch (error) {
                 console.warn('⚠️ Ошибка в коллбеке onSave:', error);
             }
-        });
+        }
+    });
 
-        board.coreMoodboard.eventBus.on('save:error', (data) => {
+    board.coreMoodboard.eventBus.on('save:error', (data) => {
+        if (typeof board.options.onSave === 'function') {
             try {
                 board.options.onSave({
                     success: false,
@@ -183,6 +194,6 @@ export function bindSaveCallbacks(board) {
             } catch (error) {
                 console.warn('⚠️ Ошибка в коллбеке onSave:', error);
             }
-        });
-    }
+        }
+    });
 }
