@@ -46,33 +46,13 @@ export class SaveManager {
         if (!this.options.autoSave || this._listenersAttached) return;
         this._listenersAttached = true;
 
-        this._handlers.onGridBoardDataChanged = () => {
+        // Единый триггер сохранения: любое изменение истории команд.
+        // Это покрывает execute/undo/redo и исключает "лишние" save-триггеры.
+        this._handlers.onHistoryChanged = () => {
             this.markAsChanged();
         };
-        this._handlers.onObjectCreated = () => {
-            this.markAsChanged();
-        };
-        this._handlers.onObjectUpdated = () => {
-            this.markAsChanged();
-        };
-        this._handlers.onObjectDeleted = () => {
-            this.markAsChanged();
-        };
-        this._handlers.onObjectStateChanged = () => {
-            this.markAsChanged();
-        };
-        
-        // Отслеживаем создание объектов
-        this.eventBus.on(Events.Object.Created, this._handlers.onObjectCreated);
-        
-        // Отслеживаем изменения объектов
-        this.eventBus.on(Events.Object.Updated, this._handlers.onObjectUpdated);
-        
-        // Отслеживаем удаление объектов
-        this.eventBus.on(Events.Object.Deleted, this._handlers.onObjectDeleted);
-        
-        // Отслеживаем прямые изменения состояния (для Undo/Redo)
-        this.eventBus.on(Events.Object.StateChanged, this._handlers.onObjectStateChanged);
+
+        this.eventBus.on(Events.History.Changed, this._handlers.onHistoryChanged);
     }
     
     /**
@@ -375,10 +355,7 @@ export class SaveManager {
         }
 
         // Удаляем обработчики событий, передавая исходные callback-ссылки.
-        if (this._handlers.onObjectCreated) this.eventBus.off(Events.Object.Created, this._handlers.onObjectCreated);
-        if (this._handlers.onObjectUpdated) this.eventBus.off(Events.Object.Updated, this._handlers.onObjectUpdated);
-        if (this._handlers.onObjectDeleted) this.eventBus.off(Events.Object.Deleted, this._handlers.onObjectDeleted);
-        if (this._handlers.onObjectStateChanged) this.eventBus.off(Events.Object.StateChanged, this._handlers.onObjectStateChanged);
+        if (this._handlers.onHistoryChanged) this.eventBus.off(Events.History.Changed, this._handlers.onHistoryChanged);
 
         this._listenersAttached = false;
         this._handlers = {};
