@@ -96,8 +96,6 @@ export const Events = {
 		Move: 'keyboard:move',
 		Copy: 'keyboard:copy',
 		Paste: 'keyboard:paste',
-		Undo: 'keyboard:undo',
-		Redo: 'keyboard:redo',
 	},
 
 	Object: {

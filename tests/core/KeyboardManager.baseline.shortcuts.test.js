@@ -43,18 +43,6 @@ describe('KeyboardManager baseline: shortcuts', () => {
         expect(ctrlRussianV.dispatchResult).toBe(true);
     });
 
-    it('dispatches undo and redo events for ctrl and ctrl+shift shortcuts including Russian layout aliases', () => {
-        dispatchKeyboardEvent(ctx.targetElement, 'keydown', 'z', { ctrlKey: true });
-        dispatchKeyboardEvent(ctx.targetElement, 'keydown', 'я', { ctrlKey: true });
-        dispatchKeyboardEvent(ctx.targetElement, 'keydown', 'y', { ctrlKey: true });
-        dispatchKeyboardEvent(ctx.targetElement, 'keydown', 'н', { ctrlKey: true });
-        dispatchKeyboardEvent(ctx.targetElement, 'keydown', 'z', { ctrlKey: true, shiftKey: true });
-        dispatchKeyboardEvent(ctx.targetElement, 'keydown', 'я', { ctrlKey: true, shiftKey: true });
-
-        expect(collectEventCalls(ctx.eventBus, Events.Keyboard.Undo)).toHaveLength(2);
-        expect(collectEventCalls(ctx.eventBus, Events.Keyboard.Redo)).toHaveLength(4);
-    });
-
     it('does not match unsupported modifier combinations such as meta or alt variants', () => {
         dispatchKeyboardEvent(ctx.targetElement, 'keydown', 'a', { metaKey: true });
         dispatchKeyboardEvent(ctx.targetElement, 'keydown', 'v', { altKey: true });

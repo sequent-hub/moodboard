@@ -15,8 +15,6 @@ export class HistoryManager {
         this.history = [];
         // Текущая позиция в истории
         this.currentIndex = -1;
-        // Флаг для предотвращения зацикливания при undo/redo
-        this.isExecutingCommand = false;
         this._listenersAttached = false;
         this._onDebug = () => this.debugHistory();
 
@@ -34,14 +32,6 @@ export class HistoryManager {
      * Выполнить команду и добавить в историю
      */
     executeCommand(command) {
-        if (this.isExecutingCommand) {
-            // Если мы в процессе undo/redo, не добавляем в историю
-            this._executeCommandSafely(command);
-            return;
-        }
-
-
-
         // Проверяем, можно ли объединить с последней командой
         const lastCommand = this.getLastCommand();
         if (lastCommand &&
@@ -51,8 +41,6 @@ export class HistoryManager {
             lastCommand.mergeWith(command);
             this._executeCommandSafely(lastCommand);
             this.eventBus.emit('history:changed', {
-                canUndo: this.canUndo(),
-                canRedo: this.canRedo(),
                 historySize: this.history.length
             });
             return;
@@ -78,8 +66,6 @@ export class HistoryManager {
 
         // Уведомляем об изменении истории
         this.eventBus.emit(Events.History.Changed, {
-            canUndo: this.canUndo(),
-            canRedo: this.canRedo(),
             historySize: this.history.length,
             currentCommand: command.toString()
         });
@@ -106,89 +92,6 @@ export class HistoryManager {
     }
 
     /**
-     * Отменить последнюю команду
-     */
-    undo() {
-        if (!this.canUndo()) {
-
-            return false;
-        }
-
-        const command = this.history[this.currentIndex];
-
-
-        this.isExecutingCommand = true;
-        try {
-            command.undo();
-            this.currentIndex--;
-            
-            this.eventBus.emit(Events.History.Changed, {
-                canUndo: this.canUndo(),
-                canRedo: this.canRedo(),
-                historySize: this.history.length,
-                lastUndone: command.toString()
-            });
-
-
-            return true;
-        } catch (error) {
-            console.error('❌ Ошибка при отмене команды:', error);
-            return false;
-        } finally {
-            this.isExecutingCommand = false;
-        }
-    }
-
-    /**
-     * Повторить отмененную команду
-     */
-    redo() {
-        if (!this.canRedo()) {
-
-            return false;
-        }
-
-        this.currentIndex++;
-        const command = this.history[this.currentIndex];
-
-
-        this.isExecutingCommand = true;
-        try {
-            this._executeCommandSafely(command);
-            
-            this.eventBus.emit(Events.History.Changed, {
-                canUndo: this.canUndo(),
-                canRedo: this.canRedo(),
-                historySize: this.history.length,
-                lastRedone: command.toString()
-            });
-
-
-            return true;
-        } catch (error) {
-            console.error('❌ Ошибка при повторе команды:', error);
-            this.currentIndex--; // Откатываем индекс при ошибке
-            return false;
-        } finally {
-            this.isExecutingCommand = false;
-        }
-    }
-
-    /**
-     * Можно ли отменить команду
-     */
-    canUndo() {
-        return this.currentIndex >= 0;
-    }
-
-    /**
-     * Можно ли повторить команду
-     */
-    canRedo() {
-        return this.currentIndex < this.history.length - 1;
-    }
-
-    /**
      * Получить последнюю команду
      */
     getLastCommand() {
@@ -204,8 +107,6 @@ export class HistoryManager {
         this.currentIndex = -1;
         
         this.eventBus.emit(Events.History.Changed, {
-            canUndo: false,
-            canRedo: false,
             historySize: 0
         });
 
@@ -219,8 +120,6 @@ export class HistoryManager {
         return {
             totalCommands: this.history.length,
             currentIndex: this.currentIndex,
-            canUndo: this.canUndo(),
-            canRedo: this.canRedo(),
             commands: this.history.map((cmd, index) => ({
                 index,
                 isCurrent: index === this.currentIndex,
@@ -238,7 +137,6 @@ export class HistoryManager {
         console.group('📚 История команд');
         console.table(info.commands);
         console.log(`Позиция: ${this.currentIndex + 1}/${this.history.length}`);
-        console.log(`Undo: ${this.canUndo()}, Redo: ${this.canRedo()}`);
         console.groupEnd();
     }
 
