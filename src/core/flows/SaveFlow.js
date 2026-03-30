@@ -23,7 +23,9 @@ export function setupSaveFlow(core) {
     });
 
     core.eventBus.on(Events.Save.Success, async () => {
-        if (typeof core.revealPendingImageObjectsAfterSave === 'function') {
+        if (typeof core.revealPendingObjectsAfterSave === 'function') {
+            core.revealPendingObjectsAfterSave();
+        } else if (typeof core.revealPendingImageObjectsAfterSave === 'function') {
             core.revealPendingImageObjectsAfterSave();
         }
         // ВРЕМЕННО ОТКЛЮЧЕНО:

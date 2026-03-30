@@ -66,8 +66,8 @@ export class CoreMoodBoard {
             csrfToken: this.options.csrfToken
         });
         this.gridSnapResolver = new GridSnapResolver(this);
-        // Изображения показываем пользователю только после подтвержденного save:success.
-        this._pendingImageVisibilityIds = new Set();
+        // Объекты, требующие подтверждения сохранения (image/file), показываем только после save:success.
+        this._pendingPersistAckVisibilityIds = new Set();
         
         // Связываем SaveManager с ApiClient для правильной обработки изображений
         this.saveManager.setApiClient(this.apiClient);
@@ -437,17 +437,17 @@ export class CoreMoodBoard {
         const command = new CreateObjectCommand(this, objectData);
         this.history.executeCommand(command);
 
-        // Строгий UX-контракт: image появляется на доске только после успешного сохранения.
-        if (this._isImageAckType(type)) {
-            this._pendingImageVisibilityIds.add(objectData.id);
+        // Строгий UX-контракт: image/file появляются только после успешного сохранения.
+        if (this._isPersistAckRequiredType(type)) {
+            this._pendingPersistAckVisibilityIds.add(objectData.id);
             this._setObjectVisibility(objectData.id, false);
         }
 
         return objectData;
     }
 
-    _isImageAckType(type) {
-        return type === 'image' || type === 'revit-screenshot-img';
+    _isPersistAckRequiredType(type) {
+        return type === 'image' || type === 'revit-screenshot-img' || type === 'file';
     }
 
     _setObjectVisibility(objectId, visible) {
@@ -457,12 +457,17 @@ export class CoreMoodBoard {
         }
     }
 
-    revealPendingImageObjectsAfterSave() {
-        if (!this._pendingImageVisibilityIds || this._pendingImageVisibilityIds.size === 0) return;
-        for (const objectId of this._pendingImageVisibilityIds) {
+    revealPendingObjectsAfterSave() {
+        if (!this._pendingPersistAckVisibilityIds || this._pendingPersistAckVisibilityIds.size === 0) return;
+        for (const objectId of this._pendingPersistAckVisibilityIds) {
             this._setObjectVisibility(objectId, true);
         }
-        this._pendingImageVisibilityIds.clear();
+        this._pendingPersistAckVisibilityIds.clear();
+    }
+
+    // Backward-compat alias for tests/integrations created in previous step.
+    revealPendingImageObjectsAfterSave() {
+        this.revealPendingObjectsAfterSave();
     }
 
     // === Прикрепления к фреймам ===

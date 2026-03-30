@@ -39,10 +39,11 @@ function createCoreLikeObject() {
         eventBus: {
             emit: vi.fn(),
         },
-        _pendingImageVisibilityIds: new Set(),
+        _pendingPersistAckVisibilityIds: new Set(),
     };
-    core._isImageAckType = CoreMoodBoard.prototype._isImageAckType.bind(core);
+    core._isPersistAckRequiredType = CoreMoodBoard.prototype._isPersistAckRequiredType.bind(core);
     core._setObjectVisibility = CoreMoodBoard.prototype._setObjectVisibility.bind(core);
+    core.revealPendingObjectsAfterSave = CoreMoodBoard.prototype.revealPendingObjectsAfterSave.bind(core);
     core.revealPendingImageObjectsAfterSave = CoreMoodBoard.prototype.revealPendingImageObjectsAfterSave.bind(core);
     return core;
 }
@@ -60,12 +61,12 @@ describe('Image visibility save ack contract', () => {
         );
 
         expect(core.pixi.objects.get(created.id).visible).toBe(false);
-        expect(core._pendingImageVisibilityIds.has(created.id)).toBe(true);
+        expect(core._pendingPersistAckVisibilityIds.has(created.id)).toBe(true);
 
-        core.revealPendingImageObjectsAfterSave();
+        core.revealPendingObjectsAfterSave();
 
         expect(core.pixi.objects.get(created.id).visible).toBe(true);
-        expect(core._pendingImageVisibilityIds.size).toBe(0);
+        expect(core._pendingPersistAckVisibilityIds.size).toBe(0);
     });
 
     it('non-image object stays visible and is not put into pending set', () => {
@@ -80,7 +81,27 @@ describe('Image visibility save ack contract', () => {
         );
 
         expect(core.pixi.objects.get(created.id).visible).toBe(true);
-        expect(core._pendingImageVisibilityIds.size).toBe(0);
+        expect(core._pendingPersistAckVisibilityIds.size).toBe(0);
+    });
+
+    it('file object is hidden until save ack and shown after reveal', () => {
+        const core = createCoreLikeObject();
+
+        const created = CoreMoodBoard.prototype.createObject.call(
+            core,
+            'file',
+            { x: 40, y: 80 },
+            { fileName: 'doc.pdf', width: 120, height: 140, url: '/api/files/f-1/download' },
+            { fileId: 'f-1' }
+        );
+
+        expect(core.pixi.objects.get(created.id).visible).toBe(false);
+        expect(core._pendingPersistAckVisibilityIds.has(created.id)).toBe(true);
+
+        core.revealPendingObjectsAfterSave();
+
+        expect(core.pixi.objects.get(created.id).visible).toBe(true);
+        expect(core._pendingPersistAckVisibilityIds.size).toBe(0);
     });
 
     it('save:success in SaveFlow triggers revealPendingImageObjectsAfterSave', () => {
@@ -88,12 +109,12 @@ describe('Image visibility save ack contract', () => {
         const core = {
             eventBus,
             state: { state: {} },
-            revealPendingImageObjectsAfterSave: vi.fn(),
+            revealPendingObjectsAfterSave: vi.fn(),
         };
 
         setupSaveFlow(core);
         eventBus.emit(Events.Save.Success, {});
 
-        expect(core.revealPendingImageObjectsAfterSave).toHaveBeenCalledTimes(1);
+        expect(core.revealPendingObjectsAfterSave).toHaveBeenCalledTimes(1);
     });
 });
