@@ -9,6 +9,7 @@ describe('KeyboardManager - image upload channels', () => {
     let manager;
     let originalFileReader;
     let consoleErrorSpy;
+    let alertSpy;
 
     beforeEach(() => {
         eventBus = { emit: vi.fn() };
@@ -25,11 +26,13 @@ describe('KeyboardManager - image upload channels', () => {
         manager = new KeyboardManager(eventBus, targetElement, core);
         originalFileReader = global.FileReader;
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        alertSpy = vi.spyOn(globalThis, 'alert').mockImplementation(() => {});
     });
 
     afterEach(() => {
         global.FileReader = originalFileReader;
         consoleErrorSpy.mockRestore();
+        alertSpy.mockRestore();
         vi.restoreAllMocks();
     });
 
@@ -50,27 +53,17 @@ describe('KeyboardManager - image upload channels', () => {
         });
     });
 
-    it('при ошибке uploadImage делает fallback через FileReader(dataURL)', async () => {
+    it('при ошибке uploadImage не эмитит PasteImage и показывает error-flow', async () => {
         core.imageUploadService.uploadImage.mockRejectedValue(new Error('net::ERR_CONNECTION_TIMED_OUT'));
-
-        global.FileReader = class {
-            constructor() {
-                this.onload = null;
-                this.result = null;
-            }
-            readAsDataURL() {
-                this.result = 'data:image/png;base64,AAAA';
-                if (this.onload) this.onload();
-            }
-        };
 
         const file = new Blob(['png'], { type: 'image/png' });
         await manager._handleImageFileUpload(file, 'special.png');
 
-        expect(eventBus.emit).toHaveBeenCalledWith(Events.UI.PasteImage, {
-            src: 'data:image/png;base64,AAAA',
-            name: 'special.png',
-        });
+        expect(eventBus.emit).not.toHaveBeenCalledWith(
+            Events.UI.PasteImage,
+            expect.anything()
+        );
+        expect(alertSpy).toHaveBeenCalledWith('Ошибка загрузки изображения на сервер. Изображение не добавлено.');
     });
 
     it('при успешном uploadFromDataUrl эмитит PasteImage с url и imageId', async () => {
@@ -89,15 +82,16 @@ describe('KeyboardManager - image upload channels', () => {
         });
     });
 
-    it('при ошибке uploadFromDataUrl делает fallback к исходному dataUrl', async () => {
+    it('при ошибке uploadFromDataUrl не эмитит PasteImage и показывает error-flow', async () => {
         core.imageUploadService.uploadFromDataUrl.mockRejectedValue(new Error('upload failed'));
 
         await manager._handleImageUpload('data:image/png;base64,CCCC', 'clipboard.png');
 
-        expect(eventBus.emit).toHaveBeenCalledWith(Events.UI.PasteImage, {
-            src: 'data:image/png;base64,CCCC',
-            name: 'clipboard.png',
-        });
+        expect(eventBus.emit).not.toHaveBeenCalledWith(
+            Events.UI.PasteImage,
+            expect.anything()
+        );
+        expect(alertSpy).toHaveBeenCalledWith('Ошибка загрузки изображения на сервер. Изображение не добавлено.');
     });
 
     it('paste handler для text/plain data URL вызывает handleImageUpload и preventDefault', async () => {

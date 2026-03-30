@@ -64,7 +64,7 @@ describe('PlacementTool baseline: file/image placement paths', () => {
         );
     });
 
-    it('file fallback path keeps local payload fields when upload fails', async () => {
+    it('file upload error does not emit ToolbarAction and shows alert', async () => {
         core.fileUploadService.uploadFile.mockRejectedValue(new Error('upload failed'));
         const alertSpy = vi.spyOn(globalThis, 'alert').mockImplementation(() => {});
         tool.selectedFile = {
@@ -77,18 +77,8 @@ describe('PlacementTool baseline: file/image placement paths', () => {
 
         await tool.placeSelectedFile({ x: 100, y: 100, offsetX: 100, offsetY: 100, button: 0 });
 
-        const payload = collectEventPayloads(eventBus, Events.UI.ToolbarAction)[0];
-        expect(payload).toEqual(
-            expect.objectContaining({
-                type: 'file',
-                id: 'file',
-                properties: expect.objectContaining({
-                    fileName: 'local.pdf',
-                    fileSize: 777,
-                    mimeType: 'application/pdf',
-                }),
-            })
-        );
+        expect(collectEventPayloads(eventBus, Events.UI.ToolbarAction)).toHaveLength(0);
+        expect(alertSpy).toHaveBeenCalledWith('Ошибка загрузки файла на сервер. Файл не добавлен.');
         alertSpy.mockRestore();
     });
 
@@ -131,14 +121,12 @@ describe('PlacementTool baseline: file/image placement paths', () => {
         );
     });
 
-    it('image fallback path keeps minimal local payload fields', async () => {
+    it('image upload error does not emit ToolbarAction and shows alert', async () => {
         vi.spyOn(tool.revitMetadataService, 'extractFromFile').mockResolvedValue({
             hasMetadata: false,
             payload: null
         });
         core.imageUploadService.uploadImage.mockRejectedValue(new Error('upload failed'));
-        const originalCreateObjectURL = URL.createObjectURL;
-        URL.createObjectURL = vi.fn(() => 'blob://local-image');
         const alertSpy = vi.spyOn(globalThis, 'alert').mockImplementation(() => {});
         tool.selectedImage = {
             file: new Blob(['png'], { type: 'image/png' }),
@@ -150,20 +138,8 @@ describe('PlacementTool baseline: file/image placement paths', () => {
 
         await tool.placeSelectedImage({ x: 120, y: 80, offsetX: 120, offsetY: 80, button: 0 });
 
-        const payload = collectEventPayloads(eventBus, Events.UI.ToolbarAction)[0];
-        expect(payload).toEqual(
-            expect.objectContaining({
-                type: 'image',
-                id: 'image',
-                properties: expect.objectContaining({
-                    src: 'blob://local-image',
-                    name: 'local.png',
-                    width: 222,
-                    height: 111,
-                }),
-            })
-        );
-        URL.createObjectURL = originalCreateObjectURL;
+        expect(collectEventPayloads(eventBus, Events.UI.ToolbarAction)).toHaveLength(0);
+        expect(alertSpy).toHaveBeenCalledWith('Ошибка загрузки изображения на сервер. Изображение не добавлено.');
         alertSpy.mockRestore();
     });
 
@@ -204,14 +180,12 @@ describe('PlacementTool baseline: file/image placement paths', () => {
         );
     });
 
-    it('image fallback path keeps revit type and view metadata when upload fails', async () => {
+    it('revit image upload error does not emit ToolbarAction and shows alert', async () => {
         vi.spyOn(tool.revitMetadataService, 'extractFromFile').mockResolvedValue({
             hasMetadata: true,
             payload: '{"view":"fallback"}'
         });
         core.imageUploadService.uploadImage.mockRejectedValue(new Error('upload failed'));
-        const originalCreateObjectURL = URL.createObjectURL;
-        URL.createObjectURL = vi.fn(() => 'blob://revit-fallback');
         const alertSpy = vi.spyOn(globalThis, 'alert').mockImplementation(() => {});
         tool.selectedImage = {
             file: new Blob(['png'], { type: 'image/png' }),
@@ -223,18 +197,8 @@ describe('PlacementTool baseline: file/image placement paths', () => {
 
         await tool.placeSelectedImage({ x: 200, y: 120, offsetX: 200, offsetY: 120, button: 0 });
 
-        const payload = collectEventPayloads(eventBus, Events.UI.ToolbarAction)[0];
-        expect(payload).toEqual(
-            expect.objectContaining({
-                type: 'revit-screenshot-img',
-                id: 'revit-screenshot-img',
-                properties: expect.objectContaining({
-                    src: 'blob://revit-fallback',
-                    view: '{"view":"fallback"}'
-                }),
-            })
-        );
-        URL.createObjectURL = originalCreateObjectURL;
+        expect(collectEventPayloads(eventBus, Events.UI.ToolbarAction)).toHaveLength(0);
+        expect(alertSpy).toHaveBeenCalledWith('Ошибка загрузки изображения на сервер. Изображение не добавлено.');
         alertSpy.mockRestore();
     });
 });

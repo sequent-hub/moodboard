@@ -121,4 +121,46 @@ describe('MoodBoardLoadApi v2 history navigation', () => {
         await expect(loadExistingBoard(board, 22, { fallbackToSeedOnError: false })).rejects.toThrow('HTTP 405');
         expect(board.dataManager.loadData).not.toHaveBeenCalled();
     });
+
+    it('грузит image-объекты из версии без потери imageId', async () => {
+        const board = createBoard();
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: vi.fn().mockResolvedValue({
+                success: true,
+                data: {
+                    moodboardId: 'mb-1',
+                    version: 9,
+                    settings: {},
+                    state: {
+                        objects: [
+                            {
+                                id: 'img-1',
+                                type: 'image',
+                                imageId: 'img-1-id',
+                                properties: { width: 300, height: 200 },
+                            },
+                        ],
+                    },
+                },
+            }),
+        });
+
+        await loadExistingBoard(board, 9, { historyNavigation: true });
+
+        expect(board.dataManager.loadData).toHaveBeenCalledWith(
+            expect.objectContaining({
+                version: 9,
+                objects: [
+                    expect.objectContaining({
+                        id: 'img-1',
+                        type: 'image',
+                        imageId: 'img-1-id',
+                    }),
+                ],
+            })
+        );
+        expect(board.historyHeadVersion).toBeUndefined();
+        expect(board.historyCursorVersion).toBe(9);
+    });
 });

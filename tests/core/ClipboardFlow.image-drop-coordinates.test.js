@@ -98,7 +98,7 @@ describe('ClipboardFlow - PasteImageAt coordinates', () => {
     );
   });
 
-  it('использует fallback размер 300x200 если загрузка image завершается ошибкой', async () => {
+  it('не создает объект если imageId отсутствует и server upload недоступен', async () => {
     global.Image = class {
       constructor() {
         this.onload = null;
@@ -111,6 +111,7 @@ describe('ClipboardFlow - PasteImageAt coordinates', () => {
 
     const eventBus = createEventBus();
     const createObject = vi.fn();
+    const alertSpy = vi.spyOn(globalThis, 'alert').mockImplementation(() => {});
     const core = {
       eventBus,
       createObject,
@@ -118,6 +119,7 @@ describe('ClipboardFlow - PasteImageAt coordinates', () => {
         app: { stage: {}, view: { clientWidth: 1000, clientHeight: 700 } },
         worldLayer: { x: 120, y: 40, scale: { x: 1.5 } }
       },
+      imageUploadService: null,
       state: { state: { objects: [] } },
       history: { executeCommand: vi.fn() },
       toolManager: { getActiveTool: vi.fn(() => null) },
@@ -133,23 +135,9 @@ describe('ClipboardFlow - PasteImageAt coordinates', () => {
       name: 'broken.png',
       imageId: null
     });
-    await waitForCreateObjectCall(createObject);
-
-    const worldX = (420 - 120) / 1.5;
-    const worldY = (340 - 40) / 1.5;
-    const expectedPosition = {
-      x: Math.round(worldX - 150),
-      y: Math.round(worldY - 100)
-    };
-
-    expect(createObject).toHaveBeenCalledWith(
-      'image',
-      expectedPosition,
-      expect.objectContaining({
-        width: 300,
-        height: 200
-      }),
-      {}
-    );
+    await Promise.resolve();
+    expect(createObject).not.toHaveBeenCalled();
+    expect(alertSpy).toHaveBeenCalledWith('Сервис загрузки изображений недоступен. Изображение не добавлено.');
+    alertSpy.mockRestore();
   });
 });

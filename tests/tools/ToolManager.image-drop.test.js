@@ -66,19 +66,14 @@ describe('ToolManager - drag and drop image upload', () => {
         });
     });
 
-    it('при ошибке uploadImage делает fallback через FileReader(dataURL)', async () => {
+    it('при ошибке uploadImage не эмитит PasteImageAt и показывает warning', async () => {
         core.imageUploadService.uploadImage.mockRejectedValue(new Error('net::ERR_CONNECTION_TIMED_OUT'));
-
-        global.FileReader = class {
-            constructor() {
-                this.onload = null;
-                this.result = null;
-            }
-            readAsDataURL() {
-                this.result = 'data:image/png;base64,BBBB';
-                if (this.onload) this.onload();
-            }
-        };
+        const notifySpy = vi.fn();
+        if (typeof window !== 'undefined') {
+            window.moodboard = {
+                workspaceManager: { showNotification: notifySpy }
+            };
+        }
 
         const file = new Blob(['png'], { type: 'image/png' });
         file.name = 'special.png';
@@ -94,13 +89,9 @@ describe('ToolManager - drag and drop image upload', () => {
 
         await manager.handleDrop(event);
 
-        expect(eventBus.emit).toHaveBeenCalledWith(Events.UI.PasteImageAt, {
-            x: 50,
-            y: 60,
-            src: 'data:image/png;base64,BBBB',
-            name: 'special.png',
-            imageId: null,
-        });
+        const imagePasteCalls = eventBus.emit.mock.calls.filter(([evt]) => evt === Events.UI.PasteImageAt);
+        expect(imagePasteCalls).toHaveLength(0);
+        expect(notifySpy).toHaveBeenCalledWith('Не удалось загрузить "special.png" на сервер. Изображение не добавлено.');
     });
 
     it('при drop обычного файла эмитит ToolbarAction type="file"', async () => {

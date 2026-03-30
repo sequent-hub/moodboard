@@ -95,4 +95,27 @@ describe('SaveManager - retry/backoff', () => {
         expect(apiClient.saveBoard).toHaveBeenCalledTimes(2);
         expect(manager.getStatus().saveStatus).toBe('error');
     });
+
+    it('после трех неудачных попыток эмитит Save.Error и оставляет hasUnsavedChanges=true', async () => {
+        manager.options.maxRetries = 3;
+        const saveErrors = [];
+        eventBus.on(Events.Save.Error, (payload) => saveErrors.push(payload));
+        apiClient.saveBoard.mockRejectedValue(new Error('persistent-timeout'));
+
+        manager.hasUnsavedChanges = true;
+        await manager.saveImmediately(); // attempt 1
+        await vi.advanceTimersByTimeAsync(100); // attempt 2
+        await vi.advanceTimersByTimeAsync(200); // attempt 3
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(apiClient.saveBoard).toHaveBeenCalledTimes(3);
+        expect(saveErrors).toHaveLength(3);
+        expect(saveErrors[2]).toMatchObject({
+            retryCount: 3,
+            maxRetries: 3,
+        });
+        const status = manager.getStatus();
+        expect(status.saveStatus).toBe('error');
+        expect(status.hasUnsavedChanges).toBe(true);
+    });
 });
