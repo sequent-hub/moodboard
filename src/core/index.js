@@ -465,11 +465,6 @@ export class CoreMoodBoard {
         this._pendingPersistAckVisibilityIds.clear();
     }
 
-    // Backward-compat alias for tests/integrations created in previous step.
-    revealPendingImageObjectsAfterSave() {
-        this.revealPendingObjectsAfterSave();
-    }
-
     // === Прикрепления к фреймам ===
     // Логика фреймов перенесена в FrameService
 

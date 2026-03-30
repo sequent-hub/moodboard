@@ -93,4 +93,24 @@ describe('ImageUploadService - таймауты и ошибки загрузки
             size: 470515,
         });
     });
+
+    it('падает если backend вернул legacy url без /api/v2', async () => {
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: vi.fn().mockResolvedValue({
+                success: true,
+                data: {
+                    imageId: 'img-legacy-1',
+                    url: '/api/images/img-legacy-1/file',
+                    width: 910,
+                    height: 617,
+                    name: 'legacy.png',
+                    size: 470515,
+                },
+            }),
+        });
+
+        const file = new Blob(['png-data'], { type: 'image/png' });
+        await expect(service.uploadImage(file, 'legacy.png')).rejects.toThrow('Некорректный URL изображения');
+    });
 });

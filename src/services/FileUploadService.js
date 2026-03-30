@@ -1,3 +1,5 @@
+import { isV2FileDownloadUrl } from './AssetUrlPolicy.js';
+
 /**
  * Сервис для загрузки и управления файлами на сервере
  */
@@ -92,10 +94,19 @@ export class FileUploadService {
                 throw new Error(result.message || 'Ошибка загрузки файла');
             }
 
+            const fileId = result.data.fileId || result.data.id;
+            const serverUrl = typeof result.data.url === 'string' ? result.data.url.trim() : '';
+            if (!fileId) {
+                throw new Error('Сервер не вернул fileId.');
+            }
+            if (!isV2FileDownloadUrl(serverUrl)) {
+                throw new Error('Некорректный URL файла от сервера. Ожидается /api/v2/files/{fileId}/download');
+            }
+
             return {
-                id: result.data.fileId || result.data.id, // Используем fileId как основное поле, id для обратной совместимости
-                fileId: result.data.fileId || result.data.id, // Добавляем fileId для явного доступа
-                url: result.data.url,
+                id: fileId, // Используем fileId как основное поле, id для обратной совместимости
+                fileId, // Добавляем fileId для явного доступа
+                url: serverUrl,
                 size: result.data.size,
                 name: result.data.name,
                 type: result.data.type

@@ -138,4 +138,29 @@ describe('SaveManager - retry/backoff', () => {
         expect(status.saveStatus).toBe('error');
         expect(status.hasUnsavedChanges).toBe(true);
     });
+
+    it('блокирует сохранение image с legacy src без /api/v2', async () => {
+        eventBus.on(Events.Save.GetBoardData, (request) => {
+            request.data = {
+                id: 'board-1',
+                objects: [
+                    {
+                        id: 'img-legacy',
+                        type: 'image',
+                        imageId: 'img-legacy',
+                        properties: { src: '/api/images/img-legacy/file' },
+                    },
+                ],
+            };
+        });
+
+        manager.hasUnsavedChanges = true;
+        await manager.saveImmediately();
+
+        expect(apiClient.saveBoard).not.toHaveBeenCalled();
+        const status = manager.getStatus();
+        expect(status.saveStatus).toBe('error');
+        expect(status.hasUnsavedChanges).toBe(true);
+    });
+
 });

@@ -90,6 +90,27 @@ describe('ApiClient - image persistence safety', () => {
         expect(() => client._cleanObjectData(boardData)).toThrow('forbidden data/blob src');
     });
 
+    it('cleanObjectData блокирует image с legacy src без /api/v2', () => {
+        const boardData = {
+            id: 'board-1',
+            objects: [
+                {
+                    id: 'img-legacy-1',
+                    type: 'image',
+                    imageId: 'img-legacy-1',
+                    src: '/api/images/img-legacy-1/file',
+                    properties: {
+                        src: '/api/images/img-legacy-1/file',
+                        width: 200,
+                        height: 100,
+                    },
+                },
+            ],
+        };
+
+        expect(() => client._cleanObjectData(boardData)).toThrow('non-v2');
+    });
+
     it('saveBoard отправляет imageId в payload и не теряет image объект', async () => {
         global.fetch.mockResolvedValue({
             ok: true,

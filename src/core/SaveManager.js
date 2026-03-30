@@ -3,6 +3,7 @@
  */
 import { Events } from './events/Events.js';
 import { logMindmapCompoundDebug } from '../mindmap/MindmapCompoundContract.js';
+import { isV2ImageDownloadUrl } from '../services/AssetUrlPolicy.js';
 export class SaveManager {
     constructor(eventBus, options = {}) {
         this.eventBus = eventBus;
@@ -244,6 +245,12 @@ export class SaveManager {
             }
             if (/^data:/i.test(topSrc) || /^blob:/i.test(topSrc) || /^data:/i.test(propSrc) || /^blob:/i.test(propSrc)) {
                 throw new Error(`Image object "${obj.id || 'unknown'}" contains forbidden data/blob src. Save is blocked.`);
+            }
+            if (topSrc && !isV2ImageDownloadUrl(topSrc)) {
+                throw new Error(`Image object "${obj.id || 'unknown'}" has non-v2 src URL. Save is blocked.`);
+            }
+            if (propSrc && !isV2ImageDownloadUrl(propSrc)) {
+                throw new Error(`Image object "${obj.id || 'unknown'}" has non-v2 properties.src URL. Save is blocked.`);
             }
         }
     }

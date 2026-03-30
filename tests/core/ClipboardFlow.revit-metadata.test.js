@@ -6,7 +6,7 @@ vi.mock('../../src/services/RevitScreenshotMetadataService.js', () => {
     return {
         RevitScreenshotMetadataService: class {
             async extractFromImageSource(src) {
-                if (typeof src === 'string' && src.includes('revit')) {
+                if (typeof src === 'string' && (src.includes('revit') || src.includes('img-1'))) {
                     return {
                         hasMetadata: true,
                         payload: '{"view":"revit-1"}',
@@ -81,7 +81,7 @@ describe('ClipboardFlow Revit metadata routing', () => {
 
         setupClipboardFlow(core);
         eventBus.emit(Events.UI.PasteImage, {
-            src: 'https://example.com/revit-image.png',
+            src: '/api/v2/images/img-1/download',
             name: 'r.png',
             imageId: 'img-1'
         });
@@ -91,7 +91,7 @@ describe('ClipboardFlow Revit metadata routing', () => {
             'revit-screenshot-img',
             expect.any(Object),
             expect.objectContaining({
-                src: 'https://example.com/revit-image.png',
+                src: '/api/v2/images/img-1/download',
                 view: '{"view":"revit-1"}'
             }),
             { imageId: 'img-1' }
@@ -118,9 +118,9 @@ describe('ClipboardFlow Revit metadata routing', () => {
         eventBus.emit(Events.UI.PasteImageAt, {
             x: 100,
             y: 100,
-            src: 'https://example.com/plain.png',
+            src: '/api/v2/images/img-2/download',
             name: 'plain.png',
-            imageId: null
+            imageId: 'img-2'
         });
 
         await vi.waitFor(() => expect(createObject).toHaveBeenCalled());
@@ -128,8 +128,40 @@ describe('ClipboardFlow Revit metadata routing', () => {
             'image',
             expect.any(Object),
             expect.not.objectContaining({ view: expect.any(String) }),
-            {}
+            { imageId: 'img-2' }
         );
+    });
+
+    it('does not create object when image src is legacy and not v2', async () => {
+        const eventBus = createEventBus();
+        const createObject = vi.fn();
+        const alertSpy = vi.spyOn(globalThis, 'alert').mockImplementation(() => {});
+        const core = {
+            eventBus,
+            createObject,
+            pixi: {
+                app: { stage: {}, view: { clientWidth: 1000, clientHeight: 700 } },
+                worldLayer: { x: 0, y: 0, scale: { x: 1 } }
+            },
+            state: { state: { objects: [] } },
+            history: { executeCommand: vi.fn() },
+            toolManager: { getActiveTool: vi.fn(() => null) },
+            selectTool: null
+        };
+
+        setupClipboardFlow(core);
+        eventBus.emit(Events.UI.PasteImageAt, {
+            x: 100,
+            y: 100,
+            src: '/api/images/img-legacy/file',
+            name: 'legacy.png',
+            imageId: 'img-legacy'
+        });
+
+        await Promise.resolve();
+        expect(createObject).not.toHaveBeenCalled();
+        expect(alertSpy).toHaveBeenCalled();
+        alertSpy.mockRestore();
     });
 });
 

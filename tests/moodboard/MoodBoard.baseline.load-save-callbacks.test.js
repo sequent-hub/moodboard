@@ -42,28 +42,32 @@ describe('MoodBoard baseline: auto-load and callback contracts', () => {
 
     it('fetches existing board on init and preserves current success payload contract', async () => {
         const serverData = {
-            objects: [{ id: 'server-text-1', type: 'text', position: { x: 30, y: 45 }, properties: { content: 'loaded' } }],
+            moodboardId: 'board-42',
+            state: {
+                objects: [{ id: 'server-text-1', type: 'text', position: { x: 30, y: 45 }, properties: { content: 'loaded' } }],
+            },
             settings: { backgroundColor: '#ffeeaa' },
+            version: 12,
         };
         const onLoad = vi.fn();
         const loadDataSpy = vi.spyOn(DataManager.prototype, 'loadData');
 
         global.fetch.mockResolvedValue({
             ok: true,
-            json: vi.fn().mockResolvedValue({ data: serverData }),
+            json: vi.fn().mockResolvedValue({ success: true, data: serverData }),
         });
 
         board = createMoodBoard(container, {
             autoLoad: true,
             boardId: 'board-42',
-            apiUrl: '/api/moodboard',
+            apiUrl: '/api/v2/moodboard',
             onLoad,
         });
 
         await settleMoodBoard(board);
 
         expect(global.fetch).toHaveBeenCalledWith(
-            '/api/moodboard/load/board-42',
+            '/api/v2/moodboard/board-42',
             expect.objectContaining({
                 method: 'GET',
                 headers: expect.objectContaining({
@@ -72,8 +76,19 @@ describe('MoodBoard baseline: auto-load and callback contracts', () => {
                 }),
             })
         );
-        expect(loadDataSpy).toHaveBeenCalledWith(serverData);
-        expect(onLoad).toHaveBeenCalledWith({ success: true, data: serverData });
+        expect(loadDataSpy).toHaveBeenCalledWith(expect.objectContaining({
+            objects: serverData.state.objects,
+            moodboardId: 'board-42',
+            settings: serverData.settings,
+            version: 12,
+        }));
+        expect(onLoad).toHaveBeenCalledWith(expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+                objects: serverData.state.objects,
+                moodboardId: 'board-42',
+            }),
+        }));
     });
 
     it('falls back to local data on load error without breaking init', async () => {
@@ -92,7 +107,7 @@ describe('MoodBoard baseline: auto-load and callback contracts', () => {
         board = createMoodBoard(container, {
             autoLoad: true,
             boardId: 'broken-board',
-            apiUrl: '/api/moodboard',
+            apiUrl: '/api/v2/moodboard',
             onLoad,
         }, fallbackData);
 
@@ -142,13 +157,13 @@ describe('MoodBoard baseline: auto-load and callback contracts', () => {
     it('loadFromApi uses provided boardId for the request and restores original boardId', async () => {
         global.fetch.mockResolvedValue({
             ok: true,
-            json: vi.fn().mockResolvedValue({ data: { objects: [] } }),
+            json: vi.fn().mockResolvedValue({ success: true, data: { moodboardId: 'temporary-board', state: { objects: [] } } }),
         });
 
         board = createMoodBoard(container, {
             autoLoad: false,
             boardId: 'original-board',
-            apiUrl: '/api/moodboard',
+            apiUrl: '/api/v2/moodboard',
         });
         await settleMoodBoard(board);
 
@@ -157,9 +172,20 @@ describe('MoodBoard baseline: auto-load and callback contracts', () => {
         await board.loadFromApi('temporary-board');
 
         expect(global.fetch).toHaveBeenCalledWith(
-            '/api/moodboard/load/temporary-board',
+            '/api/v2/moodboard/temporary-board',
             expect.any(Object)
         );
         expect(board.options.boardId).toBe('original-board');
+    });
+
+    it('throws on legacy apiUrl without v2', async () => {
+        board = createMoodBoard(container, {
+            autoLoad: false,
+            boardId: 'legacy-board',
+            apiUrl: '/api/moodboard',
+        });
+        await settleMoodBoard(board);
+
+        await expect(board.loadFromApi('legacy-board', null, { fallbackToSeedOnError: false })).rejects.toThrow('Legacy apiUrl');
     });
 });

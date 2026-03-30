@@ -25,8 +25,6 @@ export function setupSaveFlow(core) {
     core.eventBus.on(Events.Save.Success, async () => {
         if (typeof core.revealPendingObjectsAfterSave === 'function') {
             core.revealPendingObjectsAfterSave();
-        } else if (typeof core.revealPendingImageObjectsAfterSave === 'function') {
-            core.revealPendingImageObjectsAfterSave();
         }
         // ВРЕМЕННО ОТКЛЮЧЕНО:
         // cleanup-фича требует доработки контракта и серверной поддержки.

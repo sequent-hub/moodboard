@@ -21,12 +21,10 @@ function resolveMoodboardApiBase(board) {
     const raw = String(board?.options?.apiUrl || '').trim();
     if (!raw) return '/api/v2/moodboard';
 
-    // Совместимость с legacy конфигом: /api/moodboard -> /api/v2/moodboard
-    if (raw.endsWith('/api/moodboard')) {
-        return raw.replace(/\/api\/moodboard$/, '/api/v2/moodboard');
-    }
-    if (raw.endsWith('/api/moodboard/')) {
-        return raw.replace(/\/api\/moodboard\/$/, '/api/v2/moodboard/');
+    const hasLegacyPath = /\/api\/moodboard(?:\/|$)/i.test(raw);
+    const hasV2Path = /\/api\/v2\/moodboard(?:\/|$)/i.test(raw);
+    if (hasLegacyPath && !hasV2Path) {
+        throw new Error('Legacy apiUrl "/api/moodboard" is not supported. Use "/api/v2/moodboard".');
     }
 
     return raw;

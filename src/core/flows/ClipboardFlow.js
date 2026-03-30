@@ -1,6 +1,7 @@
 import { Events } from '../events/Events.js';
 import { PasteObjectCommand } from '../commands/index.js';
 import { RevitScreenshotMetadataService } from '../../services/RevitScreenshotMetadataService.js';
+import { isV2ImageDownloadUrl } from '../../services/AssetUrlPolicy.js';
 
 export function setupClipboardFlow(core) {
     const revitMetadataService = new RevitScreenshotMetadataService(console);
@@ -21,7 +22,12 @@ export function setupClipboardFlow(core) {
 
     const ensureServerImage = async ({ src, name, imageId }) => {
         if (imageId) {
-            return { src, name, imageId };
+            const serverUrl = typeof src === 'string' ? src.trim() : '';
+            if (!isV2ImageDownloadUrl(serverUrl)) {
+                alert('Некорректный адрес изображения. Изображение не добавлено.');
+                return null;
+            }
+            return { src: serverUrl, name, imageId };
         }
         if (!core.imageUploadService) {
             alert('Сервис загрузки изображений недоступен. Изображение не добавлено.');
@@ -39,8 +45,12 @@ export function setupClipboardFlow(core) {
                 const blob = await response.blob();
                 uploadResult = await core.imageUploadService.uploadImage(blob, name || 'clipboard-image');
             }
+            const serverUrl = typeof uploadResult.url === 'string' ? uploadResult.url.trim() : '';
+            if (!isV2ImageDownloadUrl(serverUrl)) {
+                throw new Error('Сервер вернул некорректный URL изображения');
+            }
             return {
-                src: uploadResult.url,
+                src: serverUrl,
                 name: uploadResult.name || name,
                 imageId: uploadResult.imageId || uploadResult.id
             };
@@ -272,10 +282,12 @@ export function setupClipboardFlow(core) {
             const img = new Image();
             img.decoding = 'async';
             img.onload = () => { void placeWithAspect(img.naturalWidth || 0, img.naturalHeight || 0); };
-            img.onerror = () => { void placeWithAspect(0, 0); };
+            img.onerror = () => {
+                alert('Не удалось загрузить изображение с сервера. Изображение не добавлено.');
+            };
             img.src = uploaded.src;
         } catch (_) {
-            void placeWithAspect(0, 0);
+            alert('Не удалось загрузить изображение с сервера. Изображение не добавлено.');
         }
     });
 
@@ -320,10 +332,12 @@ export function setupClipboardFlow(core) {
             const img = new Image();
             img.decoding = 'async';
             img.onload = () => { void placeWithAspect(img.naturalWidth || 0, img.naturalHeight || 0); };
-            img.onerror = () => { void placeWithAspect(0, 0); };
+            img.onerror = () => {
+                alert('Не удалось загрузить изображение с сервера. Изображение не добавлено.');
+            };
             img.src = uploaded.src;
         } catch (_) {
-            void placeWithAspect(0, 0);
+            alert('Не удалось загрузить изображение с сервера. Изображение не добавлено.');
         }
     });
 

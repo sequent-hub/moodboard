@@ -1,3 +1,5 @@
+import { isV2ImageDownloadUrl } from '../services/AssetUrlPolicy.js';
+
 // src/core/ApiClient.js
 export class ApiClient {
     constructor(baseUrl, authToken = null) {
@@ -158,6 +160,12 @@ export class ApiClient {
                 }
                 if (hasForbiddenInlineSrc) {
                     throw new Error(`Image object "${obj.id || 'unknown'}" contains forbidden data/blob src. Save is blocked.`);
+                }
+                if (topSrc && !isV2ImageDownloadUrl(topSrc)) {
+                    throw new Error(`Image object "${obj.id || 'unknown'}" has non-v2 src URL. Save is blocked.`);
+                }
+                if (propSrc && !isV2ImageDownloadUrl(propSrc)) {
+                    throw new Error(`Image object "${obj.id || 'unknown'}" has non-v2 properties.src URL. Save is blocked.`);
                 }
 
                 const cleanedObj = { ...obj };

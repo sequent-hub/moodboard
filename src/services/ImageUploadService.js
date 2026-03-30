@@ -1,3 +1,5 @@
+import { isV2ImageDownloadUrl } from './AssetUrlPolicy.js';
+
 /**
  * Сервис для загрузки и управления изображениями на сервере
  */
@@ -97,10 +99,19 @@ export class ImageUploadService {
                 throw new Error(result.message || 'Ошибка загрузки изображения');
             }
 
+            const imageId = result.data.imageId || result.data.id;
+            const serverUrl = typeof result.data.url === 'string' ? result.data.url.trim() : '';
+            if (!imageId) {
+                throw new Error('Сервер не вернул imageId.');
+            }
+            if (!isV2ImageDownloadUrl(serverUrl)) {
+                throw new Error('Некорректный URL изображения от сервера. Ожидается /api/v2/images/{imageId}/download');
+            }
+
             return {
-                id: result.data.imageId || result.data.id, // Используем imageId как основное поле, id для обратной совместимости
-                imageId: result.data.imageId || result.data.id, // Добавляем imageId для явного доступа
-                url: result.data.url,
+                id: imageId, // Используем imageId как основное поле, id для обратной совместимости
+                imageId, // Добавляем imageId для явного доступа
+                url: serverUrl,
                 width: result.data.width,
                 height: result.data.height,
                 name: result.data.name,

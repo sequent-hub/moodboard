@@ -44,7 +44,6 @@ function createCoreLikeObject() {
     core._isPersistAckRequiredType = CoreMoodBoard.prototype._isPersistAckRequiredType.bind(core);
     core._setObjectVisibility = CoreMoodBoard.prototype._setObjectVisibility.bind(core);
     core.revealPendingObjectsAfterSave = CoreMoodBoard.prototype.revealPendingObjectsAfterSave.bind(core);
-    core.revealPendingImageObjectsAfterSave = CoreMoodBoard.prototype.revealPendingImageObjectsAfterSave.bind(core);
     return core;
 }
 
@@ -104,7 +103,7 @@ describe('Image visibility save ack contract', () => {
         expect(core._pendingPersistAckVisibilityIds.size).toBe(0);
     });
 
-    it('save:success in SaveFlow triggers revealPendingImageObjectsAfterSave', () => {
+    it('save:success in SaveFlow triggers revealPendingObjectsAfterSave', () => {
         const eventBus = createEventBus();
         const core = {
             eventBus,
