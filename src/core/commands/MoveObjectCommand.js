@@ -23,9 +23,7 @@ export class MoveObjectCommand extends BaseCommand {
     }
 
     undo() {
-        // Возвращаем старую позицию
-        this._setPosition(this.oldPosition);
-
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     _setPosition(position) {

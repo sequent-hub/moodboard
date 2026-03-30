@@ -25,9 +25,7 @@ export class ResizeObjectCommand extends BaseCommand {
     }
 
     undo() {
-        // Возвращаем старый размер и позицию
-        this._setSizeAndPosition(this.oldSize, this.oldPosition);
-        this._updateResizeHandles();
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     _setSizeAndPosition(size, position = null) {

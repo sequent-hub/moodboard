@@ -94,7 +94,7 @@
                 // Мокаем fetch для имитации нового формата ответа
                 const originalFetch = window.fetch;
                 window.fetch = async (url, options) => {
-                    if (url === '/api/images/upload') {
+                    if (url === '/api/v2/images/upload') {
                         return {
                             ok: true,
                             json: async () => ({
@@ -152,7 +152,7 @@
                 // Мокаем fetch для имитации нового формата ответа
                 const originalFetch = window.fetch;
                 window.fetch = async (url, options) => {
-                    if (url === '/api/files/upload') {
+                    if (url === '/api/v2/files/upload') {
                         return {
                             ok: true,
                             json: async () => ({

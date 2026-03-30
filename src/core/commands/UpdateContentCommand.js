@@ -22,7 +22,7 @@ export class UpdateContentCommand extends BaseCommand {
     }
 
     undo() {
-        this._applyContent(this.oldContent, this.oldSize, this.oldPosition);
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     canMergeWith(otherCommand) {

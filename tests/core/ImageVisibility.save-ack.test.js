@@ -56,7 +56,7 @@ describe('Image visibility save ack contract', () => {
             core,
             'image',
             { x: 100, y: 200 },
-            { src: '/api/images/img-1/file', width: 300, height: 150 },
+            { src: '/api/v2/images/img-1/download', width: 300, height: 150 },
             { imageId: 'img-1' }
         );
 
@@ -91,7 +91,7 @@ describe('Image visibility save ack contract', () => {
             core,
             'file',
             { x: 40, y: 80 },
-            { fileName: 'doc.pdf', width: 120, height: 140, url: '/api/files/f-1/download' },
+            { fileName: 'doc.pdf', width: 120, height: 140, url: '/api/v2/files/f-1/download' },
             { fileId: 'f-1' }
         );
 

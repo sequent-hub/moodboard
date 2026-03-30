@@ -4,8 +4,8 @@
 export class ImageUploadService {
     constructor(apiClient, options = {}) {
         this.apiClient = apiClient;
-        this.uploadEndpoint = '/api/images/upload';
-        this.deleteEndpoint = '/api/images';
+        this.uploadEndpoint = '/api/v2/images/upload';
+        this.deleteEndpoint = '/api/v2/images';
         this.options = {
             csrfToken: null, // Можно передать токен напрямую
             csrfTokenSelector: 'meta[name="csrf-token"]', // Селектор для поиска токена в DOM

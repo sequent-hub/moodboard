@@ -22,8 +22,7 @@ export class EditFileNameCommand extends BaseCommand {
     }
 
     async undo() {
-        // Возвращаем старое название
-        await this._setFileName(this.oldName);
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     /**

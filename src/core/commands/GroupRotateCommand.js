@@ -28,15 +28,7 @@ export class GroupRotateCommand extends BaseCommand {
     }
 
     undo() {
-        for (const c of this.changes) {
-            if (this.core.pixi?.updateObjectRotation) {
-                this.core.pixi.updateObjectRotation(c.id, c.fromAngle);
-            }
-            this.core.updateObjectRotationDirect(c.id, c.fromAngle);
-            this.core.updateObjectPositionDirect(c.id, c.fromPos);
-            this.emit(Events.Object.TransformUpdated, { objectId: c.id, type: 'rotation', angle: c.fromAngle });
-            this.emit(Events.Object.TransformUpdated, { objectId: c.id, type: 'position', position: c.fromPos });
-        }
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     getDescription() {

@@ -23,7 +23,7 @@ test.describe('File drop viewport smoke', () => {
         size: 4,
         mimeType: 'text/plain',
         formattedSize: '4 B',
-        url: '/api/files/file-e2e-1/download'
+        url: '/api/v2/files/file-e2e-1/download'
       });
 
       const canvas = core.pixi.app.view;

@@ -23,10 +23,7 @@ export class GroupResizeCommand extends BaseCommand {
     }
 
     undo() {
-        for (const c of this.changes) {
-            this.core.updateObjectSizeAndPositionDirect(c.id, c.fromSize, c.fromPos, c.type || null);
-            this.emit(Events.Object.TransformUpdated, { objectId: c.id, type: 'resize', size: c.fromSize, position: c.fromPos });
-        }
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     getDescription() {

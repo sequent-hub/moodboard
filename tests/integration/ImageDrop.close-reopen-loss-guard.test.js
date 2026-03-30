@@ -74,7 +74,7 @@ describe('Integration: image drop -> close/reopen guard', () => {
                 uploadImage: vi.fn().mockResolvedValue({
                     imageId: 'img-remote-1',
                     id: 'img-remote-1',
-                    url: '/api/images/img-remote-1/file',
+                    url: '/api/v2/images/img-remote-1/download',
                     name: 'dropped.png',
                 }),
             },
@@ -153,7 +153,7 @@ describe('Integration: image drop -> close/reopen guard', () => {
                 type: 'image',
                 imageId: 'img-remote-1',
                 properties: expect.objectContaining({
-                    src: '/api/images/img-remote-1/file',
+                    src: '/api/v2/images/img-remote-1/download',
                 }),
             })
         );

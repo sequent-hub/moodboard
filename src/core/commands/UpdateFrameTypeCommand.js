@@ -32,7 +32,7 @@ export class UpdateFrameTypeCommand extends BaseCommand {
     }
 
     undo() {
-        this._apply(this.oldType, this.oldSize, this.oldPosition);
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     _apply(typeValue, size, position) {

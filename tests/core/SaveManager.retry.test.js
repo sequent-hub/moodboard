@@ -25,7 +25,7 @@ describe('SaveManager - retry/backoff', () => {
 
     const boardData = {
         id: 'board-1',
-        objects: [{ id: 'img-1', type: 'image', imageId: 'img-1', properties: { src: '/api/images/img-1/file' } }]
+        objects: [{ id: 'img-1', type: 'image', imageId: 'img-1', properties: { src: '/api/v2/images/img-1/download' } }]
     };
 
     beforeEach(() => {

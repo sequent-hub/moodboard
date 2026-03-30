@@ -86,7 +86,7 @@ describe('Integration: image persistence при сетевых сбоях', () =
             id: 'img-local',
             type: 'image',
             imageId: 'img-remote-1',
-            properties: { src: '/api/images/img-remote-1/file', width: 300, height: 200 },
+            properties: { src: '/api/v2/images/img-remote-1/download', width: 300, height: 200 },
         });
 
         manager.hasUnsavedChanges = true;

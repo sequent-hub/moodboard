@@ -46,7 +46,7 @@ describe('SaveManager - таймауты и сохранение', () => {
     it('при timeout в saveBoard сохраняет статус error и unsavedChanges', async () => {
         const boardData = {
             id: 'board-1',
-            objects: [{ id: 'img-1', type: 'image', imageId: 'img-1', properties: { src: '/api/images/img-1/file' } }]
+            objects: [{ id: 'img-1', type: 'image', imageId: 'img-1', properties: { src: '/api/v2/images/img-1/download' } }]
         };
         eventBus.on(Events.Save.GetBoardData, (request) => {
             request.data = boardData;
@@ -74,7 +74,7 @@ describe('SaveManager - таймауты и сохранение', () => {
     it('при успешном save сбрасывает unsavedChanges и эмитит save:success', async () => {
         const boardData = {
             id: 'board-1',
-            objects: [{ id: 'img-1', type: 'image', imageId: 'img-1', properties: { src: '/api/images/img-1/file' } }]
+            objects: [{ id: 'img-1', type: 'image', imageId: 'img-1', properties: { src: '/api/v2/images/img-1/download' } }]
         };
         eventBus.on(Events.Save.GetBoardData, (request) => {
             request.data = boardData;
@@ -101,7 +101,7 @@ describe('SaveManager - таймауты и сохранение', () => {
     it('не отправляет повторный save если данные не изменились', async () => {
         const boardData = {
             id: 'board-1',
-            objects: [{ id: 'img-1', type: 'image', imageId: 'img-1', properties: { src: '/api/images/img-1/file' } }]
+            objects: [{ id: 'img-1', type: 'image', imageId: 'img-1', properties: { src: '/api/v2/images/img-1/download' } }]
         };
         eventBus.on(Events.Save.GetBoardData, (request) => {
             request.data = boardData;

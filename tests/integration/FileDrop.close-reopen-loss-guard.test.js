@@ -60,7 +60,7 @@ describe('Integration: file drop -> close/reopen guard', () => {
                     size: 123,
                     mimeType: 'application/pdf',
                     formattedSize: '123 B',
-                    url: '/api/files/file-1/download',
+                    url: '/api/v2/files/file-1/download',
                 }),
             },
             pixi: {
@@ -125,7 +125,7 @@ describe('Integration: file drop -> close/reopen guard', () => {
                 type: 'file',
                 fileId: 'file-1',
                 properties: expect.objectContaining({
-                    url: '/api/files/file-1/download',
+                    url: '/api/v2/files/file-1/download',
                 }),
             })
         );

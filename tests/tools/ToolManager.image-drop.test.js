@@ -38,7 +38,7 @@ describe('ToolManager - drag and drop image upload', () => {
 
     it('при успешном uploadImage эмитит PasteImageAt с server URL', async () => {
         core.imageUploadService.uploadImage.mockResolvedValue({
-            url: '/api/images/img-1/file',
+            url: '/api/v2/images/img-1/download',
             name: 'special.png',
             imageId: 'img-1',
         });
@@ -60,7 +60,7 @@ describe('ToolManager - drag and drop image upload', () => {
         expect(eventBus.emit).toHaveBeenCalledWith(Events.UI.PasteImageAt, {
             x: 100,
             y: 200,
-            src: '/api/images/img-1/file',
+            src: '/api/v2/images/img-1/download',
             name: 'special.png',
             imageId: 'img-1',
         });
@@ -102,7 +102,7 @@ describe('ToolManager - drag and drop image upload', () => {
             size: 12345,
             mimeType: 'application/pdf',
             formattedSize: '12 KB',
-            url: '/api/files/file-1/download',
+            url: '/api/v2/files/file-1/download',
         }) };
 
         const file = new Blob(['pdf-content'], { type: 'application/pdf' });
@@ -128,7 +128,7 @@ describe('ToolManager - drag and drop image upload', () => {
             properties: expect.objectContaining({
                 fileName: 'report.pdf',
                 mimeType: 'application/pdf',
-                url: '/api/files/file-1/download',
+                url: '/api/v2/files/file-1/download',
             }),
         }));
     });
@@ -136,7 +136,7 @@ describe('ToolManager - drag and drop image upload', () => {
     it('учитывает смещение canvas при drop изображения (client -> local)', async () => {
         container.getBoundingClientRect = vi.fn(() => ({ left: 120, top: 80 }));
         core.imageUploadService.uploadImage.mockResolvedValue({
-            url: '/api/images/img-2/file',
+            url: '/api/v2/images/img-2/download',
             name: 'offset.png',
             imageId: 'img-2',
         });
@@ -158,7 +158,7 @@ describe('ToolManager - drag and drop image upload', () => {
         expect(eventBus.emit).toHaveBeenCalledWith(Events.UI.PasteImageAt, {
             x: 100,
             y: 150,
-            src: '/api/images/img-2/file',
+            src: '/api/v2/images/img-2/download',
             name: 'offset.png',
             imageId: 'img-2',
         });
@@ -175,7 +175,7 @@ describe('ToolManager - drag and drop image upload', () => {
                     size: 100,
                     mimeType: 'application/pdf',
                     formattedSize: '100 B',
-                    url: '/api/files/file-1/download',
+                    url: '/api/v2/files/file-1/download',
                 })
                 .mockResolvedValueOnce({
                     id: 'file-2',
@@ -184,7 +184,7 @@ describe('ToolManager - drag and drop image upload', () => {
                     size: 200,
                     mimeType: 'application/pdf',
                     formattedSize: '200 B',
-                    url: '/api/files/file-2/download',
+                    url: '/api/v2/files/file-2/download',
                 })
                 .mockResolvedValueOnce({
                     id: 'file-3',
@@ -193,7 +193,7 @@ describe('ToolManager - drag and drop image upload', () => {
                     size: 300,
                     mimeType: 'application/pdf',
                     formattedSize: '300 B',
-                    url: '/api/files/file-3/download',
+                    url: '/api/v2/files/file-3/download',
                 }),
         };
 
@@ -247,7 +247,7 @@ describe('ToolManager - drag and drop image upload', () => {
                 size: 4,
                 mimeType: 'text/plain',
                 formattedSize: '4 B',
-                url: '/api/files/file-1/download',
+                url: '/api/v2/files/file-1/download',
             }),
         };
         core.pixi = {
@@ -316,14 +316,14 @@ describe('ToolManager - drag and drop image upload', () => {
         });
 
         resolveSecond({
-            url: '/api/images/img-2/file',
+            url: '/api/v2/images/img-2/download',
             name: 'second.png',
             imageId: 'img-2',
         });
         await secondDrop;
 
         resolveFirst({
-            url: '/api/images/img-1/file',
+            url: '/api/v2/images/img-1/download',
             name: 'first.png',
             imageId: 'img-1',
         });
@@ -337,7 +337,7 @@ describe('ToolManager - drag and drop image upload', () => {
         expect(pasteEvents[0]).toEqual({
             x: 200,
             y: 220,
-            src: '/api/images/img-2/file',
+            src: '/api/v2/images/img-2/download',
             name: 'second.png',
             imageId: 'img-2',
         });
@@ -356,7 +356,7 @@ describe('ToolManager - drag and drop image upload', () => {
                     size: file.size,
                     mimeType: file.type,
                     formattedSize: '1 B',
-                    url: `/api/files/${file.name}/download`,
+                    url: `/api/v2/files/${file.name}/download`,
                 }));
             })),
         };
@@ -409,7 +409,7 @@ describe('ToolManager - drag and drop image upload', () => {
                 size: file.size || 0,
                 mimeType: file.type || 'application/octet-stream',
                 formattedSize: '1 B',
-                url: `/api/files/${name}/download`,
+                url: `/api/v2/files/${name}/download`,
             })),
         };
 
@@ -443,7 +443,7 @@ describe('ToolManager - drag and drop image upload', () => {
                 size: file.size || 0,
                 mimeType: file.type || 'application/octet-stream',
                 formattedSize: '1 B',
-                url: `/api/files/${name}/download`,
+                url: `/api/v2/files/${name}/download`,
             })),
         };
 

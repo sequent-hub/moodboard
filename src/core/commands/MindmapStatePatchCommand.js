@@ -29,7 +29,7 @@ export class MindmapStatePatchCommand extends BaseCommand {
     }
 
     undo() {
-        this._applyEntries(this.beforeEntries);
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     _applyEntries(entries) {

@@ -18,7 +18,7 @@ export class ReorderZCommand extends BaseCommand {
     }
 
     undo() {
-        this.apply(this.toIndex, this.fromIndex);
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     apply(from, to) {

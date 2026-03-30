@@ -647,14 +647,22 @@ Lifecycle MapPanel: document.removeEventListener(mousedown), hidePopup при de
 - Image: `Place.ImageSelected` → `showImageGhost` → ghost в world (async).
 - File: `Place.FileSelected` → `showFileGhost` → ghost 120×140 в world.
 
-### `tests/core/UpdateNoteStyleCommand.test.js` — 15 unit-тестов
+### `tests/core/UpdateNoteStyleCommand.test.js` — 15 unit-тестов *(LEGACY, не используется; файл удален)*
 
 Команда `UpdateNoteStyleCommand` (`src/core/commands/UpdateNoteStyleCommand.js`).
 
-- **execute** — применение fontFamily, fontSize, textColor, backgroundColor в object.properties и вызов instance.setStyle; создание properties при отсутствии.
-- **undo** — восстановление каждого свойства.
-- **canMergeWith** — true для той же objectId+property; false для другого objectId/property/типа команды.
-- **mergeWith** — обновление newValue и timestamp; выброс при несовместимой команде.
+- **Было:** execute/undo/canMergeWith/mergeWith для note-style команд.
+- **Текущий статус:** локальные `undo()`-ветки команд отключены, проверка `undo`-поведения удалена как legacy.
+
+### Удаленные legacy тесты локального undo/redo команд
+
+Эти файлы удалены и не используются в актуальном прогоне:
+
+- `tests/core/UpdateFrameTypeCommand.test.js`
+- `tests/core/UpdateFramePropertiesCommand.test.js`
+- `tests/integration/CoordinatePipeline.command-chain.test.js`
+- `tests/core/CoordinateContracts.commands.test.js`
+- `tests/core/CoordinateContracts.command-cycles.test.js`
 
 ### `tests/core/ObjectLifecycleFlow.note-style.test.js` — 5 тестов
 

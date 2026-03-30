@@ -30,9 +30,9 @@ describe('ApiClient - image persistence safety', () => {
                     id: 'img-1',
                     type: 'image',
                     imageId: 'img-remote-1',
-                    src: '/api/images/img-remote-1/file',
+                    src: '/api/v2/images/img-remote-1/download',
                     properties: {
-                        src: '/api/images/img-remote-1/file',
+                        src: '/api/v2/images/img-remote-1/download',
                         width: 300,
                         height: 200,
                     },
@@ -103,9 +103,9 @@ describe('ApiClient - image persistence safety', () => {
                     id: 'img-1',
                     type: 'image',
                     imageId: 'img-remote-1',
-                    src: '/api/images/img-remote-1/file',
+                    src: '/api/v2/images/img-remote-1/download',
                     properties: {
-                        src: '/api/images/img-remote-1/file',
+                        src: '/api/v2/images/img-remote-1/download',
                         width: 300,
                         height: 200,
                     },
@@ -170,8 +170,8 @@ describe('ApiClient - image persistence safety', () => {
         const restored = await client.restoreObjectUrls(boardData);
         const image = restored.objects[0];
 
-        expect(image.src).toBe('/api/images/img-remote-1/file');
-        expect(image.properties.src).toBe('/api/images/img-remote-1/file');
+        expect(image.src).toBe('/api/v2/images/img-remote-1/download');
+        expect(image.properties.src).toBe('/api/v2/images/img-remote-1/download');
         expect(image.imageId).toBe('img-remote-1');
     });
 

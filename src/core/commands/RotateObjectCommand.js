@@ -25,15 +25,7 @@ export class RotateObjectCommand extends BaseCommand {
     }
 
     undo() {
-        // Обновляем угол поворота в состоянии
-        this._setRotation(this.oldAngle);
-        
-        // Возвращаем старый угол поворота
-        this.emit(Events.Object.Rotate, {
-            objectId: this.objectId,
-            angle: this.oldAngle
-        });
-        console.log(`↩️ Отменяем поворот объекта ${this.objectId}, возвращаем ${this.oldAngle}°`);
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     /**

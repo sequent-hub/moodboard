@@ -96,16 +96,7 @@ export class PasteObjectCommand extends BaseCommand {
     }
 
     undo() {
-        if (this.newObjectId) {
-            // Удаляем созданный объект
-            this.coreMoodboard.state.removeObject(this.newObjectId);
-            this.coreMoodboard.pixi.removeObject(this.newObjectId);
-            
-            // Соответствующего константного события нет — остаёмся без эмита или используем Object.Deleted, если надо глобально
-            this.emit(Events.Object.Deleted, {
-                objectId: this.newObjectId
-            });
-        }
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     getDescription() {

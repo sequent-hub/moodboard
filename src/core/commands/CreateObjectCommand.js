@@ -33,14 +33,6 @@ export class CreateObjectCommand extends BaseCommand {
     }
 
     undo() {
-        // Удаляем объект из состояния и PIXI
-        this.coreMoodboard.state.removeObject(this.objectData.id);
-        this.coreMoodboard.pixi.removeObject(this.objectData.id);
-        
-
-        
-        this.coreMoodboard.eventBus.emit(Events.Object.Deleted, { 
-            objectId: this.objectData.id 
-        });
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 }

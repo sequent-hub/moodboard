@@ -29,7 +29,7 @@ describe('ImageUploadService - таймауты и ошибки загрузки
         await expect(service.uploadImage(file, 'special.png')).rejects.toThrow('ERR_CONNECTION_TIMED_OUT');
         expect(global.fetch).toHaveBeenCalledTimes(1);
         expect(global.fetch).toHaveBeenCalledWith(
-            '/api/images/upload',
+            '/api/v2/images/upload',
             expect.objectContaining({
                 method: 'POST',
                 credentials: 'same-origin',
@@ -71,7 +71,7 @@ describe('ImageUploadService - таймауты и ошибки загрузки
                 success: true,
                 data: {
                     imageId: 'img-1',
-                    url: '/api/images/img-1/file',
+                    url: '/api/v2/images/img-1/download',
                     width: 910,
                     height: 617,
                     name: 'special.png',
@@ -86,7 +86,7 @@ describe('ImageUploadService - таймауты и ошибки загрузки
         expect(result).toEqual({
             id: 'img-1',
             imageId: 'img-1',
-            url: '/api/images/img-1/file',
+            url: '/api/v2/images/img-1/download',
             width: 910,
             height: 617,
             name: 'special.png',

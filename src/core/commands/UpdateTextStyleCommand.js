@@ -28,7 +28,7 @@ export class UpdateTextStyleCommand extends BaseCommand {
     }
 
     undo() {
-        this._apply(this.oldValue);
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     canMergeWith(otherCommand) {

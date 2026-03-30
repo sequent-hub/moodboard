@@ -22,8 +22,7 @@ export class GroupReorderZCommand extends BaseCommand {
     }
 
     undo() {
-        if (!this.beforeOrder) return;
-        this.applyOrder(this.beforeOrder);
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     applyOrder(idOrder) {

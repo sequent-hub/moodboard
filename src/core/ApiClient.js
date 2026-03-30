@@ -221,7 +221,7 @@ export class ApiClient {
                     if (obj.imageId && (!obj.src && !obj.properties?.src)) {
                         try {
                             // Формируем URL изображения
-                            const imageUrl = `/api/images/${obj.imageId}/file`;
+                            const imageUrl = `/api/v2/images/${obj.imageId}/download`;
                             
                             return {
                                 ...obj,
@@ -243,7 +243,7 @@ export class ApiClient {
                     if (obj.fileId) {
                         try {
                             // Формируем URL файла для скачивания
-                            const fileUrl = `/api/files/${obj.fileId}/download`;
+                            const fileUrl = `/api/v2/files/${obj.fileId}/download`;
                             
                             // Создаем обновленный объект с восстановленными данными
                             const restoredObj = {
@@ -259,7 +259,7 @@ export class ApiClient {
                             // (Это будет выполнено асинхронно, чтобы не блокировать загрузку)
                             setTimeout(async () => {
                                 try {
-                                    const response = await fetch(`/api/files/${obj.fileId}`, {
+                                    const response = await fetch(`/api/v2/files/${obj.fileId}`, {
                                         headers: {
                                             'Accept': 'application/json',
                                             'X-Requested-With': 'XMLHttpRequest'

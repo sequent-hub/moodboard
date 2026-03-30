@@ -37,7 +37,7 @@ describe('PlacementTool baseline: file/image placement paths', () => {
             size: 2048,
             mimeType: 'application/pdf',
             formattedSize: '2 KB',
-            url: '/api/files/file-1/download',
+            url: '/api/v2/files/file-1/download',
         });
         tool.selectedFile = {
             file: new Blob(['x'], { type: 'application/pdf' }),
@@ -58,7 +58,7 @@ describe('PlacementTool baseline: file/image placement paths', () => {
                 properties: expect.objectContaining({
                     fileName: 'spec.pdf',
                     mimeType: 'application/pdf',
-                    url: '/api/files/file-1/download',
+                    url: '/api/v2/files/file-1/download',
                 }),
             })
         );
@@ -91,7 +91,7 @@ describe('PlacementTool baseline: file/image placement paths', () => {
             id: 'img-1',
             imageId: 'img-1',
             name: 'photo.png',
-            url: '/api/images/img-1/file',
+            url: '/api/v2/images/img-1/download',
             width: 1000,
             height: 500,
         });
@@ -112,7 +112,7 @@ describe('PlacementTool baseline: file/image placement paths', () => {
                 id: 'image',
                 imageId: 'img-1',
                 properties: expect.objectContaining({
-                    src: '/api/images/img-1/file',
+                    src: '/api/v2/images/img-1/download',
                     name: 'photo.png',
                     width: 300,
                     height: 150,
@@ -152,7 +152,7 @@ describe('PlacementTool baseline: file/image placement paths', () => {
             id: 'img-2',
             imageId: 'img-2',
             name: 'revit.png',
-            url: '/api/images/img-2/file',
+            url: '/api/v2/images/img-2/download',
             width: 1000,
             height: 500,
         });
@@ -173,7 +173,7 @@ describe('PlacementTool baseline: file/image placement paths', () => {
                 id: 'revit-screenshot-img',
                 imageId: 'img-2',
                 properties: expect.objectContaining({
-                    src: '/api/images/img-2/file',
+                    src: '/api/v2/images/img-2/download',
                     view: '{"view":"abc"}'
                 }),
             })

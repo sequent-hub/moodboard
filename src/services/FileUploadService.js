@@ -4,8 +4,8 @@
 export class FileUploadService {
     constructor(apiClient, options = {}) {
         this.apiClient = apiClient;
-        this.uploadEndpoint = '/api/files/upload';
-        this.deleteEndpoint = '/api/files';
+        this.uploadEndpoint = '/api/v2/files/upload';
+        this.deleteEndpoint = '/api/v2/files';
         this.options = {
             csrfToken: null, // Можно передать токен напрямую
             csrfTokenSelector: 'meta[name="csrf-token"]', // Селектор для поиска токена в DOM

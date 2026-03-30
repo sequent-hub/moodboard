@@ -120,7 +120,7 @@ describe('MoodBoard baseline: UI wiring contracts', () => {
                 fileSize: 1024,
                 mimeType: 'application/pdf',
                 formattedSize: '1 KB',
-                url: '/api/files/file-1/download',
+                url: '/api/v2/files/file-1/download',
                 width: 120,
                 height: 140,
             },

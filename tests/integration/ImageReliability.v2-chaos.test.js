@@ -107,7 +107,7 @@ describe('Integration: image reliability v2 chaos', () => {
             .mockResolvedValueOnce({
                 imageId: 'img-remote-77',
                 id: 'img-remote-77',
-                url: '/api/images/img-remote-77/file',
+                url: '/api/v2/images/img-remote-77/download',
                 name: 'stable.png',
             });
 
@@ -122,7 +122,7 @@ describe('Integration: image reliability v2 chaos', () => {
                 type: 'image',
                 imageId: 'img-remote-77',
                 properties: expect.objectContaining({
-                    src: '/api/images/img-remote-77/file',
+                    src: '/api/v2/images/img-remote-77/download',
                 }),
             })
         );
@@ -167,7 +167,7 @@ describe('Integration: image reliability v2 chaos', () => {
         const reopened = await restorer.restoreObjectUrls(clone(serverSnapshot));
         expect(reopened.objects).toHaveLength(1);
         expect(reopened.objects[0].imageId).toBe('img-remote-77');
-        expect(reopened.objects[0].src).toBe('/api/images/img-remote-77/file');
-        expect(reopened.objects[0].properties.src).toBe('/api/images/img-remote-77/file');
+        expect(reopened.objects[0].src).toBe('/api/v2/images/img-remote-77/download');
+        expect(reopened.objects[0].properties.src).toBe('/api/v2/images/img-remote-77/download');
     });
 });

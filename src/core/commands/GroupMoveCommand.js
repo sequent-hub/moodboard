@@ -47,32 +47,7 @@ export class GroupMoveCommand extends BaseCommand {
     }
 
     undo() {
-        // Возвращаем исходные позиции
-        for (const item of this.moves) {
-            if (this.coordinatesAreTopLeft) {
-                // Координаты уже левый-верх (Frame перемещение)
-                this.core.updateObjectPositionDirect(item.id, item.from);
-                this.emit(Events.Object.TransformUpdated, {
-                    objectId: item.id,
-                    type: 'position',
-                    position: item.from
-                });
-            } else {
-                // Координаты - центры PIXI (обычное групповое перемещение)
-                const pixiObject = this.core?.pixi?.objects?.get(item.id);
-                if (pixiObject) {
-                    const halfW = (pixiObject.width || 0) / 2;
-                    const halfH = (pixiObject.height || 0) / 2;
-                    const topLeft = { x: item.from.x - halfW, y: item.from.y - halfH };
-                    this.core.updateObjectPositionDirect(item.id, topLeft);
-                    this.emit(Events.Object.TransformUpdated, {
-                        objectId: item.id,
-                        type: 'position',
-                        position: topLeft
-                    });
-                }
-            }
-        }
+        // Локальный undo отключен: история состояния загружается с сервера по версиям.
     }
 
     getDescription() {
