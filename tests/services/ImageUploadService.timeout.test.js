@@ -94,6 +94,29 @@ describe('ImageUploadService - таймауты и ошибки загрузки
         });
     });
 
+    it('принимает абсолютный v2 URL от backend', async () => {
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: vi.fn().mockResolvedValue({
+                success: true,
+                data: {
+                    imageId: 'img-abs-1',
+                    url: 'https://dev.futurello.futurebim.ru/api/v2/images/img-abs-1/download',
+                    width: 910,
+                    height: 617,
+                    name: 'abs.png',
+                    size: 470515,
+                },
+            }),
+        });
+
+        const file = new Blob(['png-data'], { type: 'image/png' });
+        const result = await service.uploadImage(file, 'abs.png');
+
+        expect(result.imageId).toBe('img-abs-1');
+        expect(result.url).toBe('https://dev.futurello.futurebim.ru/api/v2/images/img-abs-1/download');
+    });
+
     it('падает если backend вернул legacy url без /api/v2', async () => {
         global.fetch.mockResolvedValue({
             ok: true,
@@ -112,5 +135,25 @@ describe('ImageUploadService - таймауты и ошибки загрузки
 
         const file = new Blob(['png-data'], { type: 'image/png' });
         await expect(service.uploadImage(file, 'legacy.png')).rejects.toThrow('Некорректный URL изображения');
+    });
+
+    it('падает если imageId не совпадает с id в URL', async () => {
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: vi.fn().mockResolvedValue({
+                success: true,
+                data: {
+                    imageId: 'img-1',
+                    url: '/api/v2/images/img-2/download',
+                    width: 910,
+                    height: 617,
+                    name: 'mismatch.png',
+                    size: 470515,
+                },
+            }),
+        });
+
+        const file = new Blob(['png-data'], { type: 'image/png' });
+        await expect(service.uploadImage(file, 'mismatch.png')).rejects.toThrow('imageId не совпадает');
     });
 });

@@ -107,6 +107,9 @@ export class ImageUploadService {
             if (!isV2ImageDownloadUrl(serverUrl)) {
                 throw new Error('Некорректный URL изображения от сервера. Ожидается /api/v2/images/{imageId}/download');
             }
+            if (!this._matchesImageIdInUrl(serverUrl, imageId)) {
+                throw new Error('imageId не совпадает с URL изображения от сервера.');
+            }
 
             return {
                 id: imageId, // Используем imageId как основное поле, id для обратной совместимости
@@ -121,6 +124,23 @@ export class ImageUploadService {
         } catch (error) {
             console.error('Ошибка загрузки изображения:', error);
             throw error;
+        }
+    }
+
+    _matchesImageIdInUrl(url, imageId) {
+        const id = typeof imageId === 'string' ? imageId.trim() : '';
+        if (!id || typeof url !== 'string') return false;
+        const raw = url.trim();
+        const relativeMatch = raw.match(/^\/api\/v2\/images\/([^/]+)\/download$/i);
+        if (relativeMatch) {
+            return decodeURIComponent(relativeMatch[1]) === id;
+        }
+        try {
+            const parsed = new URL(raw);
+            const absoluteMatch = parsed.pathname.match(/^\/api\/v2\/images\/([^/]+)\/download$/i);
+            return !!absoluteMatch && decodeURIComponent(absoluteMatch[1]) === id;
+        } catch (_) {
+            return false;
         }
     }
 

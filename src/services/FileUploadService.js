@@ -102,6 +102,9 @@ export class FileUploadService {
             if (!isV2FileDownloadUrl(serverUrl)) {
                 throw new Error('Некорректный URL файла от сервера. Ожидается /api/v2/files/{fileId}/download');
             }
+            if (!this._matchesFileIdInUrl(serverUrl, fileId)) {
+                throw new Error('fileId не совпадает с URL файла от сервера.');
+            }
 
             return {
                 id: fileId, // Используем fileId как основное поле, id для обратной совместимости
@@ -115,6 +118,23 @@ export class FileUploadService {
         } catch (error) {
             console.error('Ошибка загрузки файла:', error);
             throw error;
+        }
+    }
+
+    _matchesFileIdInUrl(url, fileId) {
+        const id = typeof fileId === 'string' ? fileId.trim() : '';
+        if (!id || typeof url !== 'string') return false;
+        const raw = url.trim();
+        const relativeMatch = raw.match(/^\/api\/v2\/files\/([^/]+)\/download$/i);
+        if (relativeMatch) {
+            return decodeURIComponent(relativeMatch[1]) === id;
+        }
+        try {
+            const parsed = new URL(raw);
+            const absoluteMatch = parsed.pathname.match(/^\/api\/v2\/files\/([^/]+)\/download$/i);
+            return !!absoluteMatch && decodeURIComponent(absoluteMatch[1]) === id;
+        } catch (_) {
+            return false;
         }
     }
 
