@@ -23,7 +23,10 @@ describe('SaveManager - retry/backoff', () => {
     let apiClient;
     let consoleErrorSpy;
 
-    const boardData = { id: 'board-1', objects: [{ id: 'img-1', type: 'image' }] };
+    const boardData = {
+        id: 'board-1',
+        objects: [{ id: 'img-1', type: 'image', imageId: 'img-1', properties: { src: '/api/images/img-1/file' } }]
+    };
 
     beforeEach(() => {
         vi.useFakeTimers();
@@ -114,6 +117,23 @@ describe('SaveManager - retry/backoff', () => {
             retryCount: 3,
             maxRetries: 3,
         });
+        const status = manager.getStatus();
+        expect(status.saveStatus).toBe('error');
+        expect(status.hasUnsavedChanges).toBe(true);
+    });
+
+    it('блокирует сохранение image без imageId до обращения к apiClient', async () => {
+        eventBus.on(Events.Save.GetBoardData, (request) => {
+            request.data = {
+                id: 'board-1',
+                objects: [{ id: 'img-missing', type: 'image', properties: { src: 'data:image/png;base64,AAAA' } }],
+            };
+        });
+
+        manager.hasUnsavedChanges = true;
+        await manager.saveImmediately();
+
+        expect(apiClient.saveBoard).not.toHaveBeenCalled();
         const status = manager.getStatus();
         expect(status.saveStatus).toBe('error');
         expect(status.hasUnsavedChanges).toBe(true);

@@ -44,7 +44,10 @@ describe('SaveManager - таймауты и сохранение', () => {
     });
 
     it('при timeout в saveBoard сохраняет статус error и unsavedChanges', async () => {
-        const boardData = { id: 'board-1', objects: [{ id: 'img-1', type: 'image' }] };
+        const boardData = {
+            id: 'board-1',
+            objects: [{ id: 'img-1', type: 'image', imageId: 'img-1', properties: { src: '/api/images/img-1/file' } }]
+        };
         eventBus.on(Events.Save.GetBoardData, (request) => {
             request.data = boardData;
         });
@@ -69,7 +72,10 @@ describe('SaveManager - таймауты и сохранение', () => {
     });
 
     it('при успешном save сбрасывает unsavedChanges и эмитит save:success', async () => {
-        const boardData = { id: 'board-1', objects: [{ id: 'img-1', type: 'image' }] };
+        const boardData = {
+            id: 'board-1',
+            objects: [{ id: 'img-1', type: 'image', imageId: 'img-1', properties: { src: '/api/images/img-1/file' } }]
+        };
         eventBus.on(Events.Save.GetBoardData, (request) => {
             request.data = boardData;
         });
@@ -93,7 +99,10 @@ describe('SaveManager - таймауты и сохранение', () => {
     });
 
     it('не отправляет повторный save если данные не изменились', async () => {
-        const boardData = { id: 'board-1', objects: [{ id: 'img-1', type: 'image' }] };
+        const boardData = {
+            id: 'board-1',
+            objects: [{ id: 'img-1', type: 'image', imageId: 'img-1', properties: { src: '/api/images/img-1/file' } }]
+        };
         eventBus.on(Events.Save.GetBoardData, (request) => {
             request.data = boardData;
         });
@@ -112,10 +121,10 @@ describe('SaveManager - таймауты и сохранение', () => {
         expect(apiClient.saveBoard).toHaveBeenCalledTimes(1);
     });
 
-    it('ставит pending-статус при отложенном автосохранении', () => {
+    it('scheduleAutoSave не использует pending-статус и не падает без данных', () => {
         manager.scheduleAutoSave();
         const statusEvents = eventBus.emit.mock.calls.filter((call) => call[0] === Events.Save.StatusChanged);
-        const lastStatus = statusEvents[statusEvents.length - 1][1];
-        expect(lastStatus.status).toBe('pending');
+        const statuses = statusEvents.map(([, payload]) => payload?.status).filter(Boolean);
+        expect(statuses).not.toContain('pending');
     });
 });

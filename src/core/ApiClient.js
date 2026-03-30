@@ -144,90 +144,55 @@ export class ApiClient {
 
         const cleanedObjects = boardData.objects.map(obj => {
             if (obj.type === 'image') {
-                console.log('🧹 DEBUG _cleanImageData: обрабатываем изображение:', {
-                    id: obj.id,
-                    imageId: obj.imageId,
-                    hasSrc: !!obj.src,
-                    hasPropertiesSrc: !!obj.properties?.src,
-                    srcIsBase64: !!(obj.src && obj.src.startsWith('data:')),
-                    propertiesSrcIsBase64: !!(obj.properties?.src && obj.properties.src.startsWith('data:'))
-                });
-                
+                const imageId = typeof obj.imageId === 'string' ? obj.imageId.trim() : '';
+                const topSrc = typeof obj.src === 'string' ? obj.src : '';
+                const propSrc = typeof obj.properties?.src === 'string' ? obj.properties.src : '';
+                const hasForbiddenInlineSrc = /^data:/i.test(topSrc)
+                    || /^blob:/i.test(topSrc)
+                    || /^data:/i.test(propSrc)
+                    || /^blob:/i.test(propSrc);
+
+                // Жесткий контракт v2: сохраняем image только через server imageId.
+                if (!imageId) {
+                    throw new Error(`Image object "${obj.id || 'unknown'}" has no imageId. Save is blocked.`);
+                }
+                if (hasForbiddenInlineSrc) {
+                    throw new Error(`Image object "${obj.id || 'unknown'}" contains forbidden data/blob src. Save is blocked.`);
+                }
+
                 const cleanedObj = { ...obj };
-                
-                // Если есть imageId, убираем src для экономии места
-                if (obj.imageId && typeof obj.imageId === 'string' && obj.imageId.trim().length > 0) {
-                    console.log('🧹 DEBUG _cleanImageData: у изображения есть imageId, убираем src');
-                    
-                    // Убираем src с верхнего уровня
-                    if (cleanedObj.src) {
-                        delete cleanedObj.src;
-                        console.log('🧹 DEBUG: удален src с верхнего уровня');
-                    }
-                    
-                    // Убираем src из properties
-                    if (cleanedObj.properties?.src) {
-                        cleanedObj.properties = { ...cleanedObj.properties };
-                        delete cleanedObj.properties.src;
-                        console.log('🧹 DEBUG: удален src из properties');
-                    }
+
+                // imageId валиден — src можно безопасно убрать из history payload.
+                if (cleanedObj.src) {
+                    delete cleanedObj.src;
                 }
-                // Если нет imageId, предупреждаем о base64
-                else {
-                    console.log('🧹 DEBUG _cleanImageData: у изображения НЕТ imageId, оставляем src как есть');
-                    if (cleanedObj.properties?.src && cleanedObj.properties.src.startsWith('data:')) {
-                        console.warn('❌ Изображение сохраняется с base64 в properties, так как нет imageId:', cleanedObj.id);
-                    }
-                    if (cleanedObj.src && cleanedObj.src.startsWith('data:')) {
-                        console.warn('❌ Изображение сохраняется с base64 в src, так как нет imageId:', cleanedObj.id);
-                    }
-                    if (!obj.imageId) {
-                        console.warn('❌ У изображения отсутствует imageId:', cleanedObj.id);
-                    }
+                if (cleanedObj.properties?.src) {
+                    cleanedObj.properties = { ...cleanedObj.properties };
+                    delete cleanedObj.properties.src;
                 }
-                
+
                 return cleanedObj;
             }
             
             if (obj.type === 'file') {
-                console.log('🧹 DEBUG _cleanObjectData: обрабатываем файл:', {
-                    id: obj.id,
-                    fileId: obj.fileId,
-                    hasContent: !!obj.content,
-                    hasPropertiesContent: !!obj.properties?.content
-                });
-                
                 const cleanedObj = { ...obj };
                 
                 // Если есть fileId, убираем content для экономии места
                 if (obj.fileId && typeof obj.fileId === 'string' && obj.fileId.trim().length > 0) {
-                    console.log('🧹 DEBUG _cleanObjectData: у файла есть fileId, убираем content');
-                    
                     // Убираем content с верхнего уровня
                     if (cleanedObj.content) {
                         delete cleanedObj.content;
-                        console.log('🧹 DEBUG: удален content с верхнего уровня');
                     }
                     
                     // Убираем content из properties
                     if (cleanedObj.properties?.content) {
                         cleanedObj.properties = { ...cleanedObj.properties };
                         delete cleanedObj.properties.content;
-                        console.log('🧹 DEBUG: удален content из properties');
                     }
                 }
                 // Если нет fileId, предупреждаем о наличии content
                 else {
-                    console.log('🧹 DEBUG _cleanObjectData: у файла НЕТ fileId, оставляем content как есть');
-                    if (cleanedObj.properties?.content) {
-                        console.warn('❌ Файл сохраняется с content в properties, так как нет fileId:', cleanedObj.id);
-                    }
-                    if (cleanedObj.content) {
-                        console.warn('❌ Файл сохраняется с content, так как нет fileId:', cleanedObj.id);
-                    }
-                    if (!obj.fileId) {
-                        console.warn('❌ У файла отсутствует fileId:', cleanedObj.id);
-                    }
+                    // Для файлов сейчас сохраняем поведение: без fileId не модифицируем объект.
                 }
                 
                 return cleanedObj;
@@ -253,15 +218,7 @@ export class ApiClient {
         const restoredObjects = await Promise.all(
             boardData.objects.map(async (obj) => {
                 if (obj.type === 'image') {
-                    console.log('🔗 DEBUG restoreImageUrls: обрабатываем изображение:', {
-                        id: obj.id,
-                        imageId: obj.imageId,
-                        hasSrc: !!obj.src,
-                        hasPropertiesSrc: !!obj.properties?.src
-                    });
-                    
                     if (obj.imageId && (!obj.src && !obj.properties?.src)) {
-                        console.log('🔗 DEBUG: восстанавливаем URL для изображения');
                         try {
                             // Формируем URL изображения
                             const imageUrl = `/api/images/${obj.imageId}/file`;
@@ -278,22 +235,12 @@ export class ApiClient {
                             console.warn(`Не удалось восстановить URL для изображения ${obj.imageId}:`, error);
                             return obj;
                         }
-                    } else {
-                        console.log('🔗 DEBUG: изображение уже имеет URL или нет imageId, оставляем как есть');
-                        return obj;
                     }
+                    return obj;
                 }
                 
                 if (obj.type === 'file') {
-                    console.log('🔗 DEBUG restoreObjectUrls: обрабатываем файл:', {
-                        id: obj.id,
-                        fileId: obj.fileId,
-                        hasUrl: !!obj.url,
-                        hasPropertiesUrl: !!obj.properties?.url
-                    });
-                    
                     if (obj.fileId) {
-                        console.log('🔗 DEBUG: восстанавливаем данные для файла');
                         try {
                             // Формируем URL файла для скачивания
                             const fileUrl = `/api/files/${obj.fileId}/download`;
@@ -323,7 +270,6 @@ export class ApiClient {
                                     if (response.ok) {
                                         const result = await response.json();
                                         if (result.success && result.data) {
-                                            console.log('🔄 Обновляем метаданные файла с сервера:', result.data);
                                             // Эмитим событие для обновления метаданных файла в состоянии
                                             // (это будет обработано в core, если EventBus доступен)
                                             if (typeof window !== 'undefined' && window.moodboardEventBus) {
@@ -345,10 +291,8 @@ export class ApiClient {
                             console.warn(`Не удалось восстановить данные для файла ${obj.fileId}:`, error);
                             return obj;
                         }
-                    } else {
-                        console.log('🔗 DEBUG: файл не имеет fileId, оставляем как есть');
-                        return obj;
                     }
+                    return obj;
                 }
                 
                 return obj;

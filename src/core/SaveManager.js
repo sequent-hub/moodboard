@@ -103,6 +103,11 @@ export class SaveManager {
                     sample: mindmapNodes.slice(0, 5),
                 });
             }
+
+            // Жесткий контракт для сохранения картинок:
+            // - каждый image обязан иметь imageId
+            // - data:/blob: URL в image запрещены
+            this._assertImageSaveContract(saveData);
             
             // Проверяем, изменились ли данные с последнего сохранения
             if (this.lastSavedData && JSON.stringify(saveData) === JSON.stringify(this.lastSavedData)) {
@@ -219,6 +224,28 @@ export class SaveManager {
         }
         
         return await response.json();
+    }
+
+    _assertImageSaveContract(saveData) {
+        const objects = Array.isArray(saveData?.boardData?.objects)
+            ? saveData.boardData.objects
+            : Array.isArray(saveData?.objects)
+                ? saveData.objects
+                : [];
+
+        for (const obj of objects) {
+            if (!obj || obj.type !== 'image') continue;
+            const imageId = typeof obj.imageId === 'string' ? obj.imageId.trim() : '';
+            const topSrc = typeof obj.src === 'string' ? obj.src : '';
+            const propSrc = typeof obj.properties?.src === 'string' ? obj.properties.src : '';
+
+            if (!imageId) {
+                throw new Error(`Image object "${obj.id || 'unknown'}" has no imageId. Save is blocked.`);
+            }
+            if (/^data:/i.test(topSrc) || /^blob:/i.test(topSrc) || /^data:/i.test(propSrc) || /^blob:/i.test(propSrc)) {
+                throw new Error(`Image object "${obj.id || 'unknown'}" contains forbidden data/blob src. Save is blocked.`);
+            }
+        }
     }
 
     _buildSavePayload(boardId, data, csrfToken = undefined) {

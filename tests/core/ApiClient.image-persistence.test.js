@@ -49,7 +49,7 @@ describe('ApiClient - image persistence safety', () => {
         expect(image.properties.width).toBe(300);
     });
 
-    it('cleanObjectData не удаляет src если imageId отсутствует', () => {
+    it('cleanObjectData блокирует image без imageId', () => {
         const boardData = {
             id: 'board-1',
             objects: [
@@ -66,12 +66,28 @@ describe('ApiClient - image persistence safety', () => {
             ],
         };
 
-        const cleaned = client._cleanObjectData(boardData);
-        const image = cleaned.objects[0];
+        expect(() => client._cleanObjectData(boardData)).toThrow('has no imageId');
+    });
 
-        expect(image.imageId).toBeUndefined();
-        expect(image.src).toBe('data:image/png;base64,AAAA');
-        expect(image.properties.src).toBe('data:image/png;base64,AAAA');
+    it('cleanObjectData блокирует image с blob/data src даже при наличии imageId', () => {
+        const boardData = {
+            id: 'board-1',
+            objects: [
+                {
+                    id: 'img-blob-1',
+                    type: 'image',
+                    imageId: 'img-blob-id',
+                    src: 'blob://temporary-image',
+                    properties: {
+                        src: 'blob://temporary-image',
+                        width: 200,
+                        height: 100,
+                    },
+                },
+            ],
+        };
+
+        expect(() => client._cleanObjectData(boardData)).toThrow('forbidden data/blob src');
     });
 
     it('saveBoard отправляет imageId в payload и не теряет image объект', async () => {
@@ -117,6 +133,26 @@ describe('ApiClient - image persistence safety', () => {
         expect(savedImage.imageId).toBe('img-remote-1');
         expect(savedImage.src).toBeUndefined();
         expect(savedImage.properties.src).toBeUndefined();
+    });
+
+    it('saveBoard блокирует отправку, если image без imageId', async () => {
+        const board = {
+            id: 'board-1',
+            objects: [
+                {
+                    id: 'img-1',
+                    type: 'image',
+                    properties: {
+                        src: 'data:image/png;base64,AAAA',
+                        width: 300,
+                        height: 200,
+                    },
+                },
+            ],
+        };
+
+        await expect(client.saveBoard('board-1', board)).rejects.toThrow('has no imageId');
+        expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it('restoreObjectUrls восстанавливает src из imageId после загрузки', async () => {

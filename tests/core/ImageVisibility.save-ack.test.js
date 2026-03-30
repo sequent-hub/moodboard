@@ -1,0 +1,99 @@
+import { describe, it, expect, vi } from 'vitest';
+import { CoreMoodBoard } from '../../src/core/index.js';
+import { setupSaveFlow } from '../../src/core/flows/SaveFlow.js';
+import { Events } from '../../src/core/events/Events.js';
+
+function createEventBus() {
+    const handlers = new Map();
+    return {
+        on: vi.fn((event, handler) => {
+            if (!handlers.has(event)) handlers.set(event, []);
+            handlers.get(event).push(handler);
+        }),
+        emit: vi.fn((event, payload) => {
+            const list = handlers.get(event) || [];
+            for (const handler of list) handler(payload);
+        }),
+    };
+}
+
+function createCoreLikeObject() {
+    const objects = [];
+    const pixiObjects = new Map();
+    const core = {
+        state: {
+            state: { objects },
+            addObject: vi.fn((obj) => { objects.push(obj); }),
+        },
+        pixi: {
+            objects: pixiObjects,
+            createObject: vi.fn((obj) => { pixiObjects.set(obj.id, { visible: true }); }),
+            findObjectByPosition: vi.fn(() => null),
+        },
+        gridSnapResolver: {
+            snapWorldTopLeft: vi.fn((position) => position),
+        },
+        history: {
+            executeCommand: vi.fn((command) => command.execute()),
+        },
+        eventBus: {
+            emit: vi.fn(),
+        },
+        _pendingImageVisibilityIds: new Set(),
+    };
+    core._isImageAckType = CoreMoodBoard.prototype._isImageAckType.bind(core);
+    core._setObjectVisibility = CoreMoodBoard.prototype._setObjectVisibility.bind(core);
+    core.revealPendingImageObjectsAfterSave = CoreMoodBoard.prototype.revealPendingImageObjectsAfterSave.bind(core);
+    return core;
+}
+
+describe('Image visibility save ack contract', () => {
+    it('image object is hidden until save ack and shown after reveal', () => {
+        const core = createCoreLikeObject();
+
+        const created = CoreMoodBoard.prototype.createObject.call(
+            core,
+            'image',
+            { x: 100, y: 200 },
+            { src: '/api/images/img-1/file', width: 300, height: 150 },
+            { imageId: 'img-1' }
+        );
+
+        expect(core.pixi.objects.get(created.id).visible).toBe(false);
+        expect(core._pendingImageVisibilityIds.has(created.id)).toBe(true);
+
+        core.revealPendingImageObjectsAfterSave();
+
+        expect(core.pixi.objects.get(created.id).visible).toBe(true);
+        expect(core._pendingImageVisibilityIds.size).toBe(0);
+    });
+
+    it('non-image object stays visible and is not put into pending set', () => {
+        const core = createCoreLikeObject();
+
+        const created = CoreMoodBoard.prototype.createObject.call(
+            core,
+            'note',
+            { x: 10, y: 20 },
+            { content: 'hello', width: 200, height: 200 },
+            {}
+        );
+
+        expect(core.pixi.objects.get(created.id).visible).toBe(true);
+        expect(core._pendingImageVisibilityIds.size).toBe(0);
+    });
+
+    it('save:success in SaveFlow triggers revealPendingImageObjectsAfterSave', () => {
+        const eventBus = createEventBus();
+        const core = {
+            eventBus,
+            state: { state: {} },
+            revealPendingImageObjectsAfterSave: vi.fn(),
+        };
+
+        setupSaveFlow(core);
+        eventBus.emit(Events.Save.Success, {});
+
+        expect(core.revealPendingImageObjectsAfterSave).toHaveBeenCalledTimes(1);
+    });
+});

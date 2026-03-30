@@ -66,6 +66,8 @@ export class CoreMoodBoard {
             csrfToken: this.options.csrfToken
         });
         this.gridSnapResolver = new GridSnapResolver(this);
+        // Изображения показываем пользователю только после подтвержденного save:success.
+        this._pendingImageVisibilityIds = new Set();
         
         // Связываем SaveManager с ApiClient для правильной обработки изображений
         this.saveManager.setApiClient(this.apiClient);
@@ -435,7 +437,32 @@ export class CoreMoodBoard {
         const command = new CreateObjectCommand(this, objectData);
         this.history.executeCommand(command);
 
+        // Строгий UX-контракт: image появляется на доске только после успешного сохранения.
+        if (this._isImageAckType(type)) {
+            this._pendingImageVisibilityIds.add(objectData.id);
+            this._setObjectVisibility(objectData.id, false);
+        }
+
         return objectData;
+    }
+
+    _isImageAckType(type) {
+        return type === 'image' || type === 'revit-screenshot-img';
+    }
+
+    _setObjectVisibility(objectId, visible) {
+        const pixiObject = this.pixi?.objects?.get?.(objectId);
+        if (pixiObject) {
+            pixiObject.visible = !!visible;
+        }
+    }
+
+    revealPendingImageObjectsAfterSave() {
+        if (!this._pendingImageVisibilityIds || this._pendingImageVisibilityIds.size === 0) return;
+        for (const objectId of this._pendingImageVisibilityIds) {
+            this._setObjectVisibility(objectId, true);
+        }
+        this._pendingImageVisibilityIds.clear();
     }
 
     // === Прикрепления к фреймам ===
