@@ -63,21 +63,6 @@ export class PlacementPayloadFactory {
         });
     }
 
-    emitImageFallback(position, imageUrl, fileName, width, height, objectType = 'image', extraProperties = {}) {
-        this.host.eventBus.emit(Events.UI.ToolbarAction, {
-            type: objectType,
-            id: objectType,
-            position,
-            properties: {
-                src: imageUrl,
-                name: fileName,
-                width,
-                height,
-                ...extraProperties
-            }
-        });
-    }
-
     emitFileUploaded(position, uploadResult, width, height) {
         this.host.eventBus.emit(Events.UI.ToolbarAction, {
             type: 'file',
@@ -96,18 +81,4 @@ export class PlacementPayloadFactory {
         });
     }
 
-    emitFileFallback(position, fileName, fileSize, mimeType, width, height) {
-        this.host.eventBus.emit(Events.UI.ToolbarAction, {
-            type: 'file',
-            id: 'file',
-            position,
-            properties: {
-                fileName,
-                fileSize,
-                mimeType,
-                width,
-                height
-            }
-        });
-    }
 }

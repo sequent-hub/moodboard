@@ -339,28 +339,13 @@ export class ToolEventRouter {
                             index
                         };
                     } else {
-                        const localSrc = await new Promise((resolve) => {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                                resolve(reader.result);
-                            };
-                            reader.readAsDataURL(file);
-                        });
-                        if (!isCurrentDrop()) {
-                            logDropDebug(diagnostics, 'image_local_fallback_stale_drop_ignored', {
-                                fileName: file.name || 'image'
-                            });
-                            return null;
-                        }
-                        logDropDebug(diagnostics, 'image_local_fallback_success', {
-                            fileName: file.name || 'image'
-                        });
-                        return {
-                            src: localSrc,
-                            name: file.name || 'image',
-                            imageId: null,
-                            index
-                        };
+                        showDropWarning(
+                            manager,
+                            `Не удалось добавить "${file.name || 'image'}": сервис загрузки изображений недоступен`,
+                            diagnostics,
+                            { fileName: file.name || 'image' }
+                        );
+                        return null;
                     }
                 } catch (error) {
                     console.warn('Ошибка загрузки изображения через drag-and-drop:', error);
@@ -368,28 +353,16 @@ export class ToolEventRouter {
                         fileName: file.name || 'image',
                         message: error?.message || String(error)
                     });
-                    const fallbackSrc = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                            resolve(reader.result);
-                        };
-                        reader.readAsDataURL(file);
-                    });
-                    if (!isCurrentDrop()) {
-                        logDropDebug(diagnostics, 'image_error_fallback_stale_drop_ignored', {
-                            fileName: file.name || 'image'
-                        });
-                        return null;
-                    }
-                    logDropDebug(diagnostics, 'image_error_fallback_success', {
-                        fileName: file.name || 'image'
-                    });
-                    return {
-                        src: fallbackSrc,
-                        name: file.name || 'image',
-                        imageId: null,
-                        index
-                    };
+                    showDropWarning(
+                        manager,
+                        `Не удалось загрузить "${file.name || 'image'}" на сервер. Изображение не добавлено.`,
+                        diagnostics,
+                        {
+                            fileName: file.name || 'image',
+                            message: error?.message || String(error)
+                        }
+                    );
+                    return null;
                 }
             });
             for (const placement of imagePlacements) {
@@ -461,21 +434,13 @@ export class ToolEventRouter {
                             fileId: uploadResult.fileId || uploadResult.id || null
                         };
                     } else {
-                        if (!isCurrentDrop()) {
-                            logDropDebug(diagnostics, 'file_local_fallback_stale_drop_ignored', {
-                                fileName: fallbackProps.fileName
-                            });
-                            return null;
-                        }
-                        logDropDebug(diagnostics, 'file_local_fallback_success', {
-                            fileName: fallbackProps.fileName
-                        });
-                        return {
-                            type: 'file',
-                            id: 'file',
-                            position,
-                            properties: fallbackProps
-                        };
+                        showDropWarning(
+                            manager,
+                            `Не удалось добавить "${fallbackProps.fileName}": сервис загрузки файлов недоступен`,
+                            diagnostics,
+                            { fileName: fallbackProps.fileName }
+                        );
+                        return null;
                     }
                 } catch (error) {
                     console.warn('Ошибка загрузки файла через drag-and-drop:', error);
@@ -483,21 +448,16 @@ export class ToolEventRouter {
                         fileName: fallbackProps.fileName,
                         message: error?.message || String(error)
                     });
-                    if (!isCurrentDrop()) {
-                        logDropDebug(diagnostics, 'file_error_fallback_stale_drop_ignored', {
-                            fileName: fallbackProps.fileName
-                        });
-                        return null;
-                    }
-                    logDropDebug(diagnostics, 'file_error_fallback_success', {
-                        fileName: fallbackProps.fileName
-                    });
-                    return {
-                        type: 'file',
-                        id: 'file',
-                        position,
-                        properties: fallbackProps
-                    };
+                    showDropWarning(
+                        manager,
+                        `Не удалось загрузить "${fallbackProps.fileName}" на сервер. Файл не добавлен.`,
+                        diagnostics,
+                        {
+                            fileName: fallbackProps.fileName,
+                            message: error?.message || String(error)
+                        }
+                    );
+                    return null;
                 }
             });
             for (const actionPayload of filePlacements) {

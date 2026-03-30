@@ -227,13 +227,8 @@ export class PlacementInputRouter {
                         host.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
                     } catch (uploadError) {
                         console.error('Ошибка загрузки файла на сервер:', uploadError);
-                        const fileName = file.name;
-                        const fileSize = file.size;
-                        const mimeType = file.type;
-
-                        host.payloadFactory.emitFileFallback(position, fileName, fileSize, mimeType, props.width || 120, props.height || 140);
                         host.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
-                        alert('Ошибка загрузки файла на сервер. Файл добавлен локально.');
+                        alert('Ошибка загрузки файла на сервер. Файл не добавлен.');
                     }
                 } catch (error) {
                     console.error('Ошибка при выборе файла:', error);

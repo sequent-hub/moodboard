@@ -225,18 +225,8 @@ export class PlacementTool extends BaseTool {
             
         } catch (uploadError) {
             console.error('Ошибка загрузки файла на сервер:', uploadError);
-            // Fallback: создаем объект файла с локальными данными
-            this.payloadFactory.emitFileFallback(
-                position,
-                this.selectedFile.fileName,
-                this.selectedFile.fileSize,
-                this.selectedFile.mimeType,
-                props.width || 120,
-                props.height || 140
-            );
-            
-            // Показываем предупреждение пользователю
-            alert('Ошибка загрузки файла на сервер. Файл добавлен локально.');
+            // Строгий режим: локальное сохранение файлов запрещено.
+            alert('Ошибка загрузки файла на сервер. Файл не добавлен.');
         }
 
         // Убираем призрак и возвращаемся к инструменту выделения
@@ -341,23 +331,9 @@ export class PlacementTool extends BaseTool {
             
         } catch (uploadError) {
             console.error('Ошибка загрузки изображения на сервер:', uploadError);
-            
-            // Fallback: создаем объект изображения с локальными данными
-            const imageUrl = URL.createObjectURL(this.selectedImage.file);
-            const targetW = this.selectedImage.properties.width || 300;
-            const targetH = this.selectedImage.properties.height || 200;
-            
-            const halfW = targetW / 2;
-            const halfH = targetH / 2;
-            const position = { 
-                x: Math.round(worldPoint.x - halfW), 
-                y: Math.round(worldPoint.y - halfH) 
-            };
-            
-            this.payloadFactory.emitImageFallback(position, imageUrl, this.selectedImage.fileName, targetW, targetH, objectType, extraProperties);
-            
-            // Показываем предупреждение пользователю
-            alert('Ошибка загрузки изображения на сервер. Изображение добавлено локально.');
+
+            // Строгий режим: локальное сохранение изображений запрещено.
+            alert('Ошибка загрузки изображения на сервер. Изображение не добавлено.');
         }
 
         // Убираем призрак и возвращаемся к инструменту выделения

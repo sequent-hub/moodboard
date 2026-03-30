@@ -104,10 +104,13 @@ describe('ApiClient - image persistence safety', () => {
 
         await client.saveBoard('board-1', board);
 
-        expect(global.fetch).toHaveBeenCalledTimes(1);
-        const [, request] = global.fetch.mock.calls[0];
-        const body = JSON.parse(request.body);
-        const savedImage = body.boardData.objects.find((o) => o.id === 'img-1');
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+        expect(global.fetch.mock.calls[0][0]).toBe('/api/v2/moodboard/metadata/save');
+        expect(global.fetch.mock.calls[1][0]).toBe('/api/v2/moodboard/history/save');
+
+        const [, historyRequest] = global.fetch.mock.calls[1];
+        const historyBody = JSON.parse(historyRequest.body);
+        const savedImage = historyBody.state.objects.find((o) => o.id === 'img-1');
 
         expect(savedImage).toBeDefined();
         expect(savedImage.type).toBe('image');

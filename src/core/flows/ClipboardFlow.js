@@ -19,6 +19,38 @@ export function setupClipboardFlow(core) {
         };
     };
 
+    const ensureServerImage = async ({ src, name, imageId }) => {
+        if (imageId) {
+            return { src, name, imageId };
+        }
+        if (!core.imageUploadService) {
+            alert('Сервис загрузки изображений недоступен. Изображение не добавлено.');
+            return null;
+        }
+        try {
+            let uploadResult = null;
+            if (typeof src === 'string' && /^data:image\//i.test(src)) {
+                uploadResult = await core.imageUploadService.uploadFromDataUrl(src, name || 'clipboard-image.png');
+            } else {
+                const response = await fetch(src);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const blob = await response.blob();
+                uploadResult = await core.imageUploadService.uploadImage(blob, name || 'clipboard-image');
+            }
+            return {
+                src: uploadResult.url,
+                name: uploadResult.name || name,
+                imageId: uploadResult.imageId || uploadResult.id
+            };
+        } catch (error) {
+            console.error('Ошибка загрузки вставленного изображения на сервер:', error);
+            alert('Ошибка загрузки изображения на сервер. Изображение не добавлено.');
+            return null;
+        }
+    };
+
     core.eventBus.on(Events.UI.CopyObject, ({ objectId }) => {
         if (!objectId) return;
         core.copyObject(objectId);
@@ -186,8 +218,10 @@ export function setupClipboardFlow(core) {
         core._cursor.y = y;
     });
 
-    core.eventBus.on(Events.UI.PasteImage, ({ src, name, imageId }) => {
+    core.eventBus.on(Events.UI.PasteImage, async ({ src, name, imageId }) => {
         if (!src) return;
+        const uploaded = await ensureServerImage({ src, name, imageId });
+        if (!uploaded?.imageId) return;
         const view = core.pixi.app.view;
         const world = core.pixi.worldLayer || core.pixi.app.stage;
         const s = world?.scale?.x || 1;
@@ -214,18 +248,18 @@ export function setupClipboardFlow(core) {
                 w = 300;
                 h = Math.max(1, Math.round(w / ar));
             }
-            const revitPayload = await resolveRevitImagePayload(src, {
+            const revitPayload = await resolveRevitImagePayload(uploaded.src, {
                 source: 'clipboard:paste-image',
-                name
+                name: uploaded.name
             });
             const properties = {
-                src,
-                name,
+                src: uploaded.src,
+                name: uploaded.name,
                 width: w,
                 height: h,
                 ...revitPayload.properties
             };
-            const extraData = imageId ? { imageId } : {};
+            const extraData = uploaded.imageId ? { imageId: uploaded.imageId } : {};
             core.createObject(
                 revitPayload.type,
                 { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) },
@@ -239,14 +273,16 @@ export function setupClipboardFlow(core) {
             img.decoding = 'async';
             img.onload = () => { void placeWithAspect(img.naturalWidth || 0, img.naturalHeight || 0); };
             img.onerror = () => { void placeWithAspect(0, 0); };
-            img.src = src;
+            img.src = uploaded.src;
         } catch (_) {
             void placeWithAspect(0, 0);
         }
     });
 
-    core.eventBus.on(Events.UI.PasteImageAt, ({ x, y, src, name, imageId }) => {
+    core.eventBus.on(Events.UI.PasteImageAt, async ({ x, y, src, name, imageId }) => {
         if (!src) return;
+        const uploaded = await ensureServerImage({ src, name, imageId });
+        if (!uploaded?.imageId) return;
         const world = core.pixi.worldLayer || core.pixi.app.stage;
         const s = world?.scale?.x || 1;
         const worldX = (x - (world?.x || 0)) / s;
@@ -260,18 +296,18 @@ export function setupClipboardFlow(core) {
                 w = 300;
                 h = Math.max(1, Math.round(w / ar));
             }
-            const revitPayload = await resolveRevitImagePayload(src, {
+            const revitPayload = await resolveRevitImagePayload(uploaded.src, {
                 source: 'clipboard:paste-image-at',
-                name
+                name: uploaded.name
             });
             const properties = {
-                src,
-                name,
+                src: uploaded.src,
+                name: uploaded.name,
                 width: w,
                 height: h,
                 ...revitPayload.properties
             };
-            const extraData = imageId ? { imageId } : {};
+            const extraData = uploaded.imageId ? { imageId: uploaded.imageId } : {};
             core.createObject(
                 revitPayload.type,
                 { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) },
@@ -285,7 +321,7 @@ export function setupClipboardFlow(core) {
             img.decoding = 'async';
             img.onload = () => { void placeWithAspect(img.naturalWidth || 0, img.naturalHeight || 0); };
             img.onerror = () => { void placeWithAspect(0, 0); };
-            img.src = src;
+            img.src = uploaded.src;
         } catch (_) {
             void placeWithAspect(0, 0);
         }

@@ -16,11 +16,11 @@ export class KeyboardClipboardImagePaste {
                     imageId: uploadResult.imageId || uploadResult.id
                 });
             } else {
-                this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: fileName });
+                alert('Сервис загрузки изображений недоступен. Изображение не добавлено.');
             }
         } catch (error) {
             console.error('Ошибка загрузки изображения:', error);
-            this.eventBus.emit(Events.UI.PasteImage, { src: dataUrl, name: fileName });
+            alert('Ошибка загрузки изображения на сервер. Изображение не добавлено.');
         }
     }
 
@@ -34,29 +34,11 @@ export class KeyboardClipboardImagePaste {
                     imageId: uploadResult.imageId || uploadResult.id
                 });
             } else {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    this.eventBus.emit(Events.UI.PasteImage, {
-                        src: reader.result,
-                        name: fileName
-                    });
-                };
-                reader.readAsDataURL(file);
+                alert('Сервис загрузки изображений недоступен. Изображение не добавлено.');
             }
         } catch (error) {
             console.error('Ошибка загрузки файла изображения:', error);
-            try {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    this.eventBus.emit(Events.UI.PasteImage, {
-                        src: reader.result,
-                        name: fileName
-                    });
-                };
-                reader.readAsDataURL(file);
-            } catch (fallbackError) {
-                console.error('Критическая ошибка при чтении файла:', fallbackError);
-            }
+            alert('Ошибка загрузки изображения на сервер. Изображение не добавлено.');
         }
     }
 
@@ -105,10 +87,7 @@ export class KeyboardClipboardImagePaste {
                                 const dataUrl = await this._blobToDataUrl(blob);
                                 this.handleImageUpload(dataUrl, srcInHtml.split('/').pop() || 'image');
                             } catch (_) {
-                                this.eventBus.emit(Events.UI.PasteImage, {
-                                    src: srcInHtml,
-                                    name: srcInHtml.split('/').pop() || 'image'
-                                });
+                                alert('Не удалось загрузить изображение из URL. Изображение не добавлено.');
                             }
                             return;
                         }
@@ -151,10 +130,7 @@ export class KeyboardClipboardImagePaste {
                             this.handleImageUpload(dataUrl, trimmed.split('/').pop() || 'image');
                             return;
                         } catch (_) {
-                            this.eventBus.emit(Events.UI.PasteImage, {
-                                src: trimmed,
-                                name: trimmed.split('/').pop() || 'image'
-                            });
+                            alert('Не удалось загрузить изображение из URL. Изображение не добавлено.');
                             return;
                         }
                     }

@@ -17,7 +17,7 @@ function createEventBus() {
     };
 }
 
-describe('SaveManager - autosave flow', () => {
+describe('SaveManager - history-triggered save flow', () => {
     let eventBus;
     let manager;
     let apiClient;
@@ -25,11 +25,8 @@ describe('SaveManager - autosave flow', () => {
     const boardData = { id: 'board-autosave-1', objects: [{ id: 'n1', type: 'note' }] };
 
     beforeEach(() => {
-        vi.useFakeTimers();
         eventBus = createEventBus();
         manager = new SaveManager(eventBus);
-        manager.options.saveDelay = 400;
-        manager.options.periodicSaveInterval = 30000;
 
         eventBus.on(Events.Save.GetBoardData, (request) => {
             request.data = boardData;
@@ -45,107 +42,82 @@ describe('SaveManager - autosave flow', () => {
         manager.hasUnsavedChanges = false;
         manager.destroy();
         consoleErrorSpy.mockRestore();
-        vi.useRealTimers();
         vi.restoreAllMocks();
     });
 
-    it('debounce: серия markAsChanged вызывает один save после saveDelay', async () => {
-        manager.markAsChanged();
-        await vi.advanceTimersByTimeAsync(200);
-        manager.markAsChanged();
-        await vi.advanceTimersByTimeAsync(200);
-        manager.markAsChanged();
+    it('сохраняет по событию history:changed', async () => {
+        eventBus.emit(Events.History.Changed, {});
+        await vi.waitFor(() => {
+            expect(apiClient.saveBoard).toHaveBeenCalledTimes(1);
+        });
+    });
 
-        await vi.advanceTimersByTimeAsync(399);
+    it('не сохраняет по object:* событиям (лишние триггеры отключены)', async () => {
+        eventBus.emit(Events.Object.Created, {});
+        eventBus.emit(Events.Object.Updated, {});
+        eventBus.emit(Events.Object.Deleted, {});
+        eventBus.emit(Events.Object.StateChanged, {});
+        await Promise.resolve();
         expect(apiClient.saveBoard).toHaveBeenCalledTimes(0);
+    });
 
-        await vi.advanceTimersByTimeAsync(1);
+    it('повторное history:changed с теми же данными не вызывает лишний save', async () => {
+        eventBus.emit(Events.History.Changed, {});
+        await vi.waitFor(() => {
+            expect(apiClient.saveBoard).toHaveBeenCalledTimes(1);
+        });
+
+        eventBus.emit(Events.History.Changed, {});
+        await vi.waitFor(() => {
+            expect(apiClient.saveBoard).toHaveBeenCalledTimes(1);
+        });
         expect(apiClient.saveBoard).toHaveBeenCalledTimes(1);
     });
 
-    it('повторное изменение переносит дедлайн автосохранения', async () => {
-        manager.markAsChanged();
-        await vi.advanceTimersByTimeAsync(300);
-
-        manager.markAsChanged();
-        await vi.advanceTimersByTimeAsync(399);
-        expect(apiClient.saveBoard).toHaveBeenCalledTimes(0);
-
-        await vi.advanceTimersByTimeAsync(1);
-        expect(apiClient.saveBoard).toHaveBeenCalledTimes(1);
-    });
-
-    it('periodic interval сохраняет только при unsavedChanges и отсутствии in-flight запроса', async () => {
-        manager.hasUnsavedChanges = false;
-        await vi.advanceTimersByTimeAsync(30000);
-        expect(apiClient.saveBoard).toHaveBeenCalledTimes(0);
-
-        manager.hasUnsavedChanges = true;
-        manager.isRequestInProgress = true;
-        await vi.advanceTimersByTimeAsync(30000);
-        expect(apiClient.saveBoard).toHaveBeenCalledTimes(0);
-
-        manager.isRequestInProgress = false;
-        await vi.advanceTimersByTimeAsync(30000);
-        expect(apiClient.saveBoard).toHaveBeenCalledTimes(1);
-    });
-
-    it('setAutoSave(false) отменяет pending таймер и блокирует новый schedule', async () => {
-        manager.markAsChanged();
-        manager.setAutoSave(false);
-
-        await vi.advanceTimersByTimeAsync(1000);
-        expect(apiClient.saveBoard).toHaveBeenCalledTimes(0);
-
-        manager.markAsChanged();
-        await vi.advanceTimersByTimeAsync(1000);
-        expect(apiClient.saveBoard).toHaveBeenCalledTimes(0);
-    });
-
-    it('forceSave очищает pending таймер и выполняет немедленное сохранение один раз', async () => {
-        manager.markAsChanged();
+    it('forceSave выполняет сохранение немедленно', async () => {
         await manager.forceSave();
         expect(apiClient.saveBoard).toHaveBeenCalledTimes(1);
-
-        await vi.advanceTimersByTimeAsync(1000);
-        expect(apiClient.saveBoard).toHaveBeenCalledTimes(1);
     });
 
-    it('эмитит корректный порядок статусов для autosave success: pending -> saving -> saved', async () => {
-        manager.markAsChanged();
-        await vi.advanceTimersByTimeAsync(400);
+    it('эмитит корректный порядок статусов: saving -> saved', async () => {
+        eventBus.emit(Events.History.Changed, {});
+        await vi.waitFor(() => {
+            const statusEvents = eventBus.emit.mock.calls
+                .filter((call) => call[0] === Events.Save.StatusChanged)
+                .map((call) => call[1]);
+            expect(statusEvents.length).toBeGreaterThanOrEqual(2);
+        });
 
         const statusEvents = eventBus.emit.mock.calls
             .filter((call) => call[0] === Events.Save.StatusChanged)
             .map((call) => call[1]);
 
-        expect(statusEvents.length).toBeGreaterThanOrEqual(3);
-        expect(statusEvents[0].status).toBe('pending');
-        expect(statusEvents[1].status).toBe('saving');
-        expect(statusEvents[2].status).toBe('saved');
+        expect(statusEvents.length).toBeGreaterThanOrEqual(2);
+        expect(statusEvents[0].status).toBe('saving');
+        expect(statusEvents[1].status).toBe('saved');
 
         expect(statusEvents[0].hasUnsavedChanges).toBe(true);
-        expect(statusEvents[1].hasUnsavedChanges).toBe(true);
-        expect(statusEvents[2].hasUnsavedChanges).toBe(false);
+        expect(statusEvents[1].hasUnsavedChanges).toBe(false);
     });
 
-    it('эмитит корректный порядок статусов для autosave error: pending -> saving -> error', async () => {
+    it('эмитит корректный порядок статусов для ошибки: saving -> error', async () => {
+        vi.useFakeTimers();
         apiClient.saveBoard.mockRejectedValueOnce(new Error('network-timeout'));
         manager.options.maxRetries = 1;
 
-        manager.markAsChanged();
-        await vi.advanceTimersByTimeAsync(400);
+        eventBus.emit(Events.History.Changed, {});
+        await vi.runAllTimersAsync();
 
         const statusEvents = eventBus.emit.mock.calls
             .filter((call) => call[0] === Events.Save.StatusChanged)
             .map((call) => call[1]);
 
-        expect(statusEvents.length).toBeGreaterThanOrEqual(3);
-        expect(statusEvents[0].status).toBe('pending');
-        expect(statusEvents[1].status).toBe('saving');
-        expect(statusEvents[2].status).toBe('error');
+        expect(statusEvents.length).toBeGreaterThanOrEqual(2);
+        expect(statusEvents[0].status).toBe('saving');
+        expect(statusEvents[1].status).toBe('error');
 
-        expect(statusEvents[2].hasUnsavedChanges).toBe(true);
-        expect(statusEvents[2].message).toContain('network-timeout');
+        expect(statusEvents[1].hasUnsavedChanges).toBe(true);
+        expect(statusEvents[1].message).toContain('network-timeout');
+        vi.useRealTimers();
     });
 });
