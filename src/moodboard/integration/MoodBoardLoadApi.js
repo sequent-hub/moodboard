@@ -86,6 +86,14 @@ export async function loadExistingBoard(board, version = null, options = {}) {
 
         if (apiResponse?.success && payload) {
             const normalizedData = normalizeLoadedPayload(payload, boardId);
+            const loadedObjects = Array.isArray(normalizedData.objects) ? normalizedData.objects : [];
+            const imageObjects = loadedObjects.filter((obj) => obj?.type === 'image');
+            const imageObjectsWithSrc = imageObjects.filter((obj) => typeof obj?.src === 'string' && obj.src.trim().length > 0);
+            console.log('MoodBoard load image src diagnostics:', {
+                totalObjects: loadedObjects.length,
+                imageObjects: imageObjects.length,
+                imageObjectsWithSrc: imageObjectsWithSrc.length
+            });
             const loadedVersion = Number(normalizedData.version) || null;
             board.currentLoadedVersion = loadedVersion;
             board.historyCursorVersion = loadedVersion;

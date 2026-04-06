@@ -6,7 +6,7 @@ import * as PIXI from 'pixi.js';
 export class ImageObject {
     constructor(objectData = {}) {
         this.objectData = objectData;
-        let src = objectData.properties?.src || objectData.src;
+        let src = objectData.src;
         const isEmojiIcon = !!objectData.properties?.isEmojiIcon;
         // Не используем устаревшие blob: URL — они недолговечны и приводят к ERR_FILE_NOT_FOUND
         if (typeof src === 'string' && src.startsWith('blob:')) {

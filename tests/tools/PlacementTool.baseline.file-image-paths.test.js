@@ -88,8 +88,6 @@ describe('PlacementTool baseline: file/image placement paths', () => {
             payload: null
         });
         core.imageUploadService.uploadImage.mockResolvedValue({
-            id: 'img-1',
-            imageId: 'img-1',
             name: 'photo.png',
             url: '/api/v2/images/img-1/download',
             width: 1000,
@@ -110,7 +108,6 @@ describe('PlacementTool baseline: file/image placement paths', () => {
             expect.objectContaining({
                 type: 'image',
                 id: 'image',
-                imageId: 'img-1',
                 properties: expect.objectContaining({
                     src: '/api/v2/images/img-1/download',
                     name: 'photo.png',
@@ -149,8 +146,6 @@ describe('PlacementTool baseline: file/image placement paths', () => {
             payload: '{"view":"abc"}'
         });
         core.imageUploadService.uploadImage.mockResolvedValue({
-            id: 'img-2',
-            imageId: 'img-2',
             name: 'revit.png',
             url: '/api/v2/images/img-2/download',
             width: 1000,
@@ -171,7 +166,6 @@ describe('PlacementTool baseline: file/image placement paths', () => {
             expect.objectContaining({
                 type: 'revit-screenshot-img',
                 id: 'revit-screenshot-img',
-                imageId: 'img-2',
                 properties: expect.objectContaining({
                     src: '/api/v2/images/img-2/download',
                     view: '{"view":"abc"}'

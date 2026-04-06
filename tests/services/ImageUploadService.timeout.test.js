@@ -64,13 +64,12 @@ describe('ImageUploadService - таймауты и ошибки загрузки
         expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('корректно принимает успешный ответ с imageId', async () => {
+    it('корректно принимает успешный ответ с src', async () => {
         global.fetch.mockResolvedValue({
             ok: true,
             json: vi.fn().mockResolvedValue({
                 success: true,
                 data: {
-                    imageId: 'img-1',
                     url: '/api/v2/images/img-1/download',
                     width: 910,
                     height: 617,
@@ -84,8 +83,6 @@ describe('ImageUploadService - таймауты и ошибки загрузки
         const result = await service.uploadImage(file, 'special.png');
 
         expect(result).toEqual({
-            id: 'img-1',
-            imageId: 'img-1',
             url: '/api/v2/images/img-1/download',
             width: 910,
             height: 617,
@@ -100,7 +97,6 @@ describe('ImageUploadService - таймауты и ошибки загрузки
             json: vi.fn().mockResolvedValue({
                 success: true,
                 data: {
-                    imageId: 'img-abs-1',
                     url: 'https://dev.futurello.futurebim.ru/api/v2/images/img-abs-1/download',
                     width: 910,
                     height: 617,
@@ -113,7 +109,6 @@ describe('ImageUploadService - таймауты и ошибки загрузки
         const file = new Blob(['png-data'], { type: 'image/png' });
         const result = await service.uploadImage(file, 'abs.png');
 
-        expect(result.imageId).toBe('img-abs-1');
         expect(result.url).toBe('https://dev.futurello.futurebim.ru/api/v2/images/img-abs-1/download');
     });
 
@@ -123,7 +118,6 @@ describe('ImageUploadService - таймауты и ошибки загрузки
             json: vi.fn().mockResolvedValue({
                 success: true,
                 data: {
-                    imageId: 'img-legacy-1',
                     url: '/api/images/img-legacy-1/file',
                     width: 910,
                     height: 617,
@@ -137,13 +131,12 @@ describe('ImageUploadService - таймауты и ошибки загрузки
         await expect(service.uploadImage(file, 'legacy.png')).rejects.toThrow('Некорректный URL изображения');
     });
 
-    it('падает если imageId не совпадает с id в URL', async () => {
+    it('принимает src без проверки соответствия imageId в payload', async () => {
         global.fetch.mockResolvedValue({
             ok: true,
             json: vi.fn().mockResolvedValue({
                 success: true,
                 data: {
-                    imageId: 'img-1',
                     url: '/api/v2/images/img-2/download',
                     width: 910,
                     height: 617,
@@ -154,6 +147,12 @@ describe('ImageUploadService - таймауты и ошибки загрузки
         });
 
         const file = new Blob(['png-data'], { type: 'image/png' });
-        await expect(service.uploadImage(file, 'mismatch.png')).rejects.toThrow('imageId не совпадает');
+        await expect(service.uploadImage(file, 'mismatch.png')).resolves.toEqual({
+            url: '/api/v2/images/img-2/download',
+            width: 910,
+            height: 617,
+            name: 'mismatch.png',
+            size: 470515,
+        });
     });
 });

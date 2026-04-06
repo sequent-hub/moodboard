@@ -1,7 +1,6 @@
 import { Events } from '../events/Events.js';
 import { PasteObjectCommand } from '../commands/index.js';
 import { RevitScreenshotMetadataService } from '../../services/RevitScreenshotMetadataService.js';
-import { isV2ImageDownloadUrl } from '../../services/AssetUrlPolicy.js';
 
 export function setupClipboardFlow(core) {
     const revitMetadataService = new RevitScreenshotMetadataService(console);
@@ -20,14 +19,10 @@ export function setupClipboardFlow(core) {
         };
     };
 
-    const ensureServerImage = async ({ src, name, imageId }) => {
-        if (imageId) {
-            const serverUrl = typeof src === 'string' ? src.trim() : '';
-            if (!isV2ImageDownloadUrl(serverUrl)) {
-                alert('Некорректный адрес изображения. Изображение не добавлено.');
-                return null;
-            }
-            return { src: serverUrl, name, imageId };
+    const ensureServerImage = async ({ src, name }) => {
+        const srcValue = typeof src === 'string' ? src.trim() : '';
+        if (srcValue && !/^data:image\//i.test(srcValue) && !/^blob:/i.test(srcValue)) {
+            return { src: srcValue, name };
         }
         if (!core.imageUploadService) {
             alert('Сервис загрузки изображений недоступен. Изображение не добавлено.');
@@ -46,13 +41,12 @@ export function setupClipboardFlow(core) {
                 uploadResult = await core.imageUploadService.uploadImage(blob, name || 'clipboard-image');
             }
             const serverUrl = typeof uploadResult.url === 'string' ? uploadResult.url.trim() : '';
-            if (!isV2ImageDownloadUrl(serverUrl)) {
+            if (!serverUrl || /^data:/i.test(serverUrl) || /^blob:/i.test(serverUrl)) {
                 throw new Error('Сервер вернул некорректный URL изображения');
             }
             return {
                 src: serverUrl,
-                name: uploadResult.name || name,
-                imageId: uploadResult.imageId || uploadResult.id
+                name: uploadResult.name || name
             };
         } catch (error) {
             console.error('Ошибка загрузки вставленного изображения на сервер:', error);
@@ -228,10 +222,10 @@ export function setupClipboardFlow(core) {
         core._cursor.y = y;
     });
 
-    core.eventBus.on(Events.UI.PasteImage, async ({ src, name, imageId }) => {
+    core.eventBus.on(Events.UI.PasteImage, async ({ src, name }) => {
         if (!src) return;
-        const uploaded = await ensureServerImage({ src, name, imageId });
-        if (!uploaded?.imageId) return;
+        const uploaded = await ensureServerImage({ src, name });
+        if (!uploaded?.src) return;
         const view = core.pixi.app.view;
         const world = core.pixi.worldLayer || core.pixi.app.stage;
         const s = world?.scale?.x || 1;
@@ -269,12 +263,10 @@ export function setupClipboardFlow(core) {
                 height: h,
                 ...revitPayload.properties
             };
-            const extraData = uploaded.imageId ? { imageId: uploaded.imageId } : {};
             core.createObject(
                 revitPayload.type,
                 { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) },
-                properties,
-                extraData
+                properties
             );
         };
 
@@ -291,10 +283,10 @@ export function setupClipboardFlow(core) {
         }
     });
 
-    core.eventBus.on(Events.UI.PasteImageAt, async ({ x, y, src, name, imageId }) => {
+    core.eventBus.on(Events.UI.PasteImageAt, async ({ x, y, src, name }) => {
         if (!src) return;
-        const uploaded = await ensureServerImage({ src, name, imageId });
-        if (!uploaded?.imageId) return;
+        const uploaded = await ensureServerImage({ src, name });
+        if (!uploaded?.src) return;
         const world = core.pixi.worldLayer || core.pixi.app.stage;
         const s = world?.scale?.x || 1;
         const worldX = (x - (world?.x || 0)) / s;
@@ -319,12 +311,10 @@ export function setupClipboardFlow(core) {
                 height: h,
                 ...revitPayload.properties
             };
-            const extraData = uploaded.imageId ? { imageId: uploaded.imageId } : {};
             core.createObject(
                 revitPayload.type,
                 { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) },
-                properties,
-                extraData
+                properties
             );
         };
 

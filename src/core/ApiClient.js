@@ -1,5 +1,3 @@
-import { isV2ImageDownloadUrl } from '../services/AssetUrlPolicy.js';
-
 // src/core/ApiClient.js
 export class ApiClient {
     constructor(baseUrl, authToken = null) {
@@ -66,6 +64,14 @@ export class ApiClient {
 
             // Фильтруем объекты изображений и файлов - убираем избыточные данные
             const cleanedData = this._cleanObjectData(payloadBoardData);
+            const objects = Array.isArray(cleanedData?.objects) ? cleanedData.objects : [];
+            const imageObjects = objects.filter((obj) => obj?.type === 'image');
+            const imageObjectsWithSrc = imageObjects.filter((obj) => typeof obj?.src === 'string' && obj.src.trim().length > 0);
+            console.log('history/save payload stats:', {
+                totalObjects: objects.length,
+                imageObjects: imageObjects.length,
+                imageObjectsWithSrc: imageObjectsWithSrc.length
+            });
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
@@ -146,39 +152,31 @@ export class ApiClient {
 
         const cleanedObjects = boardData.objects.map(obj => {
             if (obj.type === 'image') {
-                const imageId = typeof obj.imageId === 'string' ? obj.imageId.trim() : '';
-                const topSrc = typeof obj.src === 'string' ? obj.src : '';
-                const propSrc = typeof obj.properties?.src === 'string' ? obj.properties.src : '';
-                const hasForbiddenInlineSrc = /^data:/i.test(topSrc)
-                    || /^blob:/i.test(topSrc)
-                    || /^data:/i.test(propSrc)
-                    || /^blob:/i.test(propSrc);
+                const topSrcRaw = typeof obj.src === 'string' ? obj.src : '';
+                const propSrcRaw = typeof obj.properties?.src === 'string' ? obj.properties.src : '';
+                const normalizedSrc = topSrcRaw.trim() || propSrcRaw.trim();
 
-                // Жесткий контракт v2: сохраняем image только через server imageId.
-                if (!imageId) {
-                    throw new Error(`Image object "${obj.id || 'unknown'}" has no imageId. Save is blocked.`);
+                if (!normalizedSrc) {
+                    throw new Error(`Image object "${obj.id || 'unknown'}" has no src. Save is blocked.`);
                 }
-                if (hasForbiddenInlineSrc) {
+                if (/^data:/i.test(normalizedSrc) || /^blob:/i.test(normalizedSrc)) {
                     throw new Error(`Image object "${obj.id || 'unknown'}" contains forbidden data/blob src. Save is blocked.`);
                 }
-                if (topSrc && !isV2ImageDownloadUrl(topSrc)) {
-                    throw new Error(`Image object "${obj.id || 'unknown'}" has non-v2 src URL. Save is blocked.`);
-                }
-                if (propSrc && !isV2ImageDownloadUrl(propSrc)) {
-                    throw new Error(`Image object "${obj.id || 'unknown'}" has non-v2 properties.src URL. Save is blocked.`);
+                if (/^\/api\/images\//i.test(normalizedSrc)) {
+                    throw new Error(`Image object "${obj.id || 'unknown'}" has legacy src URL. Save is blocked.`);
                 }
 
-                const cleanedObj = { ...obj };
-
-                // imageId валиден — src можно безопасно убрать из history payload.
-                if (cleanedObj.src) {
-                    delete cleanedObj.src;
-                }
+                const cleanedObj = {
+                    ...obj,
+                    src: normalizedSrc
+                };
                 if (cleanedObj.properties?.src) {
                     cleanedObj.properties = { ...cleanedObj.properties };
                     delete cleanedObj.properties.src;
                 }
-
+                if ('imageId' in cleanedObj) {
+                    delete cleanedObj.imageId;
+                }
                 return cleanedObj;
             }
             
@@ -216,7 +214,7 @@ export class ApiClient {
     }
 
     /**
-     * Восстанавливает URL изображений и файлов при загрузке
+     * Нормализует URL ресурсов при загрузке
      */
     async restoreObjectUrls(boardData) {
         if (!boardData || !boardData.objects) {
@@ -226,25 +224,22 @@ export class ApiClient {
         const restoredObjects = await Promise.all(
             boardData.objects.map(async (obj) => {
                 if (obj.type === 'image') {
-                    if (obj.imageId && (!obj.src && !obj.properties?.src)) {
-                        try {
-                            // Формируем URL изображения
-                            const imageUrl = `/api/v2/images/${obj.imageId}/download`;
-                            
-                            return {
-                                ...obj,
-                                src: imageUrl,
-                                properties: {
-                                    ...obj.properties,
-                                    src: imageUrl
-                                }
-                            };
-                        } catch (error) {
-                            console.warn(`Не удалось восстановить URL для изображения ${obj.imageId}:`, error);
-                            return obj;
-                        }
+                    const topSrc = typeof obj.src === 'string' ? obj.src.trim() : '';
+                    const propSrc = typeof obj.properties?.src === 'string' ? obj.properties.src.trim() : '';
+                    const normalizedSrc = topSrc || propSrc;
+                    if (!normalizedSrc) return obj;
+                    const restoredObj = {
+                        ...obj,
+                        src: normalizedSrc
+                    };
+                    if (restoredObj.properties?.src) {
+                        restoredObj.properties = { ...restoredObj.properties };
+                        delete restoredObj.properties.src;
                     }
-                    return obj;
+                    if ('imageId' in restoredObj) {
+                        delete restoredObj.imageId;
+                    }
+                    return restoredObj;
                 }
                 
                 if (obj.type === 'file') {

@@ -39,8 +39,7 @@ describe('ToolManager - drag and drop image upload', () => {
     it('при успешном uploadImage эмитит PasteImageAt с server URL', async () => {
         core.imageUploadService.uploadImage.mockResolvedValue({
             url: '/api/v2/images/img-1/download',
-            name: 'special.png',
-            imageId: 'img-1',
+            name: 'special.png'
         });
 
         const file = new Blob(['png'], { type: 'image/png' });
@@ -61,8 +60,7 @@ describe('ToolManager - drag and drop image upload', () => {
             x: 100,
             y: 200,
             src: '/api/v2/images/img-1/download',
-            name: 'special.png',
-            imageId: 'img-1',
+            name: 'special.png'
         });
     });
 
@@ -137,8 +135,7 @@ describe('ToolManager - drag and drop image upload', () => {
         container.getBoundingClientRect = vi.fn(() => ({ left: 120, top: 80 }));
         core.imageUploadService.uploadImage.mockResolvedValue({
             url: '/api/v2/images/img-2/download',
-            name: 'offset.png',
-            imageId: 'img-2',
+            name: 'offset.png'
         });
 
         const file = new Blob(['png'], { type: 'image/png' });
@@ -159,8 +156,7 @@ describe('ToolManager - drag and drop image upload', () => {
             x: 100,
             y: 150,
             src: '/api/v2/images/img-2/download',
-            name: 'offset.png',
-            imageId: 'img-2',
+            name: 'offset.png'
         });
     });
 
@@ -317,15 +313,13 @@ describe('ToolManager - drag and drop image upload', () => {
 
         resolveSecond({
             url: '/api/v2/images/img-2/download',
-            name: 'second.png',
-            imageId: 'img-2',
+            name: 'second.png'
         });
         await secondDrop;
 
         resolveFirst({
             url: '/api/v2/images/img-1/download',
-            name: 'first.png',
-            imageId: 'img-1',
+            name: 'first.png'
         });
         await firstDrop;
 
@@ -338,8 +332,7 @@ describe('ToolManager - drag and drop image upload', () => {
             x: 200,
             y: 220,
             src: '/api/v2/images/img-2/download',
-            name: 'second.png',
-            imageId: 'img-2',
+            name: 'second.png'
         });
     });
 

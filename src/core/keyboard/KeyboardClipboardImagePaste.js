@@ -12,8 +12,7 @@ export class KeyboardClipboardImagePaste {
                 const uploadResult = await this.core.imageUploadService.uploadFromDataUrl(dataUrl, fileName);
                 this.eventBus.emit(Events.UI.PasteImage, {
                     src: uploadResult.url,
-                    name: uploadResult.name,
-                    imageId: uploadResult.imageId || uploadResult.id
+                    name: uploadResult.name
                 });
             } else {
                 alert('Сервис загрузки изображений недоступен. Изображение не добавлено.');
@@ -30,8 +29,7 @@ export class KeyboardClipboardImagePaste {
                 const uploadResult = await this.core.imageUploadService.uploadImage(file, fileName);
                 this.eventBus.emit(Events.UI.PasteImage, {
                     src: uploadResult.url,
-                    name: uploadResult.name,
-                    imageId: uploadResult.imageId || uploadResult.id
+                    name: uploadResult.name
                 });
             } else {
                 alert('Сервис загрузки изображений недоступен. Изображение не добавлено.');

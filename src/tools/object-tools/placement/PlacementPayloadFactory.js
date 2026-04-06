@@ -58,8 +58,7 @@ export class PlacementPayloadFactory {
                 width,
                 height,
                 ...extraProperties
-            },
-            imageId: uploadResult.imageId || uploadResult.id
+            }
         });
     }
 

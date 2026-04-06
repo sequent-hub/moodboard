@@ -1,5 +1,3 @@
-import { isV2ImageDownloadUrl } from './AssetUrlPolicy.js';
-
 /**
  * Сервис для загрузки и управления изображениями на сервере
  */
@@ -7,7 +5,6 @@ export class ImageUploadService {
     constructor(apiClient, options = {}) {
         this.apiClient = apiClient;
         this.uploadEndpoint = '/api/v2/images/upload';
-        this.deleteEndpoint = '/api/v2/images';
         this.options = {
             csrfToken: null, // Можно передать токен напрямую
             csrfTokenSelector: 'meta[name="csrf-token"]', // Селектор для поиска токена в DOM
@@ -51,7 +48,7 @@ export class ImageUploadService {
      * Загружает изображение на сервер
      * @param {File|Blob} file - файл изображения
      * @param {string} name - имя файла
-     * @returns {Promise<{id: string, url: string, width: number, height: number}>}
+     * @returns {Promise<{url: string, width: number, height: number}>}
      */
     async uploadImage(file, name = null) {
         try {
@@ -99,21 +96,13 @@ export class ImageUploadService {
                 throw new Error(result.message || 'Ошибка загрузки изображения');
             }
 
-            const imageId = result.data.imageId || result.data.id;
             const serverUrl = typeof result.data.url === 'string' ? result.data.url.trim() : '';
-            if (!imageId) {
-                throw new Error('Сервер не вернул imageId.');
+            if (!this._isPersistedImageSrc(serverUrl)) {
+                throw new Error('Некорректный URL изображения от сервера. Ожидается непустой src без data:/blob:.');
             }
-            if (!isV2ImageDownloadUrl(serverUrl)) {
-                throw new Error('Некорректный URL изображения от сервера. Ожидается /api/v2/images/{imageId}/download');
-            }
-            if (!this._matchesImageIdInUrl(serverUrl, imageId)) {
-                throw new Error('imageId не совпадает с URL изображения от сервера.');
-            }
+            console.log('Image upload response data.url:', serverUrl);
 
             return {
-                id: imageId, // Используем imageId как основное поле, id для обратной совместимости
-                imageId, // Добавляем imageId для явного доступа
                 url: serverUrl,
                 width: result.data.width,
                 height: result.data.height,
@@ -127,146 +116,24 @@ export class ImageUploadService {
         }
     }
 
-    _matchesImageIdInUrl(url, imageId) {
-        const id = typeof imageId === 'string' ? imageId.trim() : '';
-        if (!id || typeof url !== 'string') return false;
+    _isPersistedImageSrc(url) {
+        if (typeof url !== 'string') return false;
         const raw = url.trim();
-        const relativeMatch = raw.match(/^\/api\/v2\/images\/([^/]+)\/download$/i);
-        if (relativeMatch) {
-            return decodeURIComponent(relativeMatch[1]) === id;
-        }
-        try {
-            const parsed = new URL(raw);
-            const absoluteMatch = parsed.pathname.match(/^\/api\/v2\/images\/([^/]+)\/download$/i);
-            return !!absoluteMatch && decodeURIComponent(absoluteMatch[1]) === id;
-        } catch (_) {
-            return false;
-        }
+        if (!raw) return false;
+        if (/^data:/i.test(raw) || /^blob:/i.test(raw)) return false;
+        if (/^\/api\/images\//i.test(raw)) return false;
+        return true;
     }
 
     /**
      * Загружает изображение из base64 DataURL
      * @param {string} dataUrl - base64 DataURL
      * @param {string} name - имя файла
-     * @returns {Promise<{id: string, url: string, width: number, height: number}>}
+     * @returns {Promise<{url: string, width: number, height: number}>}
      */
     async uploadFromDataUrl(dataUrl, name = 'clipboard-image.png') {
         const blob = await this._dataUrlToBlob(dataUrl);
         return this.uploadImage(blob, name);
-    }
-
-    /**
-     * Удаляет изображение с сервера
-     * @param {string} imageId - ID изображения
-     */
-    async deleteImage(imageId) {
-        try {
-            const csrfToken = this._getCsrfToken();
-            
-            const headers = {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': 'application/json'
-            };
-
-            // Добавляем CSRF токен только если он есть
-            if (csrfToken) {
-                headers['X-CSRF-TOKEN'] = csrfToken;
-            }
-
-            const response = await fetch(`${this.deleteEndpoint}/${imageId}`, {
-                method: 'DELETE',
-                headers,
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => null);
-                throw new Error(errorData?.message || `HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            return result.success;
-
-        } catch (error) {
-            console.error('Ошибка удаления изображения:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Очищает неиспользуемые изображения с сервера
-     * @returns {Promise<{deletedCount: number, errors: Array}>}
-     */
-    async cleanupUnusedImages() {
-        try {
-            const csrfToken = this._getCsrfToken();
-            
-            const headers = {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': 'application/json'
-            };
-
-            // Добавляем CSRF токен только если он есть
-            if (csrfToken) {
-                headers['X-CSRF-TOKEN'] = csrfToken;
-            }
-
-            const response = await fetch(`${this.deleteEndpoint}/cleanup`, {
-                method: 'POST',
-                headers,
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => null);
-                throw new Error(errorData?.message || `HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            
-            if (result.success) {
-                // Защитная проверка на существование result.data
-                const data = result.data || {};
-                return {
-                    deletedCount: data.deleted_count || 0,
-                    errors: data.errors || []
-                };
-            } else {
-                throw new Error(result.message || 'Ошибка очистки изображений');
-            }
-
-        } catch (error) {
-            console.error('Ошибка очистки неиспользуемых изображений:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Получает информацию об изображении
-     * @param {string} imageId - ID изображения  
-     */
-    async getImageInfo(imageId) {
-        try {
-            const response = await fetch(`${this.deleteEndpoint}/${imageId}`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            return result.data;
-
-        } catch (error) {
-            console.error('Ошибка получения информации об изображении:', error);
-            throw error;
-        }
     }
 
     /**

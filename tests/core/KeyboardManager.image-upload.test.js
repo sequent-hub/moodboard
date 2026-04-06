@@ -36,11 +36,10 @@ describe('KeyboardManager - image upload channels', () => {
         vi.restoreAllMocks();
     });
 
-    it('при успешном uploadImage эмитит PasteImage с url и imageId', async () => {
+    it('при успешном uploadImage эмитит PasteImage с url', async () => {
         core.imageUploadService.uploadImage.mockResolvedValue({
             url: '/api/v2/images/img-1/download',
-            name: 'special.png',
-            imageId: 'img-1',
+            name: 'special.png'
         });
 
         const file = new Blob(['png'], { type: 'image/png' });
@@ -48,8 +47,7 @@ describe('KeyboardManager - image upload channels', () => {
 
         expect(eventBus.emit).toHaveBeenCalledWith(Events.UI.PasteImage, {
             src: '/api/v2/images/img-1/download',
-            name: 'special.png',
-            imageId: 'img-1',
+            name: 'special.png'
         });
     });
 
@@ -66,19 +64,17 @@ describe('KeyboardManager - image upload channels', () => {
         expect(alertSpy).toHaveBeenCalledWith('Ошибка загрузки изображения на сервер. Изображение не добавлено.');
     });
 
-    it('при успешном uploadFromDataUrl эмитит PasteImage с url и imageId', async () => {
+    it('при успешном uploadFromDataUrl эмитит PasteImage с url', async () => {
         core.imageUploadService.uploadFromDataUrl.mockResolvedValue({
             url: '/api/v2/images/img-2/download',
-            name: 'clipboard.png',
-            id: 'img-2',
+            name: 'clipboard.png'
         });
 
         await manager._handleImageUpload('data:image/png;base64,BBBB', 'clipboard.png');
 
         expect(eventBus.emit).toHaveBeenCalledWith(Events.UI.PasteImage, {
             src: '/api/v2/images/img-2/download',
-            name: 'clipboard.png',
-            imageId: 'img-2',
+            name: 'clipboard.png'
         });
     });
 

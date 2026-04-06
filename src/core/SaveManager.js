@@ -3,7 +3,6 @@
  */
 import { Events } from './events/Events.js';
 import { logMindmapCompoundDebug } from '../mindmap/MindmapCompoundContract.js';
-import { isV2ImageDownloadUrl } from '../services/AssetUrlPolicy.js';
 export class SaveManager {
     constructor(eventBus, options = {}) {
         this.eventBus = eventBus;
@@ -106,7 +105,7 @@ export class SaveManager {
             }
 
             // Жесткий контракт для сохранения картинок:
-            // - каждый image обязан иметь imageId
+            // - каждый image обязан иметь src
             // - data:/blob: URL в image запрещены
             this._assertImageSaveContract(saveData);
             
@@ -236,21 +235,18 @@ export class SaveManager {
 
         for (const obj of objects) {
             if (!obj || obj.type !== 'image') continue;
-            const imageId = typeof obj.imageId === 'string' ? obj.imageId.trim() : '';
             const topSrc = typeof obj.src === 'string' ? obj.src : '';
             const propSrc = typeof obj.properties?.src === 'string' ? obj.properties.src : '';
+            const effectiveSrc = topSrc.trim() || propSrc.trim();
 
-            if (!imageId) {
-                throw new Error(`Image object "${obj.id || 'unknown'}" has no imageId. Save is blocked.`);
+            if (!effectiveSrc) {
+                throw new Error(`Image object "${obj.id || 'unknown'}" has no src. Save is blocked.`);
             }
             if (/^data:/i.test(topSrc) || /^blob:/i.test(topSrc) || /^data:/i.test(propSrc) || /^blob:/i.test(propSrc)) {
                 throw new Error(`Image object "${obj.id || 'unknown'}" contains forbidden data/blob src. Save is blocked.`);
             }
-            if (topSrc && !isV2ImageDownloadUrl(topSrc)) {
-                throw new Error(`Image object "${obj.id || 'unknown'}" has non-v2 src URL. Save is blocked.`);
-            }
-            if (propSrc && !isV2ImageDownloadUrl(propSrc)) {
-                throw new Error(`Image object "${obj.id || 'unknown'}" has non-v2 properties.src URL. Save is blocked.`);
+            if (/^\/api\/images\//i.test(effectiveSrc)) {
+                throw new Error(`Image object "${obj.id || 'unknown'}" has legacy src URL. Save is blocked.`);
             }
         }
     }

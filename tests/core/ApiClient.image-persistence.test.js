@@ -22,14 +22,13 @@ describe('ApiClient - image persistence safety', () => {
         vi.restoreAllMocks();
     });
 
-    it('cleanObjectData удаляет src только если есть imageId', () => {
+    it('cleanObjectData сохраняет src на верхнем уровне и убирает properties.src', () => {
         const boardData = {
             id: 'board-1',
             objects: [
                 {
                     id: 'img-1',
                     type: 'image',
-                    imageId: 'img-remote-1',
                     src: '/api/v2/images/img-remote-1/download',
                     properties: {
                         src: '/api/v2/images/img-remote-1/download',
@@ -43,22 +42,19 @@ describe('ApiClient - image persistence safety', () => {
         const cleaned = client._cleanObjectData(boardData);
         const image = cleaned.objects[0];
 
-        expect(image.imageId).toBe('img-remote-1');
-        expect(image.src).toBeUndefined();
+        expect(image.src).toBe('/api/v2/images/img-remote-1/download');
         expect(image.properties.src).toBeUndefined();
         expect(image.properties.width).toBe(300);
     });
 
-    it('cleanObjectData блокирует image без imageId', () => {
+    it('cleanObjectData блокирует image без src', () => {
         const boardData = {
             id: 'board-1',
             objects: [
                 {
                     id: 'img-local-1',
                     type: 'image',
-                    src: 'data:image/png;base64,AAAA',
                     properties: {
-                        src: 'data:image/png;base64,AAAA',
                         width: 200,
                         height: 100,
                     },
@@ -66,17 +62,16 @@ describe('ApiClient - image persistence safety', () => {
             ],
         };
 
-        expect(() => client._cleanObjectData(boardData)).toThrow('has no imageId');
+        expect(() => client._cleanObjectData(boardData)).toThrow('has no src');
     });
 
-    it('cleanObjectData блокирует image с blob/data src даже при наличии imageId', () => {
+    it('cleanObjectData блокирует image с blob/data src', () => {
         const boardData = {
             id: 'board-1',
             objects: [
                 {
                     id: 'img-blob-1',
                     type: 'image',
-                    imageId: 'img-blob-id',
                     src: 'blob://temporary-image',
                     properties: {
                         src: 'blob://temporary-image',
@@ -97,7 +92,6 @@ describe('ApiClient - image persistence safety', () => {
                 {
                     id: 'img-legacy-1',
                     type: 'image',
-                    imageId: 'img-legacy-1',
                     src: '/api/images/img-legacy-1/file',
                     properties: {
                         src: '/api/images/img-legacy-1/file',
@@ -108,10 +102,10 @@ describe('ApiClient - image persistence safety', () => {
             ],
         };
 
-        expect(() => client._cleanObjectData(boardData)).toThrow('non-v2');
+        expect(() => client._cleanObjectData(boardData)).toThrow('legacy src URL');
     });
 
-    it('saveBoard отправляет imageId в payload и не теряет image объект', async () => {
+    it('saveBoard отправляет src в payload и не теряет image объект', async () => {
         global.fetch.mockResolvedValue({
             ok: true,
             json: vi.fn().mockResolvedValue({ success: true }),
@@ -123,7 +117,6 @@ describe('ApiClient - image persistence safety', () => {
                 {
                     id: 'img-1',
                     type: 'image',
-                    imageId: 'img-remote-1',
                     src: '/api/v2/images/img-remote-1/download',
                     properties: {
                         src: '/api/v2/images/img-remote-1/download',
@@ -151,12 +144,11 @@ describe('ApiClient - image persistence safety', () => {
 
         expect(savedImage).toBeDefined();
         expect(savedImage.type).toBe('image');
-        expect(savedImage.imageId).toBe('img-remote-1');
-        expect(savedImage.src).toBeUndefined();
+        expect(savedImage.src).toBe('/api/v2/images/img-remote-1/download');
         expect(savedImage.properties.src).toBeUndefined();
     });
 
-    it('saveBoard блокирует отправку, если image без imageId', async () => {
+    it('saveBoard блокирует отправку, если image содержит data/blob src', async () => {
         const board = {
             id: 'board-1',
             objects: [
@@ -172,18 +164,17 @@ describe('ApiClient - image persistence safety', () => {
             ],
         };
 
-        await expect(client.saveBoard('board-1', board)).rejects.toThrow('has no imageId');
+        await expect(client.saveBoard('board-1', board)).rejects.toThrow('forbidden data/blob src');
         expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('restoreObjectUrls восстанавливает src из imageId после загрузки', async () => {
+    it('restoreObjectUrls нормализует src из properties.src', async () => {
         const boardData = {
             objects: [
                 {
                     id: 'img-1',
                     type: 'image',
-                    imageId: 'img-remote-1',
-                    properties: { width: 300, height: 200 },
+                    properties: { width: 300, height: 200, src: '/cdn/yandex/img-1.png' },
                 },
             ],
         };
@@ -191,18 +182,16 @@ describe('ApiClient - image persistence safety', () => {
         const restored = await client.restoreObjectUrls(boardData);
         const image = restored.objects[0];
 
-        expect(image.src).toBe('/api/v2/images/img-remote-1/download');
-        expect(image.properties.src).toBe('/api/v2/images/img-remote-1/download');
-        expect(image.imageId).toBe('img-remote-1');
+        expect(image.src).toBe('/cdn/yandex/img-1.png');
+        expect(image.properties.src).toBeUndefined();
     });
 
-    it('restoreObjectUrls не перезаписывает существующий src', async () => {
+    it('restoreObjectUrls сохраняет текущий src и удаляет properties.src', async () => {
         const boardData = {
             objects: [
                 {
                     id: 'img-1',
                     type: 'image',
-                    imageId: 'img-remote-1',
                     src: 'data:image/png;base64,AAAA',
                     properties: { src: 'data:image/png;base64,AAAA' },
                 },
@@ -213,6 +202,6 @@ describe('ApiClient - image persistence safety', () => {
         const image = restored.objects[0];
 
         expect(image.src).toBe('data:image/png;base64,AAAA');
-        expect(image.properties.src).toBe('data:image/png;base64,AAAA');
+        expect(image.properties.src).toBeUndefined();
     });
 });

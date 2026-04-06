@@ -273,7 +273,7 @@ export class ToolEventRouter {
             return { dx: direction.x * step * ring, dy: direction.y * step * ring };
         };
 
-        const emitAt = (src, name, imageId = null, offsetIndex = 0) => {
+        const emitAt = (src, name, offsetIndex = 0) => {
             if (!isCurrentDrop()) {
                 logDropDebug(diagnostics, 'emit_skipped_stale_drop', { route: 'image', offsetIndex });
                 return;
@@ -283,8 +283,7 @@ export class ToolEventRouter {
                 x: x + offset,
                 y: y + offset,
                 src,
-                name,
-                imageId
+                name
             });
         };
 
@@ -329,13 +328,11 @@ export class ToolEventRouter {
                             return null;
                         }
                         logDropDebug(diagnostics, 'image_upload_success', {
-                            fileName: uploadResult?.name || file.name || 'image',
-                            imageId: uploadResult?.imageId || uploadResult?.id || null
+                            fileName: uploadResult?.name || file.name || 'image'
                         });
                         return {
                             src: uploadResult.url,
                             name: uploadResult.name,
-                            imageId: uploadResult.imageId || uploadResult.id || null,
                             index
                         };
                     } else {
@@ -367,7 +364,7 @@ export class ToolEventRouter {
             });
             for (const placement of imagePlacements) {
                 if (!placement) continue;
-                emitAt(placement.src, placement.name, placement.imageId, placement.index);
+                emitAt(placement.src, placement.name, placement.index);
             }
             logDropDebug(diagnostics, 'drop_done', { route: 'image_files', itemsProcessed: imageFiles.length });
             return;

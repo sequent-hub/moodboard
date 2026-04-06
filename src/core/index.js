@@ -416,8 +416,15 @@ export class CoreMoodBoard {
             transform: {
                 pivotCompensated: false  // Новые объекты еще не скомпенсированы
             },
-            ...extraData  // Добавляем дополнительные данные (например, imageId)
+            ...extraData
         };
+        if ((type === 'image' || type === 'revit-screenshot-img') && typeof properties?.src === 'string') {
+            objectData.src = properties.src;
+            if (objectData.properties && objectData.properties.src) {
+                objectData.properties = { ...objectData.properties };
+                delete objectData.properties.src;
+            }
+        }
         objectData.properties = normalizeMindmapPropertiesForCreate({
             type,
             objectId: objectData.id,
@@ -517,6 +524,21 @@ export class CoreMoodBoard {
             properties: objectData.properties || {},
             existingObjects: this.state?.state?.objects || [],
         });
+        if (objectData.type === 'image' || objectData.type === 'revit-screenshot-img') {
+            const topSrc = typeof objectData.src === 'string' ? objectData.src.trim() : '';
+            const propSrc = typeof objectData.properties?.src === 'string' ? objectData.properties.src.trim() : '';
+            const normalizedSrc = topSrc || propSrc;
+            if (normalizedSrc) {
+                objectData.src = normalizedSrc;
+            }
+            if (objectData.properties?.src) {
+                objectData.properties = { ...objectData.properties };
+                delete objectData.properties.src;
+            }
+            if ('imageId' in objectData) {
+                delete objectData.imageId;
+            }
+        }
         if (objectData.type === 'mindmap') {
             logMindmapCompoundDebug('core:load-object', {
                 id: objectData.id,
@@ -626,45 +648,6 @@ export class CoreMoodBoard {
      */
     getObjectData(objectId) {
         return this.state.getObjects().find(o => o.id === objectId);
-    }
-
-    /**
-     * Очищает неиспользуемые изображения с сервера
-     * @returns {Promise<{deletedCount: number, errors: Array}>}
-     */
-    async cleanupUnusedImages() {
-        try {
-            if (!this.imageUploadService) {
-                console.warn('ImageUploadService недоступен для очистки изображений');
-                return { deletedCount: 0, errors: ['ImageUploadService недоступен'] };
-            }
-
-            const result = await this.imageUploadService.cleanupUnusedImages();
-            
-            // Проверяем результат на корректность
-            if (!result || typeof result !== 'object') {
-                console.warn('Некорректный ответ от ImageUploadService:', result);
-                return { deletedCount: 0, errors: ['Некорректный ответ сервера'] };
-            }
-
-            const deletedCount = Number(result.deletedCount) || 0;
-            const errors = Array.isArray(result.errors) ? result.errors : [];
-
-            if (deletedCount > 0) {
-                console.log(`Очищено ${deletedCount} неиспользуемых изображений`);
-            }
-            if (errors.length > 0) {
-                console.warn('Ошибки при очистке изображений:', errors);
-            }
-
-            return { deletedCount, errors };
-        } catch (error) {
-            console.error('Ошибка при автоматической очистке изображений:', error);
-            return { 
-                deletedCount: 0, 
-                errors: [error?.message || 'Неизвестная ошибка'] 
-            };
-        }
     }
 
     destroy() {
