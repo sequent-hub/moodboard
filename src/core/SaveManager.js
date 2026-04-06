@@ -104,9 +104,9 @@ export class SaveManager {
                 });
             }
 
-            // Жесткий контракт для сохранения картинок:
-            // - каждый image обязан иметь src
+            // Контракт сохранения картинок:
             // - data:/blob: URL в image запрещены
+            // - image без src допускаются (legacy broken state), но логируются
             this._assertImageSaveContract(saveData);
             
             // Проверяем, изменились ли данные с последнего сохранения
@@ -240,7 +240,8 @@ export class SaveManager {
             const effectiveSrc = topSrc.trim() || propSrc.trim();
 
             if (!effectiveSrc) {
-                throw new Error(`Image object "${obj.id || 'unknown'}" has no src. Save is blocked.`);
+                console.warn(`Image object "${obj.id || 'unknown'}" has no src. Saving continues for legacy compatibility.`);
+                continue;
             }
             if (/^data:/i.test(topSrc) || /^blob:/i.test(topSrc) || /^data:/i.test(propSrc) || /^blob:/i.test(propSrc)) {
                 throw new Error(`Image object "${obj.id || 'unknown'}" contains forbidden data/blob src. Save is blocked.`);

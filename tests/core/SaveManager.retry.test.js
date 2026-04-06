@@ -122,7 +122,28 @@ describe('SaveManager - retry/backoff', () => {
         expect(status.hasUnsavedChanges).toBe(true);
     });
 
-    it('блокирует сохранение image без src до обращения к apiClient', async () => {
+    it('не блокирует сохранение image без src и передает данные в apiClient', async () => {
+        eventBus.on(Events.Save.GetBoardData, (request) => {
+            request.data = {
+                id: 'board-1',
+                objects: [
+                    { id: 'img-broken-old', type: 'image', properties: { width: 100, height: 80 } },
+                    { id: 'img-valid-new', type: 'image', src: '/api/v2/images/img-valid-new/download', properties: { width: 100, height: 80 } },
+                ],
+            };
+        });
+        apiClient.saveBoard.mockResolvedValue({ success: true, data: { ok: true } });
+
+        manager.hasUnsavedChanges = true;
+        await manager.saveImmediately();
+
+        expect(apiClient.saveBoard).toHaveBeenCalledTimes(1);
+        const status = manager.getStatus();
+        expect(status.saveStatus).toBe('saved');
+        expect(status.hasUnsavedChanges).toBe(false);
+    });
+
+    it('блокирует сохранение image с data/blob src до обращения к apiClient', async () => {
         eventBus.on(Events.Save.GetBoardData, (request) => {
             request.data = {
                 id: 'board-1',

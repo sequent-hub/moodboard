@@ -67,11 +67,17 @@ export class ApiClient {
             const objects = Array.isArray(cleanedData?.objects) ? cleanedData.objects : [];
             const imageObjects = objects.filter((obj) => obj?.type === 'image');
             const imageObjectsWithSrc = imageObjects.filter((obj) => typeof obj?.src === 'string' && obj.src.trim().length > 0);
+            const imageObjectsWithoutSrc = imageObjects
+                .filter((obj) => !(typeof obj?.src === 'string' && obj.src.trim().length > 0))
+                .map((obj) => obj?.id || 'unknown');
             console.log('history/save payload stats:', {
                 totalObjects: objects.length,
                 imageObjects: imageObjects.length,
                 imageObjectsWithSrc: imageObjectsWithSrc.length
             });
+            if (imageObjectsWithoutSrc.length > 0) {
+                console.warn('history/save warning: image objects without src (kept as broken placeholders):', imageObjectsWithoutSrc);
+            }
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
@@ -157,7 +163,7 @@ export class ApiClient {
                 const normalizedSrc = topSrcRaw.trim() || propSrcRaw.trim();
 
                 if (!normalizedSrc) {
-                    throw new Error(`Image object "${obj.id || 'unknown'}" has no src. Save is blocked.`);
+                    return obj;
                 }
                 if (/^data:/i.test(normalizedSrc) || /^blob:/i.test(normalizedSrc)) {
                     throw new Error(`Image object "${obj.id || 'unknown'}" contains forbidden data/blob src. Save is blocked.`);

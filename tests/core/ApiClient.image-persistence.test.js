@@ -47,7 +47,7 @@ describe('ApiClient - image persistence safety', () => {
         expect(image.properties.width).toBe(300);
     });
 
-    it('cleanObjectData блокирует image без src', () => {
+    it('cleanObjectData не блокирует image без src (broken placeholder)', () => {
         const boardData = {
             id: 'board-1',
             objects: [
@@ -62,7 +62,12 @@ describe('ApiClient - image persistence safety', () => {
             ],
         };
 
-        expect(() => client._cleanObjectData(boardData)).toThrow('has no src');
+        const cleaned = client._cleanObjectData(boardData);
+        const image = cleaned.objects[0];
+        expect(image).toBeDefined();
+        expect(image.id).toBe('img-local-1');
+        expect(image.type).toBe('image');
+        expect(image.src).toBeUndefined();
     });
 
     it('cleanObjectData блокирует image с blob/data src', () => {
@@ -146,6 +151,49 @@ describe('ApiClient - image persistence safety', () => {
         expect(savedImage.type).toBe('image');
         expect(savedImage.src).toBe('/api/v2/images/img-remote-1/download');
         expect(savedImage.properties.src).toBeUndefined();
+    });
+
+    it('saveBoard не отбрасывает image без src и сохраняет рядом валидные image', async () => {
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: vi.fn().mockResolvedValue({ success: true }),
+        });
+
+        const board = {
+            id: 'board-1',
+            objects: [
+                {
+                    id: 'img-broken',
+                    type: 'image',
+                    properties: {
+                        width: 300,
+                        height: 200,
+                    },
+                },
+                {
+                    id: 'img-valid',
+                    type: 'image',
+                    src: '/api/v2/images/img-valid/download',
+                    properties: {
+                        src: '/api/v2/images/img-valid/download',
+                        width: 300,
+                        height: 200,
+                    },
+                },
+            ],
+        };
+
+        await client.saveBoard('board-1', board);
+
+        const [, historyRequest] = global.fetch.mock.calls[1];
+        const historyBody = JSON.parse(historyRequest.body);
+        const broken = historyBody.state.objects.find((o) => o.id === 'img-broken');
+        const valid = historyBody.state.objects.find((o) => o.id === 'img-valid');
+
+        expect(broken).toBeDefined();
+        expect(broken.src).toBeUndefined();
+        expect(valid).toBeDefined();
+        expect(valid.src).toBe('/api/v2/images/img-valid/download');
     });
 
     it('saveBoard блокирует отправку, если image содержит data/blob src', async () => {
