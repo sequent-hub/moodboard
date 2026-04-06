@@ -535,9 +535,6 @@ export class CoreMoodBoard {
                 objectData.properties = { ...objectData.properties };
                 delete objectData.properties.src;
             }
-            if ('imageId' in objectData) {
-                delete objectData.imageId;
-            }
         }
         if (objectData.type === 'mindmap') {
             logMindmapCompoundDebug('core:load-object', {

@@ -28,7 +28,7 @@ describe('SaveManager payload contract stress diagnostics', () => {
         id: 'board-stress-1',
         boardData: {
             objects: [
-                { id: 'img-1', type: 'image', imageId: 'img-1', properties: { width: 200, height: 120 } }
+                { id: 'img-1', type: 'image', src: '/api/v2/images/img-1/download', properties: { width: 200, height: 120 } }
             ],
             name: 'stress-board'
         },

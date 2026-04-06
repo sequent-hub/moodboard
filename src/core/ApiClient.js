@@ -174,9 +174,6 @@ export class ApiClient {
                     cleanedObj.properties = { ...cleanedObj.properties };
                     delete cleanedObj.properties.src;
                 }
-                if ('imageId' in cleanedObj) {
-                    delete cleanedObj.imageId;
-                }
                 return cleanedObj;
             }
             
@@ -235,9 +232,6 @@ export class ApiClient {
                     if (restoredObj.properties?.src) {
                         restoredObj.properties = { ...restoredObj.properties };
                         delete restoredObj.properties.src;
-                    }
-                    if ('imageId' in restoredObj) {
-                        delete restoredObj.imageId;
                     }
                     return restoredObj;
                 }

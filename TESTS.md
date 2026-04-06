@@ -215,7 +215,7 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 
 ### Новый блок: сеть / загрузка изображений / сохранение
 
-- `tests/services/ImageUploadService.timeout.test.js` — 4 теста: timeout `uploadImage`, серверная ошибка, CSRF-check, success с `imageId`.
+- `tests/services/ImageUploadService.timeout.test.js` — 4 теста: timeout `uploadImage`, серверная ошибка, CSRF-check, success с `src`.
 - `tests/core/SaveManager.timeout.test.js` — 4 теста: поведение при timeout save, success-путь, отсутствие лишнего save при неизменных данных, `pending`-статус.
 - `tests/integration/ImagePersistence.network-fail.test.js` — 2 теста: «локально видно, после reopen пропало» при timeout и контрольный success-кейс.
 - `tests/core/SaveManager.retry.test.js` — 2 теста: retry/backoff и остановка после `maxRetries`.
@@ -225,7 +225,7 @@ UI-level regressions для `group resize` и `Shift`-режима (`src/ui/hand
 - `tests/ui/SaveStatus.test.js` — 5 тестов: `pending/saving/saved/error`, auto-hide, обработка `save:error`.
 - `tests/integration/SaveStatus.network-state.test.js` — 2 теста: связка `SaveManager + SaveStatus` при success/timeout.
 - `tests/core/SaveManager.unload-flush.test.js` — 4 теста: `beforeunload/pagehide/visibilitychange`, `sendBeacon`, sync XHR fallback.
-- `tests/core/ApiClient.image-persistence.test.js` — 5 тестов: очистка image-данных при save, сохранение `imageId`, восстановление `src` при load, защита от перезаписи существующего `src`.
+- `tests/core/ApiClient.image-persistence.test.js` — 5 тестов: нормализация image-данных при save, сохранение `src` при load/save, защита от перезаписи существующего `src`.
 
 ### `tests/image-object2/TextTool.e2e.spec.js` — 18 E2E-тестов *(LEGACY, не используется; файл удален)*
 

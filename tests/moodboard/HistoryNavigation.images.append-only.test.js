@@ -20,18 +20,18 @@ describe('History navigation (images, append-only)', () => {
     it('из старой версии создается новый head, старые версии с картинками остаются доступными', async () => {
         const eventBus = createEventBus();
         const snapshotsByVersion = new Map([
-            [2, { objects: [{ id: 'img-a', type: 'image', imageId: 'img-a-id' }] }],
+            [2, { objects: [{ id: 'img-a', type: 'image', src: '/api/v2/images/img-a-id/download' }] }],
             [3, {
                 objects: [
-                    { id: 'img-a', type: 'image', imageId: 'img-a-id' },
-                    { id: 'img-b', type: 'image', imageId: 'img-b-id' },
+                    { id: 'img-a', type: 'image', src: '/api/v2/images/img-a-id/download' },
+                    { id: 'img-b', type: 'image', src: '/api/v2/images/img-b-id/download' },
                 ]
             }],
             [4, {
                 objects: [
-                    { id: 'img-a', type: 'image', imageId: 'img-a-id' },
-                    { id: 'img-b', type: 'image', imageId: 'img-b-id' },
-                    { id: 'img-c', type: 'image', imageId: 'img-c-id' },
+                    { id: 'img-a', type: 'image', src: '/api/v2/images/img-a-id/download' },
+                    { id: 'img-b', type: 'image', src: '/api/v2/images/img-b-id/download' },
+                    { id: 'img-c', type: 'image', src: '/api/v2/images/img-c-id/download' },
                 ]
             }],
         ]);
@@ -66,14 +66,14 @@ describe('History navigation (images, append-only)', () => {
         await Promise.resolve();
         expect(board.historyCursorVersion).toBe(3);
         expect(board.historyHeadVersion).toBe(4);
-        expect(board.data.objects.map((o) => o.imageId)).toEqual(['img-a-id', 'img-b-id']);
+        expect(board.data.objects.map((o) => o.src)).toEqual(['/api/v2/images/img-a-id/download', '/api/v2/images/img-b-id/download']);
 
         // Шаг 2: пользователь изменил контент на базе v3, backend сохранил новую версию v5.
         snapshotsByVersion.set(5, {
             objects: [
-                { id: 'img-a', type: 'image', imageId: 'img-a-id' },
-                { id: 'img-b', type: 'image', imageId: 'img-b-id' },
-                { id: 'img-d', type: 'image', imageId: 'img-d-id' },
+                { id: 'img-a', type: 'image', src: '/api/v2/images/img-a-id/download' },
+                { id: 'img-b', type: 'image', src: '/api/v2/images/img-b-id/download' },
+                { id: 'img-d', type: 'image', src: '/api/v2/images/img-d-id/download' },
             ]
         });
         eventBus.emit(Events.Save.Success, {
@@ -83,16 +83,16 @@ describe('History navigation (images, append-only)', () => {
 
         expect(board.historyHeadVersion).toBe(5);
         expect(board.historyCursorVersion).toBe(5);
-        expect(board.data.objects.map((o) => o.imageId)).toEqual(['img-a-id', 'img-b-id', 'img-d-id']);
+        expect(board.data.objects.map((o) => o.src)).toEqual(['/api/v2/images/img-a-id/download', '/api/v2/images/img-b-id/download', '/api/v2/images/img-d-id/download']);
 
         // Шаг 3: старые версии (включая v4) по-прежнему доступны и неизменны.
         await board.loadFromApi('mb-1', 4, { historyNavigation: true });
         expect(board.historyHeadVersion).toBe(5);
         expect(board.historyCursorVersion).toBe(4);
-        expect(board.data.objects.map((o) => o.imageId)).toEqual(['img-a-id', 'img-b-id', 'img-c-id']);
+        expect(board.data.objects.map((o) => o.src)).toEqual(['/api/v2/images/img-a-id/download', '/api/v2/images/img-b-id/download', '/api/v2/images/img-c-id/download']);
 
         await board.loadFromApi('mb-1', 3, { historyNavigation: true });
-        expect(board.data.objects.map((o) => o.imageId)).toEqual(['img-a-id', 'img-b-id']);
+        expect(board.data.objects.map((o) => o.src)).toEqual(['/api/v2/images/img-a-id/download', '/api/v2/images/img-b-id/download']);
 
         expect(loadCalls.map((call) => call.version)).toContain(3);
     });

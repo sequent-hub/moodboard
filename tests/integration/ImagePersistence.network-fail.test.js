@@ -65,8 +65,8 @@ describe('Integration: image persistence при сетевых сбоях', () =
         boardState.objects.push({
             id: 'img-local',
             type: 'image',
-            imageId: null,
-            properties: { src: 'data:image/png;base64,AAAA', width: 300, height: 200 },
+            src: 'data:image/png;base64,AAAA',
+            properties: { width: 300, height: 200 },
         });
 
         manager.hasUnsavedChanges = true;
@@ -85,8 +85,8 @@ describe('Integration: image persistence при сетевых сбоях', () =
         boardState.objects.push({
             id: 'img-local',
             type: 'image',
-            imageId: 'img-remote-1',
-            properties: { src: '/api/v2/images/img-remote-1/download', width: 300, height: 200 },
+            src: '/api/v2/images/img-remote-1/download',
+            properties: { width: 300, height: 200 },
         });
 
         manager.hasUnsavedChanges = true;

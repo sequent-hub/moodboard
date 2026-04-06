@@ -115,7 +115,7 @@
 | Добавление | PlacementTool + Place.Set (type: note/text) | Основная кнопка: file chooser → Place.ImageSelected; paste/drop → PasteImage/PasteImageAt |
 | Призрак | showNoteGhost / showTextGhost (Place.Set) | showImageGhost (Place.ImageSelected), showImageUrlGhost (Place.Set type: image) |
 | Панель свойств | NotePropertiesPanel, TextPropertiesPanel | Нет отдельной панели (или общая для image — уточнить) |
-| Хранение | properties.content, properties.fontSize и т.д. | properties.src, width, height, imageId |
+| Хранение | properties.content, properties.fontSize и т.д. | src, width, height |
 | Кнопка тулбара | note, text-add | `.moodboard-toolbar__button--image` (image-add) |
 
 ---

@@ -131,7 +131,7 @@ describe('ImageUploadService - таймауты и ошибки загрузки
         await expect(service.uploadImage(file, 'legacy.png')).rejects.toThrow('Некорректный URL изображения');
     });
 
-    it('принимает src без проверки соответствия imageId в payload', async () => {
+    it('принимает src без дополнительных проверок payload', async () => {
         global.fetch.mockResolvedValue({
             ok: true,
             json: vi.fn().mockResolvedValue({

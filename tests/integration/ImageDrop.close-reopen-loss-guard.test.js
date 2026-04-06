@@ -72,8 +72,6 @@ describe('Integration: image drop -> close/reopen guard', () => {
             eventBus,
             imageUploadService: {
                 uploadImage: vi.fn().mockResolvedValue({
-                    imageId: 'img-remote-1',
-                    id: 'img-remote-1',
                     url: '/api/v2/images/img-remote-1/download',
                     name: 'dropped.png',
                 }),
@@ -91,7 +89,7 @@ describe('Integration: image drop -> close/reopen guard', () => {
                     id: `img-${localBoardState.objects.length + 1}`,
                     type,
                     position,
-                    imageId: extraData.imageId || null,
+                    src: properties?.src || null,
                     properties: { ...properties },
                 };
                 localBoardState.objects.push(obj);
@@ -151,7 +149,7 @@ describe('Integration: image drop -> close/reopen guard', () => {
         expect(localBoardState.objects[0]).toEqual(
             expect.objectContaining({
                 type: 'image',
-                imageId: 'img-remote-1',
+                src: '/api/v2/images/img-remote-1/download',
                 properties: expect.objectContaining({
                     src: '/api/v2/images/img-remote-1/download',
                 }),

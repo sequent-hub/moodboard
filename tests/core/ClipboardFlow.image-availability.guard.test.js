@@ -78,7 +78,6 @@ describe('ClipboardFlow image availability guard (diagnostic)', () => {
         eventBus.emit(Events.UI.PasteImage, {
             src: '/api/v2/images/img-404/download',
             name: 'broken.png',
-            imageId: 'img-404',
         });
 
         await Promise.resolve();

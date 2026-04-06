@@ -56,6 +56,12 @@ describe('ClipboardFlow - PasteImageAt coordinates', () => {
     const core = {
       eventBus,
       createObject,
+      imageUploadService: {
+        uploadFromDataUrl: vi.fn().mockResolvedValue({
+          url: '/api/v2/images/img-1/download',
+          name: 'image.png',
+        })
+      },
       pixi: {
         app: { stage: {}, view: { clientWidth: 1000, clientHeight: 700 } },
         worldLayer: { x: 180, y: 90, scale: { x: 2 } }
@@ -72,8 +78,7 @@ describe('ClipboardFlow - PasteImageAt coordinates', () => {
       x: 580,
       y: 390,
       src: 'data:image/png;base64,AAAA',
-      name: 'image.png',
-      imageId: 'img-1'
+      name: 'image.png'
     });
     await waitForCreateObjectCall(createObject);
 
@@ -89,16 +94,15 @@ describe('ClipboardFlow - PasteImageAt coordinates', () => {
       'image',
       expectedPosition,
       expect.objectContaining({
-        src: 'data:image/png;base64,AAAA',
+        src: '/api/v2/images/img-1/download',
         name: 'image.png',
         width: 300,
         height: 150
-      }),
-      { imageId: 'img-1' }
+      })
     );
   });
 
-  it('не создает объект если imageId отсутствует и server upload недоступен', async () => {
+  it('не создает объект если src недоступен и server upload недоступен', async () => {
     global.Image = class {
       constructor() {
         this.onload = null;
@@ -133,11 +137,10 @@ describe('ClipboardFlow - PasteImageAt coordinates', () => {
       y: 340,
       src: 'broken-src',
       name: 'broken.png',
-      imageId: null
     });
     await Promise.resolve();
     expect(createObject).not.toHaveBeenCalled();
-    expect(alertSpy).toHaveBeenCalledWith('Сервис загрузки изображений недоступен. Изображение не добавлено.');
+    expect(alertSpy).toHaveBeenCalledWith('Не удалось загрузить изображение с сервера. Изображение не добавлено.');
     alertSpy.mockRestore();
   });
 });

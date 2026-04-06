@@ -56,7 +56,7 @@ describe('Image visibility save ack contract', () => {
             'image',
             { x: 100, y: 200 },
             { src: '/api/v2/images/img-1/download', width: 300, height: 150 },
-            { imageId: 'img-1' }
+            {}
         );
 
         expect(core.pixi.objects.get(created.id).visible).toBe(false);

@@ -25,7 +25,7 @@ describe('SaveManager - retry/backoff', () => {
 
     const boardData = {
         id: 'board-1',
-        objects: [{ id: 'img-1', type: 'image', imageId: 'img-1', properties: { src: '/api/v2/images/img-1/download' } }]
+        objects: [{ id: 'img-1', type: 'image', src: '/api/v2/images/img-1/download', properties: {} }]
     };
 
     beforeEach(() => {
@@ -122,7 +122,7 @@ describe('SaveManager - retry/backoff', () => {
         expect(status.hasUnsavedChanges).toBe(true);
     });
 
-    it('блокирует сохранение image без imageId до обращения к apiClient', async () => {
+    it('блокирует сохранение image без src до обращения к apiClient', async () => {
         eventBus.on(Events.Save.GetBoardData, (request) => {
             request.data = {
                 id: 'board-1',
@@ -147,7 +147,6 @@ describe('SaveManager - retry/backoff', () => {
                     {
                         id: 'img-legacy',
                         type: 'image',
-                        imageId: 'img-legacy',
                         properties: { src: '/api/images/img-legacy/file' },
                     },
                 ],

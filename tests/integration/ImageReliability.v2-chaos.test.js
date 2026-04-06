@@ -62,12 +62,12 @@ describe('Integration: image reliability v2 chaos', () => {
         saveManager.options.retryDelay = 10;
 
         // Моделируем добавление объекта на доску после успешного server upload.
-        eventBus.on(Events.UI.PasteImage, ({ src, name, imageId }) => {
+        eventBus.on(Events.UI.PasteImage, ({ src, name }) => {
             boardState.objects.push({
                 id: `img-${boardState.objects.length + 1}`,
                 type: 'image',
-                imageId,
-                properties: { src, name, width: 300, height: 200 },
+                src,
+                properties: { name, width: 300, height: 200 },
             });
         });
 
@@ -105,8 +105,6 @@ describe('Integration: image reliability v2 chaos', () => {
         core.imageUploadService.uploadImage
             .mockRejectedValueOnce(new Error('timeout-1'))
             .mockResolvedValueOnce({
-                imageId: 'img-remote-77',
-                id: 'img-remote-77',
                 url: '/api/v2/images/img-remote-77/download',
                 name: 'stable.png',
             });
@@ -114,15 +112,15 @@ describe('Integration: image reliability v2 chaos', () => {
         await keyboardManager._handleImageFileUpload(new Blob(['img'], { type: 'image/png' }), 'stable.png');
         expect(boardState.objects).toHaveLength(0);
 
-        // 2) Вторая попытка upload успешна: объект добавлен только с server URL + imageId.
+        // 2) Вторая попытка upload успешна: объект добавлен только с server URL.
         await keyboardManager._handleImageFileUpload(new Blob(['img'], { type: 'image/png' }), 'stable.png');
         expect(boardState.objects).toHaveLength(1);
         expect(boardState.objects[0]).toEqual(
             expect.objectContaining({
                 type: 'image',
-                imageId: 'img-remote-77',
+                src: '/api/v2/images/img-remote-77/download',
                 properties: expect.objectContaining({
-                    src: '/api/v2/images/img-remote-77/download',
+                    name: 'stable.png',
                 }),
             })
         );
@@ -133,14 +131,14 @@ describe('Integration: image reliability v2 chaos', () => {
             .mockRejectedValueOnce(new Error('save-timeout-2'))
             .mockImplementationOnce(async (_boardId, payload) => {
                 const first = payload.objects[0];
-                // Эмулируем серверный снимок истории: хранит imageId, без inline src.
+                // Эмулируем серверный снимок истории: хранит только src.
                 serverSnapshot = {
                     id: payload.id,
                     objects: [
                         {
                             id: first.id,
                             type: 'image',
-                            imageId: first.imageId,
+                            src: first.src,
                             properties: {
                                 width: first.properties.width,
                                 height: first.properties.height,
@@ -159,15 +157,14 @@ describe('Integration: image reliability v2 chaos', () => {
 
         expect(apiClient.saveBoard).toHaveBeenCalledTimes(3);
         expect(serverSnapshot.objects).toHaveLength(1);
-        expect(serverSnapshot.objects[0].imageId).toBe('img-remote-77');
+        expect(serverSnapshot.objects[0].src).toBe('/api/v2/images/img-remote-77/download');
         expect(serverSnapshot.objects[0].properties.src).toBeUndefined();
 
-        // 4) Reopen: URL восстанавливается из imageId, картинка доступна после загрузки.
+        // 4) Reopen: картинка доступна после загрузки по src.
         const restorer = new ApiClient();
         const reopened = await restorer.restoreObjectUrls(clone(serverSnapshot));
         expect(reopened.objects).toHaveLength(1);
-        expect(reopened.objects[0].imageId).toBe('img-remote-77');
         expect(reopened.objects[0].src).toBe('/api/v2/images/img-remote-77/download');
-        expect(reopened.objects[0].properties.src).toBe('/api/v2/images/img-remote-77/download');
+        expect(reopened.objects[0].properties.src).toBeUndefined();
     });
 });

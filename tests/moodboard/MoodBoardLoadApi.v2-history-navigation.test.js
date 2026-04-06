@@ -122,7 +122,7 @@ describe('MoodBoardLoadApi v2 history navigation', () => {
         expect(board.dataManager.loadData).not.toHaveBeenCalled();
     });
 
-    it('грузит image-объекты из версии без потери imageId', async () => {
+    it('грузит image-объекты из версии с сохранением src', async () => {
         const board = createBoard();
         global.fetch.mockResolvedValueOnce({
             ok: true,
@@ -137,7 +137,7 @@ describe('MoodBoardLoadApi v2 history navigation', () => {
                             {
                                 id: 'img-1',
                                 type: 'image',
-                                imageId: 'img-1-id',
+                                src: '/api/v2/images/img-1-id/download',
                                 properties: { width: 300, height: 200 },
                             },
                         ],
@@ -155,7 +155,7 @@ describe('MoodBoardLoadApi v2 history navigation', () => {
                     expect.objectContaining({
                         id: 'img-1',
                         type: 'image',
-                        imageId: 'img-1-id',
+                        src: '/api/v2/images/img-1-id/download',
                     }),
                 ],
             })

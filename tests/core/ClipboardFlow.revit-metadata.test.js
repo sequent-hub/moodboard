@@ -82,8 +82,7 @@ describe('ClipboardFlow Revit metadata routing', () => {
         setupClipboardFlow(core);
         eventBus.emit(Events.UI.PasteImage, {
             src: '/api/v2/images/img-1/download',
-            name: 'r.png',
-            imageId: 'img-1'
+            name: 'r.png'
         });
 
         await vi.waitFor(() => expect(createObject).toHaveBeenCalled());
@@ -93,8 +92,7 @@ describe('ClipboardFlow Revit metadata routing', () => {
             expect.objectContaining({
                 src: '/api/v2/images/img-1/download',
                 view: '{"view":"revit-1"}'
-            }),
-            { imageId: 'img-1' }
+            })
         );
     });
 
@@ -119,20 +117,18 @@ describe('ClipboardFlow Revit metadata routing', () => {
             x: 100,
             y: 100,
             src: '/api/v2/images/img-2/download',
-            name: 'plain.png',
-            imageId: 'img-2'
+            name: 'plain.png'
         });
 
         await vi.waitFor(() => expect(createObject).toHaveBeenCalled());
         expect(createObject).toHaveBeenCalledWith(
             'image',
             expect.any(Object),
-            expect.not.objectContaining({ view: expect.any(String) }),
-            { imageId: 'img-2' }
+            expect.not.objectContaining({ view: expect.any(String) })
         );
     });
 
-    it('does not create object when image src is legacy and not v2', async () => {
+    it('создает image-объект для legacy src (контракт src-only)', async () => {
         const eventBus = createEventBus();
         const createObject = vi.fn();
         const alertSpy = vi.spyOn(globalThis, 'alert').mockImplementation(() => {});
@@ -154,13 +150,20 @@ describe('ClipboardFlow Revit metadata routing', () => {
             x: 100,
             y: 100,
             src: '/api/images/img-legacy/file',
-            name: 'legacy.png',
-            imageId: 'img-legacy'
+            name: 'legacy.png'
         });
 
         await Promise.resolve();
-        expect(createObject).not.toHaveBeenCalled();
-        expect(alertSpy).toHaveBeenCalled();
+        await vi.waitFor(() => expect(createObject).toHaveBeenCalled());
+        expect(createObject).toHaveBeenCalledWith(
+            'image',
+            expect.any(Object),
+            expect.objectContaining({
+                src: '/api/images/img-legacy/file',
+                name: 'legacy.png',
+            })
+        );
+        expect(alertSpy).not.toHaveBeenCalled();
         alertSpy.mockRestore();
     });
 });

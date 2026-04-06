@@ -21,7 +21,6 @@
 {
   "success": true,
   "data": {
-    "imageId": "uuid-here",  // ✅ Основное поле для изображений
     "fileId": "uuid-here",   // ✅ Основное поле для файлов
     "id": "uuid-here",       // ✅ Для обратной совместимости
     "url": "...",
@@ -35,8 +34,8 @@
 
 ### 1. ImageUploadService.js
 - **Файл**: `src/services/ImageUploadService.js`
-- **Изменения**: Обновлен метод `uploadImage()` для поддержки нового поля `imageId`
-- **Совместимость**: Сохранена обратная совместимость с полем `id`
+- **Изменения**: Обновлен метод `uploadImage()` для контракта `src-only`
+- **Совместимость**: Логика завязана на `data.url`, без дополнительных идентификаторов
 
 ```javascript
 // Было:
@@ -48,8 +47,6 @@ return {
 
 // Стало:
 return {
-    id: result.data.imageId || result.data.id, // Используем imageId как основное поле, id для обратной совместимости
-    imageId: result.data.imageId || result.data.id, // Добавляем imageId для явного доступа
     url: result.data.url,
     // ...
 };
@@ -80,18 +77,18 @@ return {
 ### 3. KeyboardManager.js
 - **Файл**: `src/core/KeyboardManager.js`
 - **Изменения**: Обновлены методы `_handleImageUpload()` и `_handleImageFileUpload()`
-- **Детали**: Используется `uploadResult.imageId || uploadResult.id` для совместимости
+- **Детали**: Используется только `uploadResult.url` и `uploadResult.name`
 
 ### 4. ToolManager.js
 - **Файл**: `src/tools/ToolManager.js`
 - **Изменения**: Обновлен метод `handleDrop()` для drag-and-drop загрузки
-- **Детали**: Используется `uploadResult.imageId || uploadResult.id`
+- **Детали**: Используется только `uploadResult.url`
 
 ### 5. PlacementTool.js
 - **Файл**: `src/tools/object-tools/PlacementTool.js`
 - **Изменения**: Обновлены методы размещения изображений и файлов
-- **Детали**: 
-  - Для изображений: `uploadResult.imageId || uploadResult.id`
+- **Детали**:
+  - Для изображений: только `uploadResult.url`
   - Для файлов: `uploadResult.fileId || uploadResult.id`
 
 ## Принципы SOLID, соблюденные в исправлениях
@@ -120,15 +117,15 @@ return {
 
 Создан тестовый файл `test-image-upload-fix.html` для проверки корректности исправлений:
 
-1. **Тест ImageUploadService**: Проверяет обработку нового формата ответа с `imageId`
+1. **Тест ImageUploadService**: Проверяет обработку нового формата ответа с `url`
 2. **Тест FileUploadService**: Проверяет обработку нового формата ответа с `fileId`
-3. **Проверка совместимости**: Убеждается, что `imageId`/`fileId` и `id` совпадают
+3. **Проверка совместимости**: Убеждается, что `url`/`fileId` корректно передаются в payload
 
 ## Обратная совместимость
 
 Все изменения обеспечивают обратную совместимость:
 - Если сервер возвращает только `id` - код работает как раньше
-- Если сервер возвращает `imageId`/`fileId` - код использует новые поля
+- Если сервер возвращает `fileId` - код использует поле для файлов
 - Fallback логика `||` гарантирует работу в любом случае
 
 ## Рекомендации для тестирования

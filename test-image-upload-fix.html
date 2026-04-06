@@ -49,7 +49,7 @@
     
     <div class="test-section">
         <h2>Тестирование ImageUploadService</h2>
-        <p class="info">Проверяем, что сервис корректно обрабатывает новый формат ответа с imageId</p>
+        <p class="info">Проверяем, что сервис корректно обрабатывает новый формат ответа с src</p>
         <button onclick="testImageUploadService()">Запустить тест</button>
     </div>
 
@@ -100,7 +100,6 @@
                             json: async () => ({
                                 success: true,
                                 data: {
-                                    imageId: "test-image-uuid-123",
                                     id: "test-image-uuid-123", // для обратной совместимости
                                     url: "https://example.com/test-image.jpg",
                                     width: 800,
@@ -123,18 +122,10 @@
                 const result = await window.imageUploadService.uploadImage(testFile, 'test-image.jpg');
                 
                 log(`✅ ImageUploadService тест успешен!`, 'success');
-                log(`   imageId: ${result.imageId}`, 'success');
                 log(`   id: ${result.id}`, 'success');
                 log(`   url: ${result.url}`, 'success');
                 log(`   width: ${result.width}`, 'success');
                 log(`   height: ${result.height}`, 'success');
-
-                // Проверяем, что imageId и id одинаковые
-                if (result.imageId === result.id) {
-                    log('✅ imageId и id совпадают - корректно!', 'success');
-                } else {
-                    log('❌ imageId и id не совпадают!', 'error');
-                }
 
             } catch (error) {
                 log(`❌ Ошибка в тесте ImageUploadService: ${error.message}`, 'error');
