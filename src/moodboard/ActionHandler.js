@@ -11,6 +11,8 @@ export class ActionHandler {
      * Обрабатывает действия тулбара
      */
     handleToolbarAction(action) {
+        this._assertImageActionContract(action);
+
         switch (action.type) {
             case 'frame':
             case 'simple-text':
@@ -111,5 +113,20 @@ export class ActionHandler {
      */
     exportBoard() {
         return this.handleExportBoard();
+    }
+
+    _assertImageActionContract(action) {
+        if (!action || (action.type !== 'image' && action.type !== 'revit-screenshot-img')) return;
+        const src = typeof action?.properties?.src === 'string' ? action.properties.src.trim() : '';
+        if (src) return;
+
+        const reason = 'в цепочке создания отсутствует обязательное поле properties.src';
+        const message = `Загрузить картинку не получилось: ${reason}. Попробуйте еще раз.`;
+        if (this.workspaceManager?.showNotification) {
+            this.workspaceManager.showNotification(message);
+        } else if (typeof alert === 'function') {
+            alert(message);
+        }
+        throw new Error(`Image action contract violated: ${reason}`);
     }
 }
