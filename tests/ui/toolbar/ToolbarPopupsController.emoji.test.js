@@ -117,7 +117,7 @@ describe('ToolbarPopupsController emoji', () => {
     expect(payload.size).toEqual({ width: 64, height: 64 });
   });
 
-  it('при emojiBasePath сохраняет локальный src вместо inline data URL', async () => {
+  it('inline emoji сохраняет data URL даже при emojiBasePath', async () => {
     toolbar?.destroy?.();
     container.innerHTML = '';
     toolbar = new Toolbar(container, eventBus, 'light', { emojiBasePath: '/emoji-assets' });
@@ -133,7 +133,6 @@ describe('ToolbarPopupsController emoji', () => {
     const src = payload?.properties?.src;
 
     expect(typeof src).toBe('string');
-    expect(src).toContain('/emoji-assets/');
-    expect(src.startsWith('data:image/')).toBe(false);
+    expect(src.startsWith('data:image/')).toBe(true);
   });
 });

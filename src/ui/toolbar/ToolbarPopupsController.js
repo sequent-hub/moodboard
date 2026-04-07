@@ -470,7 +470,7 @@ export class ToolbarPopupsController {
                             const target = 64;
                             const targetW = target;
                             const targetH = target;
-                            const placementSrc = this.resolveEmojiPlacementSrc(cat, emojiCode, url);
+                            const placementSrc = this.resolveEmojiPlacementSrc(cat, emojiCode, url, isInline);
                             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
                             this.toolbar.eventBus.emit(Events.Place.Set, {
                                 type: 'image',
@@ -509,7 +509,7 @@ export class ToolbarPopupsController {
                     const target = 64;
                     const targetW = target;
                     const targetH = target;
-                    const placementSrc = this.resolveEmojiPlacementSrc(cat, emojiCode, url);
+                    const placementSrc = this.resolveEmojiPlacementSrc(cat, emojiCode, url, isInline);
 
                     this.toolbar.eventBus.emit(Events.Place.Set, {
                         type: 'image',
@@ -535,7 +535,10 @@ export class ToolbarPopupsController {
         this.toolbar.container.appendChild(this.toolbar.emojiPopupEl);
     }
 
-    resolveEmojiPlacementSrc(category, emojiCode, fallbackUrl) {
+    resolveEmojiPlacementSrc(category, emojiCode, fallbackUrl, isInline = false) {
+        if (isInline) {
+            return fallbackUrl;
+        }
         const basePath = this.getEmojiBasePath();
         if (!emojiCode || !basePath) {
             return fallbackUrl;
