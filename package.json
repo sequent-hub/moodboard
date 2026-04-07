@@ -1,6 +1,6 @@
 {
   "name": "@sequent-org/moodboard",
-  "version": "1.4.12",
+  "version": "1.4.15",
   "type": "module",
   "description": "Interactive moodboard",
   "main": "./src/index.js",
