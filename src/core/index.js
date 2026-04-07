@@ -418,11 +418,17 @@ export class CoreMoodBoard {
             },
             ...extraData
         };
-        if ((type === 'image' || type === 'revit-screenshot-img') && typeof properties?.src === 'string') {
-            objectData.src = properties.src;
-            if (objectData.properties && objectData.properties.src) {
+        if (type === 'image' || type === 'revit-screenshot-img' || type === 'file') {
+            const propSrc = typeof properties?.src === 'string' ? properties.src.trim() : '';
+            const propUrl = typeof properties?.url === 'string' ? properties.url.trim() : '';
+            const normalizedSrc = propSrc || propUrl;
+            if (normalizedSrc) {
+                objectData.src = normalizedSrc;
+            }
+            if (objectData.properties && (objectData.properties.src || objectData.properties.url)) {
                 objectData.properties = { ...objectData.properties };
                 delete objectData.properties.src;
+                delete objectData.properties.url;
             }
         }
         objectData.properties = normalizeMindmapPropertiesForCreate({
@@ -524,17 +530,21 @@ export class CoreMoodBoard {
             properties: objectData.properties || {},
             existingObjects: this.state?.state?.objects || [],
         });
-        if (objectData.type === 'image' || objectData.type === 'revit-screenshot-img') {
+        if (objectData.type === 'image' || objectData.type === 'revit-screenshot-img' || objectData.type === 'file') {
             const topSrc = typeof objectData.src === 'string' ? objectData.src.trim() : '';
             const propSrc = typeof objectData.properties?.src === 'string' ? objectData.properties.src.trim() : '';
-            const normalizedSrc = topSrc || propSrc;
+            const topUrl = typeof objectData.url === 'string' ? objectData.url.trim() : '';
+            const propUrl = typeof objectData.properties?.url === 'string' ? objectData.properties.url.trim() : '';
+            const normalizedSrc = topSrc || propSrc || topUrl || propUrl;
             if (normalizedSrc) {
                 objectData.src = normalizedSrc;
             }
-            if (objectData.properties?.src) {
+            if (objectData.properties?.src || objectData.properties?.url) {
                 objectData.properties = { ...objectData.properties };
                 delete objectData.properties.src;
+                delete objectData.properties.url;
             }
+            if (objectData.url) delete objectData.url;
         }
         if (objectData.type === 'mindmap') {
             logMindmapCompoundDebug('core:load-object', {

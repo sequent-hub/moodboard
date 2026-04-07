@@ -89,11 +89,21 @@ export async function loadExistingBoard(board, version = null, options = {}) {
             const loadedObjects = Array.isArray(normalizedData.objects) ? normalizedData.objects : [];
             const imageObjects = loadedObjects.filter((obj) => obj?.type === 'image');
             const imageObjectsWithSrc = imageObjects.filter((obj) => typeof obj?.src === 'string' && obj.src.trim().length > 0);
+            const fileObjects = loadedObjects.filter((obj) => obj?.type === 'file');
+            const fileObjectsWithSrc = fileObjects.filter((obj) => typeof obj?.src === 'string' && obj.src.trim().length > 0);
+            const fileObjectsWithoutSrc = fileObjects
+                .filter((obj) => !(typeof obj?.src === 'string' && obj.src.trim().length > 0))
+                .map((obj) => obj?.id || 'unknown');
             console.log('MoodBoard load image src diagnostics:', {
                 totalObjects: loadedObjects.length,
                 imageObjects: imageObjects.length,
-                imageObjectsWithSrc: imageObjectsWithSrc.length
+                imageObjectsWithSrc: imageObjectsWithSrc.length,
+                fileObjects: fileObjects.length,
+                fileObjectsWithSrc: fileObjectsWithSrc.length
             });
+            if (fileObjectsWithoutSrc.length > 0) {
+                console.warn('MoodBoard load warning: file objects without src:', fileObjectsWithoutSrc);
+            }
             const loadedVersion = Number(normalizedData.version) || null;
             board.currentLoadedVersion = loadedVersion;
             board.historyCursorVersion = loadedVersion;

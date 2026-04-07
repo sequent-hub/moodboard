@@ -1,5 +1,3 @@
-import { isV2FileDownloadUrl } from './AssetUrlPolicy.js';
-
 /**
  * Сервис для загрузки и управления файлами на сервере
  */
@@ -7,7 +5,6 @@ export class FileUploadService {
     constructor(apiClient, options = {}) {
         this.apiClient = apiClient;
         this.uploadEndpoint = '/api/v2/files/upload';
-        this.deleteEndpoint = '/api/v2/files';
         this.options = {
             csrfToken: null, // Можно передать токен напрямую
             csrfTokenSelector: 'meta[name="csrf-token"]', // Селектор для поиска токена в DOM
@@ -51,7 +48,7 @@ export class FileUploadService {
      * Загружает файл на сервер
      * @param {File|Blob} file - файл для загрузки
      * @param {string} name - имя файла
-     * @returns {Promise<{id: string, url: string, size: number, name: string}>}
+     * @returns {Promise<{src: string, size: number, name: string, mimeType: string}>}
      */
     async uploadFile(file, name = null) {
         try {
@@ -89,357 +86,31 @@ export class FileUploadService {
             }
 
             const result = await response.json();
+            const status = response.status;
             
             if (!result.success) {
                 throw new Error(result.message || 'Ошибка загрузки файла');
             }
 
-            const fileId = result.data.fileId || result.data.id;
             const serverUrl = typeof result.data.url === 'string' ? result.data.url.trim() : '';
-            if (!fileId) {
-                throw new Error('Сервер не вернул fileId.');
+            if (!serverUrl) {
+                throw new Error('Сервер не вернул data.url для файла.');
             }
-            if (!isV2FileDownloadUrl(serverUrl)) {
-                throw new Error('Некорректный URL файла от сервера. Ожидается /api/v2/files/{fileId}/download');
-            }
-            if (!this._matchesFileIdInUrl(serverUrl, fileId)) {
-                throw new Error('fileId не совпадает с URL файла от сервера.');
-            }
+            console.log('File upload diagnostics:', {
+                status,
+                success: !!result.success,
+                url: serverUrl
+            });
 
             return {
-                id: fileId, // Используем fileId как основное поле, id для обратной совместимости
-                fileId, // Добавляем fileId для явного доступа
-                url: serverUrl,
+                src: serverUrl,
                 size: result.data.size,
                 name: result.data.name,
-                type: result.data.type
+                mimeType: result.data.mime_type || result.data.type || file.type || 'application/octet-stream'
             };
 
         } catch (error) {
             console.error('Ошибка загрузки файла:', error);
-            throw error;
-        }
-    }
-
-    _matchesFileIdInUrl(url, fileId) {
-        const id = typeof fileId === 'string' ? fileId.trim() : '';
-        if (!id || typeof url !== 'string') return false;
-        const raw = url.trim();
-        const relativeMatch = raw.match(/^\/api\/v2\/files\/([^/]+)\/download$/i);
-        if (relativeMatch) {
-            return decodeURIComponent(relativeMatch[1]) === id;
-        }
-        try {
-            const parsed = new URL(raw);
-            const absoluteMatch = parsed.pathname.match(/^\/api\/v2\/files\/([^/]+)\/download$/i);
-            return !!absoluteMatch && decodeURIComponent(absoluteMatch[1]) === id;
-        } catch (_) {
-            return false;
-        }
-    }
-
-    /**
-     * Обновляет метаданные файла на сервере
-     * @param {string} fileId - ID файла
-     * @param {Object} metadata - метаданные для обновления
-     * @returns {Promise<Object>}
-     */
-    async updateFileMetadata(fileId, metadata) {
-        try {
-            const csrfToken = this._getCsrfToken();
-            
-            if (this.options.requireCsrf && !csrfToken) {
-                throw new Error('CSRF токен не найден. Добавьте <meta name="csrf-token" content="{{ csrf_token() }}"> в HTML или передайте токен в опциях.');
-            }
-
-            const headers = {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': 'application/json'
-            };
-
-            // Добавляем CSRF токен только если он есть
-            if (csrfToken) {
-                headers['X-CSRF-TOKEN'] = csrfToken;
-            }
-
-            const response = await fetch(`${this.deleteEndpoint}/${fileId}`, {
-                method: 'PUT',
-                headers,
-                credentials: 'same-origin',
-                body: JSON.stringify(metadata)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => null);
-                throw new Error(errorData?.message || `HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            
-            if (!result.success) {
-                throw new Error(result.message || 'Ошибка обновления метаданных файла');
-            }
-
-            return result.data;
-
-        } catch (error) {
-            console.error('Ошибка обновления метаданных файла:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Удаляет файл с сервера
-     * @param {string} fileId - ID файла
-     */
-    async deleteFile(fileId) {
-        try {
-            const csrfToken = this._getCsrfToken();
-            
-            const headers = {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': 'application/json'
-            };
-
-            // Добавляем CSRF токен только если он есть
-            if (csrfToken) {
-                headers['X-CSRF-TOKEN'] = csrfToken;
-            }
-
-            const response = await fetch(`${this.deleteEndpoint}/${fileId}`, {
-                method: 'DELETE',
-                headers,
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => null);
-                throw new Error(errorData?.message || `HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            return result.success;
-
-        } catch (error) {
-            console.error('Ошибка удаления файла:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Получает информацию о файле
-     * @param {string} fileId - ID файла  
-     */
-    async getFileInfo(fileId) {
-        try {
-            const response = await fetch(`${this.deleteEndpoint}/${fileId}`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            return result.data;
-
-        } catch (error) {
-            console.error('Ошибка получения информации о файле:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Получает URL для скачивания файла
-     * @param {string} fileId - ID файла
-     */
-    getDownloadUrl(fileId) {
-        return `${this.deleteEndpoint}/${fileId}/download`;
-    }
-
-    /**
-     * Скачивает файл с сервера
-     * @param {string} fileId - ID файла 
-     * @param {string} fileName - имя файла для скачивания
-     */
-    async downloadFile(fileId, fileName = null) {
-        try {
-            const downloadUrl = this.getDownloadUrl(fileId);
-            
-            console.log('📥 FileUploadService: Начинаем скачивание файла:', {
-                fileId,
-                fileName,
-                downloadUrl,
-                userAgent: navigator.userAgent,
-                isSecureContext: window.isSecureContext
-            });
-            
-            // Метод 1: Попробуем через fetch + blob (более надежно для современных браузеров)
-            try {
-                console.log('🔄 Метод 1: Пробуем скачивание через fetch...');
-                
-                const response = await fetch(downloadUrl, {
-                    method: 'GET',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'same-origin'
-                });
-                
-                console.log('📥 Ответ сервера:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    contentType: response.headers.get('content-type'),
-                    contentLength: response.headers.get('content-length'),
-                    contentDisposition: response.headers.get('content-disposition')
-                });
-                
-                if (!response.ok) {
-                    // Пытаемся получить JSON ошибку от Laravel
-                    let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-                    
-                    try {
-                        const errorData = await response.json();
-                        console.error('🚨 Ошибка от сервера:', errorData);
-                        
-                        if (errorData.message) {
-                            errorMessage = `${errorMessage} - ${errorData.message}`;
-                        }
-                        
-                        // Показываем пользователю детальную ошибку
-                        if (errorData.success === false) {
-                            alert(`Ошибка сервера: ${errorData.message || 'Файл не найден'}`);
-                        }
-                    } catch (jsonError) {
-                        console.warn('Не удалось прочитать JSON ошибку:', jsonError);
-                    }
-                    
-                    throw new Error(errorMessage);
-                }
-                
-                // Получаем blob файла
-                const blob = await response.blob();
-                console.log('📦 Получен blob:', {
-                    size: blob.size,
-                    type: blob.type
-                });
-                
-                // Создаем URL для blob
-                const blobUrl = window.URL.createObjectURL(blob);
-                
-                // Создаем ссылку для скачивания
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.download = fileName || `file_${fileId}`;
-                
-                // Добавляем в DOM, кликаем и удаляем
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                // Освобождаем память
-                window.URL.revokeObjectURL(blobUrl);
-                
-                console.log('✅ Файл успешно скачан через fetch/blob:', fileName || fileId);
-                return true;
-                
-            } catch (fetchError) {
-                console.warn('❌ Ошибка скачивания через fetch:', fetchError);
-                
-                // Метод 2: Fallback - открываем в новом окне
-                console.log('🔄 Метод 2: Пробуем открытие в новом окне...');
-                
-                try {
-                    const newWindow = window.open(downloadUrl, '_blank');
-                    if (newWindow) {
-                        console.log('✅ Файл открыт в новом окне');
-                        return true;
-                    } else {
-                        throw new Error('Popup заблокирован браузером');
-                    }
-                } catch (windowError) {
-                    console.warn('❌ Ошибка открытия в новом окне:', windowError);
-                    
-                    // Метод 3: Последний fallback - прямая ссылка
-                    console.log('🔄 Метод 3: Создаем прямую ссылку...');
-                    
-                    const link = document.createElement('a');
-                    link.href = downloadUrl;
-                    if (fileName) {
-                        link.download = fileName;
-                    }
-                    link.target = '_blank';
-                    
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    console.log('✅ Создана прямая ссылка для скачивания');
-                    return true;
-                }
-            }
-
-        } catch (error) {
-            console.error('❌ FileUploadService: Критическая ошибка скачивания файла:', error);
-            
-            // Показываем пользователю альтернативную ссылку
-            if (confirm(`Автоматическое скачивание не удалось: ${error.message}\n\nОткрыть файл в новой вкладке?`)) {
-                window.open(this.getDownloadUrl(fileId), '_blank');
-            }
-            
-            throw error;
-        }
-    }
-
-    /**
-     * Очищает неиспользуемые файлы с сервера
-     * @returns {Promise<{deletedCount: number, errors: Array}>}
-     */
-    async cleanupUnusedFiles() {
-        try {
-            const csrfToken = this._getCsrfToken();
-            
-            const headers = {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': 'application/json'
-            };
-
-            // Добавляем CSRF токен только если он есть
-            if (csrfToken) {
-                headers['X-CSRF-TOKEN'] = csrfToken;
-            }
-
-            const response = await fetch(`${this.deleteEndpoint}/cleanup`, {
-                method: 'POST',
-                headers,
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => null);
-                throw new Error(errorData?.message || `HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            
-            if (result.success) {
-                const data = result.data || {};
-                return {
-                    deletedCount: data.deleted_count || 0,
-                    errors: data.errors || []
-                };
-            } else {
-                throw new Error(result.message || 'Ошибка очистки файлов');
-            }
-
-        } catch (error) {
-            console.error('Ошибка очистки неиспользуемых файлов:', error);
             throw error;
         }
     }

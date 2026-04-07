@@ -64,19 +64,6 @@ export class EditFileNameCommand extends BaseCommand {
             }
             objectData.properties.fileName = fileName;
             
-            // Синхронизируем с сервером, если есть fileId
-            if (objectData.fileId && this.coreMoodboard.fileUploadService) {
-                try {
-                    await this.coreMoodboard.fileUploadService.updateFileMetadata(objectData.fileId, { 
-                        fileName: fileName 
-                    });
-                    console.log('✅ Название файла успешно обновлено на сервере');
-                } catch (error) {
-                    console.warn('⚠️ Ошибка синхронизации названия файла с сервером:', error);
-                    // Не останавливаем выполнение, продолжаем с локальным обновлением
-                }
-            }
-            
             // Обновляем состояние
             this.coreMoodboard.state.markDirty();
             

@@ -70,13 +70,23 @@ export class ApiClient {
             const imageObjectsWithoutSrc = imageObjects
                 .filter((obj) => !(typeof obj?.src === 'string' && obj.src.trim().length > 0))
                 .map((obj) => obj?.id || 'unknown');
+            const fileObjects = objects.filter((obj) => obj?.type === 'file');
+            const fileObjectsWithSrc = fileObjects.filter((obj) => typeof obj?.src === 'string' && obj.src.trim().length > 0);
+            const fileObjectsWithoutSrc = fileObjects
+                .filter((obj) => !(typeof obj?.src === 'string' && obj.src.trim().length > 0))
+                .map((obj) => obj?.id || 'unknown');
             console.log('history/save payload stats:', {
                 totalObjects: objects.length,
                 imageObjects: imageObjects.length,
-                imageObjectsWithSrc: imageObjectsWithSrc.length
+                imageObjectsWithSrc: imageObjectsWithSrc.length,
+                fileObjects: fileObjects.length,
+                fileObjectsWithSrc: fileObjectsWithSrc.length
             });
             if (imageObjectsWithoutSrc.length > 0) {
                 console.warn('history/save warning: image objects without src (kept as broken placeholders):', imageObjectsWithoutSrc);
+            }
+            if (fileObjectsWithoutSrc.length > 0) {
+                console.warn('history/save warning: file objects without src:', fileObjectsWithoutSrc);
             }
 
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -184,26 +194,35 @@ export class ApiClient {
             }
             
             if (obj.type === 'file') {
-                const cleanedObj = { ...obj };
-                
-                // Если есть fileId, убираем content для экономии места
-                if (obj.fileId && typeof obj.fileId === 'string' && obj.fileId.trim().length > 0) {
-                    // Убираем content с верхнего уровня
-                    if (cleanedObj.content) {
-                        delete cleanedObj.content;
-                    }
-                    
-                    // Убираем content из properties
-                    if (cleanedObj.properties?.content) {
-                        cleanedObj.properties = { ...cleanedObj.properties };
-                        delete cleanedObj.properties.content;
-                    }
+                const topSrcRaw = typeof obj.src === 'string' ? obj.src : '';
+                const propSrcRaw = typeof obj.properties?.src === 'string' ? obj.properties.src : '';
+                const topUrlRaw = typeof obj.url === 'string' ? obj.url : '';
+                const propUrlRaw = typeof obj.properties?.url === 'string' ? obj.properties.url : '';
+                const normalizedSrc = topSrcRaw.trim() || propSrcRaw.trim() || topUrlRaw.trim() || propUrlRaw.trim();
+
+                if (!normalizedSrc) {
+                    throw new Error(`File object "${obj.id || 'unknown'}" has no src. Save is blocked.`);
                 }
-                // Если нет fileId, предупреждаем о наличии content
-                else {
-                    // Для файлов сейчас сохраняем поведение: без fileId не модифицируем объект.
+                if (/^data:/i.test(normalizedSrc) || /^blob:/i.test(normalizedSrc)) {
+                    throw new Error(`File object "${obj.id || 'unknown'}" contains forbidden data/blob src. Save is blocked.`);
                 }
-                
+                if (/^\/api\/v2\/files\//i.test(normalizedSrc)) {
+                    throw new Error(`File object "${obj.id || 'unknown'}" has legacy id-based src URL. Save is blocked.`);
+                }
+
+                const cleanedObj = {
+                    ...obj,
+                    src: normalizedSrc
+                };
+                if (cleanedObj.url) delete cleanedObj.url;
+                if (cleanedObj.content) delete cleanedObj.content;
+                if (cleanedObj.fileId) delete cleanedObj.fileId;
+                if (cleanedObj.properties?.src || cleanedObj.properties?.url || cleanedObj.properties?.content) {
+                    cleanedObj.properties = { ...cleanedObj.properties };
+                    delete cleanedObj.properties.src;
+                    delete cleanedObj.properties.url;
+                    delete cleanedObj.properties.content;
+                }
                 return cleanedObj;
             }
             
@@ -243,59 +262,23 @@ export class ApiClient {
                 }
                 
                 if (obj.type === 'file') {
-                    if (obj.fileId) {
-                        try {
-                            // Формируем URL файла для скачивания
-                            const fileUrl = `/api/v2/files/${obj.fileId}/download`;
-                            
-                            // Создаем обновленный объект с восстановленными данными
-                            const restoredObj = {
-                                ...obj,
-                                url: fileUrl,
-                                properties: {
-                                    ...obj.properties,
-                                    url: fileUrl
-                                }
-                            };
-                            
-                            // Пытаемся восстановить актуальные метаданные файла с сервера
-                            // (Это будет выполнено асинхронно, чтобы не блокировать загрузку)
-                            setTimeout(async () => {
-                                try {
-                                    const response = await fetch(`/api/v2/files/${obj.fileId}`, {
-                                        headers: {
-                                            'Accept': 'application/json',
-                                            'X-Requested-With': 'XMLHttpRequest'
-                                        },
-                                        credentials: 'same-origin'
-                                    });
-                                    
-                                    if (response.ok) {
-                                        const result = await response.json();
-                                        if (result.success && result.data) {
-                                            // Эмитим событие для обновления метаданных файла в состоянии
-                                            // (это будет обработано в core, если EventBus доступен)
-                                            if (typeof window !== 'undefined' && window.moodboardEventBus) {
-                                                window.moodboardEventBus.emit('file:metadata:updated', {
-                                                    objectId: obj.id,
-                                                    fileId: obj.fileId,
-                                                    metadata: result.data
-                                                });
-                                            }
-                                        }
-                                    }
-                                } catch (error) {
-                                    console.warn(`Не удалось обновить метаданные файла ${obj.fileId}:`, error);
-                                }
-                            }, 100);
-                            
-                            return restoredObj;
-                        } catch (error) {
-                            console.warn(`Не удалось восстановить данные для файла ${obj.fileId}:`, error);
-                            return obj;
-                        }
+                    const topSrc = typeof obj.src === 'string' ? obj.src.trim() : '';
+                    const propSrc = typeof obj.properties?.src === 'string' ? obj.properties.src.trim() : '';
+                    const topUrl = typeof obj.url === 'string' ? obj.url.trim() : '';
+                    const propUrl = typeof obj.properties?.url === 'string' ? obj.properties.url.trim() : '';
+                    const normalizedSrc = topSrc || propSrc || topUrl || propUrl;
+                    const restoredObj = { ...obj };
+                    if (normalizedSrc) {
+                        restoredObj.src = normalizedSrc;
                     }
-                    return obj;
+                    if (restoredObj.url) delete restoredObj.url;
+                    if (restoredObj.fileId) delete restoredObj.fileId;
+                    if (restoredObj.properties?.src || restoredObj.properties?.url) {
+                        restoredObj.properties = { ...restoredObj.properties };
+                        delete restoredObj.properties.src;
+                        delete restoredObj.properties.url;
+                    }
+                    return restoredObj;
                 }
                 
                 return obj;

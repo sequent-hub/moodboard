@@ -108,6 +108,10 @@ export class SaveManager {
             // - data:/blob: URL в image запрещены
             // - image без src допускаются (legacy broken state), но логируются
             this._assertImageSaveContract(saveData);
+            // Контракт сохранения файлов:
+            // - file обязан иметь src
+            // - data:/blob: URL и id-based /api/v2/files/* для file запрещены
+            this._assertFileSaveContract(saveData);
             
             // Проверяем, изменились ли данные с последнего сохранения
             if (this.lastSavedData && JSON.stringify(saveData) === JSON.stringify(this.lastSavedData)) {
@@ -248,6 +252,33 @@ export class SaveManager {
             }
             if (/^\/api\/images\//i.test(effectiveSrc)) {
                 throw new Error(`Image object "${obj.id || 'unknown'}" has legacy src URL. Save is blocked.`);
+            }
+        }
+    }
+
+    _assertFileSaveContract(saveData) {
+        const objects = Array.isArray(saveData?.boardData?.objects)
+            ? saveData.boardData.objects
+            : Array.isArray(saveData?.objects)
+                ? saveData.objects
+                : [];
+
+        for (const obj of objects) {
+            if (!obj || obj.type !== 'file') continue;
+            const topSrc = typeof obj.src === 'string' ? obj.src : '';
+            const propSrc = typeof obj.properties?.src === 'string' ? obj.properties.src : '';
+            const topUrl = typeof obj.url === 'string' ? obj.url : '';
+            const propUrl = typeof obj.properties?.url === 'string' ? obj.properties.url : '';
+            const effectiveSrc = topSrc.trim() || propSrc.trim() || topUrl.trim() || propUrl.trim();
+
+            if (!effectiveSrc) {
+                throw new Error(`File object "${obj.id || 'unknown'}" has no src. Save is blocked.`);
+            }
+            if (/^data:/i.test(effectiveSrc) || /^blob:/i.test(effectiveSrc)) {
+                throw new Error(`File object "${obj.id || 'unknown'}" contains forbidden data/blob src. Save is blocked.`);
+            }
+            if (/^\/api\/v2\/files\//i.test(effectiveSrc)) {
+                throw new Error(`File object "${obj.id || 'unknown'}" has legacy id-based src URL. Save is blocked.`);
             }
         }
     }

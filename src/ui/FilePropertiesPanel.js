@@ -181,8 +181,8 @@ export class FilePropertiesPanel {
     }
 
     async _handleDownload() {
-        if (!this.currentId || !this.core?.fileUploadService) {
-            console.warn('FilePropertiesPanel: не могу скачать файл - нет currentId или fileUploadService');
+        if (!this.currentId || !this.core?.state?.getObjects) {
+            console.warn('FilePropertiesPanel: не могу скачать файл - нет currentId или state');
             return;
         }
 
@@ -202,18 +202,18 @@ export class FilePropertiesPanel {
                 return;
             }
 
-            const fileId = fileObject.fileId;
+            const fileSrc = typeof fileObject.src === 'string' ? fileObject.src.trim() : '';
             const fileName = fileObject.properties?.fileName || 'file';
 
             console.log('📎 FilePropertiesPanel: Данные файла для скачивания:', {
-                fileId,
+                fileSrc,
                 fileName,
-                downloadUrl: this.core.fileUploadService.getDownloadUrl(fileId)
+                hasSrc: !!fileSrc
             });
 
-            if (!fileId) {
-                console.warn('FilePropertiesPanel: у файла нет fileId');
-                alert('Ошибка: файл не имеет ID для скачивания');
+            if (!fileSrc) {
+                console.warn('FilePropertiesPanel: у файла нет src');
+                alert('Ошибка: у файла отсутствует src для скачивания');
                 return;
             }
 
@@ -228,8 +228,14 @@ export class FilePropertiesPanel {
             `;
             this.downloadButton.disabled = true;
 
-            // Скачиваем файл
-            await this.core.fileUploadService.downloadFile(fileId, fileName);
+            // Скачиваем файл напрямую по src (без id-based endpoint)
+            const link = document.createElement('a');
+            link.href = fileSrc;
+            link.download = fileName;
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
 
             // Восстанавливаем кнопку
             setTimeout(() => {
@@ -262,14 +268,14 @@ export class FilePropertiesPanel {
         const fileObject = objects.find(obj => obj.id === this.currentId);
         
         if (fileObject && fileObject.type === 'file') {
-            const hasFileId = !!(fileObject.fileId);
+            const hasFileSrc = typeof fileObject.src === 'string' && fileObject.src.trim().length > 0;
             
-            // Показываем/скрываем кнопку скачивания в зависимости от наличия fileId
+            // Показываем/скрываем кнопку скачивания в зависимости от наличия src
             if (this.downloadButton) {
-                // Всегда показываем кнопку, даже без fileId
+                // Всегда показываем кнопку, но отключаем без src
                 this.downloadButton.style.display = 'flex';
-                this.downloadButton.disabled = !hasFileId;
-                this.downloadButton.title = hasFileId ? 'Скачать файл' : 'Файл недоступен для скачивания';
+                this.downloadButton.disabled = !hasFileSrc;
+                this.downloadButton.title = hasFileSrc ? 'Скачать файл' : 'Файл недоступен для скачивания';
             }
         }
     }

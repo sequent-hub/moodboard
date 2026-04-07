@@ -26,9 +26,8 @@ export class ActionHandler {
             case 'comment':
             case 'file':
             case 'mindmap':
-                // Для изображений используем только src; для файлов сохраняем fileId.
-                const extraData = action.fileId ? { fileId: action.fileId } : {};
-                return this.handleCreateObject(action.type, action.position, action.properties || {}, extraData);
+                // Для изображений и файлов используем только src.
+                return this.handleCreateObject(action.type, action.position, action.properties || {}, {});
 
             case 'delete-object':
                 if (action.id) {

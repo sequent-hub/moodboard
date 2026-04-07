@@ -31,13 +31,11 @@ describe('PlacementTool baseline: file/image placement paths', () => {
 
     it('file selected flow emits ToolbarAction with server payload fields', async () => {
         core.fileUploadService.uploadFile.mockResolvedValue({
-            id: 'file-1',
-            fileId: 'file-1',
+            src: 'https://cdn.futurello.futurebim.ru/files/spec.pdf',
             name: 'spec.pdf',
             size: 2048,
             mimeType: 'application/pdf',
             formattedSize: '2 KB',
-            url: '/api/v2/files/file-1/download',
         });
         tool.selectedFile = {
             file: new Blob(['x'], { type: 'application/pdf' }),
@@ -54,11 +52,10 @@ describe('PlacementTool baseline: file/image placement paths', () => {
             expect.objectContaining({
                 type: 'file',
                 id: 'file',
-                fileId: 'file-1',
                 properties: expect.objectContaining({
                     fileName: 'spec.pdf',
                     mimeType: 'application/pdf',
-                    url: '/api/v2/files/file-1/download',
+                    src: 'https://cdn.futurello.futurebim.ru/files/spec.pdf',
                 }),
             })
         );

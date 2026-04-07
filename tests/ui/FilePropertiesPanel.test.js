@@ -36,13 +36,13 @@ function createMockContainer() {
     return el;
 }
 
-function createMockCore(selectedIds = [], fileObjectId = null, fileHasId = false) {
+function createMockCore(selectedIds = [], fileObjectId = null, fileHasSrc = false) {
     const objectsMap = new Map();
     if (fileObjectId) {
         const fileObj = {
             id: fileObjectId,
             type: 'file',
-            fileId: fileHasId ? 'test-file-id' : undefined,
+            src: fileHasSrc ? 'https://cdn.futurello.futurebim.ru/files/doc.pdf' : undefined,
             properties: { fileName: 'doc.pdf', fileSize: 1024 },
         };
         objectsMap.set(fileObjectId, {
@@ -51,7 +51,7 @@ function createMockCore(selectedIds = [], fileObjectId = null, fileHasId = false
     }
 
     const stateObjects = fileObjectId
-        ? [{ id: fileObjectId, type: 'file', fileId: fileHasId ? 'test-file-id' : undefined, properties: { fileName: 'doc.pdf' } }]
+        ? [{ id: fileObjectId, type: 'file', src: fileHasSrc ? 'https://cdn.futurello.futurebim.ru/files/doc.pdf' : undefined, properties: { fileName: 'doc.pdf' } }]
         : [];
 
     return {
@@ -62,7 +62,7 @@ function createMockCore(selectedIds = [], fileObjectId = null, fileHasId = false
         state: {
             getObjects: vi.fn(() => stateObjects),
         },
-        fileUploadService: { downloadFile: vi.fn(), getDownloadUrl: vi.fn() },
+        fileUploadService: {},
     };
 }
 

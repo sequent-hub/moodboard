@@ -54,13 +54,11 @@ describe('Integration: file drop -> close/reopen guard', () => {
         core = {
             fileUploadService: {
                 uploadFile: vi.fn().mockResolvedValue({
-                    id: 'file-1',
-                    fileId: 'file-1',
                     name: 'report.pdf',
                     size: 123,
                     mimeType: 'application/pdf',
                     formattedSize: '123 B',
-                    url: '/api/v2/files/file-1/download',
+                    src: 'https://cdn.futurello.futurebim.ru/files/report.pdf',
                 }),
             },
             pixi: {
@@ -74,7 +72,7 @@ describe('Integration: file drop -> close/reopen guard', () => {
             localBoardState.objects.push({
                 id: `file-${localBoardState.objects.length + 1}`,
                 type: 'file',
-                fileId: action.fileId || null,
+                src: typeof action?.properties?.src === 'string' ? action.properties.src : null,
                 properties: { ...(action.properties || {}) },
             });
         });
@@ -123,9 +121,9 @@ describe('Integration: file drop -> close/reopen guard', () => {
         expect(localBoardState.objects[0]).toEqual(
             expect.objectContaining({
                 type: 'file',
-                fileId: 'file-1',
+                src: 'https://cdn.futurello.futurebim.ru/files/report.pdf',
                 properties: expect.objectContaining({
-                    url: '/api/v2/files/file-1/download',
+                    src: 'https://cdn.futurello.futurebim.ru/files/report.pdf',
                 }),
             })
         );

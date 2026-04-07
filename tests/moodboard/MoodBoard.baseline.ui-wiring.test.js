@@ -120,11 +120,10 @@ describe('MoodBoard baseline: UI wiring contracts', () => {
                 fileSize: 1024,
                 mimeType: 'application/pdf',
                 formattedSize: '1 KB',
-                url: '/api/v2/files/file-1/download',
+                src: 'https://cdn.futurello.futurebim.ru/files/report.pdf',
                 width: 120,
                 height: 140,
-            },
-            fileId: 'file-1',
+            }
         };
 
         core.eventBus.emit(Events.UI.ToolbarAction, action);
@@ -133,7 +132,7 @@ describe('MoodBoard baseline: UI wiring contracts', () => {
             'file',
             { x: 580, y: 390 }, // Позиция уже приходит как левый-верх из маршрута drop
             action.properties,
-            { fileId: 'file-1' }
+            {}
         );
 
         // Диагностическая проверка: при viewport-transform expected world-позиция иная.

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileUploadService } from '../../src/services/FileUploadService.js';
 
-describe('FileUploadService URL normalization', () => {
+describe('FileUploadService src-only contract', () => {
     let service;
     let originalFetch;
 
@@ -16,36 +16,40 @@ describe('FileUploadService URL normalization', () => {
         vi.restoreAllMocks();
     });
 
-    it('throws when upload response has legacy non-v2 file url', async () => {
+    it('accepts file upload with external data.url and returns src', async () => {
         global.fetch.mockResolvedValue({
             ok: true,
             json: vi.fn().mockResolvedValue({
                 success: true,
                 data: {
-                    fileId: 'file-1',
-                    url: '/api/files/file-1/download',
+                    url: 'https://cdn.futurello.futurebim.ru/files/2026/04/spec.pdf',
                     size: 123,
                     name: 'doc.pdf',
-                    type: 'application/pdf',
+                    mime_type: 'application/pdf',
                 },
             }),
         });
 
         const file = new Blob(['pdf-data'], { type: 'application/pdf' });
-        await expect(service.uploadFile(file, 'doc.pdf')).rejects.toThrow('Некорректный URL файла');
+        const result = await service.uploadFile(file, 'doc.pdf');
+        expect(result).toEqual({
+            src: 'https://cdn.futurello.futurebim.ru/files/2026/04/spec.pdf',
+            size: 123,
+            name: 'doc.pdf',
+            mimeType: 'application/pdf',
+        });
     });
 
-    it('accepts absolute v2 file url from backend', async () => {
+    it('accepts relative data.url from backend', async () => {
         global.fetch.mockResolvedValue({
             ok: true,
             json: vi.fn().mockResolvedValue({
                 success: true,
                 data: {
-                    fileId: 'file-abs-1',
-                    url: 'https://dev.futurello.futurebim.ru/api/v2/files/file-abs-1/download',
+                    url: '/storage/files/spec.pdf',
                     size: 123,
                     name: 'doc.pdf',
-                    type: 'application/pdf',
+                    mime_type: 'application/pdf',
                 },
             }),
         });
@@ -53,46 +57,25 @@ describe('FileUploadService URL normalization', () => {
         const file = new Blob(['pdf-data'], { type: 'application/pdf' });
         const result = await service.uploadFile(file, 'doc.pdf');
 
-        expect(result.fileId).toBe('file-abs-1');
-        expect(result.url).toBe('https://dev.futurello.futurebim.ru/api/v2/files/file-abs-1/download');
+        expect(result.src).toBe('/storage/files/spec.pdf');
     });
 
-    it('throws when upload response has invalid file url and no fileId', async () => {
+    it('throws when upload response has no data.url', async () => {
         global.fetch.mockResolvedValue({
             ok: true,
             json: vi.fn().mockResolvedValue({
                 success: true,
                 data: {
-                    id: null,
-                    url: 'https://example.com/file.pdf',
+                    url: '',
                     size: 123,
                     name: 'doc.pdf',
-                    type: 'application/pdf',
+                    mime_type: 'application/pdf',
                 },
             }),
         });
 
         const file = new Blob(['pdf-data'], { type: 'application/pdf' });
-        await expect(service.uploadFile(file, 'doc.pdf')).rejects.toThrow('Сервер не вернул fileId');
-    });
-
-    it('throws when fileId does not match id inside URL', async () => {
-        global.fetch.mockResolvedValue({
-            ok: true,
-            json: vi.fn().mockResolvedValue({
-                success: true,
-                data: {
-                    fileId: 'file-1',
-                    url: '/api/v2/files/file-2/download',
-                    size: 123,
-                    name: 'doc.pdf',
-                    type: 'application/pdf',
-                },
-            }),
-        });
-
-        const file = new Blob(['pdf-data'], { type: 'application/pdf' });
-        await expect(service.uploadFile(file, 'doc.pdf')).rejects.toThrow('fileId не совпадает');
+        await expect(service.uploadFile(file, 'doc.pdf')).rejects.toThrow('Сервер не вернул data.url');
     });
 });
 

@@ -381,7 +381,7 @@ export class ToolEventRouter {
                     fileSize: file.size || 0,
                     mimeType: file.type || 'application/octet-stream',
                     formattedSize: null,
-                    url: null,
+                    src: null,
                     width: 120,
                     height: 140
                 };
@@ -413,7 +413,7 @@ export class ToolEventRouter {
                         };
                         logDropDebug(diagnostics, 'file_upload_success', {
                             fileName: uploadResult?.name || fallbackProps.fileName,
-                            fileId: uploadResult?.fileId || uploadResult?.id || null
+                            srcPresent: !!(typeof uploadResult?.src === 'string' && uploadResult.src.trim())
                         });
                         return {
                             type: 'file',
@@ -424,11 +424,10 @@ export class ToolEventRouter {
                                 fileSize: uploadResult.size,
                                 mimeType: uploadResult.mimeType,
                                 formattedSize: uploadResult.formattedSize,
-                                url: uploadResult.url,
+                                src: uploadResult.src,
                                 width: 120,
                                 height: 140
-                            },
-                            fileId: uploadResult.fileId || uploadResult.id || null
+                            }
                         };
                     } else {
                         showDropWarning(

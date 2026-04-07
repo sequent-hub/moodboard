@@ -72,11 +72,10 @@ export class PlacementPayloadFactory {
                 fileSize: uploadResult.size,
                 mimeType: uploadResult.mimeType,
                 formattedSize: uploadResult.formattedSize,
-                url: uploadResult.url,
+                src: uploadResult.src,
                 width,
                 height
-            },
-            fileId: uploadResult.fileId || uploadResult.id
+            }
         });
     }
 
