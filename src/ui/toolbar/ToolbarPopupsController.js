@@ -471,6 +471,10 @@ export class ToolbarPopupsController {
                             const targetW = target;
                             const targetH = target;
                             const placementSrc = this.resolveEmojiPlacementSrc(cat, emojiCode, url, isInline);
+                            if (!placementSrc) {
+                                console.warn('Emoji placement skipped: cannot resolve public src', { cat, emojiCode, url });
+                                return;
+                            }
                             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
                             this.toolbar.eventBus.emit(Events.Place.Set, {
                                 type: 'image',
@@ -510,6 +514,10 @@ export class ToolbarPopupsController {
                     const targetW = target;
                     const targetH = target;
                     const placementSrc = this.resolveEmojiPlacementSrc(cat, emojiCode, url, isInline);
+                    if (!placementSrc) {
+                        console.warn('Emoji placement skipped: cannot resolve public src', { cat, emojiCode, url });
+                        return;
+                    }
 
                     this.toolbar.eventBus.emit(Events.Place.Set, {
                         type: 'image',
@@ -536,24 +544,25 @@ export class ToolbarPopupsController {
     }
 
     resolveEmojiPlacementSrc(category, emojiCode, fallbackUrl, isInline = false) {
-        if (isInline) {
-            return fallbackUrl;
-        }
         const basePath = this.getEmojiBasePath();
-        if (!emojiCode || !basePath) {
-            return fallbackUrl;
+        if (emojiCode && basePath) {
+            const normalizeBase = basePath.endsWith('/') ? basePath : `${basePath}/`;
+            const encodedCategory = encodeURIComponent(category || 'Разное');
+            const encodedEmojiCode = encodeURIComponent(emojiCode);
+            const relativePath = `${encodedCategory}/${encodedEmojiCode}.png`;
+
+            try {
+                return new URL(relativePath, normalizeBase).href;
+            } catch (_) {
+                return `${normalizeBase}${relativePath}`;
+            }
         }
 
-        const normalizeBase = basePath.endsWith('/') ? basePath : `${basePath}/`;
-        const encodedCategory = encodeURIComponent(category || 'Разное');
-        const encodedEmojiCode = encodeURIComponent(emojiCode);
-        const relativePath = `${encodedCategory}/${encodedEmojiCode}.png`;
-
-        try {
-            return new URL(relativePath, normalizeBase).href;
-        } catch (_) {
-            return `${normalizeBase}${relativePath}`;
-        }
+        const fallback = typeof fallbackUrl === 'string' ? fallbackUrl.trim() : '';
+        if (!fallback) return null;
+        if (/^data:/i.test(fallback) || /^blob:/i.test(fallback)) return null;
+        if (fallback.includes('/node_modules/')) return null;
+        return fallback;
     }
 
     getFallbackEmojiGroups() {
@@ -622,35 +631,31 @@ export class ToolbarPopupsController {
     }
 
     getEmojiBasePath() {
-        if (this.toolbar.emojiBasePath) {
-            return this.toolbar.emojiBasePath.endsWith('/') ? this.toolbar.emojiBasePath : this.toolbar.emojiBasePath + '/';
+        const normalize = (value) => {
+            if (!value || typeof value !== 'string') return null;
+            const trimmed = value.trim();
+            if (!trimmed) return null;
+            if (trimmed.includes('/node_modules/')) return null;
+            return trimmed.endsWith('/') ? trimmed : `${trimmed}/`;
+        };
+
+        const fromOptions = normalize(this.toolbar.emojiBasePath);
+        if (fromOptions) {
+            return fromOptions;
+        }
+
+        const fromExplicitGlobal = normalize(window.MOODBOARD_EMOJI_BASE_PATH);
+        if (fromExplicitGlobal) {
+            return fromExplicitGlobal;
         }
 
         if (window.MOODBOARD_BASE_PATH) {
             const basePath = window.MOODBOARD_BASE_PATH.endsWith('/') ? window.MOODBOARD_BASE_PATH : window.MOODBOARD_BASE_PATH + '/';
-            return `${basePath}src/assets/emodji/`;
+            const fromGlobalBase = normalize(`${basePath}emodji/`);
+            if (fromGlobalBase) return fromGlobalBase;
         }
 
-        try {
-            const currentModuleUrl = import.meta.url;
-            const emojiUrl = new URL('../assets/emodji/', currentModuleUrl).href;
-            return emojiUrl;
-        } catch (error) {
-            console.warn('⚠️ Не удалось определить путь через import.meta.url:', error);
-        }
-
-        try {
-            const currentScript = document.currentScript;
-            if (currentScript && currentScript.src) {
-                const scriptUrl = new URL(currentScript.src);
-                const baseUrl = new URL('../assets/emodji/', scriptUrl).href;
-                return baseUrl;
-            }
-        } catch (error) {
-            console.warn('⚠️ Не удалось определить путь через currentScript:', error);
-        }
-
-        return '/src/assets/emodji/';
+        return '/emodji/';
     }
 
     toggleEmojiPopup(anchorButton) {
