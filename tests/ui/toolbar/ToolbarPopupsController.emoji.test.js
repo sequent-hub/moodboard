@@ -116,4 +116,24 @@ describe('ToolbarPopupsController emoji', () => {
     const payload = placeSetCall[1];
     expect(payload.size).toEqual({ width: 64, height: 64 });
   });
+
+  it('при emojiBasePath сохраняет локальный src вместо inline data URL', async () => {
+    toolbar?.destroy?.();
+    container.innerHTML = '';
+    toolbar = new Toolbar(container, eventBus, 'light', { emojiBasePath: '/emoji-assets' });
+    await flushToolbarInit();
+
+    container.querySelector('.moodboard-toolbar__button--emoji').click();
+    const btn = container.querySelector('.moodboard-toolbar__popup--emoji .moodboard-emoji__btn');
+    btn?.click();
+
+    const placeSetCall = eventBus.emit.mock.calls.find((c) => c[0] === Events.Place.Set);
+    expect(placeSetCall).toBeTruthy();
+    const payload = placeSetCall[1];
+    const src = payload?.properties?.src;
+
+    expect(typeof src).toBe('string');
+    expect(src).toContain('/emoji-assets/');
+    expect(src.startsWith('data:image/')).toBe(false);
+  });
 });

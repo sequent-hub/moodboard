@@ -470,10 +470,11 @@ export class ToolbarPopupsController {
                             const target = 64;
                             const targetW = target;
                             const targetH = target;
+                            const placementSrc = this.resolveEmojiPlacementSrc(cat, emojiCode, url);
                             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
                             this.toolbar.eventBus.emit(Events.Place.Set, {
                                 type: 'image',
-                                properties: { src: url, width: targetW, height: targetH, isEmojiIcon: true },
+                                properties: { src: placementSrc, width: targetW, height: targetH, isEmojiIcon: true },
                                 size: { width: targetW, height: targetH },
                                 placeOnMouseUp: true
                             });
@@ -508,11 +509,12 @@ export class ToolbarPopupsController {
                     const target = 64;
                     const targetW = target;
                     const targetH = target;
+                    const placementSrc = this.resolveEmojiPlacementSrc(cat, emojiCode, url);
 
                     this.toolbar.eventBus.emit(Events.Place.Set, {
                         type: 'image',
                         properties: {
-                            src: url,
+                            src: placementSrc,
                             width: targetW,
                             height: targetH,
                             isEmojiIcon: true,
@@ -531,6 +533,24 @@ export class ToolbarPopupsController {
             this.toolbar.emojiPopupEl.appendChild(section);
         });
         this.toolbar.container.appendChild(this.toolbar.emojiPopupEl);
+    }
+
+    resolveEmojiPlacementSrc(category, emojiCode, fallbackUrl) {
+        const basePath = this.getEmojiBasePath();
+        if (!emojiCode || !basePath) {
+            return fallbackUrl;
+        }
+
+        const normalizeBase = basePath.endsWith('/') ? basePath : `${basePath}/`;
+        const encodedCategory = encodeURIComponent(category || 'Разное');
+        const encodedEmojiCode = encodeURIComponent(emojiCode);
+        const relativePath = `${encodedCategory}/${encodedEmojiCode}.png`;
+
+        try {
+            return new URL(relativePath, normalizeBase).href;
+        } catch (_) {
+            return `${normalizeBase}${relativePath}`;
+        }
     }
 
     getFallbackEmojiGroups() {
