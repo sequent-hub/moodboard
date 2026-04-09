@@ -510,7 +510,9 @@ export function openMindmapEditor(object, create = false) {
         const sideButton = (typeof target.closest === 'function')
             ? target.closest('.mb-mindmap-side-btn')
             : null;
-        if (sideButton?.dataset?.side === 'bottom') return;
+        // Allow all mindmap "+" buttons to complete their click flow
+        // without collapsing current selection in capture phase.
+        if (sideButton) return;
         finalize(true);
         if (typeof this.clearSelection === 'function') {
             this.clearSelection();

@@ -209,7 +209,10 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
         if (!(targetX === currentX && targetY === currentY)) {
             core.updateObjectPositionDirect(node.id, { x: targetX, y: targetY }, { snap: false });
             eventBus.emit(Events.Object.TransformUpdated, { objectId: node.id });
-            eventBus.emit(Events.Tool.DragUpdate, { object: node.id });
+            eventBus.emit(Events.Tool.DragUpdate, {
+                object: node.id,
+                position: { x: targetX, y: targetY },
+            });
             movedPositions.set(node.id, { x: targetX, y: targetY });
 
             const dx = Math.round(targetX - currentX);
@@ -233,7 +236,10 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
                     };
                     core.updateObjectPositionDirect(descId, nextPos, { snap: false });
                     eventBus.emit(Events.Object.TransformUpdated, { objectId: descId });
-                    eventBus.emit(Events.Tool.DragUpdate, { object: descId });
+                    eventBus.emit(Events.Tool.DragUpdate, {
+                        object: descId,
+                        position: nextPos,
+                    });
                     movedPositions.set(descId, nextPos);
                 });
             }
@@ -965,7 +971,10 @@ export class HandlesDomRenderer {
                     const nextPos = { x: Math.round(Number(snap.x) + dx), y: Math.round(Number(snap.y) + dy) };
                     core.updateObjectPositionDirect(nodeId, nextPos, { snap: false });
                     eventBus.emit(Events.Object.TransformUpdated, { objectId: nodeId });
-                    eventBus.emit(Events.Tool.DragUpdate, { object: nodeId });
+                    eventBus.emit(Events.Tool.DragUpdate, {
+                        object: nodeId,
+                        position: nextPos,
+                    });
                 });
                 translatedScopeByCompound.set(compoundId, moveScopeIds);
                 logMindmapCompoundDebug('layout:drag-end-translate-scope', {
@@ -994,7 +1003,10 @@ export class HandlesDomRenderer {
                 const nextPos = { x: Math.round(snap.x), y: Math.round(snap.y) };
                 core.updateObjectPositionDirect(nodeId, nextPos, { snap: false });
                 eventBus.emit(Events.Object.TransformUpdated, { objectId: nodeId });
-                eventBus.emit(Events.Tool.DragUpdate, { object: nodeId });
+                eventBus.emit(Events.Tool.DragUpdate, {
+                    object: nodeId,
+                    position: nextPos,
+                });
             });
             logMindmapCompoundDebug('layout:drag-end-restore-compound', {
                 compoundId,
