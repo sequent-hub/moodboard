@@ -9,11 +9,38 @@ function getSelectTool(board) {
         || null;
 }
 
-function hasOpenTextEditorInDom(board) {
-    const doc = board?.workspaceElement?.ownerDocument
-        || (typeof document !== 'undefined' ? document : null);
-    if (!doc || typeof doc.querySelector !== 'function') return false;
-    return Boolean(doc.querySelector('.moodboard-text-input'));
+function shouldOpenEditorForObject(objectType) {
+    return objectType === 'mindmap'
+        || objectType === 'text'
+        || objectType === 'simple-text'
+        || objectType === 'note'
+        || objectType === 'file';
+}
+
+function focusCreatedObject(board, createdObject) {
+    if (!board?.coreMoodboard?.eventBus || !createdObject?.id) return;
+    const objectType = createdObject?.type || null;
+    const objectPayload = {
+        id: createdObject.id,
+        type: objectType,
+        position: createdObject.position || null,
+        properties: createdObject.properties || {},
+    };
+
+    // Run after object is mounted so selection/HTML overlays can sync first.
+    setTimeout(() => {
+        board.coreMoodboard.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+        const selectTool = getSelectTool(board);
+        if (typeof selectTool?.setSelection === 'function') {
+            selectTool.setSelection([createdObject.id]);
+        }
+        if (shouldOpenEditorForObject(objectType)) {
+            board.coreMoodboard.eventBus.emit(Events.Tool.ObjectEdit, {
+                object: objectPayload,
+                create: true,
+            });
+        }
+    }, 0);
 }
 
 export function bindToolbarEvents(board) {
@@ -26,63 +53,8 @@ export function bindToolbarEvents(board) {
             });
         }
         const createdObject = board.actionHandler.handleToolbarAction(action);
-        if (action?.type === 'mindmap' && createdObject?.id) {
-            const content = String(createdObject?.properties?.content || '');
-            const createdMeta = createdObject?.properties?.mindmap || {};
-            const isRootMindmap = createdMeta?.role === 'root';
-            const mindmapObjects = (board?.coreMoodboard?.state?.state?.objects || [])
-                .filter((obj) => obj?.type === 'mindmap');
-            const rootCount = mindmapObjects.filter((obj) => (obj?.properties?.mindmap?.role || null) === 'root').length;
-            const shouldAutoOpenForRoot = !isRootMindmap || rootCount <= 1;
-            const selectTool = getSelectTool(board);
-            const hasActiveEditor = Boolean(selectTool?.textEditor?.active);
-            const hasEditorDom = hasOpenTextEditorInDom(board);
-            const shouldBlockAutoOpen = hasActiveEditor && hasEditorDom;
-            if (content.trim().length === 0 && !shouldBlockAutoOpen && shouldAutoOpenForRoot) {
-                const doc = board?.workspaceElement?.ownerDocument
-                    || (typeof document !== 'undefined' ? document : null);
-                const closeSeqAtSchedule = Number(selectTool?._mindmapEditorCloseSeq || 0);
-                let cancelledByPointer = false;
-                const cancelOnPointerDown = () => {
-                    cancelledByPointer = true;
-                };
-                const cancelOnEscape = (event) => {
-                    if (event?.key === 'Escape') {
-                        cancelledByPointer = true;
-                    }
-                };
-                if (doc && typeof doc.addEventListener === 'function') {
-                    doc.addEventListener('pointerdown', cancelOnPointerDown, true);
-                    doc.addEventListener('keydown', cancelOnEscape, true);
-                }
-                setTimeout(() => {
-                    if (doc && typeof doc.removeEventListener === 'function') {
-                        doc.removeEventListener('pointerdown', cancelOnPointerDown, true);
-                        doc.removeEventListener('keydown', cancelOnEscape, true);
-                    }
-                    if (cancelledByPointer) return;
-                    const latestSelectTool = getSelectTool(board);
-                    const latestCloseSeq = Number(latestSelectTool?._mindmapEditorCloseSeq || 0);
-                    if (latestCloseSeq !== closeSeqAtSchedule) return;
-
-                    const nextSelectTool = getSelectTool(board);
-                    const nextHasActiveEditor = Boolean(nextSelectTool?.textEditor?.active);
-                    const nextHasEditorDom = hasOpenTextEditorInDom(board);
-                    if (nextHasActiveEditor || nextHasEditorDom) {
-                        return;
-                    }
-                    board.coreMoodboard.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
-                    board.coreMoodboard.eventBus.emit(Events.Tool.ObjectEdit, {
-                        object: {
-                            id: createdObject.id,
-                            type: 'mindmap',
-                            position: createdObject.position || null,
-                            properties: createdObject.properties || {},
-                        },
-                        create: true,
-                    });
-                }, 0);
-            }
+        if (createdObject?.id) {
+            focusCreatedObject(board, createdObject);
         }
     });
 
