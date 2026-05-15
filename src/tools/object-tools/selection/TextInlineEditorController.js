@@ -143,6 +143,8 @@ export function openTextEditor(object, create = false) {
     // Базовые стили вынесены в CSS (.moodboard-text-editor)
 
     const textarea = createTextEditorTextarea(content || '');
+    // Без доступного статичного HTML-элемента (часто при create) не оставляем Caveat как fallback.
+    textarea.style.fontFamily = isNote ? 'Caveat, Arial, cursive' : 'Roboto, Arial, sans-serif';
 
     // Вычисляем межстрочный интервал; подгоняем к реальным значениям HTML-отображения
     let lhInitial = computeTextEditorLineHeightPx(effectiveFontPx);
@@ -380,7 +382,7 @@ export function openTextEditor(object, create = false) {
     }
 
     // Для записок размеры уже установлены выше, пропускаем эту логику
-    if (!isNote) {
+    if (!isNote && !create) {
         if (initialWpx) {
             textarea.style.width = `${initialWpx}px`;
             wrapper.style.width = `${initialWpx}px`;
@@ -391,13 +393,29 @@ export function openTextEditor(object, create = false) {
         }
     }
     // Автоподгон
+    const syncRegularTextSizeToObject = !isNote && objectId
+        ? ({ widthPx, heightPx }) => {
+            try {
+                const scaleX = (worldLayerRef?.scale?.x) || 1;
+                const widthWorld = Math.max(1, Math.round(widthPx * viewRes / scaleX));
+                const heightWorld = Math.max(1, Math.round(heightPx * viewRes / scaleX));
+                const posReq = { objectId, position: null };
+                this.eventBus.emit(Events.Tool.GetObjectPosition, posReq);
+                this.eventBus.emit(Events.Tool.ResizeUpdate, {
+                    object: objectId,
+                    size: { width: widthWorld, height: heightWorld },
+                    position: posReq.position || { x: position.x, y: position.y },
+                });
+            } catch (_) {}
+        }
+        : null;
+
     const autoSize = createRegularTextAutoSize({
         textarea,
         wrapper,
         minWBound,
         minHBound,
-        effectiveFontPx,
-        computeLineHeightPx: computeTextEditorLineHeightPx,
+        onSizeChange: syncRegularTextSizeToObject,
     });
 
     // Вызываем autoSize только для обычного текста

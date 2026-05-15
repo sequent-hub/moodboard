@@ -6,32 +6,28 @@ export function createRegularTextAutoSize({
     wrapper,
     minWBound,
     minHBound,
-    effectiveFontPx,
-    computeLineHeightPx,
+    onSizeChange,
 }) {
     const MAX_AUTO_WIDTH = 360;
-    const BASELINE_FIX = 2;
 
     return () => {
         textarea.style.width = 'auto';
         textarea.style.height = 'auto';
 
-        const naturalW = textarea.scrollWidth + 1;
-        const targetW = Math.min(MAX_AUTO_WIDTH, Math.max(minWBound, naturalW));
+        const naturalW = Math.max(1, Math.ceil(textarea.scrollWidth + 1));
+        const targetW = Math.round(Math.min(MAX_AUTO_WIDTH, Math.max(minWBound, naturalW)));
         textarea.style.width = `${targetW}px`;
         wrapper.style.width = `${targetW}px`;
 
         textarea.style.height = 'auto';
-        const adjust = BASELINE_FIX;
-        const computed = (typeof window !== 'undefined') ? window.getComputedStyle(textarea) : null;
-        const lineH = (computed ? parseFloat(computed.lineHeight) : computeLineHeightPx(effectiveFontPx)) + 10;
-        const rawH = textarea.scrollHeight;
-        const lines = lineH > 0 ? Math.max(1, Math.round(rawH / lineH)) : 1;
-        const targetH = lines <= 1
-            ? Math.max(minHBound, Math.max(1, lineH - BASELINE_FIX))
-            : Math.max(minHBound, Math.max(1, rawH - adjust));
+        const naturalH = Math.max(1, Math.ceil(textarea.scrollHeight));
+        const targetH = Math.round(Math.max(minHBound, naturalH));
         textarea.style.height = `${targetH}px`;
         wrapper.style.height = `${targetH}px`;
+
+        if (typeof onSizeChange === 'function') {
+            onSizeChange({ widthPx: targetW, heightPx: targetH });
+        }
     };
 }
 
