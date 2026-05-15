@@ -99,7 +99,10 @@ export class TextPropertiesPanel {
             this.panel = createTextPropertiesPanelRenderer(this);
             this.layer.appendChild(this.panel);
             bindTextPropertiesPanelControls(this);
+        }
+        if (!this._docMouseDownAttached) {
             document.addEventListener('mousedown', this._onDocMouseDown, true);
+            this._docMouseDownAttached = true;
         }
 
         this.panel.style.display = 'flex';
@@ -116,7 +119,10 @@ export class TextPropertiesPanel {
 
         this._hideColorDropdown();
         this._hideBgColorDropdown();
-        document.removeEventListener('mousedown', this._onDocMouseDown, true);
+        if (this._docMouseDownAttached) {
+            document.removeEventListener('mousedown', this._onDocMouseDown, true);
+            this._docMouseDownAttached = false;
+        }
     }
 
     _toggleColorDropdown() {

@@ -106,7 +106,8 @@ describe('TextInlineEditorController baseline: open/close flow', () => {
 
         expect(ctx.textEditor.objectId).toBe('text-second');
         expect(ctx.textEditor.textarea.value).toBe('second');
-        expect(document.querySelectorAll('.moodboard-text-editor').length).toBeGreaterThan(wrappersBefore);
+        // После закрытия предыдущего редактора wrapper удаляется; в DOM остаётся ровно один активный wrapper.
+        expect(document.querySelectorAll('.moodboard-text-editor').length).toBe(wrappersBefore);
         expect(collectEventPayloads(eventBus, Events.Object.ContentChange)).toContainEqual({
             objectId: 'text-first',
             oldContent: 'first',

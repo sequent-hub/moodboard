@@ -267,6 +267,16 @@ export function closeTextEditorFromState(controller, commit) {
         textarea.remove();
     }
     controller.textEditor = { active: false, objectId: null, textarea: null, world: null, objectType: 'text' };
+
+    // Синхронно с createTextEditorFinalize: UI (в т.ч. панель свойств текста) ждёт окончание редактирования.
+    if (objectType === 'note') {
+        controller.eventBus.emit(Events.UI.NoteEditEnd, { objectId: objectId || null });
+        showNotePixiText(controller, objectId);
+    } else {
+        controller.eventBus.emit(Events.UI.TextEditEnd, { objectId: objectId || null });
+    }
+    updateGlobalTextEditorHandlesLayer();
+
     if (!commitValue) {
         if (shouldDeleteEmptyNewCreation) {
             controller.eventBus.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });

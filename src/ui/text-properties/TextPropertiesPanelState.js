@@ -21,6 +21,7 @@ export function createTextPropertiesPanelState() {
         _bgPresetButtons: [],
         _onColorDocumentClick: null,
         _onBgDocumentClick: null,
+        _docMouseDownAttached: false,
     };
 }
 
@@ -36,4 +37,5 @@ export function clearTextPropertiesPanelState(panel) {
     panel._eventBridgeHandlers = null;
     panel._onColorDocumentClick = null;
     panel._onBgDocumentClick = null;
+    panel._docMouseDownAttached = false;
 }
