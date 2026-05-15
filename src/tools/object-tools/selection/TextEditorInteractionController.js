@@ -120,7 +120,11 @@ export function createTextEditorFinalize(controller, {
         updateGlobalTextEditorHandlesLayer();
 
         if (!commitValue) {
-            if (isNewCreation && objectId) {
+            // Safety against race conditions: when a newly-created editor is blurred by
+            // tool-switch/outside click, do not auto-delete the object. Explicit cancel
+            // (Esc -> commit === false) still removes empty creation.
+            const shouldDeleteEmptyNewCreation = isNewCreation && objectId && commit === false;
+            if (shouldDeleteEmptyNewCreation) {
                 controller.eventBus.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
             }
             return;
