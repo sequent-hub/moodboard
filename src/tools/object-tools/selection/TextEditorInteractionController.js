@@ -221,6 +221,9 @@ export function bindTextEditorInteractions(controller, {
 export function closeTextEditorFromState(controller, commit) {
     const textarea = controller.textEditor.textarea;
     if (!textarea) return;
+    const wrapper = controller.textEditor.wrapper || null;
+    const removeDomListeners = controller.textEditor._removeDomListeners || null;
+    const placeholderStyleEl = controller.textEditor._phStyle || null;
     const value = textarea.value.trim();
     const commitValue = commit && value.length > 0;
     const objectType = controller.textEditor.objectType || 'text';
@@ -252,7 +255,17 @@ export function closeTextEditorFromState(controller, commit) {
         }
     }
 
-    textarea.remove();
+    if (typeof removeDomListeners === 'function') {
+        try { removeDomListeners(); } catch (_) {}
+    }
+    if (placeholderStyleEl && typeof placeholderStyleEl.remove === 'function') {
+        try { placeholderStyleEl.remove(); } catch (_) {}
+    }
+    if (wrapper && typeof wrapper.remove === 'function') {
+        wrapper.remove();
+    } else {
+        textarea.remove();
+    }
     controller.textEditor = { active: false, objectId: null, textarea: null, world: null, objectType: 'text' };
     if (!commitValue) {
         if (shouldDeleteEmptyNewCreation) {
