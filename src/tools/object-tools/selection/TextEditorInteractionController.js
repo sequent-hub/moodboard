@@ -172,12 +172,21 @@ export function bindTextEditorInteractions(controller, {
     finalize,
 }) {
     const blurHandler = () => {
-        const value = (textarea.value || '').trim();
-        if (isNewCreation && value.length === 0) {
-            finalize(false);
-            return;
-        }
-        finalize(true);
+        const editorObjectId = controller?.textEditor?.objectId || null;
+        setTimeout(() => {
+            // Если редактор уже закрыт/переключен другим обработчиком (outside click),
+            // blur не должен дублировать finalize.
+            if (!controller?.textEditor?.active) return;
+            if ((controller?.textEditor?.objectId || null) !== editorObjectId) return;
+            if (controller?.textEditor?._closingByOutside) return;
+
+            const value = (textarea.value || '').trim();
+            if (isNewCreation && value.length === 0) {
+                finalize(false);
+                return;
+            }
+            finalize(true);
+        }, 0);
     };
 
     const keydownHandler = (e) => {
@@ -220,6 +229,7 @@ export function closeTextEditorFromState(controller, commit) {
     const properties = controller.textEditor.properties;
     const isNewCreation = controller.textEditor.isNewCreation;
     const initialContent = controller.textEditor.initialContent ?? '';
+    const shouldDeleteEmptyNewCreation = !commitValue && !!isNewCreation && !!objectId;
 
     if (objectId) {
         if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
@@ -244,7 +254,12 @@ export function closeTextEditorFromState(controller, commit) {
 
     textarea.remove();
     controller.textEditor = { active: false, objectId: null, textarea: null, world: null, objectType: 'text' };
-    if (!commitValue) return;
+    if (!commitValue) {
+        if (shouldDeleteEmptyNewCreation) {
+            controller.eventBus.emit(Events.Tool.ObjectsDelete, { objects: [objectId] });
+        }
+        return;
+    }
     if (objectId == null) {
         controller.eventBus.emit(Events.UI.ToolbarAction, {
             type: objectType,

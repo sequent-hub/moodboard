@@ -58,8 +58,22 @@ export function openTextEditor(object, create = false) {
         return;
     }
 
-    // Закрываем предыдущий редактор, если он открыт
-    if (this.textEditor.active) this._closeTextEditor(true);
+    // Закрываем предыдущий редактор, если он открыт.
+    // Защита от повторного открытия того же объекта в один цикл событий:
+    // не пересоздаём textarea/обёртку, если уже редактируем этот объект.
+    if (this.textEditor.active) {
+        const sameEditorObject = !!(
+            objectId &&
+            this.textEditor.objectId &&
+            this.textEditor.objectId === objectId &&
+            this.textEditor.objectType === objectType
+        );
+        if (sameEditorObject && this.textEditor.textarea) {
+            try { this.textEditor.textarea.focus(); } catch (_) {}
+            return;
+        }
+        this._closeTextEditor(true);
+    }
 
     // Если это редактирование существующего объекта, получаем его данные
     if (!create && objectId) {

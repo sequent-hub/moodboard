@@ -3,6 +3,9 @@ import { Events } from '../../../core/events/Events.js';
 export function onMouseDown(event) {
     // Если активен текстовый редактор, закрываем его при клике вне
     if (this.textEditor.active) {
+        // Помечаем, что закрытие инициировано кликом вне редактора.
+        // Это используется в blur-handler, чтобы избежать двойного finalize в одном цикле.
+        this.textEditor._closingByOutside = true;
         const activeEditorType = this.textEditor.objectType;
         if (this.textEditor.objectType === 'file') {
             this._closeFileNameEditor(true);
