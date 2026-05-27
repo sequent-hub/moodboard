@@ -1,0 +1,457 @@
+@font-face {
+    font-family: 'GeistSans';
+    src: url('../../assets/fonts/geist/geist-sans-latin-400-normal.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Чат-окно ИИ-ассистента (фикс-позиционирование в нижней части мудборда) */
+
+.moodboard-chat {
+    position: absolute;
+    left: 50%;
+    bottom: 32px;
+    transform: translateX(-50%);
+    width: min(720px, 96%);
+    z-index: 2500;
+    pointer-events: auto;
+    font-family: 'Roboto', Arial, sans-serif;
+    color: #374151;
+}
+
+.moodboard-chat__history {
+    max-height: 360px;
+    overflow-y: auto;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    scroll-behavior: smooth;
+}
+
+.moodboard-chat__history.is-visible {
+    display: flex;
+}
+
+.moodboard-chat__msg {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 100%;
+}
+
+.moodboard-chat__msg-role {
+    font-size: 11px;
+    color: #9CA3AF;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.moodboard-chat__msg-body {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #374151;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.moodboard-chat__msg--user .moodboard-chat__msg-body {
+    color: #111827;
+    font-weight: 500;
+}
+
+.moodboard-chat__msg--error .moodboard-chat__msg-body {
+    color: #B91C1C;
+}
+
+.moodboard-chat__msg-cursor {
+    display: inline-block;
+    width: 6px;
+    height: 1em;
+    margin-left: 2px;
+    background: #9CA3AF;
+    vertical-align: text-bottom;
+    animation: moodboard-chat-blink 1s steps(1) infinite;
+}
+
+@keyframes moodboard-chat-blink {
+    50% { opacity: 0; }
+}
+
+.moodboard-chat__composer {
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    padding: 14px 16px 10px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.moodboard-chat__input-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.moodboard-chat__textarea {
+    flex: 1;
+    border: 0;
+    outline: 0;
+    resize: none;
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.4;
+    color: #374151;
+    background: transparent;
+    padding: 6px 0;
+    min-height: 24px;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.moodboard-chat__textarea::placeholder {
+    color: #9CA3AF;
+}
+
+.moodboard-chat__settings-trigger {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #6B7280;
+    transition: background-color 120ms ease;
+}
+
+.moodboard-chat__settings-trigger:hover {
+    background: #F3F4F6;
+    color: #374151;
+}
+
+.moodboard-chat__actions-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: nowrap;
+    overflow: visible;
+}
+
+.moodboard-chat__pills {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+    overflow: visible;
+    flex-wrap: wrap;
+}
+
+.moodboard-chat__pill {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 6px 8px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #6B7280;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+.moodboard-chat__pill:hover:not(:disabled) {
+    background: #F3F4F6;
+    color: #374151;
+}
+
+.moodboard-chat__pill[disabled] {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.moodboard-chat__pill[data-active="true"] {
+    background: #EEF2FF;
+    color: #4338CA;
+}
+
+.moodboard-chat__pill-icon {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    display: inline-flex;
+}
+
+.moodboard-chat__pill-icon-wrap {
+    display: inline-flex;
+}
+
+.moodboard-chat__pill-label {
+    font-family: 'GeistSans', 'GeistSans Fallback', 'Roboto', Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: normal;
+    color: lab(5.0601 0 0);
+}
+
+.moodboard-chat__send-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+}
+
+.moodboard-chat__attach {
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    cursor: not-allowed;
+    color: #9CA3AF;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+}
+
+.moodboard-chat__send {
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: #F3F4F6;
+    color: #9CA3AF;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+.moodboard-chat__send[data-state="ready"] {
+    background: #111827;
+    color: #ffffff;
+}
+
+.moodboard-chat__send[data-state="streaming"] {
+    background: #EF4444;
+    color: #ffffff;
+}
+
+.moodboard-chat__send:disabled {
+    cursor: not-allowed;
+}
+
+/* Выпадающее меню (общее для switch / preset) */
+.moodboard-chat__menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+    border: 1px solid #E5E7EB;
+    padding: 6px;
+    min-width: 200px;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 10;
+}
+
+.moodboard-chat__menu.is-open { display: flex; }
+
+.moodboard-chat__menu-item {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #374151;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.moodboard-chat__menu-item--rich {
+    align-items: flex-start;
+    justify-content: flex-start;
+    min-width: 340px;
+    padding: 8px;
+    gap: 10px;
+}
+
+.moodboard-chat__menu-item-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    overflow: hidden;
+    outline: 1px solid lab(5.0601% 0 0 / .0784);
+    outline-offset: -1px;
+    background: #F3F4F6;
+    color: #6B7280;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+.moodboard-chat__menu-item-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+.moodboard-chat__menu-item-label {
+    font-size: 13px;
+    line-height: 1.25;
+    color: #374151;
+}
+
+.moodboard-chat__menu-item-description,
+.moodboard-chat__menu-item-hint {
+    font-size: 11px;
+    line-height: 1.25;
+    color: #9CA3AF;
+}
+
+.moodboard-chat__menu-item:hover { background: #F3F4F6; }
+.moodboard-chat__menu-item[data-active="true"] { background: #EEF2FF; color: #4338CA; }
+.moodboard-chat__menu-item[data-active="true"] .moodboard-chat__menu-item-label { color: #4338CA; }
+.moodboard-chat__menu-item[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+.moodboard-chat__pill-wrapper {
+    position: relative;
+    display: inline-flex;
+}
+
+/* Грид-меню выбора формата изображения */
+.moodboard-chat__menu--grid {
+    min-width: 0;
+    width: max-content;
+}
+
+.moodboard-chat__menu--grid.is-open {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.moodboard-chat__menu--grid .moodboard-chat__menu-item {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 6px 4px 5px;
+    gap: 4px;
+    min-width: 0;
+}
+
+/* Сброс rich-стилей внутри грида */
+.moodboard-chat__menu--grid .moodboard-chat__menu-item--rich {
+    align-items: center;
+    min-width: 0;
+}
+
+.moodboard-chat__menu--grid .moodboard-chat__menu-item-icon {
+    width: auto;
+    height: auto;
+    background: transparent;
+    outline: none;
+    border-radius: 0;
+    color: #6B7280;
+}
+
+.moodboard-chat__menu--grid .moodboard-chat__menu-item-text {
+    flex: none;
+    text-align: center;
+}
+
+.moodboard-chat__menu--grid .moodboard-chat__menu-item-label {
+    font-size: 10px;
+    line-height: 1;
+    color: #6B7280;
+}
+
+.moodboard-chat__menu--grid .moodboard-chat__menu-item[data-active="true"] .moodboard-chat__menu-item-icon {
+    color: #374151;
+}
+
+.moodboard-chat__menu--grid .moodboard-chat__menu-item[data-active="true"] .moodboard-chat__menu-item-label {
+    color: #374151;
+}
+
+.moodboard-chat__ratio-icon {
+    display: block;
+}
+
+/* Попап настроек */
+.moodboard-chat__settings-popup {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 6px);
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+    border: 1px solid #E5E7EB;
+    padding: 12px;
+    width: 320px;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 10;
+}
+.moodboard-chat__settings-popup.is-open { display: flex; }
+
+.moodboard-chat__settings-field { display: flex; flex-direction: column; gap: 4px; }
+.moodboard-chat__settings-label { font-size: 11px; color: #6B7280; text-transform: uppercase; letter-spacing: 0.04em; }
+.moodboard-chat__settings-textarea,
+.moodboard-chat__settings-input {
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #111827;
+    background: #ffffff;
+    outline: none;
+    resize: vertical;
+}
+.moodboard-chat__settings-textarea { min-height: 60px; }
+.moodboard-chat__settings-textarea:focus,
+.moodboard-chat__settings-input:focus { border-color: #6366F1; }
+
+.moodboard-chat__settings-popup-row {
+    display: flex; align-items: center; gap: 8px; justify-content: flex-end;
+}
+
+.moodboard-chat__settings-clear {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: #B91C1C;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 6px;
+}
+.moodboard-chat__settings-clear:hover { background: #FEF2F2; }

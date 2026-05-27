@@ -14,6 +14,7 @@ import { TextPropertiesPanel } from '../../ui/TextPropertiesPanel.js';
 import { FramePropertiesPanel } from '../../ui/FramePropertiesPanel.js';
 import { NotePropertiesPanel } from '../../ui/NotePropertiesPanel.js';
 import { FilePropertiesPanel } from '../../ui/FilePropertiesPanel.js';
+import { ChatWindow } from '../../ui/chat/ChatWindow.js';
 import { bindToolbarEvents, bindTopbarEvents } from '../integration/MoodBoardEventBindings.js';
 
 function initToolbar(board) {
@@ -86,6 +87,12 @@ function initContextMenu(board) {
     );
 }
 
+function initChatWindow(board) {
+    if (board?.options?.disableChat === true) return;
+    board.chatWindow = new ChatWindow(board.workspaceElement);
+    board.chatWindow.attach();
+}
+
 function initHtmlLayersAndPanels(board) {
     board.htmlTextLayer = new HtmlTextLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
     board.htmlTextLayer.attach();
@@ -127,4 +134,5 @@ export function createMoodBoardUi(board) {
     }
     initContextMenu(board);
     initHtmlLayersAndPanels(board);
+    initChatWindow(board);
 }

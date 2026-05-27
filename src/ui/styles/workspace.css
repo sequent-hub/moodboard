@@ -1,5 +1,75 @@
 /* Fonts */
 @font-face {
+    font-family: 'GeistSans';
+    src: url('../../assets/fonts/geist/geist-sans-latin-100-normal.ttf') format('truetype');
+    font-weight: 100;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'GeistSans';
+    src: url('../../assets/fonts/geist/geist-sans-latin-200-normal.ttf') format('truetype');
+    font-weight: 200;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'GeistSans';
+    src: url('../../assets/fonts/geist/geist-sans-latin-300-normal.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'GeistSans';
+    src: url('../../assets/fonts/geist/geist-sans-latin-400-normal.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'GeistSans';
+    src: url('../../assets/fonts/geist/geist-sans-latin-500-normal.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'GeistSans';
+    src: url('../../assets/fonts/geist/geist-sans-latin-600-normal.ttf') format('truetype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'GeistSans';
+    src: url('../../assets/fonts/geist/geist-sans-latin-700-normal.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'GeistSans';
+    src: url('../../assets/fonts/geist/geist-sans-latin-800-normal.ttf') format('truetype');
+    font-weight: 800;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'GeistSans';
+    src: url('../../assets/fonts/geist/geist-sans-latin-900-normal.ttf') format('truetype');
+    font-weight: 900;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'GeistSans Fallback';
+    src: url('../../assets/fonts/geist/geist-sans-latin-400-normal.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
     font-family: 'Roboto';
     src: url('../../assets/fonts/roboto/Roboto-Regular.ttf') format('truetype');
     font-weight: 400;
@@ -1171,7 +1241,9 @@
 
 /* Tooltips */
 .moodboard-tooltip {
-    position: absolute;
+    position: fixed;
+    top: 0;
+    left: 0;
     background: rgba(0, 0, 0, 0.9);
     color: white;
     padding: 8px 12px;

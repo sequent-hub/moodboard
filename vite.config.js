@@ -11,6 +11,18 @@ export default defineConfig({
     // Настройки для загрузки SVG и шрифтов
     assetsInclude: ['**/*.svg', '**/*.woff2', '**/*.woff', '**/*.ttf'],
 
+    // Dev-прокси на локальный AI-прокси-сервер (server/).
+    // В прод-сборке этого роута нет — клиент будет ходить на реальный бэкенд.
+    server: {
+        proxy: {
+            '/api': {
+                target: 'http://localhost:3001',
+                changeOrigin: true,
+                ws: false
+            }
+        }
+    },
+
     build: {
         lib: {
             entry: 'src/index.js',

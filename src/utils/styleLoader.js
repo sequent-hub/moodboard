@@ -16,7 +16,8 @@ export class StyleLoader {
             'src/ui/styles/workspace.css',
             'src/ui/styles/toolbar.css', 
             'src/ui/styles/topbar.css',
-            'src/ui/styles/panels.css'
+            'src/ui/styles/panels.css',
+            'src/ui/styles/chat.css'
         ];
 
         for (const stylePath of styles) {

@@ -3,8 +3,11 @@ dist/
 .DS_Store
 *.log
 .env
+server/.env
+server/node_modules/
 .vscode/
 .idea/
 test-results/
 playwright-report/
 node_modules/.vite/
+vite.config.js.timestamp-*.mjs

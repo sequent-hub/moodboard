@@ -73,6 +73,9 @@ export function destroyMoodBoard(board) {
     safeDestroy(board.dotGridDebugPanel, 'dotGridDebugPanel');
     board.dotGridDebugPanel = null;
 
+    safeDestroy(board.chatWindow, 'chatWindow');
+    board.chatWindow = null;
+
     safeDestroy(board.coreMoodboard, 'coreMoodboard');
     board.coreMoodboard = null;
 
