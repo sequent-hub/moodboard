@@ -1,5 +1,5 @@
 /**
- * Композер: textarea + автогрузка + кнопка отправки.
+ * Композер: textarea + кнопка отправки.
  *
  * Одна ответственность: события ввода и отправки. Не знает про пиллы,
  * меню провайдеров и настройки — этим занимаются отдельные модули.
@@ -9,23 +9,22 @@
  *   onAbort()        — клик по send в состоянии 'streaming'
  */
 
-const MAX_HEIGHT = 160;
-
 export class ChatComposer {
     /**
-     * @param {{ textarea: HTMLTextAreaElement, send: HTMLButtonElement }} refs
+     * @param {{ textarea: HTMLTextAreaElement, send: HTMLButtonElement, enhancePrompt?: HTMLButtonElement }} refs
      * @param {{ onSubmit: (text: string) => void, onAbort: () => void }} handlers
      */
     constructor(refs, handlers) {
         this._textarea = refs.textarea;
         this._send = refs.send;
+        this._enhancePrompt = refs.enhancePrompt ?? null;
         this._handlers = handlers;
         this._listeners = [];
     }
 
     attach() {
         this._on(this._textarea, 'input', () => {
-            this._autoresize();
+            this._resizeTextarea();
             this._refreshSendState();
         });
         this._on(this._textarea, 'keydown', (e) => {
@@ -41,6 +40,7 @@ export class ChatComposer {
                 this._submit();
             }
         });
+        this._resizeTextarea();
         this._refreshSendState();
     }
 
@@ -71,22 +71,24 @@ export class ChatComposer {
         const trimmed = text.trim();
         if (!trimmed || this._send.dataset.state === 'streaming') return;
         this._textarea.value = '';
-        this._autoresize();
+        this._resizeTextarea();
         this._refreshSendState();
         this._handlers.onSubmit?.(trimmed);
-    }
-
-    _autoresize() {
-        const ta = this._textarea;
-        ta.style.height = 'auto';
-        const next = Math.min(ta.scrollHeight, MAX_HEIGHT);
-        ta.style.height = `${next}px`;
     }
 
     _refreshSendState() {
         const hasText = this._textarea.value.trim().length > 0;
         this._send.dataset.state = hasText ? 'ready' : 'idle';
         this._send.disabled = false;
+        if (this._enhancePrompt) {
+            this._enhancePrompt.dataset.empty = hasText ? 'false' : 'true';
+        }
+    }
+
+    _resizeTextarea() {
+        this._textarea.style.height = 'auto';
+        const nextHeight = Math.max(47, Math.ceil(this._textarea.scrollHeight));
+        this._textarea.style.height = `${nextHeight}px`;
     }
 
     _on(el, type, handler) {

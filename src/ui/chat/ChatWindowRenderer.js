@@ -11,7 +11,7 @@ import { ICONS } from './icons.js';
  *   .moodboard-chat
  *     ├ .moodboard-chat__history
  *     └ .moodboard-chat__composer
- *         ├ .moodboard-chat__input-row     (textarea + settings)
+ *         ├ .moodboard-chat__input-row     (textarea + prompt actions)
  *         └ .moodboard-chat__actions-row   (content type + pills + attach + send)
  */
 export function buildChatDom() {
@@ -46,26 +46,30 @@ function buildInputRow(collect) {
     const textarea = document.createElement('textarea');
     textarea.className = 'moodboard-chat__textarea';
     textarea.rows = 1;
-    textarea.placeholder = 'Describe what you want to generate';
+    textarea.placeholder = 'Опишите то, что хотите сгенерировать';
     textarea.setAttribute('aria-label', 'Сообщение');
     row.appendChild(textarea);
 
-    const settingsTriggerWrapper = document.createElement('div');
-    settingsTriggerWrapper.className = 'moodboard-chat__pill-wrapper';
+    const promptActionsWrapper = document.createElement('div');
+    promptActionsWrapper.className = 'moodboard-chat__pill-wrapper';
 
-    const settingsTrigger = document.createElement('button');
-    settingsTrigger.type = 'button';
-    settingsTrigger.className = 'moodboard-chat__settings-trigger';
-    settingsTrigger.setAttribute('aria-label', 'Настройки чата');
-    settingsTrigger.innerHTML = ICONS.sliders;
-    settingsTriggerWrapper.appendChild(settingsTrigger);
+    const enhancePrompt = createInputIconButton(
+        'enhance-prompt',
+        'Улучшить промпт',
+        ICONS.enhancePrompt
+    );
+    enhancePrompt.dataset.empty = 'true';
+    const extendPromptField = createInputIconButton(
+        'extend-promt-field',
+        'Развернуть поле ввода',
+        ICONS.extendPromptField
+    );
 
-    const settingsPopup = createDiv('moodboard-chat__settings-popup');
-    settingsTriggerWrapper.appendChild(settingsPopup);
+    promptActionsWrapper.appendChild(enhancePrompt);
+    promptActionsWrapper.appendChild(extendPromptField);
+    row.appendChild(promptActionsWrapper);
 
-    row.appendChild(settingsTriggerWrapper);
-
-    collect({ textarea, settingsTrigger, settingsPopup });
+    collect({ textarea, enhancePrompt, extendPromptField });
     return row;
 }
 
@@ -74,20 +78,20 @@ function buildActionsRow(collect) {
 
     const pills = createDiv('moodboard-chat__pills');
 
-    const contentTypeWrapper = pillWithMenu('Изображение', ICONS.image);
+    const contentTypeWrapper = pillWithMenu('Изображение', ICONS.image, 'chat-menu-content-type');
     contentTypeWrapper.pill.title = 'Тип генерируемого контента';
     contentTypeWrapper.pill.setAttribute('aria-label', 'Тип генерируемого контента');
 
-    const modelWrapper = pillWithMenu('Алиса', ICONS.model);
+    const modelWrapper = pillWithMenu('Алиса', ICONS.model, 'chat-menu-model');
     modelWrapper.pill.title = 'Модель ИИ';
     modelWrapper.pill.setAttribute('aria-label', 'Модель ИИ');
 
-    const formatWrapper = pillWithMenu('Auto', ICONS.ratio);
+    const formatWrapper = pillWithMenu('Auto', ICONS.ratio, 'chat-menu-format');
     formatWrapper.pill.title = 'Формат изображения';
     formatWrapper.pill.setAttribute('aria-label', 'Формат изображения');
     formatWrapper.menu.classList.add('moodboard-chat__menu--grid');
 
-    const countWrapper = pillWithMenu('Авто', ICONS.count);
+    const countWrapper = pillWithMenu('Авто', ICONS.count, 'chat-menu-count');
     countWrapper.pill.title = 'Количество изображений';
     countWrapper.pill.setAttribute('aria-label', 'Количество изображений');
 
@@ -104,14 +108,14 @@ function buildActionsRow(collect) {
     attach.disabled = true;
     attach.title = 'Вложения появятся позже';
     attach.setAttribute('aria-label', 'Вложение (недоступно)');
-    attach.innerHTML = ICONS.paperclip;
+    attach.innerHTML = ICONS.attach;
 
     const send = document.createElement('button');
     send.type = 'button';
     send.className = 'moodboard-chat__send';
     send.dataset.state = 'idle';
     send.setAttribute('aria-label', 'Отправить');
-    send.innerHTML = ICONS.arrowUp;
+    send.innerHTML = ICONS.send;
 
     sendRow.appendChild(attach);
     sendRow.appendChild(send);
@@ -142,7 +146,7 @@ function buildActionsRow(collect) {
     return row;
 }
 
-function pillWithMenu(label, iconSvg) {
+function pillWithMenu(label, iconSvg, menuId) {
     const wrapper = document.createElement('div');
     wrapper.className = 'moodboard-chat__pill-wrapper';
 
@@ -151,6 +155,7 @@ function pillWithMenu(label, iconSvg) {
     pill.className = 'moodboard-chat__pill';
     pill.setAttribute('aria-haspopup', 'menu');
     pill.setAttribute('aria-expanded', 'false');
+    if (menuId) pill.setAttribute('aria-controls', menuId);
 
     const iconSpan = document.createElement('span');
     iconSpan.className = 'moodboard-chat__pill-icon-wrap';
@@ -165,10 +170,20 @@ function pillWithMenu(label, iconSvg) {
 
     const menu = createDiv('moodboard-chat__menu');
     menu.setAttribute('role', 'menu');
+    if (menuId) menu.id = menuId;
 
     wrapper.appendChild(pill);
     wrapper.appendChild(menu);
     return { wrapper, pill, menu, labelEl, iconEl: iconSpan };
+}
+
+function createInputIconButton(name, ariaLabel, iconSvg) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `moodboard-chat__input-icon-btn moodboard-chat__input-icon-btn--${name}`;
+    button.setAttribute('aria-label', ariaLabel);
+    button.innerHTML = iconSvg;
+    return button;
 }
 
 function createDiv(className) {

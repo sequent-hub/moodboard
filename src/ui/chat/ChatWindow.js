@@ -6,8 +6,8 @@ import { buildChatDom } from './ChatWindowRenderer.js';
 import { ChatMessageList } from './ChatMessageList.js';
 import { ChatComposer } from './ChatComposer.js';
 import { ChatPillMenu } from './ChatPillMenu.js';
-import { ChatSettingsPopup } from './ChatSettingsPopup.js';
-import { ICONS, RATIO_ICONS } from './icons.js';
+import { ChatExtendedPromptModal } from './ChatExtendedPromptModal.js';
+import { ICONS, RATIO_ICONS, COUNT_ICONS } from './icons.js';
 
 const CONTENT_TYPE_OPTIONS = [
     {
@@ -43,11 +43,11 @@ const FORMAT_OPTIONS = [
 ];
 
 const COUNT_OPTIONS = [
-    { id: 'auto', label: 'Авто',         icon: '<img src="/icons/auto-num.svg"     width="14" height="14" alt="Авто"          style="object-fit:contain;" />' },
-    { id: '1',    label: '1 Изображение', icon: '<img src="/icons/one-picture.svg"  width="14" height="14" alt="1 Изображение" style="object-fit:contain;" />' },
-    { id: '2',    label: '2 Изображения', icon: '<img src="/icons/two-pictures.svg" width="14" height="14" alt="2 Изображения" style="object-fit:contain;" />' },
-    { id: '3',    label: '3 Изображения', icon: '<img src="/icons/three-pictures.svg" width="14" height="14" alt="3 Изображения" style="object-fit:contain;" />' },
-    { id: '4',    label: '4 Изображения', icon: '<img src="/icons/four-pictures.svg"  width="14" height="14" alt="4 Изображения" style="object-fit:contain;" />' },
+    { id: 'auto', label: 'Авто',          icon: COUNT_ICONS.auto },
+    { id: '1',    label: '1 Изображение', icon: COUNT_ICONS[1]   },
+    { id: '2',    label: '2 Изображения', icon: COUNT_ICONS[2]   },
+    { id: '3',    label: '3 Изображения', icon: COUNT_ICONS[3]   },
+    { id: '4',    label: '4 Изображения', icon: COUNT_ICONS[4]   },
 ];
 
 const MODEL_OPTIONS = [
@@ -115,6 +115,7 @@ export class ChatWindow {
         this._refs = null;
         this._messageList = null;
         this._composer = null;
+        this._extendedPromptModal = null;
         this._contentTypeId = 'image';
         this._contentTypeMenu = null;
         this._modelId = 'auto';
@@ -123,7 +124,6 @@ export class ChatWindow {
         this._formatMenu = null;
         this._countId = 'auto';
         this._countMenu = null;
-        this._settingsPopup = null;
         this._unsubscribe = null;
         this._attached = false;
     }
@@ -136,13 +136,20 @@ export class ChatWindow {
         this._messageList = new ChatMessageList(this._refs.history);
 
         this._composer = new ChatComposer(
-            { textarea: this._refs.textarea, send: this._refs.send },
+            { textarea: this._refs.textarea, send: this._refs.send, enhancePrompt: this._refs.enhancePrompt },
             {
                 onSubmit: (text) => this._session.send(text),
                 onAbort: () => this._session.abort()
             }
         );
         this._composer.attach();
+
+        this._extendedPromptModal = new ChatExtendedPromptModal(
+            this._container,
+            this._refs.textarea,
+            this._refs.extendPromptField
+        );
+        this._extendedPromptModal.attach();
 
         this._contentTypeMenu = new ChatPillMenu(
             {
@@ -184,6 +191,7 @@ export class ChatWindow {
                     this._formatId = id;
                     this._formatMenu.refresh();
                     this._updateFormatPillIcon();
+                    this._updateFormatPillLabel();
                 }
             }
         );
@@ -203,16 +211,6 @@ export class ChatWindow {
         );
         this._countMenu.attach();
 
-        this._settingsPopup = new ChatSettingsPopup(
-            { trigger: this._refs.settingsTrigger, popup: this._refs.settingsPopup },
-            {
-                getSettings: () => this._session.getState().settings,
-                onChange: (patch) => this._session.updateSettings(patch),
-                onClearHistory: () => this._session.clearHistory()
-            }
-        );
-        this._settingsPopup.attach();
-
         this._unsubscribe = this._session.subscribe((state) => this._render(state));
         this._render(this._session.getState());
 
@@ -225,22 +223,22 @@ export class ChatWindow {
         if (!this._attached) return;
         if (this._unsubscribe) { this._unsubscribe(); this._unsubscribe = null; }
         this._composer?.destroy();
+        this._extendedPromptModal?.destroy();
         this._contentTypeMenu?.destroy();
         this._modelMenu?.destroy();
         this._formatMenu?.destroy();
         this._countMenu?.destroy();
-        this._settingsPopup?.destroy();
         if (this._refs?.root && this._refs.root.parentNode === this._container) {
             this._container.removeChild(this._refs.root);
         }
         this._refs = null;
         this._messageList = null;
         this._composer = null;
+        this._extendedPromptModal = null;
         this._contentTypeMenu = null;
         this._modelMenu = null;
         this._formatMenu = null;
         this._countMenu = null;
-        this._settingsPopup = null;
         this._attached = false;
     }
 
@@ -261,6 +259,12 @@ export class ChatWindow {
         iconWrap.innerHTML = RATIO_ICONS[this._formatId] ?? ICONS.ratio;
     }
 
+    _updateFormatPillLabel() {
+        const labelEl = this._refs?.formatLabel;
+        if (!labelEl) return;
+        labelEl.textContent = this._formatId === 'auto' ? 'Соотношение сторон' : this._formatId;
+    }
+
     async _loadProviders() {
         try {
             const list = await this._aiClient.listProviders();
@@ -278,9 +282,9 @@ export class ChatWindow {
         this._modelMenu.refresh();
         this._formatMenu.refresh();
         this._updateFormatPillIcon();
+        this._updateFormatPillLabel();
         this._countMenu.refresh();
         this._updateCountPillIcon();
-        this._settingsPopup.refresh();
         this._composer.setStreaming(state.status === 'streaming');
     }
 }

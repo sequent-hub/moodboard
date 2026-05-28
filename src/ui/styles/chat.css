@@ -84,59 +84,91 @@
 }
 
 .moodboard-chat__composer {
+    box-sizing: border-box;
+    min-height: 103px;
     background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-    padding: 14px 16px 10px 16px;
+    border-radius: 12px;
+    --color-shadow: lab(5.0601% 0 0 / .04);
+    box-shadow:
+        0 0 0 1px lab(5.0601% 0 0 / .0784),
+        0 2px 8px -1.5px var(--color-shadow),
+        0 5px 8px -3px var(--color-shadow),
+        0 12px 12px -8px var(--color-shadow),
+        0 24px 24px -8px var(--color-shadow);
+    padding: 0px 8px 8px 10px;
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
     gap: 10px;
 }
 
 .moodboard-chat__input-row {
+    position: relative;
     display: flex;
     align-items: flex-start;
     gap: 8px;
+    padding-bottom: 10px;
+}
+
+.moodboard-chat__input-row::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background-color: #ededed;
+    mask-image: linear-gradient(to right, #000 0%, rgba(0, 0, 0, 0.8) 30%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 0%, rgba(0, 0, 0, 0.8) 30%, transparent 100%);
+    pointer-events: none;
 }
 
 .moodboard-chat__textarea {
+    box-sizing: border-box;
     flex: 1;
     border: 0;
     outline: 0;
     resize: none;
     font-family: inherit;
-    font-size: 15px;
+    font-size: 14px;
     line-height: 1.4;
     color: #374151;
     background: transparent;
-    padding: 6px 0;
-    min-height: 24px;
-    max-height: 160px;
-    overflow-y: auto;
+    padding: 17px 0 6px;
+    min-height: 47px;
+    height: 47px;
+    overflow-y: hidden;
 }
 
 .moodboard-chat__textarea::placeholder {
     color: #9CA3AF;
 }
 
-.moodboard-chat__settings-trigger {
+.moodboard-chat__input-icon-btn {
     flex: 0 0 auto;
     width: 32px;
     height: 32px;
+    padding: 0;
     border: 0;
-    border-radius: 8px;
     background: transparent;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     color: #6B7280;
-    transition: background-color 120ms ease;
+    transition: color 120ms ease;
 }
 
-.moodboard-chat__settings-trigger:hover {
-    background: #F3F4F6;
+.moodboard-chat__input-icon-btn:hover {
     color: #374151;
+}
+
+.moodboard-chat__input-icon-btn--enhance-prompt[data-empty="true"] {
+    color: lab(5.0601 0 0 / 0.3216);
+}
+
+.moodboard-chat__input-icon-btn--enhance-prompt[data-empty="true"]:hover {
+    color: lab(5.0601 0 0 / 0.3216);
 }
 
 .moodboard-chat__actions-row {
@@ -144,13 +176,14 @@
     align-items: center;
     gap: 4px;
     flex-wrap: nowrap;
+    flex-shrink: 0;
     overflow: visible;
 }
 
 .moodboard-chat__pills {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: 14px;
     flex: 1;
     min-width: 0;
     overflow: visible;
@@ -161,7 +194,7 @@
     appearance: none;
     border: 0;
     background: transparent;
-    padding: 6px 8px;
+    padding: 0;
     border-radius: 8px;
     display: inline-flex;
     align-items: center;
@@ -195,8 +228,16 @@
     display: inline-flex;
 }
 
+.moodboard-chat__pill img,
+.moodboard-chat__pill svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+}
+
 .moodboard-chat__pill-icon-wrap {
     display: inline-flex;
+    color: lab(5.0601 0 0 / 0.6392);
 }
 
 .moodboard-chat__pill-label {
@@ -210,7 +251,7 @@
 .moodboard-chat__send-row {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     flex: 0 0 auto;
 }
 
@@ -221,19 +262,18 @@
     border-radius: 8px;
     background: transparent;
     cursor: not-allowed;
-    color: #9CA3AF;
+    color: lab(5.0601 0 0 / 0.6392);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    opacity: 0.6;
 }
 
 .moodboard-chat__send {
     width: 32px;
     height: 32px;
-    border: 0;
+    border: 1px solid lab(5.0601 0 0 / 0.0588);
     border-radius: 50%;
-    background: #F3F4F6;
+    background: lab(5.0601 0 0 / 0.0196);
     color: #9CA3AF;
     cursor: pointer;
     display: inline-flex;
@@ -263,9 +303,7 @@
     left: 0;
     background: #ffffff;
     border-radius: 12px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
-    border: 1px solid #E5E7EB;
-    padding: 6px;
+    padding: 3px;
     min-width: 200px;
     display: none;
     flex-direction: column;
@@ -273,7 +311,16 @@
     z-index: 10;
 }
 
-.moodboard-chat__menu.is-open { display: flex; }
+.moodboard-chat__menu.is-open {
+    display: flex;
+    overflow-y: hidden;
+    --color-shadow: lab(5.0601% 0 0 / .04);
+    box-shadow:
+        0 0 0 1px lab(5.0601% 0 0 / .0784),
+        0 2px 8px -1.5px var(--color-shadow),
+        0 5px 8px -3px var(--color-shadow),
+        0 12px 12px -8px var(--color-shadow);
+}
 
 .moodboard-chat__menu-item {
     appearance: none;
@@ -304,8 +351,6 @@
     height: 36px;
     border-radius: 6px;
     overflow: hidden;
-    outline: 1px solid lab(5.0601% 0 0 / .0784);
-    outline-offset: -1px;
     background: #F3F4F6;
     color: #6B7280;
     display: inline-flex;
@@ -343,6 +388,9 @@
 .moodboard-chat__pill-wrapper {
     position: relative;
     display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0;
 }
 
 /* Грид-меню выбора формата изображения */
@@ -455,3 +503,209 @@
     border-radius: 6px;
 }
 .moodboard-chat__settings-clear:hover { background: #FEF2F2; }
+
+/* Меню выбора типа контента */
+#chat-menu-content-type .moodboard-chat__menu-item[data-active="true"] {
+    background: transparent;
+    color: #374151;
+}
+
+#chat-menu-content-type .moodboard-chat__menu-item[data-active="true"] .moodboard-chat__menu-item-label {
+    color: #374151;
+}
+
+#chat-menu-content-type .moodboard-chat__menu-item[data-active="true"]::after {
+    content: '';
+    display: block;
+    width: 12px;
+    height: 12px;
+    margin-left: auto;
+    align-self: center;
+    flex-shrink: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' viewBox='0 0 12 12'%3E%3Cpath stroke='%23374151' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.2' d='M1.25 5.5 5 9.25 10.75 2'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 12px 12px;
+}
+
+/* Меню выбора количества изображений */
+#chat-menu-count {
+    width: auto;
+    min-width: 166px;
+    height: 166px;
+    overflow-y: hidden;
+}
+
+#chat-menu-count .moodboard-chat__menu-item--rich {
+    height: 32px;
+    padding: 8px;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+}
+
+#chat-menu-count .moodboard-chat__menu-item-icon {
+    width: auto;
+    height: auto;
+    background: none;
+    outline: none;
+}
+
+#chat-menu-count .moodboard-chat__menu-item-text {
+    min-width: 108px;
+}
+
+#chat-menu-count .moodboard-chat__menu-item[data-active="true"] {
+    background: transparent;
+    color: #374151;
+}
+
+#chat-menu-count .moodboard-chat__menu-item[data-active="true"] .moodboard-chat__menu-item-label {
+    color: #374151;
+}
+
+#chat-menu-count .moodboard-chat__menu-item[data-active="true"]::after {
+    content: '';
+    display: block;
+    width: 12px;
+    height: 12px;
+    margin-left: auto;
+    flex-shrink: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' viewBox='0 0 12 12'%3E%3Cpath stroke='%23374151' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.2' d='M1.25 5.5 5 9.25 10.75 2'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 12px 12px;
+}
+
+/* Развернутое поле ввода (Extended Prompt Modal) */
+.moodboard-chat__extended-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 3000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 0;
+}
+
+.moodboard-chat__extended-overlay.is-visible {
+    display: flex;
+}
+
+.moodboard-chat__extended-modal {
+    width: 600px;
+    height: 100%;
+    max-height: calc(100vh - 64px);
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 32px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.moodboard-chat__extended-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+.moodboard-chat__extended-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: #111827;
+}
+
+.moodboard-chat__extended-close {
+    background: transparent;
+    border: none;
+    color: #9CA3AF;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: color 120ms ease, background-color 120ms ease;
+}
+
+.moodboard-chat__extended-close:hover {
+    color: #374151;
+    background-color: #F3F4F6;
+}
+
+.moodboard-chat__extended-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #F3F4F6;
+    border-radius: 8px;
+    padding: 16px;
+    gap: 12px;
+}
+
+.moodboard-chat__extended-textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    resize: none;
+    outline: none;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #374151;
+}
+
+.moodboard-chat__extended-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+.moodboard-chat__extended-clear {
+    background: transparent;
+    border: none;
+    color: #9CA3AF;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0;
+    transition: color 120ms ease;
+}
+
+.moodboard-chat__extended-clear:hover {
+    color: #374151;
+}
+
+.moodboard-chat__extended-enhance {
+    background: transparent;
+    border: none;
+    color: #6B7280;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 120ms ease;
+}
+
+.moodboard-chat__extended-enhance:hover {
+    color: #374151;
+}
+
+.moodboard-chat__extended-enhance-icon {
+    display: inline-flex;
+    color: inherit;
+}
+
+.moodboard-chat__extended-enhance-icon svg {
+    width: 16px;
+    height: 16px;
+}
