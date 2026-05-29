@@ -23,16 +23,23 @@ export function buildChatDom() {
 
     const composer = createDiv('moodboard-chat__composer');
 
+    const statusBar = createDiv('moodboard-chat__status-bar');
+    statusBar.setAttribute('aria-live', 'polite');
+    statusBar.setAttribute('aria-atomic', 'true');
+    statusBar.innerHTML = '<span class="moodboard-chat__status-bar-text">Идёт процесс генерации изображения…</span>';
+
     const rendererRefs = {
         root,
         history,
-        composer
+        composer,
+        statusBar
     };
 
     composer.appendChild(buildInputRow(refs => Object.assign(rendererRefs, refs)));
     composer.appendChild(buildActionsRow(refs => Object.assign(rendererRefs, refs)));
 
     root.appendChild(history);
+    root.appendChild(statusBar);
     root.appendChild(composer);
 
     // input/actions добавили свои ссылки в rendererRefs через collect-callback'и выше.
@@ -43,12 +50,15 @@ export function buildChatDom() {
 function buildInputRow(collect) {
     const row = createDiv('moodboard-chat__input-row');
 
+    const attachmentsPreview = createDiv('moodboard-chat__attachments');
+
+    const textareaRow = createDiv('moodboard-chat__textarea-row');
+
     const textarea = document.createElement('textarea');
     textarea.className = 'moodboard-chat__textarea';
     textarea.rows = 1;
     textarea.placeholder = 'Опишите то, что хотите сгенерировать';
     textarea.setAttribute('aria-label', 'Сообщение');
-    row.appendChild(textarea);
 
     const promptActionsWrapper = document.createElement('div');
     promptActionsWrapper.className = 'moodboard-chat__pill-wrapper';
@@ -67,9 +77,12 @@ function buildInputRow(collect) {
 
     promptActionsWrapper.appendChild(enhancePrompt);
     promptActionsWrapper.appendChild(extendPromptField);
-    row.appendChild(promptActionsWrapper);
+    textareaRow.appendChild(textarea);
+    textareaRow.appendChild(promptActionsWrapper);
+    row.appendChild(attachmentsPreview);
+    row.appendChild(textareaRow);
 
-    collect({ textarea, enhancePrompt, extendPromptField });
+    collect({ textarea, enhancePrompt, extendPromptField, attachmentsPreview });
     return row;
 }
 
@@ -105,10 +118,17 @@ function buildActionsRow(collect) {
     const attach = document.createElement('button');
     attach.type = 'button';
     attach.className = 'moodboard-chat__attach';
-    attach.disabled = true;
-    attach.title = 'Вложения появятся позже';
-    attach.setAttribute('aria-label', 'Вложение (недоступно)');
+    attach.title = 'Прикрепить файл';
+    attach.setAttribute('aria-label', 'Прикрепить файл');
     attach.innerHTML = ICONS.attach;
+
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.multiple = true;
+    fileInput.accept = 'image/*,.pdf,.txt,.doc,.docx';
+    fileInput.className = 'moodboard-chat__file-input';
+    fileInput.setAttribute('aria-hidden', 'true');
+    fileInput.setAttribute('tabindex', '-1');
 
     const send = document.createElement('button');
     send.type = 'button';
@@ -118,13 +138,13 @@ function buildActionsRow(collect) {
     send.innerHTML = ICONS.send;
 
     sendRow.appendChild(attach);
+    sendRow.appendChild(fileInput);
     sendRow.appendChild(send);
 
     row.appendChild(pills);
     row.appendChild(sendRow);
 
     collect({
-        pills,
         contentTypePill: contentTypeWrapper.pill,
         contentTypeMenu: contentTypeWrapper.menu,
         contentTypeLabel: contentTypeWrapper.labelEl,
@@ -141,6 +161,7 @@ function buildActionsRow(collect) {
         countLabel: countWrapper.labelEl,
         countIcon: countWrapper.iconEl,
         attach,
+        fileInput,
         send
     });
     return row;

@@ -21,7 +21,7 @@ export class ChatMessageList {
     }
 
     /**
-     * @param {Array<{id: string, role: string, content: string, pending?: boolean, error?: string}>} messages
+     * @param {Array<{id: string, role: string, content: string, pending?: boolean, error?: string, imageBase64?: string, mimeType?: string}>} messages
      */
     render(messages) {
         const visible = messages.filter((m) => m.role !== 'system');
@@ -64,6 +64,8 @@ export class ChatMessageList {
 
         if (msg.error) {
             body.textContent = msg.error;
+        } else if (msg.imageBase64) {
+            body.textContent = msg.content || 'Изображение добавлено на доску.';
         } else if (msg.pending && !msg.content) {
             body.textContent = '…';
         } else {

@@ -1,5 +1,5 @@
 /**
- * Тонкий HTTP-клиент к /api/ai/<provider>/chat.
+ * Тонкий HTTP-клиент к /api/ai.
  *
  * Одна ответственность: общение с прокси-сервером (server/).
  * Не знает ни про UI, ни про localStorage. Возвращает обычные данные
@@ -99,6 +99,36 @@ export class AiClient {
             throw new Error('AiClient.chatStream: empty response body');
         }
         return { deltas: parseClientSse(res.body, signal) };
+    }
+
+    /**
+     * Генерация изображения через YandexART.
+     * @param {object} args
+     * @param {string} args.prompt
+     * @param {string} [args.negativePrompt]
+     * @param {number} [args.widthRatio]
+     * @param {number} [args.heightRatio]
+     * @param {number} [args.seed]
+     * @param {string} [args.mimeType]
+     * @param {string} [args.model]
+     * @param {AbortSignal} [args.signal]
+     * @returns {Promise<{operationId: string, imageBase64: string, mimeType: string}>}
+     */
+    async generateImage({ signal, ...payload }) {
+        const res = await this._fetch(`${this._baseUrl}/yandex-art/image`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload),
+            signal
+        });
+        if (!res.ok) {
+            const detail = await safeReadError(res);
+            throw new Error(`AiClient.generateImage (${res.status}): ${detail}`);
+        }
+        return res.json();
     }
 }
 

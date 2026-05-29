@@ -19,9 +19,12 @@ export function setupClipboardFlow(core) {
         };
     };
 
-    const ensureServerImage = async ({ src, name }) => {
+    const ensureServerImage = async ({ src, name, skipUpload }) => {
         const srcValue = typeof src === 'string' ? src.trim() : '';
         if (srcValue && !/^data:image\//i.test(srcValue) && !/^blob:/i.test(srcValue)) {
+            return { src: srcValue, name };
+        }
+        if (skipUpload && srcValue) {
             return { src: srcValue, name };
         }
         if (!core.imageUploadService) {
@@ -222,9 +225,9 @@ export function setupClipboardFlow(core) {
         core._cursor.y = y;
     });
 
-    core.eventBus.on(Events.UI.PasteImage, async ({ src, name }) => {
+    core.eventBus.on(Events.UI.PasteImage, async ({ src, name, skipUpload }) => {
         if (!src) return;
-        const uploaded = await ensureServerImage({ src, name });
+        const uploaded = await ensureServerImage({ src, name, skipUpload });
         if (!uploaded?.src) return;
         const view = core.pixi.app.view;
         const world = core.pixi.worldLayer || core.pixi.app.stage;
@@ -283,9 +286,9 @@ export function setupClipboardFlow(core) {
         }
     });
 
-    core.eventBus.on(Events.UI.PasteImageAt, async ({ x, y, src, name }) => {
+    core.eventBus.on(Events.UI.PasteImageAt, async ({ x, y, src, name, skipUpload }) => {
         if (!src) return;
-        const uploaded = await ensureServerImage({ src, name });
+        const uploaded = await ensureServerImage({ src, name, skipUpload });
         if (!uploaded?.src) return;
         const world = core.pixi.worldLayer || core.pixi.app.stage;
         const s = world?.scale?.x || 1;
@@ -311,11 +314,18 @@ export function setupClipboardFlow(core) {
                 height: h,
                 ...revitPayload.properties
             };
-            core.createObject(
+            const createdData = core.createObject(
                 revitPayload.type,
                 { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) },
                 properties
             );
+            // data:-URL изображения (AI-генерация) не проходят через SaveManager,
+            // поэтому Events.Save.Success никогда не придёт и объект останется скрытым.
+            // Раскрываем сразу, минуя ожидание подтверждения сохранения.
+            if (skipUpload && createdData?.id) {
+                core._pendingPersistAckVisibilityIds?.delete(createdData.id);
+                core._setObjectVisibility?.(createdData.id, true);
+            }
         };
 
         try {

@@ -10,7 +10,7 @@ import { CHAT_PRESETS, DEFAULT_PRESET_ID, getPresetById } from './ChatPresets.js
  *
  * Состояние:
  *   - messages: список сообщений (с временным assistant-сообщением во время стриминга)
- *   - providerId: текущий провайдер (yandex|deepseek)
+ *   - providerId: текущий провайдер (yandex-art)
  *   - presetId: текущий пресет промпта
  *   - settings: { systemPrompt, temperature, maxTokens }
  *   - status: 'idle' | 'streaming' | 'error'
@@ -44,7 +44,7 @@ export class ChatSessionController {
 
         this._state = {
             messages: this._history.load(),
-            providerId: 'yandex',
+            providerId: 'yandex-art',
             presetId: DEFAULT_PRESET_ID,
             settings: this._loadSettings(),
             status: 'idle',
@@ -110,15 +110,16 @@ export class ChatSessionController {
     }
 
     /**
-     * Отправляет user-сообщение и стримит ответ assistant.
+     * Отправляет user-сообщение и создаёт изображение через YandexART.
      * @param {string} text
+     * @param {{widthRatio?: number, heightRatio?: number, model?: string}} [options]
      */
-    async send(text) {
+    async send(text, options = {}) {
         const trimmed = (text || '').trim();
         if (!trimmed || this._state.status === 'streaming') return;
 
         const userMsg = makeMessage('user', trimmed);
-        const assistantMsg = makeMessage('assistant', '', { provider: this._state.providerId, pending: true });
+        const assistantMsg = makeMessage('assistant', '', { provider: 'yandex-art', pending: true, kind: 'image' });
 
         this._state = {
             ...this._state,
@@ -133,21 +134,20 @@ export class ChatSessionController {
         this._abort = abort;
 
         try {
-            const messagesForApi = this._buildMessagesForApi();
-            const { deltas } = await this._client.chatStream({
-                provider: this._state.providerId,
-                messages: messagesForApi,
-                system: this._state.settings.systemPrompt || undefined,
-                temperature: this._state.settings.temperature,
-                maxTokens: this._state.settings.maxTokens,
+            const result = await this._client.generateImage({
+                prompt: trimmed,
+                widthRatio: options.widthRatio,
+                heightRatio: options.heightRatio,
+                model: options.model,
                 signal: abort.signal
             });
 
-            for await (const chunk of deltas) {
-                this._appendToAssistant(assistantMsg.id, chunk);
-            }
-
-            this._finalizeAssistant(assistantMsg.id, { error: null });
+            this._finalizeAssistant(assistantMsg.id, {
+                error: null,
+                imageBase64: result.imageBase64,
+                mimeType: result.mimeType,
+                operationId: result.operationId
+            });
         } catch (err) {
             const message = err?.name === 'AbortError' ? 'Отменено' : (err?.message || 'Ошибка запроса');
             this._finalizeAssistant(assistantMsg.id, { error: message });
@@ -156,23 +156,18 @@ export class ChatSessionController {
         }
     }
 
-    _buildMessagesForApi() {
-        return this._state.messages
-            .filter((m) => !m.pending && (m.role === 'user' || m.role === 'assistant') && m.content.length > 0)
-            .map((m) => ({ role: m.role, content: m.content }));
-    }
-
-    _appendToAssistant(id, chunk) {
+    _finalizeAssistant(id, { error, imageBase64, mimeType, operationId }) {
         const messages = this._state.messages.map((m) =>
-            m.id === id ? { ...m, content: m.content + chunk } : m
-        );
-        this._state = { ...this._state, messages };
-        this._emit();
-    }
-
-    _finalizeAssistant(id, { error }) {
-        const messages = this._state.messages.map((m) =>
-            m.id === id ? { ...m, pending: false, error: error || undefined } : m
+            m.id === id
+                ? {
+                    ...m,
+                    pending: false,
+                    error: error || undefined,
+                    imageBase64: imageBase64 || m.imageBase64,
+                    mimeType: mimeType || m.mimeType,
+                    operationId: operationId || m.operationId
+                }
+                : m
         );
         this._state = {
             ...this._state,

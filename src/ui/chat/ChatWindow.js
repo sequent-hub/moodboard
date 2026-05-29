@@ -1,6 +1,7 @@
 import { AiClient } from '../../services/ai/AiClient.js';
 import { ChatHistoryStore } from '../../services/ai/ChatHistoryStore.js';
 import { ChatSessionController } from '../../services/ai/ChatSessionController.js';
+import { Events } from '../../core/events/Events.js';
 
 import { buildChatDom } from './ChatWindowRenderer.js';
 import { ChatMessageList } from './ChatMessageList.js';
@@ -111,6 +112,7 @@ export class ChatWindow {
             aiClient: this._aiClient,
             historyStore: this._historyStore
         });
+        this._boardCore = options.boardCore || null;
 
         this._refs = null;
         this._messageList = null;
@@ -126,6 +128,15 @@ export class ChatWindow {
         this._countMenu = null;
         this._unsubscribe = null;
         this._attached = false;
+        this._boardImageMessageIds = new Set();
+        // Упорядоченный список ID объектов на доске, размещённых через AI-генерацию.
+        // Используется для сдвига предыдущих изображений влево при новой генерации.
+        this._boardAiImageIds = [];
+        this._onBoardObjectCreated = (data) => {
+            if (data?.objectData?.properties?.name === 'ai-generated.jpg') {
+                this._boardAiImageIds.push(data.objectId);
+            }
+        };
     }
 
     attach() {
@@ -136,9 +147,17 @@ export class ChatWindow {
         this._messageList = new ChatMessageList(this._refs.history);
 
         this._composer = new ChatComposer(
-            { textarea: this._refs.textarea, send: this._refs.send, enhancePrompt: this._refs.enhancePrompt },
             {
-                onSubmit: (text) => this._session.send(text),
+                textarea: this._refs.textarea,
+                send: this._refs.send,
+                attach: this._refs.attach,
+                fileInput: this._refs.fileInput,
+                attachmentsPreview: this._refs.attachmentsPreview,
+                enhancePrompt: this._refs.enhancePrompt,
+                statusBar: this._refs.statusBar
+            },
+            {
+                onSubmit: (text, attachments) => this._session.send(text, this._getImageRequestOptions()),
                 onAbort: () => this._session.abort()
             }
         );
@@ -211,8 +230,12 @@ export class ChatWindow {
         );
         this._countMenu.attach();
 
+        this._boardCore?.eventBus?.on?.(Events.Object.Created, this._onBoardObjectCreated);
+
+        const initialState = this._session.getState();
+        this._markExistingBoardImages(initialState.messages);
         this._unsubscribe = this._session.subscribe((state) => this._render(state));
-        this._render(this._session.getState());
+        this._render(initialState);
 
         this._loadProviders();
 
@@ -222,6 +245,8 @@ export class ChatWindow {
     detach() {
         if (!this._attached) return;
         if (this._unsubscribe) { this._unsubscribe(); this._unsubscribe = null; }
+        this._boardCore?.eventBus?.off?.(Events.Object.Created, this._onBoardObjectCreated);
+        this._boardAiImageIds = [];
         this._composer?.destroy();
         this._extendedPromptModal?.destroy();
         this._contentTypeMenu?.destroy();
@@ -277,6 +302,7 @@ export class ChatWindow {
 
     _render(state) {
         if (!this._attached && !this._refs) return;
+        this._syncGeneratedImagesToBoard(state.messages);
         this._messageList.render(state.messages);
         this._contentTypeMenu.refresh();
         this._modelMenu.refresh();
@@ -287,4 +313,95 @@ export class ChatWindow {
         this._updateCountPillIcon();
         this._composer.setStreaming(state.status === 'streaming');
     }
+
+    _getImageRequestOptions() {
+        const [widthRatio, heightRatio] = parseFormatRatio(this._formatId);
+        return {
+            widthRatio,
+            heightRatio,
+            model: this._modelId === 'yandex' ? 'yandex-art' : undefined
+        };
+    }
+
+    _addImageToBoard(msg) {
+        if (!this._boardCore?.eventBus) return;
+        const dataUrl = `data:${msg.mimeType || 'image/jpeg'};base64,${msg.imageBase64}`;
+        const view = this._boardCore.pixi?.app?.view;
+        const world = this._boardCore.pixi?.worldLayer || this._boardCore.pixi?.app?.stage;
+        const s = world?.scale?.x || 1;
+
+        // Сдвигаем все ранее размещённые AI-изображения влево на 320 экранных пикселей
+        // (в мировых единицах: 320 / масштаб), чтобы новое изображение всегда появлялось
+        // на фиксированной базовой позиции, не перекрывая предыдущие.
+        if (this._boardAiImageIds.length > 0) {
+            const worldShift = Math.round(320 / s);
+            const objects = this._boardCore.state?.state?.objects;
+            for (const id of this._boardAiImageIds) {
+                const obj = objects?.find((o) => o.id === id);
+                if (obj?.position) {
+                    this._boardCore.updateObjectPositionDirect?.(
+                        id,
+                        { x: Math.round(obj.position.x - worldShift), y: obj.position.y },
+                        { snap: false }
+                    );
+                }
+            }
+        }
+
+        // Новое изображение центрируется по горизонтали над панелью чата.
+        // Якорь по вертикали — верхний край composer (всегда виден).
+        // Объект создаётся с центром в (x,y), поэтому нижний край = y + h*s/2.
+        // При w=300 мировых ед. и масштабе s≈1 нижний край ≈ y+150.
+        // Чтобы нижний край изображения был на 100 px выше composer: y = composerTop - 250.
+        const chatRect = this._refs?.root?.getBoundingClientRect?.();
+        const composerRect = this._refs?.composer?.getBoundingClientRect?.();
+        const x = chatRect
+            ? Math.round(chatRect.left + chatRect.width / 2)
+            : (view ? Math.round(view.clientWidth / 2) : 400);
+        const y = composerRect
+            ? Math.round(composerRect.top - 250)
+            : (chatRect
+                ? Math.round(chatRect.top - 150)
+                : (view ? Math.round(view.clientHeight * 0.3) : 200));
+        this._boardCore.eventBus.emit(Events.UI.PasteImageAt, {
+            x, y,
+            src: dataUrl,
+            name: 'ai-generated.jpg',
+            skipUpload: true
+        });
+    }
+
+    _markExistingBoardImages(messages) {
+        for (const msg of messages || []) {
+            if (msg?.imageBase64) {
+                this._boardImageMessageIds.add(msg.id);
+            }
+        }
+    }
+
+    _syncGeneratedImagesToBoard(messages) {
+        if (!this._boardCore?.eventBus) return;
+
+        for (const msg of messages || []) {
+            if (!msg?.imageBase64 || msg.pending || this._boardImageMessageIds.has(msg.id)) {
+                continue;
+            }
+
+            this._boardImageMessageIds.add(msg.id);
+            this._addImageToBoard(msg);
+        }
+    }
+}
+
+function parseFormatRatio(formatId) {
+    if (!formatId || formatId === 'auto') {
+        return [1, 1];
+    }
+
+    const [width, height] = formatId.split(':').map((part) => Number.parseInt(part, 10));
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+        return [1, 1];
+    }
+
+    return [width, height];
 }

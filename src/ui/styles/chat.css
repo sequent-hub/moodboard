@@ -35,7 +35,7 @@
 }
 
 .moodboard-chat__history.is-visible {
-    display: flex;
+    display: none;
 }
 
 .moodboard-chat__msg {
@@ -67,6 +67,38 @@
 
 .moodboard-chat__msg--error .moodboard-chat__msg-body {
     color: #B91C1C;
+}
+
+.moodboard-chat__generated-image {
+    display: block;
+    max-width: min(100%, 320px);
+    height: auto;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+}
+
+.moodboard-chat__add-to-board-btn {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 8px;
+    padding: 6px 14px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(99, 102, 241, 0.15);
+    color: #818CF8;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.moodboard-chat__add-to-board-btn:hover {
+    background: rgba(99, 102, 241, 0.28);
+    color: #A5B4FC;
+}
+
+.moodboard-chat__add-to-board-btn:active {
+    background: rgba(99, 102, 241, 0.4);
 }
 
 .moodboard-chat__msg-cursor {
@@ -102,12 +134,86 @@
     gap: 10px;
 }
 
+.moodboard-chat__status-bar {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    margin: 0px 14px 0px 14px;
+    background: #f0f0f0;
+    border-top-right-radius: 10px;
+    border-top-left-radius: 10px;
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+    font-size: 13px;
+    color: #6B7280;
+    line-height: 1.4;
+    max-height: 24px;
+}
+
+.moodboard-chat__status-bar-text {
+    color: #6B7280;
+    -webkit-text-fill-color: #6B7280;
+}
+
+.moodboard-chat__status-bar.is-visible {
+    display: flex;
+}
+
+.moodboard-chat__status-bar.is-generating {
+    background: #f0f0f0;
+}
+
+.moodboard-chat__status-bar.is-generating .moodboard-chat__status-bar-text {
+    background: linear-gradient(
+        90deg,
+        #9ca3af 0%,
+        #9ca3af 20%,
+        #6B7280 40%,
+        #6B7280 50%,
+        #6B7280 60%,
+        #9ca3af 80%,
+        #9ca3af 100%
+    );
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: moodboard-chat-shimmer 1.8s linear infinite;
+}
+
+@keyframes moodboard-chat-shimmer {
+    0%   { background-position: 200% center; }
+    100% { background-position: -200% center; }
+}
+
+@keyframes moodboard-chat-spin {
+    to { transform: rotate(360deg); }
+}
+
 .moodboard-chat__input-row {
     position: relative;
     display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding-bottom: 10px;
+}
+
+.moodboard-chat__textarea-row {
+    display: flex;
     align-items: flex-start;
     gap: 8px;
-    padding-bottom: 10px;
+}
+
+.moodboard-chat__input-row.has-attachments .moodboard-chat__textarea-row .moodboard-chat__pill-wrapper {
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+.moodboard-chat__input-row.has-attachments .moodboard-chat__textarea-row {
+    padding-right: 72px;
 }
 
 .moodboard-chat__input-row::after {
@@ -261,11 +367,21 @@
     border: 0;
     border-radius: 8px;
     background: transparent;
-    cursor: not-allowed;
+    cursor: pointer;
     color: lab(5.0601 0 0 / 0.6392);
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    transition: color 120ms ease, background-color 120ms ease;
+}
+
+.moodboard-chat__attach:hover {
+    color: #374151;
+    background: #F3F4F6;
+}
+
+.moodboard-chat__attach:active {
+    background: #E5E7EB;
 }
 
 .moodboard-chat__send {
@@ -294,6 +410,99 @@
 
 .moodboard-chat__send:disabled {
     cursor: not-allowed;
+}
+
+/* Скрытый file input */
+.moodboard-chat__file-input {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Превью вложений */
+.moodboard-chat__attachments {
+    display: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+    padding: 4px 0 6px;
+}
+
+.moodboard-chat__attachments.is-visible {
+    display: flex;
+}
+
+.moodboard-chat__attachment-item {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    overflow: hidden;
+    flex: 0 0 auto;
+    background: #E5E7EB;
+}
+
+.moodboard-chat__attachment-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.moodboard-chat__attachment-icon {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #6B7280;
+}
+
+.moodboard-chat__attachment-badge {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'GeistSans', 'GeistSans Fallback', 'Roboto', Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    color: #374151;
+    pointer-events: none;
+}
+
+.moodboard-chat__attachment-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    border: 0;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    transition: background-color 100ms ease;
+}
+
+.moodboard-chat__attachment-remove:hover {
+    background: rgba(0, 0, 0, 0.65);
 }
 
 /* Выпадающее меню (общее для switch / preset) */

@@ -150,6 +150,12 @@ export class SaveManager {
             }
             
         } catch (error) {
+            // Transient data:/blob: URL в объектах — retry бессмысленен, ошибку пользователю не показываем.
+            // Такое возникает когда AI-изображение размещено без upload-сервера (dev-режим).
+            if (error?.message?.includes('forbidden data/blob src')) {
+                console.warn('SaveManager: объект с data:/blob: URL пропущен при сохранении:', error.message);
+                return;
+            }
             console.error('Ошибка автосохранения:', error);
             this.handleSaveError(error, data);
         } finally {

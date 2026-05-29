@@ -89,7 +89,9 @@ function initContextMenu(board) {
 
 function initChatWindow(board) {
     if (board?.options?.disableChat === true) return;
-    board.chatWindow = new ChatWindow(board.workspaceElement);
+    board.chatWindow = new ChatWindow(board.workspaceElement, {
+        boardCore: board.coreMoodboard
+    });
     board.chatWindow.attach();
 }
 

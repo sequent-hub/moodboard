@@ -18,7 +18,10 @@ export default defineConfig({
             '/api': {
                 target: 'http://localhost:3001',
                 changeOrigin: true,
-                ws: false
+                ws: false,
+                // YandexART generation can take up to 120s — proxy must not cut it off
+                proxyTimeout: 180000,
+                timeout: 180000
             }
         }
     },
