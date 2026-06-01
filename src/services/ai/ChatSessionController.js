@@ -43,7 +43,7 @@ export class ChatSessionController {
         this._abort = null;
 
         this._state = {
-            messages: this._history.load(),
+            messages: this._history.load().map((m) => (m.pending ? { ...m, pending: false, error: m.error || 'Прервано' } : m)),
             providerId: 'yandex-art',
             presetId: DEFAULT_PRESET_ID,
             settings: this._loadSettings(),
@@ -112,18 +112,23 @@ export class ChatSessionController {
     /**
      * Отправляет user-сообщение и создаёт изображение через YandexART.
      * @param {string} text
-     * @param {{widthRatio?: number, heightRatio?: number, model?: string}} [options]
+     * @param {{widthRatio?: number, heightRatio?: number, model?: string, imageCount?: number}} [options]
      */
     async send(text, options = {}) {
         const trimmed = (text || '').trim();
         if (!trimmed || this._state.status === 'streaming') return;
 
+        const imageCount = normalizeImageCount(options.imageCount);
         const userMsg = makeMessage('user', trimmed);
-        const assistantMsg = makeMessage('assistant', '', { provider: 'yandex-art', pending: true, kind: 'image' });
+        const assistantMsgs = Array.from({ length: imageCount }, (_, index) => makeMessage(
+            'assistant',
+            imageCount > 1 ? `Генерируется изображение ${index + 1} из ${imageCount}…` : '',
+            { provider: 'yandex-art', pending: true, kind: 'image' }
+        ));
 
         this._state = {
             ...this._state,
-            messages: [...this._state.messages, userMsg, assistantMsg],
+            messages: [...this._state.messages, userMsg, ...assistantMsgs],
             status: 'streaming',
             error: null
         };
@@ -132,31 +137,54 @@ export class ChatSessionController {
 
         const abort = new AbortController();
         this._abort = abort;
+        let lastError = null;
 
         try {
-            const result = await this._client.generateImage({
-                prompt: trimmed,
-                widthRatio: options.widthRatio,
-                heightRatio: options.heightRatio,
-                model: options.model,
-                signal: abort.signal
-            });
+            await Promise.all(
+                assistantMsgs.map((assistantMsg, index) => {
+                    if (abort.signal.aborted) {
+                        lastError = 'Отменено';
+                        this._updateAssistant(assistantMsg.id, { error: lastError });
+                        return Promise.resolve();
+                    }
 
-            this._finalizeAssistant(assistantMsg.id, {
-                error: null,
-                imageBase64: result.imageBase64,
-                mimeType: result.mimeType,
-                operationId: result.operationId
-            });
-        } catch (err) {
-            const message = err?.name === 'AbortError' ? 'Отменено' : (err?.message || 'Ошибка запроса');
-            this._finalizeAssistant(assistantMsg.id, { error: message });
+                    return this._client
+                        .generateImage({
+                            prompt: trimmed,
+                            widthRatio: options.widthRatio,
+                            heightRatio: options.heightRatio,
+                            model: options.model,
+                            signal: abort.signal
+                        })
+                        .then((result) => {
+                            this._updateAssistant(assistantMsg.id, {
+                                error: null,
+                                imageBase64: result.imageBase64,
+                                mimeType: result.mimeType,
+                                operationId: result.operationId,
+                                content: imageCount > 1 ? `Изображение ${index + 1} из ${imageCount} добавлено на доску.` : ''
+                            });
+                        })
+                        .catch((err) => {
+                            const msg = err?.name === 'AbortError' ? 'Отменено' : (err?.message || 'Ошибка запроса');
+                            lastError = msg;
+                            this._updateAssistant(assistantMsg.id, { error: msg });
+                        });
+                })
+            );
         } finally {
             this._abort = null;
+            this._state = {
+                ...this._state,
+                status: lastError ? 'error' : 'idle',
+                error: lastError
+            };
+            this._history.save(this._state.messages);
+            this._emit();
         }
     }
 
-    _finalizeAssistant(id, { error, imageBase64, mimeType, operationId }) {
+    _updateAssistant(id, { error, imageBase64, mimeType, operationId, content }) {
         const messages = this._state.messages.map((m) =>
             m.id === id
                 ? {
@@ -165,15 +193,14 @@ export class ChatSessionController {
                     error: error || undefined,
                     imageBase64: imageBase64 || m.imageBase64,
                     mimeType: mimeType || m.mimeType,
-                    operationId: operationId || m.operationId
+                    operationId: operationId || m.operationId,
+                    content: content ?? m.content
                 }
                 : m
         );
         this._state = {
             ...this._state,
-            messages,
-            status: error ? 'error' : 'idle',
-            error: error || null
+            messages
         };
         this._history.save(messages);
         this._emit();
@@ -217,4 +244,13 @@ function makeMessage(role, content, extra = {}) {
         ts: Date.now(),
         ...extra
     };
+}
+
+function normalizeImageCount(value) {
+    const count = Number.parseInt(value, 10);
+    if (!Number.isFinite(count)) {
+        return 1;
+    }
+
+    return Math.min(Math.max(count, 1), 4);
 }

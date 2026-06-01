@@ -28,17 +28,21 @@ export function buildChatDom() {
     statusBar.setAttribute('aria-atomic', 'true');
     statusBar.innerHTML = '<span class="moodboard-chat__status-bar-text">Идёт процесс генерации изображения…</span>';
 
+    const pendingImages = createDiv('moodboard-chat__pending-images');
+
     const rendererRefs = {
         root,
         history,
         composer,
-        statusBar
+        statusBar,
+        pendingImages
     };
 
     composer.appendChild(buildInputRow(refs => Object.assign(rendererRefs, refs)));
     composer.appendChild(buildActionsRow(refs => Object.assign(rendererRefs, refs)));
 
     root.appendChild(history);
+    root.appendChild(pendingImages);
     root.appendChild(statusBar);
     root.appendChild(composer);
 

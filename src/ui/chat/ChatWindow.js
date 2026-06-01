@@ -132,6 +132,9 @@ export class ChatWindow {
         // Упорядоченный список ID объектов на доске, размещённых через AI-генерацию.
         // Используется для сдвига предыдущих изображений влево при новой генерации.
         this._boardAiImageIds = [];
+        this._shiftedForPendingMessageIds = new Set();
+        this._pendingShiftCount = 0;
+        this._pendingOverlayEls = [];
         this._onBoardObjectCreated = (data) => {
             if (data?.objectData?.properties?.name === 'ai-generated.jpg') {
                 this._boardAiImageIds.push(data.objectId);
@@ -244,9 +247,12 @@ export class ChatWindow {
 
     detach() {
         if (!this._attached) return;
+        this._clearPendingOverlays();
         if (this._unsubscribe) { this._unsubscribe(); this._unsubscribe = null; }
         this._boardCore?.eventBus?.off?.(Events.Object.Created, this._onBoardObjectCreated);
         this._boardAiImageIds = [];
+        this._shiftedForPendingMessageIds.clear();
+        this._pendingShiftCount = 0;
         this._composer?.destroy();
         this._extendedPromptModal?.destroy();
         this._contentTypeMenu?.destroy();
@@ -312,6 +318,83 @@ export class ChatWindow {
         this._countMenu.refresh();
         this._updateCountPillIcon();
         this._composer.setStreaming(state.status === 'streaming');
+        this._updatePendingImages(state.status === 'streaming' ? state.messages : []);
+    }
+
+    _updatePendingImages(messages) {
+        this._clearPendingOverlays();
+
+        const pending = (messages || []).filter((m) => m.pending && m.kind === 'image');
+        if (pending.length === 0) return;
+
+        const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
+        const s = world?.scale?.x || 1;
+
+        let newPendingCount = 0;
+        for (const p of pending) {
+            if (!this._shiftedForPendingMessageIds.has(p.id)) {
+                this._shiftedForPendingMessageIds.add(p.id);
+                newPendingCount++;
+                this._pendingShiftCount++;
+            }
+        }
+
+        // Сдвигаем все ранее размещённые AI-изображения влево сразу при появлении блока загрузки,
+        // чтобы блок не перекрывал их. 320 - ширина блока + отступ в мировых координатах.
+        if (newPendingCount > 0 && this._boardAiImageIds.length > 0) {
+            const worldShift = Math.round(320 * newPendingCount);
+            const objects = this._boardCore?.state?.state?.objects;
+            for (const id of this._boardAiImageIds) {
+                const obj = objects?.find((o) => o.id === id);
+                if (obj?.position) {
+                    this._boardCore.updateObjectPositionDirect?.(
+                        id,
+                        { x: Math.round(obj.position.x - worldShift), y: obj.position.y },
+                        { snap: false }
+                    );
+                }
+            }
+        }
+
+        const chatRect = this._refs?.root?.getBoundingClientRect?.();
+        const composerRect = this._refs?.composer?.getBoundingClientRect?.();
+        const cx = chatRect
+            ? Math.round(chatRect.left + chatRect.width / 2)
+            : 400;
+        const cy = composerRect
+            ? Math.round(composerRect.top - 250)
+            : 200;
+
+        const [wr, hr] = parseFormatRatio(this._formatId);
+        const ratio = wr / hr;
+        const wScreen = Math.round(300 * s);
+        const hScreen = Math.round(wScreen / ratio);
+
+        for (let i = 0; i < pending.length; i++) {
+            // Более новые генерации появляются правее. i=0 — самая старая, должна быть левее.
+            const shiftX = (pending.length - 1 - i) * Math.round(320 * s);
+            const left = Math.round(cx - wScreen / 2 - shiftX);
+            const top = Math.round(cy - hScreen / 2);
+
+            const overlay = document.createElement('div');
+            overlay.className = 'moodboard-chat__pending-overlay';
+            overlay.style.cssText = `left:${left}px;top:${top}px;width:${wScreen}px;height:${hScreen}px`;
+
+            const label = document.createElement('span');
+            label.className = 'moodboard-chat__pending-image-label';
+            label.textContent = 'В процессе';
+            overlay.appendChild(label);
+
+            document.body.appendChild(overlay);
+            this._pendingOverlayEls.push(overlay);
+        }
+    }
+
+    _clearPendingOverlays() {
+        for (const el of this._pendingOverlayEls) {
+            el.remove();
+        }
+        this._pendingOverlayEls = [];
     }
 
     _getImageRequestOptions() {
@@ -319,7 +402,8 @@ export class ChatWindow {
         return {
             widthRatio,
             heightRatio,
-            model: this._modelId === 'yandex' ? 'yandex-art' : undefined
+            model: this._modelId === 'yandex' ? 'yandex-art' : undefined,
+            imageCount: parseImageCount(this._countId)
         };
     }
 
@@ -330,11 +414,14 @@ export class ChatWindow {
         const world = this._boardCore.pixi?.worldLayer || this._boardCore.pixi?.app?.stage;
         const s = world?.scale?.x || 1;
 
-        // Сдвигаем все ранее размещённые AI-изображения влево на 320 экранных пикселей
-        // (в мировых единицах: 320 / масштаб), чтобы новое изображение всегда появлялось
-        // на фиксированной базовой позиции, не перекрывая предыдущие.
-        if (this._boardAiImageIds.length > 0) {
-            const worldShift = Math.round(320 / s);
+        // Если генерация прошла без режима загрузки (например, мгновенный ответ),
+        // нужно сдвинуть существующие изображения сейчас. Иначе берем сохраненный индекс сдвига.
+        let myShiftIndex = 0;
+        if (this._pendingShiftCount > 0) {
+            this._pendingShiftCount--;
+            myShiftIndex = this._pendingShiftCount;
+        } else if (this._boardAiImageIds.length > 0) {
+            const worldShift = 320;
             const objects = this._boardCore.state?.state?.objects;
             for (const id of this._boardAiImageIds) {
                 const obj = objects?.find((o) => o.id === id);
@@ -355,14 +442,18 @@ export class ChatWindow {
         // Чтобы нижний край изображения был на 100 px выше composer: y = composerTop - 250.
         const chatRect = this._refs?.root?.getBoundingClientRect?.();
         const composerRect = this._refs?.composer?.getBoundingClientRect?.();
-        const x = chatRect
+        const xBase = chatRect
             ? Math.round(chatRect.left + chatRect.width / 2)
             : (view ? Math.round(view.clientWidth / 2) : 400);
+        
+        const x = Math.round(xBase - myShiftIndex * 320 * s);
+        
         const y = composerRect
             ? Math.round(composerRect.top - 250)
             : (chatRect
                 ? Math.round(chatRect.top - 150)
                 : (view ? Math.round(view.clientHeight * 0.3) : 200));
+        
         this._boardCore.eventBus.emit(Events.UI.PasteImageAt, {
             x, y,
             src: dataUrl,
@@ -404,4 +495,17 @@ function parseFormatRatio(formatId) {
     }
 
     return [width, height];
+}
+
+function parseImageCount(countId) {
+    if (!countId || countId === 'auto') {
+        return 1;
+    }
+
+    const count = Number.parseInt(countId, 10);
+    if (!Number.isFinite(count)) {
+        return 1;
+    }
+
+    return Math.min(Math.max(count, 1), 4);
 }

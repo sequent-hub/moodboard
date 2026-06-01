@@ -661,6 +661,63 @@
     display: block;
 }
 
+/* Контейнер блоков-заглушек при параллельной генерации изображений */
+.moodboard-chat__pending-images {
+    display: none;
+    gap: 8px;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 8px;
+    margin-bottom: 8px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+.moodboard-chat__pending-images.is-visible {
+    display: flex;
+}
+
+.moodboard-chat__pending-image-block {
+    flex: 1;
+    min-height: 180px;
+    background: #6B7E87;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Overlay-заглушка на полотне доски во время генерации изображения */
+@keyframes moodboard-pending-shimmer {
+    0%   { background-position: -100% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.moodboard-chat__pending-overlay {
+    position: fixed;
+    background: linear-gradient(
+        90deg,
+        #5F7179 0%,
+        #7A8D96 50%,
+        #5F7179 100%
+    );
+    background-size: 200% 100%;
+    animation: moodboard-pending-shimmer 5.76s linear infinite;
+    border-radius: 8px;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.moodboard-chat__pending-image-label {
+    position: absolute;
+    bottom: 10px;
+    left: 12px;
+    font-family: 'GeistSans', 'GeistSans Fallback', 'Roboto', Arial, sans-serif;
+    font-size: 20px;
+    font-weight: 400;
+    color: #ffffff;
+    pointer-events: none;
+}
+
 /* Попап настроек */
 .moodboard-chat__settings-popup {
     position: absolute;
