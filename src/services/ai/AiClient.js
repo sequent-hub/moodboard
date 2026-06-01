@@ -1,17 +1,21 @@
 /**
- * Тонкий HTTP-клиент к /api/ai.
+ * Тонкий HTTP-клиент к /api/v2/ai.
  *
- * Одна ответственность: общение с прокси-сервером (server/).
+ * Одна ответственность: общение с backend-эндпоинтами AI.
+ * В dev-режиме за same-origin стоит Node-заглушка (server/), в проде —
+ * Laravel-пакет futurello/moodboard (контроллер AiController).
+ * Контракт payload и SSE-формат у них одинаковый.
+ *
  * Не знает ни про UI, ни про localStorage. Возвращает обычные данные
  * и async generator для стриминга.
  */
 
-const DEFAULT_BASE_URL = '/api/ai';
+const DEFAULT_BASE_URL = '/api/v2/ai';
 
 export class AiClient {
     /**
      * @param {object} options
-     * @param {string} [options.baseUrl='/api/ai']
+     * @param {string} [options.baseUrl='/api/v2/ai']
      * @param {typeof fetch} [options.fetchImpl]
      */
     constructor(options = {}) {
