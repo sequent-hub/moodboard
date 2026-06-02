@@ -9,6 +9,7 @@ import { CommentObject } from './CommentObject.js';
 import { NoteObject } from './NoteObject.js';
 import { FileObject } from './FileObject.js';
 import { MindmapObject } from './MindmapObject.js';
+import { ConnectorObject } from './ConnectorObject.js';
 
 /**
  * Фабрика объектов холста
@@ -27,7 +28,8 @@ export class ObjectFactory {
         ['comment', CommentObject],
         ['note', NoteObject],
         ['file', FileObject],
-        ['mindmap', MindmapObject]
+        ['mindmap', MindmapObject],
+        ['connector', ConnectorObject],
     ]);
 
     /**

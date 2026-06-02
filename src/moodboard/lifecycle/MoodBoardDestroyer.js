@@ -55,6 +55,12 @@ export function destroyMoodBoard(board) {
     safeDestroy(board.mindmapConnectionLayer, 'mindmapConnectionLayer');
     board.mindmapConnectionLayer = null;
 
+    safeDestroy(board.connectorLayer, 'connectorLayer');
+    board.connectorLayer = null;
+
+    safeDestroy(board.connectionAnchorsLayer, 'connectionAnchorsLayer');
+    board.connectionAnchorsLayer = null;
+
     safeDestroy(board.htmlHandlesLayer, 'htmlHandlesLayer');
     board.htmlHandlesLayer = null;
 
@@ -99,6 +105,12 @@ export function destroyMoodBoard(board) {
         }
         if (window.moodboardMindmapConnectionLayer === board.mindmapConnectionLayer) {
             window.moodboardMindmapConnectionLayer = null;
+        }
+        if (window.moodboardConnectorLayer === board.connectorLayer) {
+            window.moodboardConnectorLayer = null;
+        }
+        if (window.moodboardConnectionAnchorsLayer === board.connectionAnchorsLayer) {
+            window.moodboardConnectionAnchorsLayer = null;
         }
         if (window.moodboardHtmlHandlesLayer === board.htmlHandlesLayer) {
             window.moodboardHtmlHandlesLayer = null;

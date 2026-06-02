@@ -55,6 +55,10 @@ export async function initializeCoreTools(core) {
     const textTool = new textToolModule.TextTool(core.eventBus);
     core.toolManager.registerTool(textTool);
 
+    const connectorToolModule = await import('../../tools/object-tools/ConnectorTool.js');
+    const connectorTool = new connectorToolModule.ConnectorTool(core.eventBus, core);
+    core.toolManager.registerTool(connectorTool);
+
     core.selectTool = selectTool;
     core.toolManager.activateTool('select');
 
