@@ -29,7 +29,7 @@ export class MoveObjectCommand extends BaseCommand {
     _setPosition(position) {
         // Используем готовую функцию из ядра - она правильно обрабатывает все типы объектов
         // position уже является координатами левого-верхнего угла
-        this.coreMoodboard.updateObjectPositionDirect(this.objectId, position);
+        this.coreMoodboard.updateObjectPositionDirect(this.objectId, position, { snap: false });
         
         // Уведомляем о том, что объект был изменен (для обновления ручек)
         if (this.eventBus) {

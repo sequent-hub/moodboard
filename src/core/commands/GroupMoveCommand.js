@@ -22,7 +22,7 @@ export class GroupMoveCommand extends BaseCommand {
         for (const item of this.moves) {
             if (this.coordinatesAreTopLeft) {
                 // Координаты уже левый-верх (Frame перемещение)
-                this.core.updateObjectPositionDirect(item.id, item.to);
+                this.core.updateObjectPositionDirect(item.id, item.to, { snap: false });
                 this.emit(Events.Object.TransformUpdated, {
                     objectId: item.id,
                     type: 'position',
@@ -35,7 +35,7 @@ export class GroupMoveCommand extends BaseCommand {
                     const halfW = (pixiObject.width || 0) / 2;
                     const halfH = (pixiObject.height || 0) / 2;
                     const topLeft = { x: item.to.x - halfW, y: item.to.y - halfH };
-                    this.core.updateObjectPositionDirect(item.id, topLeft);
+                    this.core.updateObjectPositionDirect(item.id, topLeft, { snap: false });
                     this.emit(Events.Object.TransformUpdated, {
                         objectId: item.id,
                         type: 'position',
