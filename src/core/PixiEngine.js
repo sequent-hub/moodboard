@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js';
 import { ObjectFactory } from '../objects/ObjectFactory.js';
 import { ObjectRenderer } from './rendering/ObjectRenderer.js';
 import { Events } from './events/Events.js';
+import { HoverLiftController } from '../ui/animation/HoverLiftController.js';
 
 export class PixiEngine {
     constructor(container, eventBus, options) {
@@ -40,6 +41,9 @@ export class PixiEngine {
 
         // Инициализируем ObjectRenderer
         this.renderer = new ObjectRenderer(this.objects, this.eventBus);
+
+        // Hover-lift анимация для всех объектов
+        this.hoverLift = new HoverLiftController(this.eventBus, this.app);
 
         // Поддержка чёткости текстов записок при зуме: подписка на событие зума
         if (this.eventBus) {
@@ -159,6 +163,17 @@ export class PixiEngine {
             this.worldLayer.addChild(pixiObject);
             this.objects.set(objectData.id, pixiObject);
 
+            // Hover-lift: подключаем упругую анимацию
+            if (this.hoverLift) {
+                this.hoverLift.attach(pixiObject, objectData);
+                // Если текстура ещё не загружена (ImageObject, EmojiObject),
+                // baseScale в attach зафиксирован как 1. Синхронизируем после загрузки.
+                const bt = pixiObject.texture?.baseTexture;
+                if (bt && !bt.valid) {
+                    bt.once('loaded', () => { this.hoverLift?.syncBase(pixiObject); });
+                }
+            }
+
 
         }
     }
@@ -222,6 +237,11 @@ export class PixiEngine {
                     }
                 }
                 
+                // Отключаем hover-lift перед очисткой listeners
+                if (this.hoverLift) {
+                    this.hoverLift.detach(pixiObject);
+                }
+
                 // Очищаем все события
                 pixiObject.removeAllListeners();
                 
@@ -229,6 +249,9 @@ export class PixiEngine {
                 pixiObject.destroy({ children: true, texture: false, baseTexture: false });
             } else {
                 // Для других типов объектов - стандартная очистка
+                if (this.hoverLift) {
+                    this.hoverLift.detach(pixiObject);
+                }
                 if (pixiObject.destroy) {
                     pixiObject.destroy({ children: true });
                 }

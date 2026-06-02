@@ -109,6 +109,7 @@ export const Events = {
 		StateChanged: 'state:changed',
 		FileNameChange: 'object:filename:change',
 		ContentChange: 'object:content:change',
+		Hover: 'object:hover',
 	},
 
 	History: {
