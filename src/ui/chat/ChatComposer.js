@@ -77,6 +77,13 @@ export class ChatComposer {
         this._textarea.focus();
     }
 
+    addAttachment(file) {
+        if (!file) return;
+        this._attachments.push(file);
+        this._renderAttachmentsPreview();
+        this._refreshSendState();
+    }
+
     destroy() {
         for (const off of this._listeners) off();
         this._listeners = [];
