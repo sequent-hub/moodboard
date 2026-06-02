@@ -1,5 +1,37 @@
 # Правила Для Агентов
 
+## Стек
+
+- Пакет: `@sequent-org/moodboard` — интерактивный редактор мудборда, поставляется как ESM-библиотека (`type: module`, точка входа `src/index.js`, публичный класс `MoodBoard`).
+- Рендер: `pixi.js` 7 (canvas/WebGL) + HTML-оверлеи поверх canvas (текст, ручки).
+- Сборка/dev: `vite` 5 (без бандла либы — публикуется исходник). Dev-прокси `/api` -> `localhost:3001`.
+- Сеть: `axios`. Иконки: `lucide-static`.
+- Тесты: `vitest` + `jsdom` + `@testing-library/*` (юнит/контракт), `@playwright/test` (e2e).
+- Runtime: браузер; Node только для скриптов/деплоя. Бэкенд — Laravel (см. `LARAVEL_USAGE.md`).
+
+## Структура
+
+- `src/index.js` — экспорт пакета.
+- `src/moodboard/` — Facade и оркестрация: `MoodBoard`, `WorkspaceManager`, `DataManager`, `ActionHandler`; `bootstrap/`, `integration/`, `lifecycle/`.
+- `src/core/` — ядро: `index.js` (`CoreMoodBoard`), `EventBus`, `StateManager`, `HistoryManager` (Command/Undo-Redo), `SaveManager`, `ApiClient`, `PixiEngine`; `events/Events.js` (реестр событий), `commands/`, `flows/`, `rendering/`, `keyboard/`, `bootstrap/`.
+- `src/objects/` — типы объектов + `ObjectFactory` (Frame, Shape, Drawing, Text, Emoji, Image, Comment, Note, File).
+- `src/tools/` — инструменты ввода: `ToolManager`, `BaseTool`, `board-tools/` (pan/zoom), `object-tools/` (select/placement/text/drawing), `object-tools/selection/` (resize/rotate/group-контроллеры).
+- `src/ui/` — UI: `Toolbar`, `Topbar`, `ZoomPanel`, `MapPanel`, `ContextMenu`, `*PropertiesPanel`, `HtmlTextLayer`, `HtmlHandlesLayer` (активная система ручек), `handles/`, `chat/` (AI-чат), `text-properties/`, `styles/`.
+- `src/services/` — бизнес-логика: `BoardService`, `ZoomPanController`, `ZOrderManager`, `FrameService`, `Image/FileUploadService`, `SettingsApplier`, `GridSnapResolver`, `ai/`.
+- `src/grid/` — сетка: `GridFactory`, `Base/Dot/Line/CrossGrid`, `ScreenGridPhaseMachine` (screen-space рендер).
+- `src/mindmap/`, `src/utils/`, `src/assets/`, `public/` — mind-map контракт, утилиты, шрифты/иконки/emoji, статика.
+- `tests/` (core/tools/ui/objects/services/integration), `scripts/` (диагностика grid, screen-integer контракт).
+
+## Пин-каноны
+
+- Архитектура event-driven: подсистемы общаются через `EventBus`; имена событий — только из `src/core/events/Events.js`, payload-контракты не менять без явной задачи.
+- Паттерны: Facade (`MoodBoard`), Factory (`ObjectFactory`), Command (`core/commands/*` + `HistoryManager`).
+- Координаты: `state.position` хранится как top-left, PIXI работает от center. Конвертация: `x = left + w/2`, `y = top + h/2`. Детали и риски — `COORDINATE_SYSTEM.md`.
+- Pixel-perfect integer contract: в screen-space запрещены дробные px; `x/y/width/height/step/radius/line positions` — integer; округление в точке формирования screen-space значений. Проверка: `npm run test:screen:integer`.
+- Перед/после рефактора больших файлов — baseline-тесты поведения (см. скрипты `test:*:baseline`).
+- Lifecycle: сохранять корректные `attach/detach/activate/deactivate/destroy`, не плодить listeners.
+- Подробнее: `ARCHITECTURE.md`.
+
 ## Назначение
 
 Эти правила защищают проект от раздувания файлов, смешения ответственностей и рискованных рефакторов.
