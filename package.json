@@ -40,7 +40,9 @@
     "deploy:prod": "NODE_ENV=production npm run build && NODE_ENV=production npm run start"
   },
   "dependencies": {
+    "@pixi/filter-drop-shadow": "^5.2.0",
     "axios": "^1.0.0",
+    "gsap": "^3.15.0",
     "lucide-static": "^1.16.0",
     "pixi.js": "^7.0.0"
   },
