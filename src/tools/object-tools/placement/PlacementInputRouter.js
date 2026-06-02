@@ -61,7 +61,7 @@ export class PlacementInputRouter {
         host.pending = null;
         host.hideGhost();
         if (host.app && host.app.view) {
-            host.app.view.removeEventListener('mousemove', host._onFrameDrawMoveBound);
+            host.app.view.removeEventListener('pointermove', host._onFrameDrawMoveBound);
             host.app.view.style.cursor = '';
         }
         host.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
@@ -84,7 +84,7 @@ export class PlacementInputRouter {
         if (!host.pending) return;
         if (host.pending.placeOnMouseUp) {
             const onUp = (ev) => {
-                host.app.view.removeEventListener('mouseup', onUp);
+                host.app.view.removeEventListener('pointerup', onUp);
                 const worldPoint = host._toWorld(ev.x, ev.y);
                 const position = {
                     x: Math.round(worldPoint.x - (host.pending.size?.width ?? 100) / 2),
@@ -96,7 +96,7 @@ export class PlacementInputRouter {
                 host.hideGhost();
                 host.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
             };
-            host.app.view.addEventListener('mouseup', onUp, { once: true });
+            host.app.view.addEventListener('pointerup', onUp, { once: true });
             return;
         }
         if (host.pending.type === 'frame-draw') {
@@ -110,8 +110,8 @@ export class PlacementInputRouter {
             }
             host._onFrameDrawMoveBound = (ev) => host._onFrameDrawMove(ev);
             host._onFrameDrawUpBound = (ev) => host._onFrameDrawUp(ev);
-            host.app.view.addEventListener('mousemove', host._onFrameDrawMoveBound);
-            host.app.view.addEventListener('mouseup', host._onFrameDrawUpBound, { once: true });
+            host.app.view.addEventListener('pointermove', host._onFrameDrawMoveBound);
+            host.app.view.addEventListener('pointerup', host._onFrameDrawUpBound, { once: true });
             return;
         }
 

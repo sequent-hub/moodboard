@@ -45,6 +45,18 @@ const ENHANCE_PROMPT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="16" 
 /** public/icons/extend-promt-field.svg */
 const EXTEND_PROMPT_FIELD_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M9.696 7.151a.599.599 0 1 1-.847-.847L12.55 2.6H9.272a.6.6 0 0 1 0-1.2H14a.6.6 0 0 1 .6.599v4.728a.6.6 0 1 1-1.2 0V3.449zM1.4 9.272a.6.6 0 1 1 1.2 0v3.28l3.704-3.703a.599.599 0 1 1 .847.847L3.45 13.4h3.279a.6.6 0 0 1 0 1.2H2A.6.6 0 0 1 1.4 14z"/></svg>`;
 
+/** public/icons/google.svg — цветной логотип Google 36×36 */
+const MODEL_GOOGLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" fill="none" viewBox="0 0 36 36"><path fill="#4285F4" d="M29.251 18.49c0-.813-.073-1.596-.209-2.347H18.23v4.445h6.179c-.272 1.43-1.086 2.64-2.307 3.455v2.89h3.726c2.17-2.003 3.423-4.946 3.423-8.442"/><path fill="#34A853" d="M18.229 29.71c3.1 0 5.698-1.023 7.597-2.776l-3.725-2.89c-1.023.688-2.328 1.105-3.872 1.105-2.985 0-5.52-2.014-6.429-4.727H7.98v2.964c1.89 3.746 5.761 6.324 10.249 6.324"/><path fill="#FBBC05" d="M11.801 20.412a6.9 6.9 0 0 1-.365-2.181c0-.762.136-1.492.365-2.181v-2.964h-3.82A11.34 11.34 0 0 0 6.75 18.23c0 1.858.449 3.6 1.231 5.145l2.975-2.317z"/><path fill="#EA4335" d="M18.229 11.321c1.69 0 3.193.585 4.393 1.712l3.288-3.288c-1.994-1.857-4.582-2.995-7.681-2.995-4.488 0-8.36 2.578-10.249 6.335l3.82 2.964c.908-2.714 3.444-4.728 6.429-4.728"/></svg>`;
+
+/** Placeholder OpenAI GPT — буква G в круге, 36×36 */
+const MODEL_GPT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#10a37f"/><text x="18" y="23" text-anchor="middle" font-size="16" font-family="Arial,sans-serif" fill="#fff" font-weight="bold">G</text></svg>`;
+
+/** Placeholder Alibaba Qwen — буква Q в круге, 36×36 */
+const MODEL_QWEN_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#6e42ca"/><text x="18" y="23" text-anchor="middle" font-size="16" font-family="Arial,sans-serif" fill="#fff" font-weight="bold">Q</text></svg>`;
+
+/** Placeholder Yandex Alice — буква А в круге, 36×36 */
+const MODEL_ALICE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#fc3f1d"/><text x="18" y="23" text-anchor="middle" font-size="16" font-family="Arial,sans-serif" fill="#fff" font-weight="bold">А</text></svg>`;
+
 export const ICONS = {
     image: IMAGE_ICON,
     video: VIDEO_ICON,
@@ -63,7 +75,11 @@ export const ICONS = {
     chevronDown: svg('<path d="M6 9l6 6 6-6"/>'),
     trash: svg('<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/>'),
     close: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 16 16"><path fill="currentColor" d="M13.575 12.726a.6.6 0 0 1-.849.849zm-.849-10.3a.6.6 0 0 1 .849.848L8.848 7.999l4.727 4.727-.425.424-.424.425-4.727-4.727-4.725 4.727a.6.6 0 0 1-.848-.849l4.726-4.727-4.726-4.725a.599.599 0 1 1 .848-.848l4.725 4.726z"></path></svg>`,
-    sparkles: svg('<path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/>')
+    sparkles: svg('<path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/>'),
+    modelGoogle: MODEL_GOOGLE_ICON,
+    modelGpt: MODEL_GPT_ICON,
+    modelQwen: MODEL_QWEN_ICON,
+    modelAlice: MODEL_ALICE_ICON,
 };
 
 /**

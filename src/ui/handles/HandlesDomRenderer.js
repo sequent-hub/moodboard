@@ -1223,6 +1223,8 @@ export class HandlesDomRenderer {
             transformOrigin: 'center center',
             transform: `rotate(${rotation}deg)`,
         });
+        box.style.setProperty('--box-w', `${width}px`);
+        box.style.setProperty('--box-h', `${height}px`);
         this.host.layer.appendChild(box);
         if (this.host._handlesSuppressed) {
             this.host.visible = true;
@@ -1252,12 +1254,12 @@ export class HandlesDomRenderer {
                 h.style.cursor = cursor;
             });
             h.addEventListener('mouseleave', () => {
-                h.style.background = HANDLES_ACCENT_COLOR;
+                h.style.background = '#ffffff';
                 h.style.borderColor = HANDLES_ACCENT_COLOR;
             });
 
             if (!isNonResizableTarget) {
-                h.addEventListener('mousedown', (e) => this.host._onHandleDown(e, box));
+                h.addEventListener('pointerdown', (e) => this.host._onHandleDown(e, box));
             }
 
             box.appendChild(h);
@@ -1286,7 +1288,7 @@ export class HandlesDomRenderer {
             });
             if (isNonResizableTarget) e.dataset.lockedHidden = '1';
             if (!isNonResizableTarget) {
-                e.addEventListener('mousedown', (evt) => this.host._onEdgeResizeDown(evt));
+                e.addEventListener('pointerdown', (evt) => this.host._onEdgeResizeDown(evt));
             }
             box.appendChild(e);
         };
@@ -1341,7 +1343,7 @@ export class HandlesDomRenderer {
                 svgEl.style.height = '100%';
                 svgEl.style.display = 'block';
             }
-            rotateHandle.addEventListener('mousedown', (e) => this.host._onRotateHandleDown(e, box));
+            rotateHandle.addEventListener('pointerdown', (e) => this.host._onRotateHandleDown(e, box));
         }
         box.appendChild(rotateHandle);
 
@@ -1626,7 +1628,7 @@ export class HandlesDomRenderer {
                     btn.style.left = `${Math.round(left + width + centerOffset)}px`;
                 }
                 btn.style.top = `${centerY}px`;
-                btn.addEventListener('mousedown', (evt) => {
+                btn.addEventListener('pointerdown', (evt) => {
                     evt.preventDefault();
                     evt.stopPropagation();
                 });
@@ -1651,7 +1653,7 @@ export class HandlesDomRenderer {
                 const centerOffset = edgeGap + buttonRadius;
                 btn.style.left = `${centerX}px`;
                 btn.style.top = `${Math.round(top + height + centerOffset)}px`;
-                btn.addEventListener('mousedown', (evt) => {
+                btn.addEventListener('pointerdown', (evt) => {
                     evt.preventDefault();
                     evt.stopPropagation();
                 });
@@ -1680,7 +1682,7 @@ export class HandlesDomRenderer {
             showInModelButton.innerHTML = `${REVIT_SHOW_IN_MODEL_ICON_SVG}<span>Показать в модели</span>`;
             showInModelButton.style.left = `${Math.round(left + width / 2)}px`;
             showInModelButton.style.top = `${Math.round(top - 34)}px`;
-            showInModelButton.addEventListener('mousedown', (evt) => {
+            showInModelButton.addEventListener('pointerdown', (evt) => {
                 evt.preventDefault();
                 evt.stopPropagation();
             });
@@ -1702,6 +1704,8 @@ export class HandlesDomRenderer {
     repositionBoxChildren(box) {
         const width = parseFloat(box.style.width);
         const height = parseFloat(box.style.height);
+        box.style.setProperty('--box-w', `${width}px`);
+        box.style.setProperty('--box-h', `${height}px`);
         const cx = width / 2;
         const cy = height / 2;
 

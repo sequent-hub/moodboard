@@ -138,7 +138,7 @@ export class ToolbarPopupsController {
             } else {
                 icon.className = `moodboard-shapes__icon shape-${s.id}`;
                 if (s.id === 'arrow') {
-                    icon.innerHTML = '<svg width="18" height="12" viewBox="0 0 18 12" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="0" y="5" width="12" height="2" rx="1" fill="#1d4ed8"/><path d="M12 0 L18 6 L12 12 Z" fill="#1d4ed8"/></svg>';
+                    icon.innerHTML = '<svg width="18" height="12" viewBox="0 0 18 12" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="0" y="5" width="12" height="2" rx="1" fill="#94a3b8"/><path d="M12 0 L18 6 L12 12 Z" fill="#94a3b8"/></svg>';
                 }
             }
             btn.appendChild(icon);

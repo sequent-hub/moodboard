@@ -93,6 +93,12 @@ export function deactivateSelectTool(superDeactivate) {
     if (this.app && this.app.view) {
         this.app.view.style.cursor = '';
     }
+
+    // Эмитим Hover с null при выходе из инструмента
+    if (this.lastHoveredObjectId !== null) {
+        this.lastHoveredObjectId = null;
+        this.emit(Events.Object.Hover, { objectId: null });
+    }
 }
 
 export function destroySelectTool(superDestroy) {
@@ -104,6 +110,12 @@ export function destroySelectTool(superDestroy) {
 
     unregisterSelectToolCoreSubscriptions(this);
     this.clearSelection();
+
+    // Эмитим Hover с null при уничтожении инструмента
+    if (this.lastHoveredObjectId !== null) {
+        this.lastHoveredObjectId = null;
+        this.emit(Events.Object.Hover, { objectId: null });
+    }
 
     // Уничтожаем ручки изменения размера
     if (this.resizeHandles) {

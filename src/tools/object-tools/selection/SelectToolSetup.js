@@ -48,6 +48,9 @@ export function initializeSelectToolState(instance) {
     instance.currentX = 0;
     instance.currentY = 0;
 
+    // Последний наведённый объект (для избежания спама Hover событий)
+    instance.lastHoveredObjectId = null;
+
     // Состояние поворота
     instance.isRotating = false;
     instance.rotateCenter = null;

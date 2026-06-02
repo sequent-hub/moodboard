@@ -68,25 +68,25 @@ const MODEL_OPTIONS = [
     {
         id: 'yandex',
         label: 'Алиса',
-        icon: '<img src="/icons/alice.png" width="36" height="36" alt="Алиса" style="object-fit: contain;" />',
+        icon: ICONS.modelAlice,
         description: 'YandexGPT'
     },
     {
         id: 'gpt',
         label: 'GPT',
-        icon: '<img src="/icons/gpt.svg" width="36" height="36" alt="GPT" style="object-fit: contain;" />',
+        icon: ICONS.modelGpt,
         description: 'OpenAI'
     },
     {
         id: 'google',
         label: 'Google',
-        icon: '<img src="/icons/google.svg" width="36" height="36" alt="Google" style="object-fit: contain;" />',
+        icon: ICONS.modelGoogle,
         description: 'Gemini'
     },
     {
         id: 'qwen',
         label: 'Qwen',
-        icon: '<img src="/icons/qwen.svg" width="36" height="36" alt="Qwen" style="object-fit: contain;" />',
+        icon: ICONS.modelQwen,
         description: 'Alibaba'
     }
 ];

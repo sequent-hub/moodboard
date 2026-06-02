@@ -188,6 +188,8 @@ export class ToolEventRouter {
     }
 
     static handleDoubleClick(manager, event) {
+        // Нативный dblclick на тач-устройствах гасим — его заменяет синтетический double-tap из PointerGestureController
+        if (manager._lastPointerType === 'touch') return;
         if (!manager.activeTool) return;
 
         const toolEvent = createPointerEvent(manager, event, {

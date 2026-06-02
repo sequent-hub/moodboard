@@ -102,14 +102,49 @@ export class HandlesPositioningService {
         const screenX = cssRect.left - offsetLeft;
         const screenY = cssRect.top - offsetTop;
         return {
-            x: ((screenX * rendererRes) - tx) / s,
-            y: ((screenY * rendererRes) - ty) / s,
-            width: (cssRect.width * rendererRes) / s,
-            height: (cssRect.height * rendererRes) / s,
+            x: (screenX - tx) / s,
+            y: (screenY - ty) / s,
+            width: cssRect.width / s,
+            height: cssRect.height / s,
         };
     }
 
     getSingleSelectionWorldBounds(id, pixi) {
+        // Для текстовых объектов (type=text/simple-text) рамку строим по реальному DOM-боксу
+        // букв, а не по сохранённому width/height из state. Только для неповёрнутых объектов:
+        // getBoundingClientRect повёрнутого элемента — axis-aligned, даст неверный размер.
+        if (typeof document !== 'undefined') {
+            const textEl = document.querySelector(`.mb-text[data-id="${id}"]`);
+            if (textEl) {
+                const rotationData = { objectId: id, rotation: 0 };
+                this.host.eventBus.emit(Events.Tool.GetObjectRotation, rotationData);
+                if (Math.abs(rotationData.rotation || 0) < 0.001) {
+                    try {
+                        const r = textEl.getBoundingClientRect();
+                        // Пустой/создаваемый текст: .mb-text схлопнут (высота ~2px),
+                        // плейсхолдер живёт в textarea редактора, а не в этом div.
+                        // В этом случае DOM-боксу не доверяем — падаем в state-размер ниже.
+                        const hasContent = !!(textEl.textContent && textEl.textContent.trim());
+                        if (hasContent && r.width > 2 && r.height > 2) {
+                            const view = this.host.core.pixi.app.view;
+                            const viewRect = view.getBoundingClientRect();
+                            const { world } = this.getWorldTransform();
+                            // getBoundingClientRect в CSS pixels; viewRect тоже; разность —
+                            // глобальные PIXI-координаты (toGlobal/toLocal работают в CSS px).
+                            const tl = world.toLocal(new PIXI.Point(r.left - viewRect.left, r.top - viewRect.top));
+                            const br = world.toLocal(new PIXI.Point(r.right - viewRect.left, r.bottom - viewRect.top));
+                            return {
+                                x: Math.min(tl.x, br.x),
+                                y: Math.min(tl.y, br.y),
+                                width: Math.max(1, Math.abs(br.x - tl.x)),
+                                height: Math.max(1, Math.abs(br.y - tl.y)),
+                            };
+                        }
+                    } catch (_) {}
+                }
+            }
+        }
+
         const positionData = { objectId: id, position: null };
         const sizeData = { objectId: id, size: null };
         this.host.eventBus.emit(Events.Tool.GetObjectPosition, positionData);
@@ -199,8 +234,8 @@ export class HandlesPositioningService {
         const screenX = centerX - offsetLeft;
         const screenY = centerY - offsetTop;
         return {
-            x: ((screenX * rendererRes) - tx) / s,
-            y: ((screenY * rendererRes) - ty) / s,
+            x: (screenX - tx) / s,
+            y: (screenY - ty) / s,
         };
     }
 }

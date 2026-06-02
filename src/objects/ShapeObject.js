@@ -16,7 +16,7 @@ export class ShapeObject {
         this.objectData = objectData;
         this.width = objectData.width || 100;
         this.height = objectData.height || 100;
-        this.fillColor = objectData.color ?? 0x3b82f6;
+        this.fillColor = objectData.color ?? 0xffffff;
         const props = objectData.properties || {};
         this.kind = props.kind || 'square';
         this.cornerRadius = props.cornerRadius || 10;

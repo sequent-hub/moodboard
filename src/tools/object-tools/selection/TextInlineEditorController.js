@@ -101,6 +101,14 @@ export function openTextEditor(object, create = false) {
     }
     // Прячем глобальные HTML-ручки на время редактирования, чтобы не было второй рамки
     hideGlobalTextEditorHandlesLayer();
+    // Подавляем пересоздание ручек при паразитных ResizeUpdate (тач double-tap):
+    // host.update() внутри HandlesEventBridge вызывается при каждом ResizeUpdate,
+    // _handlesSuppressed=true гарантирует что showBounds не создаст ручки поверх textarea.
+    try {
+        if (typeof window !== 'undefined' && window.moodboardHtmlHandlesLayer) {
+            window.moodboardHtmlHandlesLayer._handlesSuppressed = true;
+        }
+    } catch (_) {}
 
     const app = this.app;
     const world = app?.stage?.getChildByName && app.stage.getChildByName('worldLayer');
@@ -144,7 +152,7 @@ export function openTextEditor(object, create = false) {
 
     const textarea = createTextEditorTextarea(content || '');
     // Без доступного статичного HTML-элемента (часто при create) не оставляем Caveat как fallback.
-    textarea.style.fontFamily = isNote ? 'Caveat, Arial, cursive' : 'Roboto, Arial, sans-serif';
+    textarea.style.fontFamily = 'Caveat, Arial, cursive';
 
     // Вычисляем межстрочный интервал; подгоняем к реальным значениям HTML-отображения
     let lhInitial = computeTextEditorLineHeightPx(effectiveFontPx);
@@ -370,7 +378,9 @@ export function openTextEditor(object, create = false) {
 
     // Если создаём новый текст — длина поля ровно как placeholder
     if (create && !isNote) {
-        const startWidth = Math.max(1, measureTextEditorPlaceholderWidth(textarea, 'Напишите что-нибудь'));
+        // +25% — запас на Caveat vs Arial: при незагруженном Caveat span рендерится в Arial,
+        // а Caveat (рукописный шрифт) заметно шире для кириллицы.
+        const startWidth = Math.max(1, Math.ceil(measureTextEditorPlaceholderWidth(textarea, 'Напишите что-нибудь') * 1.25));
         const startHeight = Math.max(1, lhInitial - BASELINE_FIX + 10); // +5px сверху и +5px снизу
         textarea.style.width = `${startWidth}px`;
         textarea.style.height = `${startHeight}px`;
@@ -397,7 +407,7 @@ export function openTextEditor(object, create = false) {
         ? ({ widthPx, heightPx }) => {
             try {
                 const scaleX = (worldLayerRef?.scale?.x) || 1;
-                const widthWorld = Math.max(1, Math.round(widthPx * viewRes / scaleX));
+                const widthWorld = Math.max(1, Math.ceil(widthPx * viewRes / scaleX));
                 const heightWorld = Math.max(1, Math.round(heightPx * viewRes / scaleX));
                 const posReq = { objectId, position: null };
                 this.eventBus.emit(Events.Tool.GetObjectPosition, posReq);
@@ -485,5 +495,13 @@ export function openTextEditor(object, create = false) {
 }
 
 export function closeTextEditor(commit) {
+    // Снимаем подавление ручек до вызова closeTextEditorFromState,
+    // т.к. тот в конце вызывает updateGlobalTextEditorHandlesLayer() → update() → showBounds,
+    // и ручки должны пересоздаться нормально.
+    try {
+        if (typeof window !== 'undefined' && window.moodboardHtmlHandlesLayer) {
+            window.moodboardHtmlHandlesLayer._handlesSuppressed = false;
+        }
+    } catch (_) {}
     return closeTextEditorFromState(this, commit);
 }

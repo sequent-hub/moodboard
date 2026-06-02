@@ -37,7 +37,7 @@ export class PlacementEventsBridge {
                 }
                 if (this.host.pending.placeOnMouseUp && this.host.app && this.host.app.view) {
                     const onUp = (ev) => {
-                        this.host.app.view.removeEventListener('mouseup', onUp);
+                        this.host.app.view.removeEventListener('pointerup', onUp);
                         if (!this.host.pending) return;
                         const worldPoint = this.host._toWorld(ev.x, ev.y);
                         const position = {
@@ -50,7 +50,7 @@ export class PlacementEventsBridge {
                         this.host.hideGhost();
                         this.host.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
                     };
-                    this.host.app.view.addEventListener('mouseup', onUp, { once: true });
+                    this.host.app.view.addEventListener('pointerup', onUp, { once: true });
                 }
             }
         });

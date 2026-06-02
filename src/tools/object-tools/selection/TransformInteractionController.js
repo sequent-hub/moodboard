@@ -10,18 +10,16 @@ export function handleObjectSelect(objectId, event) {
         if (this.isMultiSelect) {
             this.removeFromSelection(objectId);
         } else if (this.selection.size() > 1) {
-            // Перетаскивание группы
-            this.startGroupDrag(event);
+            this._pendingDrag = { isGroup: true, objectId: null, downX: event.x, downY: event.y, event };
         } else {
-            // Начинаем перетаскивание
-            this.startDrag(objectId, event);
+            this._pendingDrag = { isGroup: false, objectId, downX: event.x, downY: event.y, event };
         }
     } else {
         this.addToSelection(objectId);
         if (this.selection.size() > 1) {
-            this.startGroupDrag(event);
+            this._pendingDrag = { isGroup: true, objectId: null, downX: event.x, downY: event.y, event };
         } else {
-            this.startDrag(objectId, event);
+            this._pendingDrag = { isGroup: false, objectId, downX: event.x, downY: event.y, event };
         }
     }
 }

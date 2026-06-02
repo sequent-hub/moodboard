@@ -42,10 +42,10 @@ export class HandlesInteractionController {
         const screenX = cssRect.left - offsetLeft;
         const screenY = cssRect.top - offsetTop;
         return {
-            x: ((screenX * rendererRes) - tx) / s,
-            y: ((screenY * rendererRes) - ty) / s,
-            width: (cssRect.width * rendererRes) / s,
-            height: (cssRect.height * rendererRes) / s,
+            x: (screenX - tx) / s,
+            y: (screenY - ty) / s,
+            width: cssRect.width / s,
+            height: cssRect.height / s,
         };
     }
 
@@ -155,6 +155,37 @@ export class HandlesInteractionController {
         const dir = e.currentTarget.dataset.dir;
         const id = e.currentTarget.dataset.id;
         const isGroup = id === '__group__';
+
+        // Детектируем двойной клик/тап по ручке текстового объекта → открываем редактор вместо resize.
+        // Необходимо, т.к. при dblclick второй mousedown попадает на HTML-ручку (stopPropagation
+        // обрывает bubbling до canvas), поэтому нативный dblclick до canvas не доходит.
+        if (!isGroup) {
+            const _now = performance.now();
+            if (!this._lastHandleDownTime) this._lastHandleDownTime = {};
+            const _prevTime = this._lastHandleDownTime[id];
+            this._lastHandleDownTime[id] = _now;
+            if (_prevTime !== undefined && (_now - _prevTime) < 300) {
+                const _typeReq = { objectId: id, pixiObject: null };
+                this.host.eventBus.emit(Events.Tool.GetObjectPixi, _typeReq);
+                const _mbType = _typeReq.pixiObject?._mb?.type;
+                if (_mbType === 'text' || _mbType === 'simple-text' || _mbType === 'note') {
+                    const _posData = { objectId: id, position: null };
+                    this.host.eventBus.emit(Events.Tool.GetObjectPosition, _posData);
+                    if (_posData.position) {
+                        this.host.eventBus.emit(Events.Tool.ObjectEdit, {
+                            id,
+                            type: _mbType,
+                            position: _posData.position,
+                            properties: _typeReq.pixiObject?._mb?.properties || {},
+                            caretClick: { clientX: e.clientX, clientY: e.clientY },
+                            create: false,
+                        });
+                    }
+                    return;
+                }
+            }
+        }
+
         const world = this.host.core.pixi.worldLayer || this.host.core.pixi.app.stage;
         const s = world?.scale?.x || 1;
         const tx = world?.x || 0;
@@ -328,10 +359,10 @@ export class HandlesInteractionController {
             const screenY = (newTop - offsetTop);
             const screenW = newW;
             const screenH = newH;
-            const worldX = ((screenX * rendererRes) - tx) / s;
-            const worldY = ((screenY * rendererRes) - ty) / s;
-            const worldW = (screenW * rendererRes) / s;
-            const worldH = (screenH * rendererRes) / s;
+            const worldX = (screenX - tx) / s;
+            const worldY = (screenY - ty) / s;
+            const worldW = screenW / s;
+            const worldH = screenH / s;
 
             if (isGroup) {
                 this.host.eventBus.emit(Events.Tool.GroupResizeUpdate, {
@@ -359,8 +390,8 @@ export class HandlesInteractionController {
         };
 
         const onUp = () => {
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
             const endCSS = {
                 left: parseFloat(box.style.left),
                 top: parseFloat(box.style.top),
@@ -371,10 +402,10 @@ export class HandlesInteractionController {
             const screenY = (endCSS.top - offsetTop);
             const screenW = endCSS.width;
             const screenH = endCSS.height;
-            const worldX = ((screenX * rendererRes) - tx) / s;
-            const worldY = ((screenY * rendererRes) - ty) / s;
-            const worldW = (screenW * rendererRes) / s;
-            const worldH = (screenH * rendererRes) / s;
+            const worldX = (screenX - tx) / s;
+            const worldY = (screenY - ty) / s;
+            const worldW = screenW / s;
+            const worldH = screenH / s;
 
             if (isGroup) {
                 this.host.eventBus.emit(Events.Tool.GroupResizeEnd, { objects });
@@ -406,7 +437,7 @@ export class HandlesInteractionController {
                             el.style.width = `${Math.max(1, Math.round(endCSS.width))}px`;
                             el.style.height = 'auto';
                             const measured = Math.max(1, Math.round(el.scrollHeight));
-                            const worldH2 = (measured * rendererRes) / s;
+                            const worldH2 = measured / s;
                             const fixData = {
                                 object: id,
                                 size: { width: worldW, height: worldH2 },
@@ -419,8 +450,8 @@ export class HandlesInteractionController {
             }
         };
 
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
     }
 
     onEdgeResizeDown(e) {
@@ -600,10 +631,10 @@ export class HandlesInteractionController {
             const screenY = (newTop - offsetTop);
             const screenW = newW;
             const screenH = newH;
-            const worldX = ((screenX * rendererRes) - tx) / s;
-            const worldY = ((screenY * rendererRes) - ty) / s;
-            const worldW = (screenW * rendererRes) / s;
-            const worldH = (screenH * rendererRes) / s;
+            const worldX = (screenX - tx) / s;
+            const worldY = (screenY - ty) / s;
+            const worldW = screenW / s;
+            const worldH = screenH / s;
             const edgePositionChanged = (newLeft !== startCSS.left) || (newTop !== startCSS.top);
 
             if (isGroup) {
@@ -624,8 +655,8 @@ export class HandlesInteractionController {
         };
 
         const onUp = () => {
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
             const endCSS = {
                 left: parseFloat(box.style.left),
                 top: parseFloat(box.style.top),
@@ -636,10 +667,10 @@ export class HandlesInteractionController {
             const screenY = (endCSS.top - offsetTop);
             const screenW = endCSS.width;
             const screenH = endCSS.height;
-            const worldX = ((screenX * rendererRes) - tx) / s;
-            const worldY = ((screenY * rendererRes) - ty) / s;
-            const worldW = (screenW * rendererRes) / s;
-            const worldH = (screenH * rendererRes) / s;
+            const worldX = (screenX - tx) / s;
+            const worldY = (screenY - ty) / s;
+            const worldW = screenW / s;
+            const worldH = screenH / s;
 
             if (isGroup) {
                 this.host.eventBus.emit(Events.Tool.GroupResizeEnd, { objects });
@@ -654,7 +685,7 @@ export class HandlesInteractionController {
                             el.style.width = `${Math.max(1, Math.round(endCSS.width))}px`;
                             el.style.height = 'auto';
                             const measured = Math.max(1, Math.round(el.scrollHeight));
-                            finalWorldH = (measured * rendererRes) / s;
+                            finalWorldH = measured / s;
                         }
                     } catch (_) {}
                 }
@@ -670,8 +701,8 @@ export class HandlesInteractionController {
             }
         };
 
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
     }
 
     onRotateHandleDown(e, box) {
@@ -741,8 +772,8 @@ export class HandlesInteractionController {
         };
 
         const onRotateUp = (ev) => {
-            document.removeEventListener('mousemove', onRotateMove);
-            document.removeEventListener('mouseup', onRotateUp);
+            document.removeEventListener('pointermove', onRotateMove);
+            document.removeEventListener('pointerup', onRotateUp);
 
             if (handleElement) {
                 handleElement.style.cursor = 'grab';
@@ -766,7 +797,7 @@ export class HandlesInteractionController {
             }
         };
 
-        document.addEventListener('mousemove', onRotateMove);
-        document.addEventListener('mouseup', onRotateUp);
+        document.addEventListener('pointermove', onRotateMove);
+        document.addEventListener('pointerup', onRotateUp);
     }
 }

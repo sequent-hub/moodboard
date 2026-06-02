@@ -1,5 +1,6 @@
 import { Events } from '../core/events/Events.js';
 import cursorDefaultSvg from '../assets/icons/cursor-default.svg?raw';
+import { PointerGestureController } from './manager/PointerGestureController.js';
 import { ToolActivationController } from './manager/ToolActivationController.js';
 import { ToolEventRouter } from './manager/ToolEventRouter.js';
 import { ToolManagerGuards } from './manager/ToolManagerGuards.js';
@@ -42,12 +43,14 @@ export class ToolManager {
         this.lastMousePos = null;
         this.isMouseOverContainer = false;
         this._originalPixiCursorStyles = null;
+        this._lastPointerType = null;
         
         // Устанавливаем курсор по умолчанию на контейнер, если инструмент ещё не активирован
         if (this.container) {
             this.container.style.cursor = DEFAULT_CURSOR; // пусто → берётся глобальный CSS-курсор
         }
 
+        this.gestures = new PointerGestureController(this);
         this.initEventListeners();
     }
     

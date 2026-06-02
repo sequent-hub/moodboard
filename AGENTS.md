@@ -27,6 +27,7 @@
 - Архитектура event-driven: подсистемы общаются через `EventBus`; имена событий — только из `src/core/events/Events.js`, payload-контракты не менять без явной задачи.
 - Паттерны: Facade (`MoodBoard`), Factory (`ObjectFactory`), Command (`core/commands/*` + `HistoryManager`).
 - Координаты: `state.position` хранится как top-left, PIXI работает от center. Конвертация: `x = left + w/2`, `y = top + h/2`. Детали и риски — `COORDINATE_SYSTEM.md`.
+- PIXI — версия `pixi.js` 7; не дрейфуй в API v8 (`new Application({...})`/`app.view`/`beginFill…endFill`/`eventMode`), снимай listeners и текстуры перед `destroy`. Канон — `.cursor/rules/pixi-canon.mdc`.
 - Pixel-perfect integer contract: в screen-space запрещены дробные px; `x/y/width/height/step/radius/line positions` — integer; округление в точке формирования screen-space значений. Проверка: `npm run test:screen:integer`.
 - Перед/после рефактора больших файлов — baseline-тесты поведения (см. скрипты `test:*:baseline`).
 - Lifecycle: сохранять корректные `attach/detach/activate/deactivate/destroy`, не плодить listeners.

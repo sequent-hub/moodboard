@@ -4,42 +4,65 @@ export class ToolManagerLifecycle {
     static initEventListeners(manager, defaultCursor) {
         if (!manager.container) return;
 
-        manager.container.addEventListener('mousedown', (event) => manager.handleMouseDown(event));
-        manager.container.addEventListener('mousemove', (event) => manager.handleMouseMove(event));
-        manager.container.addEventListener('mouseup', (event) => manager.handleMouseUp(event));
-        manager.container.addEventListener('mouseenter', () => {
+        // Bound-ссылки для корректного removeEventListener в destroy()
+        manager._onPointerDown = (e) => manager.gestures.onPointerDown(e);
+        manager._onPointerEnter = () => {
             manager.isMouseOverContainer = true;
             if (!manager.activeTool) {
                 manager.container.style.cursor = defaultCursor;
                 return;
             }
             manager.syncActiveToolCursor();
-        });
-        manager.container.addEventListener('mouseleave', () => {
+        };
+        manager._onPointerLeave = () => {
             manager.isMouseOverContainer = false;
-        });
-
-        manager.container.addEventListener('dragenter', (event) => {
-            event.preventDefault();
-        });
-        manager.container.addEventListener('dragover', (event) => {
-            event.preventDefault();
-            if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
-        });
-        manager.container.addEventListener('dragleave', () => {
-            // можно снимать подсветку, если добавим в будущем
-        });
-        manager.container.addEventListener('drop', (event) => manager.handleDrop(event));
-
-        document.addEventListener('mousemove', (event) => manager.handleMouseMove(event));
-        document.addEventListener('mouseup', (event) => {
-            manager.handleMouseUp(event);
-            if (manager.temporaryTool === 'pan') {
-                manager.handleAuxPanEnd(event);
+        };
+        manager._onDragEnter = (e) => { e.preventDefault(); };
+        manager._onDragOver = (e) => {
+            e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+        };
+        manager._onDragLeave = () => {};
+        manager._onDrop = (e) => manager.handleDrop(e);
+        manager._onDblClick = (e) => manager.handleDoubleClick(e);
+        manager._onWheel = (e) => manager.handleMouseWheel(e);
+        manager._onContextMenu = (e) => {
+            e.preventDefault();
+            if (!manager.activeTool) return;
+            const rect = manager.container.getBoundingClientRect();
+            const toolEvent = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+                originalEvent: e
+            };
+            if (typeof manager.activeTool.onContextMenu === 'function') {
+                manager.activeTool.onContextMenu(toolEvent);
             }
-        });
-        manager.container.addEventListener('dblclick', (event) => manager.handleDoubleClick(event));
-        manager.container.addEventListener('wheel', (event) => manager.handleMouseWheel(event), PASSIVE_FALSE);
+        };
+
+        manager.container.addEventListener('pointerdown', manager._onPointerDown);
+        manager.container.addEventListener('pointerenter', manager._onPointerEnter);
+        manager.container.addEventListener('pointerleave', manager._onPointerLeave);
+        manager.container.addEventListener('dragenter', manager._onDragEnter);
+        manager.container.addEventListener('dragover', manager._onDragOver);
+        manager.container.addEventListener('dragleave', manager._onDragLeave);
+        manager.container.addEventListener('drop', manager._onDrop);
+        manager.container.addEventListener('dblclick', manager._onDblClick);
+        manager.container.addEventListener('wheel', manager._onWheel, PASSIVE_FALSE);
+        manager.container.addEventListener('contextmenu', manager._onContextMenu);
+
+        // pointermove только на document — исключает двойной вызов (ранее mousemove висел и на container, и на document)
+        manager._onDocPointermove = (e) => manager.gestures.onPointerMove(e);
+        manager._onDocPointerup = (e) => manager.gestures.onPointerUp(e);
+        manager._onDocPointercancel = (e) => manager.gestures.onPointerUp(e);
+        manager._onDocKeydown = (e) => manager.handleKeyDown(e);
+        manager._onDocKeyup = (e) => manager.handleKeyUp(e);
+
+        document.addEventListener('pointermove', manager._onDocPointermove);
+        document.addEventListener('pointerup', manager._onDocPointerup);
+        document.addEventListener('pointercancel', manager._onDocPointercancel);
+        document.addEventListener('keydown', manager._onDocKeydown);
+        document.addEventListener('keyup', manager._onDocKeyup);
 
         manager._onWindowWheel = (event) => {
             try {
@@ -49,23 +72,6 @@ export class ToolManagerLifecycle {
             } catch (_) {}
         };
         window.addEventListener('wheel', manager._onWindowWheel, PASSIVE_FALSE);
-
-        document.addEventListener('keydown', (event) => manager.handleKeyDown(event));
-        document.addEventListener('keyup', (event) => manager.handleKeyUp(event));
-
-        manager.container.addEventListener('contextmenu', (event) => {
-            event.preventDefault();
-            if (!manager.activeTool) return;
-            const rect = manager.container.getBoundingClientRect();
-            const toolEvent = {
-                x: event.clientX - rect.left,
-                y: event.clientY - rect.top,
-                originalEvent: event
-            };
-            if (typeof manager.activeTool.onContextMenu === 'function') {
-                manager.activeTool.onContextMenu(toolEvent);
-            }
-        });
     }
 
     static destroy(manager) {
@@ -77,27 +83,33 @@ export class ToolManagerLifecycle {
         manager.activeTool = null;
 
         if (manager.container) {
-            manager.container.removeEventListener('mousedown', manager.handleMouseDown);
-            manager.container.removeEventListener('mousemove', manager.handleMouseMove);
-            manager.container.removeEventListener('mouseup', manager.handleMouseUp);
-            manager.container.removeEventListener('dblclick', manager.handleDoubleClick);
-            manager.container.removeEventListener('wheel', manager.handleMouseWheel);
-            manager.container.removeEventListener('contextmenu', (event) => event.preventDefault());
-            manager.container.removeEventListener('dragenter', (event) => event.preventDefault());
-            manager.container.removeEventListener('dragover', (event) => event.preventDefault());
-            manager.container.removeEventListener('dragleave', () => {});
-            manager.container.removeEventListener('drop', manager.handleDrop);
+            manager.container.removeEventListener('pointerdown', manager._onPointerDown);
+            manager.container.removeEventListener('pointerenter', manager._onPointerEnter);
+            manager.container.removeEventListener('pointerleave', manager._onPointerLeave);
+            manager.container.removeEventListener('dragenter', manager._onDragEnter);
+            manager.container.removeEventListener('dragover', manager._onDragOver);
+            manager.container.removeEventListener('dragleave', manager._onDragLeave);
+            manager.container.removeEventListener('drop', manager._onDrop);
+            manager.container.removeEventListener('dblclick', manager._onDblClick);
+            manager.container.removeEventListener('wheel', manager._onWheel);
+            manager.container.removeEventListener('contextmenu', manager._onContextMenu);
         }
-        document.removeEventListener('mousemove', manager.handleMouseMove);
-        document.removeEventListener('mouseup', manager.handleMouseUp);
 
-        document.removeEventListener('keydown', manager.handleKeyDown);
-        document.removeEventListener('keyup', manager.handleKeyUp);
+        document.removeEventListener('pointermove', manager._onDocPointermove);
+        document.removeEventListener('pointerup', manager._onDocPointerup);
+        document.removeEventListener('pointercancel', manager._onDocPointercancel);
+        document.removeEventListener('keydown', manager._onDocKeydown);
+        document.removeEventListener('keyup', manager._onDocKeyup);
+
         if (manager._onWindowWheel) {
             try {
                 window.removeEventListener('wheel', manager._onWindowWheel);
             } catch (_) {}
             manager._onWindowWheel = null;
+        }
+
+        if (manager.gestures) {
+            manager.gestures.destroy();
         }
 
         const cursorStyles = manager.getPixiCursorStyles();

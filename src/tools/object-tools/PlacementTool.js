@@ -62,7 +62,7 @@ export class PlacementTool extends BaseTool {
             this.cursor = this._getPendingCursor();
             this.app.view.style.cursor = this.cursor;
             this._boundOnMouseMove = this._boundOnMouseMove || this._onMouseMove.bind(this);
-            this.app.view.addEventListener('mousemove', this._boundOnMouseMove);
+            this.app.view.addEventListener('pointermove', this._boundOnMouseMove);
         }
         // При активации синхронизируем переопределение курсора pointer для текста
         this._updateCursorOverride();
@@ -91,7 +91,7 @@ export class PlacementTool extends BaseTool {
         super.deactivate();
         if (this.app && this.app.view && this._boundOnMouseMove) {
             this.app.view.style.cursor = '';
-            this.app.view.removeEventListener('mousemove', this._boundOnMouseMove);
+            this.app.view.removeEventListener('pointermove', this._boundOnMouseMove);
         }
         // Восстанавливаем стандартные стили курсора при выходе из инструмента
         this._updateCursorOverride(true);

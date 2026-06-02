@@ -83,24 +83,26 @@ export class NoteObject {
         this.textField.mask = this.textMask;
 
         this._redraw(); // Сначала рисуем фон
-        // Прячем текст до загрузки шрифта Caveat, чтобы не показывать системный
         this.textField.visible = false;
         this.container.addChild(this.textField); // Затем добавляем текст поверх
-        this._updateTextPosition();
-        // Если шрифт уже загружен — показываем сразу, иначе подождём загрузки
+        // Если шрифт уже загружен — позиционируем и показываем сразу.
+        // Если нет — НЕ вызываем _updateTextPosition(), чтобы не отравить кэш
+        // PIXI.TextMetrics метриками fallback-шрифта (Arial). Позиционирование
+        // произойдёт в _ensureWebFontApplied после реальной загрузки шрифта.
         if (this._isFontLoaded(fontFamily, this.fontSize)) {
+            this._updateTextPosition();
             this.textField.visible = true;
         } else {
-            this._ensureWebFontApplied(fontFamily, this.fontSize);
-            // Фолбэк на случай отсутствия Font Loading API — короткая задержка
+            // Фолбэк на случай отсутствия Font Loading API — показываем без позиционирования
             try {
                 if (!(typeof document !== 'undefined' && document.fonts && typeof document.fonts.load === 'function')) {
+                    this._updateTextPosition();
                     setTimeout(() => { try { this.textField.visible = true; } catch (_) {} }, 300);
                 }
             } catch (_) {}
         }
 
-        // Гарантируем применение web-font (например, Caveat) при первом создании
+        // Загружаем web-font и применяем корректные метрики
         this._ensureWebFontApplied(fontFamily, this.fontSize);
         
         // Отладочная информация
@@ -290,7 +292,9 @@ export class NoteObject {
     }
 
     /**
-     * Дожидается загрузки веб-шрифта и обновляет PIXI.Text, чтобы применились корректные метрики
+     * Дожидается загрузки веб-шрифта и обновляет PIXI.Text с правильными метриками.
+     * Сбрасывает кэш PIXI.TextMetrics перед позиционированием — это гарантирует,
+     * что PIXI не будет использовать ранее закэшированные метрики fallback-шрифта.
      */
     _ensureWebFontApplied(fontFamily, fontSizePx) {
         try {
@@ -299,9 +303,13 @@ export class NoteObject {
             const size = Math.max(1, Number(fontSizePx) || 32);
             const spec = `normal ${size}px ${primary}`;
             document.fonts.load(spec).then(() => {
-                // Обновляем текст после загрузки шрифта и сразу подгоняем без мерцания
                 try {
                     if (this.textField) this.textField.visible = false;
+                    // Сбрасываем кэш метрик шрифтов PIXI, чтобы Caveat переизмерился
+                    // с реальными метриками, а не с ранее закэшированными от Arial
+                    if (PIXI.TextMetrics?.clearMetrics) {
+                        PIXI.TextMetrics.clearMetrics();
+                    }
                     this.textField.style.fontFamily = fontFamily;
                     this._updateTextPosition();
                     if (this.textField) this.textField.visible = true;

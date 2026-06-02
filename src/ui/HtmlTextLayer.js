@@ -161,6 +161,12 @@ export class HtmlTextLayer {
         this.rebuildFromState();
         this.updateAll();
 
+        // После загрузки веб-шрифтов переизмеряем все боксы: до swap шрифта scrollHeight
+        // фиксируется по fallback-метрикам, после — по реальным глифам.
+        if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => this.updateAll()).catch(() => {});
+        }
+
         // Хелпер: при каждом обновлении ручек — обновляем HTML блок
         const world = this.core?.pixi?.worldLayer || this.core?.pixi?.app?.stage;
         if (world) {
@@ -221,8 +227,7 @@ export class HtmlTextLayer {
         el.style.backgroundColor = backgroundColor === 'transparent' ? '' : backgroundColor;
         el.style.lineHeight = `${baseLineHeight}px`;
         // Выравнивание рендеринга с textarea
-        el.style.whiteSpace = 'pre-wrap';
-        el.style.wordBreak = 'break-word';
+        el.style.whiteSpace = 'pre';
         el.style.overflow = 'visible';
         el.style.letterSpacing = '0px';
         el.style.fontKerning = 'normal';
@@ -374,6 +379,25 @@ export class HtmlTextLayer {
             el.textContent = content;
             console.log(`🔍 HtmlTextLayer: содержимое обновлено в updateOne для ${objectId}:`, content);
         }
+
+        // Гарантируем, что рамка не прилипает к тексту справа: ширина блока всегда
+        // не меньше реальной ширины текста + правый отступ. Слой ручек строит рамку
+        // по getBoundingClientRect этого .mb-text, поэтому запас распространяется и на неё.
+        // Применяем ко всем объектам (в т.ч. старым, сохранённым без запаса) и независимо
+        // от шрифта. Без поворота: width:auto у absolute-элемента = ширина контента.
+        try {
+            const hasContent = !!(el.textContent && el.textContent.trim());
+            if (hasContent && !angle) {
+                const rightMargin = Math.ceil(fontSizePx * 0.7) + 6;
+                const prevWidth = el.style.width;
+                el.style.width = 'auto';
+                const contentW = Math.ceil(el.scrollWidth);
+                const stateWcss = parseFloat(prevWidth) || logWidth || 0;
+                const finalW = Math.max(stateWcss, contentW + rightMargin);
+                el.style.width = `${finalW}px`;
+                logWidth = finalW;
+            }
+        } catch (_) {}
 
         // Гарантируем, что высота соответствует контенту (особенно после смены font-size)
         try {

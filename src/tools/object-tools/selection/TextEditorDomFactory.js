@@ -31,8 +31,7 @@ export function applyInitialTextEditorTextareaStyles(textarea, { effectiveFontPx
     textarea.style.height = `${initialHeightPx}px`;
     textarea.setAttribute('rows', '1');
     textarea.style.overflowY = 'hidden';
-    textarea.style.whiteSpace = 'pre-wrap';
-    textarea.style.wordBreak = 'break-word';
+    textarea.style.whiteSpace = 'pre';
     textarea.style.letterSpacing = '0px';
     textarea.style.fontKerning = 'normal';
 }

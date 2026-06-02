@@ -1,5 +1,7 @@
 import { Events } from '../../../core/events/Events.js';
 
+const DRAG_START_THRESHOLD_PX = 4;
+
 export function onMouseDown(event) {
     // Если активен текстовый редактор, закрываем его при клике вне
     if (this.textEditor.active) {
@@ -20,6 +22,7 @@ export function onMouseDown(event) {
         return; // Прерываем выполнение, чтобы не обрабатывать клик дальше
     }
 
+    this._pendingDrag = null;
     this.isMultiSelect = event.originalEvent.ctrlKey || event.originalEvent.metaKey || event.originalEvent.shiftKey;
 
     // Проверяем, что под курсором
@@ -34,8 +37,8 @@ export function onMouseDown(event) {
         const gb = this.computeGroupBounds();
         const insideGroup = this.isPointInBounds({ x: event.x, y: event.y }, { x: gb.x, y: gb.y, width: gb.width, height: gb.height });
         if (insideGroup) {
-            // Если клик внутри группы (по объекту или пустому месту), сохраняем выделение и начинаем перетаскивание группы
-            this.startGroupDrag(event);
+            // Если клик внутри группы — откладываем до превышения порога смещения
+            this._pendingDrag = { isGroup: true, objectId: null, downX: event.x, downY: event.y, event };
             return;
         }
         // Вне группы — обычная логика
@@ -116,8 +119,8 @@ export function onMouseDown(event) {
                         }
                     }
                 }
-                // Старт перетаскивания как если бы кликнули по объекту
-                this.startDrag(selId, event);
+                // Откладываем drag до превышения порога смещения
+                this._pendingDrag = { isGroup: false, objectId: selId, downX: event.x, downY: event.y, event };
                 return;
             }
         }
@@ -140,6 +143,19 @@ export function onMouseMove(event) {
         this.updateResize(event);
     } else if (this.isRotating || this.isGroupRotating) {
         this.updateRotate(event);
+    } else if (this._pendingDrag) {
+        const dx = event.x - this._pendingDrag.downX;
+        const dy = event.y - this._pendingDrag.downY;
+        if (Math.hypot(dx, dy) > DRAG_START_THRESHOLD_PX) {
+            const pending = this._pendingDrag;
+            this._pendingDrag = null;
+            if (pending.isGroup) {
+                this.startGroupDrag(pending.event);
+            } else {
+                this.startDrag(pending.objectId, pending.event);
+            }
+            this.updateDrag(event);
+        }
     } else if (this.isDragging || this.isGroupDragging) {
         this.updateDrag(event);
     } else if (this.isBoxSelect) {
@@ -147,10 +163,23 @@ export function onMouseMove(event) {
     } else {
         // Обновляем курсор в зависимости от того, что под мышью
         this.updateCursor(event);
+        
+        // Эмитим событие наведения на объект
+        const hitData = { x: event.x, y: event.y, result: null };
+        this.emit(Events.Tool.HitTest, hitData);
+        const hoveredObjectId = hitData.result?.object || null;
+        if (this.lastHoveredObjectId !== hoveredObjectId) {
+            this.lastHoveredObjectId = hoveredObjectId;
+            this.emit(Events.Object.Hover, { objectId: hoveredObjectId });
+        }
     }
 }
 
 export function onMouseUp(event) {
+    if (this._pendingDrag) {
+        this._pendingDrag = null;
+        return;
+    }
     if (this.isResizing || this.isGroupResizing) {
         this.endResize();
     } else if (this.isRotating || this.isGroupRotating) {

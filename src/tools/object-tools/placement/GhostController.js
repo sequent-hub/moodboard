@@ -431,7 +431,7 @@ export class GhostController {
         const kind = host.pending.properties?.kind || 'square';
         const width = 100;
         const height = 100;
-        const fillColor = 0x3b82f6;
+        const fillColor = 0xffffff;
         const cornerRadius = host.pending.properties?.cornerRadius || 10;
 
         const shapeGraphics = new PIXI.Graphics();
