@@ -1,6 +1,9 @@
 import * as PIXI from 'pixi.js';
 import { MINDMAP_LAYOUT } from '../ui/mindmap/MindmapLayoutConfig.js';
 
+// Толщина обводки в экранных пикселях — совпадает с толщиной веток MindmapConnectionLayer.
+const STROKE_SCREEN_PX = 2;
+
 /**
  * Простой объект mindmap: прямоугольник с синей обводкой и полупрозрачной синей заливкой.
  */
@@ -18,8 +21,10 @@ export class MindmapObject {
             ? Math.max(1, Math.round(props.capsuleBaseHeight))
             : Math.max(1, Math.round(Math.min(this.height, MINDMAP_LAYOUT.height)));
 
+        // Текущий масштаб мирового слоя; обновляется через redrawForZoom при каждом зуме.
+        this._worldScale = 1;
+
         this.graphics = new PIXI.Graphics();
-        this.graphics.roundPixels = true;
         this._draw();
     }
 
@@ -31,6 +36,16 @@ export class MindmapObject {
         if (!size) return;
         this.width = Math.max(1, size.width || this.width);
         this.height = Math.max(1, size.height || this.height);
+        this._redrawPreserveTransform();
+    }
+
+    /**
+     * Перерисовать пилюлю под текущий масштаб мира.
+     * Вызывается из PixiEngine на каждый зум — пересчитывает толщину обводки и
+     * число сегментов дуги, чтобы фаски оставались гладкими без зазубрин.
+     */
+    redrawForZoom(worldScale) {
+        this._worldScale = Math.max(0.01, worldScale || 1);
         this._redrawPreserveTransform();
     }
 
@@ -54,13 +69,16 @@ export class MindmapObject {
         const fixedBaseRadius = Math.max(0, Math.floor(this.capsuleBaseHeight / 2));
         const capsuleRadius = Math.min(dynamicRadius, fixedBaseRadius);
 
+        // Толщина в мировых единицах: 3 экранных пикселя ÷ масштаб — совпадает с ветками.
+        const strokeW = STROKE_SCREEN_PX / this._worldScale;
+
         g.beginFill(this.fillColor, this.fillAlpha);
         g.drawRoundedRect(0, 0, this.width, this.height, capsuleRadius);
         g.endFill();
 
         try {
             g.lineStyle({
-                width: this.strokeWidth,
+                width: strokeW,
                 color: this.strokeColor,
                 alpha: 1,
                 alignment: 0,
@@ -69,7 +87,7 @@ export class MindmapObject {
                 miterLimit: 2,
             });
         } catch (_) {
-            g.lineStyle(this.strokeWidth, this.strokeColor, 1, 0);
+            g.lineStyle(strokeW, this.strokeColor, 1, 0);
         }
         g.drawRoundedRect(0, 0, this.width, this.height, capsuleRadius);
     }

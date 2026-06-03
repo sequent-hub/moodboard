@@ -27,3 +27,15 @@ export const MINDMAP_LAYOUT = Object.freeze({
     maxLineChars: MINDMAP_BASE_LAYOUT.maxLineChars,
 });
 
+// Auto-fit width bounds (world units).
+// ROOT: current fixed width ~179 → min 100 keeps pill shape for short words;
+//        max 440 ≈ 50-char line in Roboto 14px (~375px) + 40px padding.
+// CHILD: slightly narrower pill baseline; same maxLineChars as root but
+//        typically smaller padding, so max is a bit tighter.
+export const MINDMAP_AUTOFIT = Object.freeze({
+    ROOT_MIN_WIDTH: 100,
+    ROOT_MAX_WIDTH: 440,
+    CHILD_MIN_WIDTH: 80,
+    CHILD_MAX_WIDTH: 360,
+});
+

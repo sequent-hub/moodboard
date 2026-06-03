@@ -523,9 +523,9 @@ export class GhostController {
         const fillAlpha = (typeof host.pending.properties?.fillAlpha === 'number')
             ? host.pending.properties.fillAlpha
             : 0.25;
-        const strokeWidth = (typeof host.pending.properties?.strokeWidth === 'number')
-            ? host.pending.properties.strokeWidth
-            : 1;
+        // Толщина обводки согласована с MindmapObject и ветками: 3 экранных пикселя.
+        const worldScale = Math.max(0.01, host.world?.scale?.x || 1);
+        const strokeWidth = 3 / worldScale;
         const fontSize = Math.max(1, Math.round(host.pending.properties?.fontSize || MINDMAP_LAYOUT.fontSize));
         const fontFamily = host.pending.properties?.fontFamily || 'Roboto, Arial, sans-serif';
         const textColor = host.pending.properties?.textColor || 0x212121;

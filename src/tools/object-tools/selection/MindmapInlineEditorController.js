@@ -13,7 +13,7 @@ import {
     showStaticTextAfterEditing,
     updateGlobalTextEditorHandlesLayer,
 } from './TextEditorLifecycleRegistry.js';
-import { MINDMAP_LAYOUT } from '../../../ui/mindmap/MindmapLayoutConfig.js';
+import { MINDMAP_LAYOUT, MINDMAP_AUTOFIT } from '../../../ui/mindmap/MindmapLayoutConfig.js';
 
 function applyMindmapCaretFromClick({ create, objectId, object, textarea }) {
     try {
@@ -417,9 +417,18 @@ export function openMindmapEditor(object, create = false) {
         const placeholderWidth = measureMindmapTextWidthPx(textarea, measureEl, textarea.placeholder || '');
         const baseCssWidth = Math.max(1, Math.round(stableBaseWorldWidth * getWorldToCssScale()));
         const placeholderCssWidth = Math.max(1, Math.ceil(placeholderWidth + padding.left + padding.right));
-        const nextCssWidth = hasText
+        const rawNextCssWidth = hasText
             ? Math.max(1, Math.ceil(textWidth + padding.left + padding.right))
             : Math.max(baseCssWidth, placeholderCssWidth);
+        const level = properties?.mindmap?.level ?? 0;
+        const isRoot = level === 0;
+        const minCssW = Math.max(1, Math.round(
+            (isRoot ? MINDMAP_AUTOFIT.ROOT_MIN_WIDTH : MINDMAP_AUTOFIT.CHILD_MIN_WIDTH) * getWorldToCssScale()
+        ));
+        const maxCssW = Math.max(1, Math.round(
+            (isRoot ? MINDMAP_AUTOFIT.ROOT_MAX_WIDTH : MINDMAP_AUTOFIT.CHILD_MAX_WIDTH) * getWorldToCssScale()
+        ));
+        const nextCssWidth = Math.max(minCssW, Math.min(maxCssW, rawNextCssWidth));
         const lineCount = getEditorLineCount();
         const lineHeightPx = getEditorLineHeightPx();
         const baseCssHeight = Math.max(1, Math.round(stableBaseWorldHeight * getWorldToCssScale()));

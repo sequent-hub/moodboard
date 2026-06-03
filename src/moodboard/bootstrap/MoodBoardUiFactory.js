@@ -8,6 +8,7 @@ import { ContextMenu } from '../../ui/ContextMenu.js';
 import { HtmlTextLayer } from '../../ui/HtmlTextLayer.js';
 import { MindmapHtmlTextLayer } from '../../ui/mindmap/MindmapHtmlTextLayer.js';
 import { MindmapConnectionLayer } from '../../ui/mindmap/MindmapConnectionLayer.js';
+import { MindmapCollapseLayer } from '../../ui/mindmap/MindmapCollapseLayer.js';
 import { ConnectorLayer } from '../../ui/connectors/ConnectorLayer.js';
 import { ConnectionAnchorsLayer } from '../../ui/connectors/ConnectionAnchorsLayer.js';
 import { HtmlHandlesLayer } from '../../ui/HtmlHandlesLayer.js';
@@ -104,6 +105,8 @@ function initHtmlLayersAndPanels(board) {
     board.mindmapHtmlTextLayer.attach();
     board.mindmapConnectionLayer = new MindmapConnectionLayer(board.coreMoodboard.eventBus, board.coreMoodboard);
     board.mindmapConnectionLayer.attach();
+    board.mindmapCollapseLayer = new MindmapCollapseLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
+    board.mindmapCollapseLayer.attach();
 
     board.connectorLayer = new ConnectorLayer(board.coreMoodboard.eventBus, board.coreMoodboard);
     board.connectorLayer.attach();
@@ -118,6 +121,7 @@ function initHtmlLayersAndPanels(board) {
         window.moodboardHtmlTextLayer = board.htmlTextLayer;
         window.moodboardMindmapHtmlTextLayer = board.mindmapHtmlTextLayer;
         window.moodboardMindmapConnectionLayer = board.mindmapConnectionLayer;
+        window.moodboardMindmapCollapseLayer = board.mindmapCollapseLayer;
         window.moodboardConnectorLayer = board.connectorLayer;
         window.moodboardConnectionAnchorsLayer = board.connectionAnchorsLayer;
         window.moodboardHtmlHandlesLayer = board.htmlHandlesLayer;

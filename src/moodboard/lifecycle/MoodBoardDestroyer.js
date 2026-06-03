@@ -55,6 +55,9 @@ export function destroyMoodBoard(board) {
     safeDestroy(board.mindmapConnectionLayer, 'mindmapConnectionLayer');
     board.mindmapConnectionLayer = null;
 
+    safeDestroy(board.mindmapCollapseLayer, 'mindmapCollapseLayer');
+    board.mindmapCollapseLayer = null;
+
     safeDestroy(board.connectorLayer, 'connectorLayer');
     board.connectorLayer = null;
 
@@ -105,6 +108,9 @@ export function destroyMoodBoard(board) {
         }
         if (window.moodboardMindmapConnectionLayer === board.mindmapConnectionLayer) {
             window.moodboardMindmapConnectionLayer = null;
+        }
+        if (window.moodboardMindmapCollapseLayer === board.mindmapCollapseLayer) {
+            window.moodboardMindmapCollapseLayer = null;
         }
         if (window.moodboardConnectorLayer === board.connectorLayer) {
             window.moodboardConnectorLayer = null;

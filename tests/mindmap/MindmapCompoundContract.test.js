@@ -97,6 +97,7 @@ describe('MindmapCompoundContract', () => {
             branchOrder: 0,
             branchRootId: null,
             branchColor: null,
+            collapsed: false,
         });
     });
 
@@ -125,6 +126,7 @@ describe('MindmapCompoundContract', () => {
             branchOrder: null,
             branchRootId: 'child-1',
             branchColor: normalized.mindmap.branchColor,
+            collapsed: false,
         });
         expect(MINDMAP_BRANCH_COLOR_PALETTE).toContain(normalized.mindmap.branchColor);
     });

@@ -57,6 +57,9 @@ export class PixiEngine {
                         if (mb && mb.type === 'note' && mb.instance && typeof mb.instance.updateCrispnessForZoom === 'function') {
                             mb.instance.updateCrispnessForZoom(s, res);
                         }
+                        if (mb && mb.type === 'mindmap' && mb.instance && typeof mb.instance.redrawForZoom === 'function') {
+                            mb.instance.redrawForZoom(s);
+                        }
                     }
                 } catch (e) {
                     console.warn('PixiEngine: zoom crispness update failed', e);
@@ -79,13 +82,16 @@ export class PixiEngine {
                 type: objectData.type,
                 instance: instance // Сохраняем ссылку на сам объект
             };
-            // Первичная установка чёткости для записок по текущему масштабу/резолюции
+            // Первичная установка чёткости/масштаба по текущему зуму
             try {
-                if (pixiObject && pixiObject._mb && pixiObject._mb.type === 'note' && pixiObject._mb.instance && typeof pixiObject._mb.instance.updateCrispnessForZoom === 'function') {
-                    const world = this.worldLayer || this.app.stage;
-                    const s = world?.scale?.x || 1;
-                    const res = this.app?.renderer?.resolution || 1;
+                const world = this.worldLayer || this.app.stage;
+                const s = world?.scale?.x || 1;
+                const res = this.app?.renderer?.resolution || 1;
+                if (pixiObject._mb.type === 'note' && pixiObject._mb.instance && typeof pixiObject._mb.instance.updateCrispnessForZoom === 'function') {
                     pixiObject._mb.instance.updateCrispnessForZoom(s, res);
+                }
+                if (pixiObject._mb.type === 'mindmap' && pixiObject._mb.instance && typeof pixiObject._mb.instance.redrawForZoom === 'function') {
+                    pixiObject._mb.instance.redrawForZoom(s);
                 }
             } catch (_) {}
         } else {

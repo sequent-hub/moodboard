@@ -1,5 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { Events } from '../../core/events/Events.js';
+import { isHiddenByCollapsedAncestor } from './MindmapCollapseGraph.js';
 
 const MINDMAP_TYPE = 'mindmap';
 const SIDE_LEFT = 'left';
@@ -61,18 +62,53 @@ function getChildAttachSide(parentSide) {
 
 function getBezierControls(start, end, side) {
     if (side === SIDE_BOTTOM) {
-        const spanY = Math.max(30, Math.round(Math.abs(end.y - start.y) * 0.35));
+        const spanY = Math.max(30, Math.abs(end.y - start.y) * 0.5);
         return {
             cp1: { x: start.x, y: start.y + spanY },
             cp2: { x: end.x, y: end.y - spanY },
         };
     }
     const dir = side === SIDE_LEFT ? -1 : 1;
-    const spanX = Math.max(30, Math.round(Math.abs(end.x - start.x) * 0.35));
+    const spanX = Math.max(30, Math.abs(end.x - start.x) * 0.5);
     return {
         cp1: { x: start.x + spanX * dir, y: start.y },
         cp2: { x: end.x - spanX * dir, y: end.y },
     };
+}
+
+function cubicPoint(p0, p1, p2, p3, t) {
+    const mt = 1 - t;
+    const a = mt * mt * mt, b = 3 * mt * mt * t, c = 3 * mt * t * t, d = t * t * t;
+    return {
+        x: a * p0.x + b * p1.x + c * p2.x + d * p3.x,
+        y: a * p0.y + b * p1.y + c * p2.y + d * p3.y,
+    };
+}
+
+function drawRibbon(g, start, cp1, cp2, end, color, width) {
+    const STEPS = 24;
+    const half = width / 2;
+    const pts = [];
+    for (let i = 0; i <= STEPS; i++) {
+        pts.push(cubicPoint(start, cp1, cp2, end, i / STEPS));
+    }
+    const top = [], bottom = [];
+    for (let i = 0; i <= STEPS; i++) {
+        const p = pts[i];
+        const prev = pts[Math.max(0, i - 1)];
+        const next = pts[Math.min(STEPS, i + 1)];
+        const dx = next.x - prev.x, dy = next.y - prev.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len, ny = dx / len;
+        top.push({ x: p.x + nx * half, y: p.y + ny * half });
+        bottom.push({ x: p.x - nx * half, y: p.y - ny * half });
+    }
+    g.beginFill(color, 1);
+    g.moveTo(top[0].x, top[0].y);
+    for (let i = 1; i <= STEPS; i++) g.lineTo(top[i].x, top[i].y);
+    for (let i = STEPS; i >= 0; i--) g.lineTo(bottom[i].x, bottom[i].y);
+    g.closePath();
+    g.endFill();
 }
 
 function resolveLegacyLink(child, byId, rootByCompoundId) {
@@ -204,6 +240,8 @@ export class MindmapConnectionLayer {
         this._lastSegments = [];
 
         children.forEach((child) => {
+            if (isHiddenByCollapsedAncestor(mindmaps, child.id)) return;
+
             const childMeta = asMindmapMeta(child);
             const { parentId, side } = resolveLegacyLink(child, byId, rootByCompoundId);
             const parent = parentId ? byId.get(parentId) : null;
@@ -218,30 +256,17 @@ export class MindmapConnectionLayer {
             const start = nudgeStartOutsideNode(startBase, side);
             const end = getAnchorPoint(child, getChildAttachSide(side));
             const { cp1, cp2 } = getBezierControls(start, end, side);
-            const color = Number(child?.properties?.strokeColor || parent?.properties?.strokeColor || 0x2563EB);
-
-            try {
-                g.lineStyle({
-                    width: 1,
-                    color,
-                    alpha: 0.95,
-                    alignment: 0,
-                    cap: 'round',
-                    join: 'round',
-                    miterLimit: 2,
-                });
-            } catch (_) {
-                g.lineStyle(1, color, 0.95, 0);
-            }
-            g.moveTo(Math.round(start.x), Math.round(start.y));
-            g.bezierCurveTo(
-                Math.round(cp1.x),
-                Math.round(cp1.y),
-                Math.round(cp2.x),
-                Math.round(cp2.y),
-                Math.round(end.x),
-                Math.round(end.y)
+            const color = Number(
+                childMeta.branchColor
+                ?? parentMeta.branchColor
+                ?? child?.properties?.strokeColor
+                ?? parent?.properties?.strokeColor
+                ?? 0x2563EB
             );
+
+            const scale = this.core?.pixi?.worldLayer?.scale?.x || 1;
+            const width = 2 / scale;
+            drawRibbon(g, start, cp1, cp2, end, color, width);
             this._lastSegments.push({
                 parentId: parent.id,
                 childId: child.id,

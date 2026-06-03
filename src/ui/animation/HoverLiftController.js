@@ -1,5 +1,6 @@
 import gsap from 'gsap';
 import { CustomEase } from 'gsap/CustomEase';
+import * as PIXI from 'pixi.js';
 import { DropShadowFilter } from '@pixi/filter-drop-shadow';
 import { Events } from '../../core/events/Events.js';
 
@@ -51,14 +52,19 @@ const IMAGE_REST_DISTANCE = 6;
  * @param {number} restDistance
  */
 function createShadowFilter(restAlpha = 0, restDistance = 8) {
-    return new DropShadowFilter({
-        color: 0x000000,
+    const f = new DropShadowFilter({
         alpha: restAlpha,
         blur: 6,
         distance: restDistance,
         angle: 90,
         quality: 3,
     });
+    // Явно устанавливаем resolution, чтобы _updatePadding() не обращался
+    // к deprecated settings.FILTER_RESOLUTION при каждом изменении distance
+    const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+    f.resolution = dpr;
+    f.multisample = PIXI.MSAA_QUALITY.HIGH;
+    return f;
 }
 
 export class HoverLiftController {
@@ -94,6 +100,11 @@ export class HoverLiftController {
         if (!pixiObject || this._entries.has(pixiObject)) return;
 
         const type = pixiObject._mb?.type || objectData?.type;
+        // text/simple-text рендерятся как HTML-элементы (HtmlTextLayer).
+        // Для них hover-lift управляется через MindmapHtmlTextLayer/_ensurePixiHover.
+        // mindmap: PIXI-капсула получает подъём через HoverLiftController; HTML-текст
+        // синхронизируется через MindmapHtmlTextLayer._ensurePixiHover (те же pointerover/out).
+        if (type === 'text' || type === 'simple-text') return;
         const hasStaticShadow = type === 'image' || type === 'frame';
         const restAlpha = hasStaticShadow ? IMAGE_REST_ALPHA : 0;
         const restDistance = hasStaticShadow ? IMAGE_REST_DISTANCE : 8;

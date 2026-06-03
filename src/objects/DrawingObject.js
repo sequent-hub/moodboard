@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import { GeometryUtils } from '../core/rendering/GeometryUtils.js';
 
 /**
  * Класс объекта «Рисунок» (карандаш/маркер)
@@ -27,6 +28,13 @@ export class DrawingObject {
         this.graphics = new PIXI.Graphics();
         this._draw(this.points, this.color, this.strokeWidth, this.mode);
 
+        // PIXI v7 Graphics.containsPoint учитывает только заливку (fillStyle),
+        // а рисунок состоит лишь из обводки (lineStyle) — поэтому штатный hit-test
+        // линии всегда «мимо», и событийная система не шлёт pointerover/pointerout
+        // (от них зависит hover-подсветка). Переопределяем containsPoint на проверку
+        // расстояния до сегментов, чтобы наведение ловилось на любом участке линии.
+        this.graphics.containsPoint = (globalPoint) => this._containsPoint(globalPoint);
+
         // Сохраняем мета для hit-test/resize
         this.graphics._mb = {
             ...(this.graphics._mb || {}),
@@ -44,6 +52,45 @@ export class DrawingObject {
 
     getPixi() {
         return this.graphics;
+    }
+
+    /**
+     * Hit-test линии по расстоянию до её сегментов.
+     * Вызывается событийной системой PIXI с ГЛОБАЛЬНОЙ точкой.
+     * @param {PIXI.IPointData} globalPoint
+     * @returns {boolean}
+     */
+    _containsPoint(globalPoint) {
+        const g = this.graphics;
+        const pts = this.points;
+        if (!pts || pts.length < 2 || !g.toLocal) return false;
+
+        // Локальные координаты курсора в системе геометрии линии.
+        const local = g.toLocal(globalPoint);
+
+        // Геометрия могла быть перерисована под новый размер (updateSize),
+        // тогда как this.points хранит базовые точки. Масштаб берём из
+        // ЛОКАЛЬНЫХ границ (не зависят от zoom), чтобы совпасть с local.
+        const lb = g.getLocalBounds();
+        const baseW = this.baseWidth || 1;
+        const baseH = this.baseHeight || 1;
+        const scaleX = baseW ? (lb.width / baseW) : 1;
+        const scaleY = baseH ? (lb.height / baseH) : 1;
+
+        // Полоса попадания: половина толщины линии + запас на «любой участок».
+        const lineWidth = this.mode === 'marker' ? this.strokeWidth * 2 : this.strokeWidth;
+        const threshold = Math.max(8, lineWidth / 2 + 6);
+
+        for (let j = 0; j < pts.length - 1; j++) {
+            const ax = pts[j].x * scaleX;
+            const ay = pts[j].y * scaleY;
+            const bx = pts[j + 1].x * scaleX;
+            const by = pts[j + 1].y * scaleY;
+            if (GeometryUtils.distancePointToSegment(local.x, local.y, ax, ay, bx, by) <= threshold) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Обновить визуал без изменения точек */

@@ -1,5 +1,20 @@
+import gsap from 'gsap';
+import { CustomEase } from 'gsap/CustomEase';
 import { Events } from '../core/events/Events.js';
 import * as PIXI from 'pixi.js';
+
+gsap.registerPlugin(CustomEase);
+const TEXT_HOVER_EASE = 'hoverLiftSpring';
+CustomEase.create(TEXT_HOVER_EASE, 'M0,0 C0.215,0.61 0.355,1 0.71,1.56 0.89,1.72 1,1 1,1');
+
+const TEXT_HOVER_TY  = -2;   // screen-px вверх
+const TEXT_HOVER_SC  = 1.06; // масштаб «маленький» пресет
+const TEXT_HOVER_DUR = 0.22;
+const TEXT_BACK_DUR  = 0.18;
+
+const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 /**
  * HtmlTextLayer — рисует текст как HTML-элементы поверх PIXI для максимальной чёткости
@@ -12,6 +27,14 @@ export class HtmlTextLayer {
         this.core = core; // CoreMoodBoard, нужен доступ к pixi/state
         this.layer = null;
         this.idToEl = new Map();
+
+        // hover-lift state: objectId -> { ty: 0, sc: 1 }
+        this._hoverStates = new Map();
+        this._hoveredTextId = null;
+        this._selectedIds = new Set();
+        // objectId -> { rect, onOver, onOut } — слушатели PIXI pointer на хит-rect текста
+        this._pixiHoverHandlers = new Map();
+        this._transformActive = false;
     }
 
     attach() {
@@ -157,6 +180,53 @@ export class HtmlTextLayer {
             ids.forEach(id => this.updateOne(id));
         });
 
+        // Hover-lift текста управляется PIXI pointerover/pointerout прямо на хит-rect
+        // текста (см. _ensurePixiHover). Events.Object.Hover для текста ненадёжен:
+        // он зависит от активного инструмента и hit-test пути и не доходит стабильно.
+
+        // Блокировка hover во время drag/resize/rotate (как в HoverLiftController)
+        this._onTransformStart = () => {
+            this._transformActive = true;
+            if (this._hoveredTextId) {
+                const id = this._hoveredTextId;
+                this._hoveredTextId = null;
+                this._animTextHoverOut(id);
+            }
+        };
+        this._onTransformEnd = () => { this._transformActive = false; };
+        this.eventBus.on(Events.Tool.DragStart, this._onTransformStart);
+        this.eventBus.on(Events.Tool.GroupDragStart, this._onTransformStart);
+        this.eventBus.on(Events.Tool.DragEnd, this._onTransformEnd);
+        this.eventBus.on(Events.Tool.GroupDragEnd, this._onTransformEnd);
+        this.eventBus.on(Events.Tool.ResizeStart, this._onTransformStart);
+        this.eventBus.on(Events.Tool.GroupResizeStart, this._onTransformStart);
+        this.eventBus.on(Events.Tool.ResizeEnd, this._onTransformEnd);
+        this.eventBus.on(Events.Tool.GroupResizeEnd, this._onTransformEnd);
+        this.eventBus.on(Events.Tool.RotateStart, this._onTransformStart);
+        this.eventBus.on(Events.Tool.GroupRotateStart, this._onTransformStart);
+        this.eventBus.on(Events.Tool.RotateEnd, this._onTransformEnd);
+        this.eventBus.on(Events.Tool.GroupRotateEnd, this._onTransformEnd);
+
+        // Отслеживаем выделение, чтобы не показывать hover у выделенных объектов
+        this._onSelectionAdd = (data) => {
+            const id = data?.object ?? data?.objectId ?? data?.id ?? data;
+            if (id) {
+                this._selectedIds.add(String(id));
+                if (this._hoveredTextId === String(id)) {
+                    this._hoveredTextId = null;
+                    this._animTextHoverOut(String(id));
+                }
+            }
+        };
+        this._onSelectionRemove = (data) => {
+            const id = data?.object ?? data?.objectId ?? data?.id ?? data;
+            if (id) this._selectedIds.delete(String(id));
+        };
+        this._onSelectionClear = () => { this._selectedIds.clear(); };
+        this.eventBus.on(Events.Tool.SelectionAdd, this._onSelectionAdd);
+        this.eventBus.on(Events.Tool.SelectionRemove, this._onSelectionRemove);
+        this.eventBus.on(Events.Tool.SelectionClear, this._onSelectionClear);
+
         // Первичная отрисовка
         this.rebuildFromState();
         this.updateAll();
@@ -178,6 +248,33 @@ export class HtmlTextLayer {
         if (this.layer) this.layer.remove();
         this.layer = null;
         this.idToEl.clear();
+        // Убиваем все hover-твины и отцепляем PIXI pointer-слушатели
+        for (const state of this._hoverStates.values()) gsap.killTweensOf(state);
+        this._hoverStates.clear();
+        for (const id of [...this._pixiHoverHandlers.keys()]) this._detachPixiHover(id);
+        this._hoveredTextId = null;
+        // Отписываемся от событий
+        if (this.eventBus) {
+            if (this._onTransformStart) {
+                this.eventBus.off(Events.Tool.DragStart, this._onTransformStart);
+                this.eventBus.off(Events.Tool.GroupDragStart, this._onTransformStart);
+                this.eventBus.off(Events.Tool.ResizeStart, this._onTransformStart);
+                this.eventBus.off(Events.Tool.GroupResizeStart, this._onTransformStart);
+                this.eventBus.off(Events.Tool.RotateStart, this._onTransformStart);
+                this.eventBus.off(Events.Tool.GroupRotateStart, this._onTransformStart);
+            }
+            if (this._onTransformEnd) {
+                this.eventBus.off(Events.Tool.DragEnd, this._onTransformEnd);
+                this.eventBus.off(Events.Tool.GroupDragEnd, this._onTransformEnd);
+                this.eventBus.off(Events.Tool.ResizeEnd, this._onTransformEnd);
+                this.eventBus.off(Events.Tool.GroupResizeEnd, this._onTransformEnd);
+                this.eventBus.off(Events.Tool.RotateEnd, this._onTransformEnd);
+                this.eventBus.off(Events.Tool.GroupRotateEnd, this._onTransformEnd);
+            }
+            if (this._onSelectionAdd) this.eventBus.off(Events.Tool.SelectionAdd, this._onSelectionAdd);
+            if (this._onSelectionRemove) this.eventBus.off(Events.Tool.SelectionRemove, this._onSelectionRemove);
+            if (this._onSelectionClear) this.eventBus.off(Events.Tool.SelectionClear, this._onSelectionClear);
+        }
     }
 
     rebuildFromState() {
@@ -245,6 +342,9 @@ export class HtmlTextLayer {
         this.layer.appendChild(el);
         this.idToEl.set(objectId, el);
         
+        // Инициализируем hover-состояние
+        this._hoverStates.set(objectId, { ty: 0, sc: 1 });
+        
         console.log(`🔍 HtmlTextLayer: HTML-элемент создан и добавлен в DOM:`, el);
     }
 
@@ -252,6 +352,12 @@ export class HtmlTextLayer {
         const el = this.idToEl.get(objectId);
         if (el) el.remove();
         this.idToEl.delete(objectId);
+        // Убиваем возможный активный твин и чистим состояние
+        const state = this._hoverStates.get(objectId);
+        if (state) gsap.killTweensOf(state);
+        this._hoverStates.delete(objectId);
+        this._detachPixiHover(objectId);
+        if (this._hoveredTextId === objectId) this._hoveredTextId = null;
     }
 
     updateAll() {
@@ -262,7 +368,10 @@ export class HtmlTextLayer {
     updateOne(objectId) {
         const el = this.idToEl.get(objectId);
         if (!el || !this.core) return;
-        
+
+        // Лениво вешаем PIXI pointer-слушатели на хит-rect текста (он уже создан к моменту updateOne)
+        this._ensurePixiHover(objectId);
+
         console.log(`🔍 HtmlTextLayer: обновляю позицию для текста ${objectId}`);
 
         const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
@@ -370,9 +479,16 @@ export class HtmlTextLayer {
             logLeft = left;
             logTop = top;
         }
-        // Поворот вокруг центра (как у PIXI и HTML-ручек)
+        // Поворот вокруг центра (как у PIXI и HTML-ручек); hover-lift добавляется сверху
+        const hover = this._hoverStates.get(objectId);
+        const hoverTy = hover?.ty ?? 0;
+        const hoverSc = hover?.sc ?? 1;
+        const hoverPart = (Math.abs(hoverTy) > 0.001 || Math.abs(hoverSc - 1) > 0.001)
+            ? `translate3d(0, ${hoverTy}px, 0) scale(${hoverSc})`
+            : '';
+        const rotatePart = angle ? `rotate(${angle}deg)` : '';
         el.style.transformOrigin = 'center center';
-        el.style.transform = angle ? `rotate(${angle}deg)` : '';
+        el.style.transform = [hoverPart, rotatePart].filter(Boolean).join(' ');
         // Текст
         const content = obj.content || obj.properties?.content;
         if (typeof content === 'string') {
@@ -420,6 +536,73 @@ export class HtmlTextLayer {
             content: content,
             visibility: el.style.visibility,
             textContent: el.textContent
+        });
+    }
+
+    /** Лениво вешает pointerover/pointerout на PIXI хит-rect текста */
+    _ensurePixiHover(objectId) {
+        if (this._pixiHoverHandlers.has(objectId)) return;
+        const rect = this.core?.pixi?.objects?.get ? this.core.pixi.objects.get(objectId) : null;
+        if (!rect || typeof rect.on !== 'function') return;
+
+        const onOver = () => this._onTextPointerOver(objectId);
+        const onOut = () => this._onTextPointerOut(objectId);
+        rect.on('pointerover', onOver);
+        rect.on('pointerout', onOut);
+        this._pixiHoverHandlers.set(objectId, { rect, onOver, onOut });
+    }
+
+    _detachPixiHover(objectId) {
+        const h = this._pixiHoverHandlers.get(objectId);
+        if (!h) return;
+        try {
+            h.rect.off('pointerover', h.onOver);
+            h.rect.off('pointerout', h.onOut);
+        } catch (_) {}
+        this._pixiHoverHandlers.delete(objectId);
+    }
+
+    _onTextPointerOver(objectId) {
+        if (prefersReducedMotion) return;
+        if (this._transformActive) return;
+        if (this._selectedIds.has(objectId) || this._selectedIds.has(String(objectId))) return;
+        if (this._hoveredTextId === objectId) return;
+        this._hoveredTextId = objectId;
+        this._animTextHoverIn(objectId);
+    }
+
+    _onTextPointerOut(objectId) {
+        if (this._hoveredTextId === objectId) this._hoveredTextId = null;
+        this._animTextHoverOut(objectId);
+    }
+
+    _animTextHoverIn(objectId) {
+        if (prefersReducedMotion) return;
+        const state = this._hoverStates.get(objectId);
+        if (!state) return;
+        gsap.killTweensOf(state);
+        gsap.to(state, {
+            ty: TEXT_HOVER_TY,
+            sc: TEXT_HOVER_SC,
+            duration: TEXT_HOVER_DUR,
+            ease: TEXT_HOVER_EASE,
+            onUpdate: () => this.updateOne(objectId),
+            onComplete: () => this.updateOne(objectId),
+        });
+    }
+
+    _animTextHoverOut(objectId) {
+        if (prefersReducedMotion) return;
+        const state = this._hoverStates.get(objectId);
+        if (!state) return;
+        gsap.killTweensOf(state);
+        gsap.to(state, {
+            ty: 0,
+            sc: 1,
+            duration: TEXT_BACK_DUR,
+            ease: 'power2.out',
+            onUpdate: () => this.updateOne(objectId),
+            onComplete: () => this.updateOne(objectId),
         });
     }
 

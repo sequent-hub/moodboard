@@ -307,8 +307,8 @@
 .mb-text--mindmap {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
-    text-align: left;
+    justify-content: center;
+    text-align: center;
     pointer-events: none;
     cursor: default;
     color: #212121;

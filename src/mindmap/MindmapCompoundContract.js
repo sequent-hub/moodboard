@@ -215,6 +215,7 @@ export function normalizeMindmapPropertiesForCreate({
                 ? (branchRootIdRaw || asNonEmptyString(objectId) || null)
                 : null,
             branchColor: role === CHILD_ROLE ? branchColor : null,
+            collapsed: meta.collapsed === true,
         },
     };
 }
