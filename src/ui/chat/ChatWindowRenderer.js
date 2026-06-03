@@ -67,26 +67,19 @@ function buildInputRow(collect) {
     const promptActionsWrapper = document.createElement('div');
     promptActionsWrapper.className = 'moodboard-chat__pill-wrapper';
 
-    const enhancePrompt = createInputIconButton(
-        'enhance-prompt',
-        'Улучшить промпт',
-        ICONS.enhancePrompt
-    );
-    enhancePrompt.dataset.empty = 'true';
     const extendPromptField = createInputIconButton(
         'extend-promt-field',
         'Развернуть поле ввода',
         ICONS.extendPromptField
     );
 
-    promptActionsWrapper.appendChild(enhancePrompt);
     promptActionsWrapper.appendChild(extendPromptField);
     textareaRow.appendChild(textarea);
     textareaRow.appendChild(promptActionsWrapper);
     row.appendChild(attachmentsPreview);
     row.appendChild(textareaRow);
 
-    collect({ textarea, enhancePrompt, extendPromptField, attachmentsPreview });
+    collect({ textarea, extendPromptField, attachmentsPreview });
     return row;
 }
 

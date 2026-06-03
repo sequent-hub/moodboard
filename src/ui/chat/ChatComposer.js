@@ -13,7 +13,7 @@ const CLOSE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12
 
 export class ChatComposer {
     /**
-     * @param {{ textarea: HTMLTextAreaElement, send: HTMLButtonElement, attach: HTMLButtonElement, fileInput: HTMLInputElement, attachmentsPreview: HTMLElement, enhancePrompt?: HTMLButtonElement, statusBar?: HTMLElement }} refs
+     * @param {{ textarea: HTMLTextAreaElement, send: HTMLButtonElement, attach: HTMLButtonElement, fileInput: HTMLInputElement, attachmentsPreview: HTMLElement, statusBar?: HTMLElement }} refs
      * @param {{ onSubmit: (text: string, attachments: File[]) => void, onAbort: () => void }} handlers
      */
     constructor(refs, handlers) {
@@ -22,7 +22,6 @@ export class ChatComposer {
         this._attach = refs.attach ?? null;
         this._fileInput = refs.fileInput ?? null;
         this._attachmentsPreview = refs.attachmentsPreview ?? null;
-        this._enhancePrompt = refs.enhancePrompt ?? null;
         this._statusBar = refs.statusBar ?? null;
         this._handlers = handlers;
         this._listeners = [];
@@ -105,9 +104,6 @@ export class ChatComposer {
         const hasAttachments = this._attachments.length > 0;
         this._send.dataset.state = (hasText || hasAttachments) ? 'ready' : 'idle';
         this._send.disabled = false;
-        if (this._enhancePrompt) {
-            this._enhancePrompt.dataset.empty = hasText ? 'false' : 'true';
-        }
     }
 
     _handleFileChange() {

@@ -36,11 +36,6 @@ export class ChatExtendedPromptModal {
             this._sourceTextarea.value = '';
             this._sourceTextarea.dispatchEvent(new Event('input', { bubbles: true }));
         });
-
-        this._on(this._refs.enhanceBtn, 'click', () => {
-            const originalEnhance = this._sourceTextarea.parentElement?.querySelector('.moodboard-chat__input-icon-btn--enhance-prompt');
-            if (originalEnhance) originalEnhance.click();
-        });
     }
 
     show() {
@@ -111,13 +106,7 @@ export class ChatExtendedPromptModal {
         clearBtn.className = 'moodboard-chat__extended-clear';
         clearBtn.textContent = 'Очистить';
 
-        const enhanceBtn = document.createElement('button');
-        enhanceBtn.type = 'button';
-        enhanceBtn.className = 'moodboard-chat__extended-enhance';
-        enhanceBtn.innerHTML = `<span class="moodboard-chat__extended-enhance-icon">${ICONS.enhancePrompt}</span> Улучшить`;
-
         actions.appendChild(clearBtn);
-        actions.appendChild(enhanceBtn);
 
         body.appendChild(textarea);
         body.appendChild(actions);
@@ -126,6 +115,6 @@ export class ChatExtendedPromptModal {
         modal.appendChild(body);
         overlay.appendChild(modal);
 
-        return { overlay, modal, header, title, closeBtn, body, textarea, clearBtn, enhanceBtn };
+        return { overlay, modal, header, title, closeBtn, body, textarea, clearBtn };
     }
 }

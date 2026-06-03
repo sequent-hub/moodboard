@@ -39,9 +39,6 @@ const ATTACHMENTS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="16" hei
 /** Кнопка отправки в composer */
 const SEND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M7.453 1.204a.87.87 0 0 1 1.093 0l.066.06 4.962 4.961a.6.6 0 0 1-.849.849L8.6 2.949v11.45a.6.6 0 0 1-1.199 0V2.946L3.273 7.074a.6.6 0 1 1-.847-.849l4.96-4.962z"/></svg>`;
 
-/** public/icons/enhance-prompt.svg */
-const ENHANCE_PROMPT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 11.771a.6.6 0 1 1 0 1.2L1.6 13a.6.6 0 0 1 0-1.2zm2-4.37A.6.6 0 1 1 10 8.6H1.6a.6.6 0 1 1 0-1.2zM14.4 3a.6.6 0 1 1 0 1.2H1.6a.6.6 0 1 1 0-1.2zm-1.101 5.5a.346.346 0 0 0-.643 0l-.174.417a2.98 2.98 0 0 1-1.538 1.59l-.489.218a.362.362 0 0 0 0 .658l.519.231c.675.3 1.216.85 1.516 1.538l.168.387a.347.347 0 0 0 .639 0l.168-.387c.3-.689.841-1.237 1.516-1.538l.519-.231a.362.362 0 0 0 0-.658l-.49-.218a3 3 0 0 1-1.538-1.59z"/></svg>`;
-
 /** public/icons/extend-promt-field.svg */
 const EXTEND_PROMPT_FIELD_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M9.696 7.151a.599.599 0 1 1-.847-.847L12.55 2.6H9.272a.6.6 0 0 1 0-1.2H14a.6.6 0 0 1 .6.599v4.728a.6.6 0 1 1-1.2 0V3.449zM1.4 9.272a.6.6 0 1 1 1.2 0v3.28l3.704-3.703a.599.599 0 1 1 .847.847L3.45 13.4h3.279a.6.6 0 0 1 0 1.2H2A.6.6 0 0 1 1.4 14z"/></svg>`;
 
@@ -69,7 +66,6 @@ export const ICONS = {
     palette: svg('<path d="M12 3a9 9 0 0 0 0 18c1.7 0 2-1 2-2 0-1.5 1-2 2-2h2a3 3 0 0 0 3-3c0-5-4-9-9-9z"/><circle cx="7.5" cy="11" r="1"/><circle cx="11" cy="7" r="1"/><circle cx="15" cy="7" r="1"/><circle cx="17.5" cy="11" r="1"/>'),
     attach: ATTACHMENTS_ICON,
     send: SEND_ICON,
-    enhancePrompt: ENHANCE_PROMPT_ICON,
     extendPromptField: EXTEND_PROMPT_FIELD_ICON,
     sliders: svg('<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>'),
     chevronDown: svg('<path d="M6 9l6 6 6-6"/>'),

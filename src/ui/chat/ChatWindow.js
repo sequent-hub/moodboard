@@ -167,7 +167,6 @@ export class ChatWindow {
                 attach: this._refs.attach,
                 fileInput: this._refs.fileInput,
                 attachmentsPreview: this._refs.attachmentsPreview,
-                enhancePrompt: this._refs.enhancePrompt,
                 statusBar: this._refs.statusBar
             },
             {

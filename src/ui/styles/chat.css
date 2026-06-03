@@ -289,14 +289,6 @@
     color: #374151;
 }
 
-.moodboard-chat__input-icon-btn--enhance-prompt[data-empty="true"] {
-    color: lab(5.0601 0 0 / 0.3216);
-}
-
-.moodboard-chat__input-icon-btn--enhance-prompt[data-empty="true"]:hover {
-    color: lab(5.0601 0 0 / 0.3216);
-}
-
 .moodboard-chat__actions-row {
     display: flex;
     align-items: center;
@@ -424,7 +416,7 @@
 }
 
 .moodboard-chat__send[data-state="streaming"] {
-    background: #EF4444;
+    background: #111827;
     color: #ffffff;
 }
 
@@ -983,32 +975,4 @@
 
 .moodboard-chat__extended-clear:hover {
     color: #374151;
-}
-
-.moodboard-chat__extended-enhance {
-    background: transparent;
-    border: none;
-    color: #6B7280;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: color 120ms ease;
-}
-
-.moodboard-chat__extended-enhance:hover {
-    color: #374151;
-}
-
-.moodboard-chat__extended-enhance-icon {
-    display: inline-flex;
-    color: inherit;
-}
-
-.moodboard-chat__extended-enhance-icon svg {
-    width: 16px;
-    height: 16px;
 }
