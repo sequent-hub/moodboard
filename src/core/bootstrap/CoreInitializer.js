@@ -4,6 +4,7 @@ import { BoardService } from '../../services/BoardService.js';
 import { ZoomPanController } from '../../services/ZoomPanController.js';
 import { ZOrderManager } from '../../services/ZOrderManager.js';
 import { FrameService } from '../../services/FrameService.js';
+import { Events } from '../events/Events.js';
 
 export async function initializeCore(core) {
     try {
@@ -20,6 +21,8 @@ export async function initializeCore(core) {
         core.frameService = new FrameService(core.eventBus, core.pixi, core.state);
         core.frameService.attach();
 
+        setupViewportResize(core);
+
         core.state.loadBoard({
             id: core.options.boardId || 'demo',
             name: 'Demo Board',
@@ -29,6 +32,42 @@ export async function initializeCore(core) {
     } catch (error) {
         console.error('MoodBoard init failed:', error);
     }
+}
+
+/**
+ * Подписывает рендерер на изменение размера контейнера.
+ * Размер берём с контейнера, а не с канваса: PIXI (autoDensity) выставляет
+ * канвасу инлайн-размер в px, перебивая CSS width:100%, поэтому
+ * canvas.clientWidth «залипает» на стартовом размере и не отражает контейнер.
+ * Без этого после ресайза окна (оконный режим → полный экран) канвас остаётся
+ * прежнего размера и справа проступает фон рабочей области.
+ */
+function setupViewportResize(core) {
+    if (typeof ResizeObserver === 'undefined' || !core.container) return;
+
+    let rafId = null;
+    const applyResize = () => {
+        rafId = null;
+        if (core.destroyed) return;
+        const el = core.container;
+        if (!el) return;
+        const width = el.clientWidth;
+        const height = el.clientHeight;
+        if (width <= 0 || height <= 0) return;
+        core.pixi.resize(width, height);
+        // Пересобираем screen-space сетку под новый размер и репозиционируем
+        // её вместе с оверлеями через существующий viewport-флоу.
+        core.boardService?.resize?.();
+        core.eventBus.emit(Events.Viewport.Changed);
+    };
+
+    core.resizeObserver = new ResizeObserver(() => {
+        if (rafId !== null) return;
+        rafId = (typeof requestAnimationFrame === 'function')
+            ? requestAnimationFrame(applyResize)
+            : setTimeout(applyResize, 16);
+    });
+    core.resizeObserver.observe(core.container);
 }
 
 export async function initializeCoreTools(core) {

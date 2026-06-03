@@ -141,6 +141,27 @@ export class FrameObject {
     }
 
     /**
+     * Применить текущий масштаб мира к заголовку.
+     * Нужно при создании объекта: viewport-зум восстанавливается раньше,
+     * чем фрейм успевает подписаться на ZoomPercent, поэтому стартовый зум
+     * до него не доходит и заголовок остаётся в мировом масштабе (мелкий).
+     * @param {number} worldScale Текущий масштаб мира (world.scale.x)
+     */
+    applyWorldScale(worldScale) {
+        if (typeof worldScale !== 'number' || !(worldScale > 0)) return;
+        this.currentWorldScale = worldScale;
+        this._updateTitleScale();
+    }
+
+    hideTitle() {
+        if (this.titleLayer) this.titleLayer.visible = false;
+    }
+
+    showTitle() {
+        if (this.titleLayer) this.titleLayer.visible = true;
+    }
+
+    /**
      * Установить заголовок фрейма
      * @param {string} title Новый заголовок
      */

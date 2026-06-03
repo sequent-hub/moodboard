@@ -28,7 +28,9 @@ import {
     openFileNameEditor as openFileNameEditorViaController,
     closeFileNameEditor as closeFileNameEditorViaController,
     closeTextEditor as closeTextEditorViaController,
-    closeMindmapEditor as closeMindmapEditorViaController
+    closeMindmapEditor as closeMindmapEditorViaController,
+    openFrameTitleEditor as openFrameTitleEditorViaController,
+    closeFrameTitleEditor as closeFrameTitleEditorViaController,
 } from './selection/InlineEditorController.js';
 import {
     hitTest as hitTestViaService,
@@ -358,6 +360,14 @@ export class SelectTool extends BaseTool {
 
     _closeMindmapEditor(commit) {
         return closeMindmapEditorViaController.call(this, commit);
+    }
+
+    _openFrameTitleEditor(object, create = false) {
+        return openFrameTitleEditorViaController.call(this, object, create);
+    }
+
+    _closeFrameTitleEditor(commit) {
+        return closeFrameTitleEditorViaController.call(this, commit);
     }
 
     destroy() {

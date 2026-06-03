@@ -4,6 +4,7 @@ import {
     FONT_SIZE_OPTIONS,
     TEXT_COLOR_PRESETS,
 } from './TextPropertiesPanelMapper.js';
+import { createTextFormatControls } from './TextFormatControls.js';
 
 export function createTextPropertiesPanelRenderer(panelInstance) {
     const panel = document.createElement('div');
@@ -169,6 +170,8 @@ function createFontControls(panelInstance, panel) {
 
     panel.appendChild(panelInstance.markdownToggle);
     panel.appendChild(mdLabel);
+
+    createTextFormatControls(panelInstance, panel);
 }
 
 function createCompactColorSelector(panelInstance, panel) {

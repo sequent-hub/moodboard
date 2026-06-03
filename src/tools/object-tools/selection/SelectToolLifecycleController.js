@@ -84,10 +84,12 @@ export function activateSelectTool(app, defaultCursor, superActivate) {
 export function deactivateSelectTool(superDeactivate) {
     superDeactivate();
 
-    // Закрываем текстовый/файловый редактор если открыт
+    // Закрываем текстовый/файловый/frame редактор если открыт
     if (this.textEditor.active) {
         if (this.textEditor.objectType === 'file') {
             this._closeFileNameEditor(true);
+        } else if (this.textEditor.objectType === 'frame') {
+            this._closeFrameTitleEditor(true);
         } else {
             this._closeTextEditor(true);
         }

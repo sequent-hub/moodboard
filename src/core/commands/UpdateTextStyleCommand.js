@@ -1,10 +1,13 @@
 /**
- * Команда изменения свойств текста (шрифт, размер, цвет, фон) для системы Undo/Redo.
- * Поддерживает: fontFamily, fontSize, color, backgroundColor.
+ * Команда изменения свойств текста для системы Undo/Redo.
+ * Поддерживает: fontFamily, fontSize, color, backgroundColor, markdown,
+ * bold, italic, underline, strikethrough, textAlign, lineHeight, listType.
  */
 import { BaseCommand } from './BaseCommand.js';
 import { Events } from '../events/Events.js';
 import { syncPixiTextProperties } from '../../ui/text-properties/TextPropertiesPanelMapper.js';
+
+const PROPERTY_LEVEL = ['fontFamily', 'markdown', 'bold', 'italic', 'underline', 'strikethrough', 'textAlign', 'lineHeight', 'listType'];
 
 export class UpdateTextStyleCommand extends BaseCommand {
     /**
@@ -52,7 +55,7 @@ export class UpdateTextStyleCommand extends BaseCommand {
 
         const { property } = this;
 
-        if (property === 'fontFamily' || property === 'markdown') {
+        if (PROPERTY_LEVEL.includes(property)) {
             if (!object.properties) object.properties = {};
             object.properties[property] = value;
         } else {
@@ -69,7 +72,7 @@ export class UpdateTextStyleCommand extends BaseCommand {
 
         syncPixiTextProperties(this.coreMoodboard.eventBus, this.objectId, { [property]: value });
 
-        const updates = (property === 'fontFamily' || property === 'markdown')
+        const updates = PROPERTY_LEVEL.includes(property)
             ? { properties: { [property]: value } }
             : { [property]: value };
         this.coreMoodboard.eventBus.emit(Events.Object.StateChanged, {
@@ -86,6 +89,13 @@ function _propertyLabel(property) {
         color: 'цвет текста',
         backgroundColor: 'фон текста',
         markdown: 'markdown-режим',
+        bold: 'жирный текст',
+        italic: 'курсив',
+        underline: 'подчёркивание',
+        strikethrough: 'зачёркивание',
+        textAlign: 'выравнивание текста',
+        lineHeight: 'межстрочный интервал',
+        listType: 'тип списка',
     };
     return labels[property] || property;
 }

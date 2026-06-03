@@ -3,6 +3,7 @@ import { CustomEase } from 'gsap/CustomEase';
 import { Events } from '../core/events/Events.js';
 import * as PIXI from 'pixi.js';
 import { renderRichText, hasMath } from '../utils/richText.js';
+import { renderTextList } from './text-properties/TextListRenderer.js';
 
 gsap.registerPlugin(CustomEase);
 const TEXT_HOVER_EASE = 'hoverLiftSpring';
@@ -42,6 +43,28 @@ function resolveMarkdown(properties, content) {
     if (properties?.markdown === true) return true;
     if (properties?.markdown === false) return false;
     return looksLikeMarkdown(content) || hasMath(content);
+}
+
+/**
+ * Возвращает коэффициент межстрочного интервала по базовому (немасштабированному) размеру шрифта.
+ * Коэффициент зависит от базового размера, а не от отрисованного, — это гарантирует,
+ * что соотношение line-height/font-size остаётся постоянным при любом зуме.
+ * @param {number} baseFontSizePx — базовый размер шрифта без учёта зума
+ * @param {object|undefined} properties
+ * @returns {number} коэффициент (не пиксели)
+ */
+function resolveLineHeightRatio(baseFontSizePx, properties) {
+    if (typeof properties?.lineHeight === 'number') {
+        return properties.lineHeight;
+    }
+    const fs = baseFontSizePx;
+    if (fs <= 12) return 1.40;
+    if (fs <= 18) return 1.34;
+    if (fs <= 36) return 1.26;
+    if (fs <= 48) return 1.24;
+    if (fs <= 72) return 1.22;
+    if (fs <= 96) return 1.20;
+    return 1.18;
 }
 
 /**
@@ -168,17 +191,9 @@ export class HtmlTextLayer {
                 }
                 if (updates.fontSize) {
                     el.style.fontSize = `${updates.fontSize}px`;
-                    // Также обновляем line-height согласно новой шкале
                     const fs = updates.fontSize;
-                    const lh = (fs <= 12) ? Math.round(fs * 1.40)
-                        : (fs <= 18) ? Math.round(fs * 1.34)
-                        : (fs <= 36) ? Math.round(fs * 1.26)
-                        : (fs <= 48) ? Math.round(fs * 1.24)
-                        : (fs <= 72) ? Math.round(fs * 1.22)
-                        : (fs <= 96) ? Math.round(fs * 1.20)
-                        : Math.round(fs * 1.18);
-                    el.style.lineHeight = `${lh}px`;
-                    // Синхронизируем базовый размер шрифта для дальнейших пересчётов (zoom/resize)
+                    const curObj = (this.core?.state?.state?.objects || []).find(o => o.id === objectId);
+                    el.style.lineHeight = `${resolveLineHeightRatio(fs, curObj?.properties)}`;
                     el.dataset.baseFontSize = String(fs);
                     console.log(`🔍 HtmlTextLayer: обновлен размер шрифта для ${objectId}:`, updates.fontSize);
                 }
@@ -365,22 +380,15 @@ export class HtmlTextLayer {
         el.className = 'mb-text';
         el.dataset.id = objectId;
         // Получаем свойства из properties объекта
-        const fontFamily = objectData.properties?.fontFamily || objectData.fontFamily || 'Caveat, Arial, cursive';
-        const color = objectData.color || objectData.properties?.color || objectData.properties?.textColor || '#000000';
-        const backgroundColor = objectData.backgroundColor || objectData.properties?.backgroundColor || 'transparent';
-        
-        // Базовый line-height исходя из стартового размера шрифта
-        const baseFs = objectData.fontSize || objectData.properties?.fontSize || 32;
-        const baseLineHeight = (() => {
-            const fs = baseFs;
-            if (fs <= 12) return Math.round(fs * 1.40);
-            if (fs <= 18) return Math.round(fs * 1.34);
-            if (fs <= 36) return Math.round(fs * 1.26);
-            if (fs <= 48) return Math.round(fs * 1.24);
-            if (fs <= 72) return Math.round(fs * 1.22);
-            if (fs <= 96) return Math.round(fs * 1.20);
-            return Math.round(fs * 1.18);
-        })();
+        const props = objectData.properties || {};
+        const fontFamily = props.fontFamily || objectData.fontFamily || 'Caveat, Arial, cursive';
+        const color = objectData.color || props.color || props.textColor || '#000000';
+        const backgroundColor = objectData.backgroundColor || props.backgroundColor || 'transparent';
+
+        // Безразмерный множитель line-height: браузер сам считает интервал относительно
+        // font-size, поэтому соотношение строк не зависит от зума и не страдает от округления.
+        const baseFs = objectData.fontSize || props.fontSize || 32;
+        const baseLineHeight = resolveLineHeightRatio(baseFs, props);
 
         const content = objectData.content || objectData.properties?.content || '';
         const isMarkdown = resolveMarkdown(objectData.properties, content);
@@ -388,7 +396,7 @@ export class HtmlTextLayer {
         el.style.color = color;
         el.style.fontFamily = fontFamily;
         el.style.backgroundColor = backgroundColor === 'transparent' ? '' : backgroundColor;
-        el.style.lineHeight = `${baseLineHeight}px`;
+        el.style.lineHeight = `${baseLineHeight}`;
         el.style.whiteSpace = isMarkdown ? 'normal' : 'pre';
         el.style.overflow = 'visible';
         if (isMarkdown) el.style.overflowWrap = 'break-word';
@@ -396,6 +404,12 @@ export class HtmlTextLayer {
         el.style.fontKerning = 'normal';
         el.style.textRendering = 'optimizeLegibility';
         if (!isMarkdown) el.style.padding = '0';
+        // Начертания и выравнивание из properties
+        el.style.fontWeight = props.bold ? 'bold' : '';
+        el.style.fontStyle = props.italic ? 'italic' : '';
+        const initDec = [props.underline && 'underline', props.strikethrough && 'line-through'].filter(Boolean).join(' ');
+        el.style.textDecoration = initDec || '';
+        el.style.textAlign = props.textAlign || '';
         this._syncElementContent(el, content, isMarkdown);
         // Базовые размеры сохраняем в dataset
         const fs = objectData.fontSize || objectData.properties?.fontSize || 32;
@@ -473,18 +487,9 @@ export class HtmlTextLayer {
         const sCss = s / res;
         const fontSizePx = Math.max(1, baseFS * sObj * sCss);
         el.style.fontSize = `${fontSizePx}px`;
-        // Адаптивный межстрочный интервал по размеру шрифта
-        const computeLineHeightPx = (fs) => {
-            if (fs <= 12) return Math.round(fs * 1.40);
-            if (fs <= 18) return Math.round(fs * 1.34);
-            if (fs <= 36) return Math.round(fs * 1.26);
-            if (fs <= 48) return Math.round(fs * 1.24);
-            if (fs <= 72) return Math.round(fs * 1.22);
-            if (fs <= 96) return Math.round(fs * 1.20);
-            return Math.round(fs * 1.18);
-        };
-        // Применяем новый line-height только если он отличается от текущего, чтобы избежать конфликтов CSS
-        const newLH = `${computeLineHeightPx(fontSizePx)}px`;
+        // Безразмерный множитель: интервал между строками масштабируется браузером
+        // пропорционально font-size, поэтому не зависит от зума и не страдает от округления.
+        const newLH = `${resolveLineHeightRatio(baseFS, obj.properties)}`;
         if (el.style.lineHeight !== newLH) {
             el.style.lineHeight = newLH;
         }
@@ -574,23 +579,56 @@ export class HtmlTextLayer {
             return;
         }
 
-        // Текст
-        const content = obj.content || obj.properties?.content;
-        const isMarkdown = resolveMarkdown(obj.properties, content);
-        if (typeof content === 'string') {
-            const contentChanged = this._syncElementContent(el, content, isMarkdown);
-            if (contentChanged) {
-                console.log(`🔍 HtmlTextLayer: содержимое обновлено в updateOne для ${objectId}:`, content);
-            }
-        }
+        // Начертания и выравнивание из properties
+        const props = obj.properties || {};
+        el.style.fontWeight = props.bold ? 'bold' : '';
+        el.style.fontStyle = props.italic ? 'italic' : '';
+        const textDec = [props.underline && 'underline', props.strikethrough && 'line-through'].filter(Boolean).join(' ');
+        el.style.textDecoration = textDec || '';
+        el.style.textAlign = props.textAlign || '';
 
-        // Синхронизируем markdown-класс и whitespace при каждом обновлении (поддержка live-переключения)
-        const hasMdClass = el.classList.contains('mb-text--md');
-        if (hasMdClass !== isMarkdown) {
-            el.classList.toggle('mb-text--md', isMarkdown);
-            el.style.whiteSpace = isMarkdown ? 'normal' : 'pre';
-            el.style.overflowWrap = isMarkdown ? 'break-word' : '';
-            if (!isMarkdown) el.style.padding = '0';
+        // Текст: список или plain/markdown
+        const content = obj.content || obj.properties?.content;
+        const listType = props.listType;
+        const useList = listType && listType !== 'none';
+        const isMarkdown = !useList && resolveMarkdown(obj.properties, content);
+        if (typeof content === 'string') {
+            if (useList) {
+                el.dataset.renderedContent = '';
+                el.dataset.renderedMd = '';
+                const listChecked = props.listChecked || [];
+                const listKey = `${listType}:${content}:${JSON.stringify(listChecked)}`;
+                if (el.dataset.renderedList !== listKey) {
+                    const onToggle = (lineIndex) => {
+                        const cur = (this.core?.state?.state?.objects || []).find(o => o.id === objectId);
+                        const curChecked = cur?.properties?.listChecked || [];
+                        const next = [...curChecked];
+                        next[lineIndex] = !next[lineIndex];
+                        this.eventBus.emit(Events.Object.StateChanged, {
+                            objectId, updates: { properties: { listChecked: next } }
+                        });
+                    };
+                    renderTextList(el, content, listType, listChecked, onToggle);
+                    el.dataset.renderedList = listKey;
+                }
+                el.classList.remove('mb-text--md');
+                el.style.whiteSpace = 'normal';
+                el.style.overflowWrap = 'break-word';
+                el.style.padding = '';
+            } else {
+                el.dataset.renderedList = '';
+                const contentChanged = this._syncElementContent(el, content, isMarkdown);
+                if (contentChanged) {
+                    console.log(`🔍 HtmlTextLayer: содержимое обновлено в updateOne для ${objectId}:`, content);
+                }
+                const hasMdClass = el.classList.contains('mb-text--md');
+                if (hasMdClass !== isMarkdown) {
+                    el.classList.toggle('mb-text--md', isMarkdown);
+                    el.style.whiteSpace = isMarkdown ? 'normal' : 'pre';
+                    el.style.overflowWrap = isMarkdown ? 'break-word' : '';
+                    if (!isMarkdown) el.style.padding = '0';
+                }
+            }
         }
 
         // Гарантируем, что рамка не прилипает к тексту справа: ширина блока всегда
@@ -600,7 +638,7 @@ export class HtmlTextLayer {
         // и width:auto сломал бы wrapping.
         try {
             const hasContent = !!(el.textContent && el.textContent.trim());
-            if (hasContent && !angle && !isMarkdown) {
+            if (hasContent && !angle && !isMarkdown && !useList && !(props.textAlign && props.textAlign !== 'left')) {
                 const rightMargin = Math.ceil(fontSizePx * 0.7) + 6;
                 const prevWidth = el.style.width;
                 el.style.width = 'auto';
@@ -743,6 +781,10 @@ export class HtmlTextLayer {
         const el = this.idToEl.get(objectId);
         if (!el || !this.core) return;
         try {
+            // Фигуры имеют фиксированные пользовательские bounds: текст центрируется внутри,
+            // а форма (квадрат остаётся квадратом) не подгоняется под высоту текста.
+            const obj = (this.core.state.state.objects || []).find(o => o.id === objectId);
+            if (obj?.type === 'shape') return;
             // Измеряем фактическую высоту HTML-текста
             el.style.height = 'auto';
             const measured = Math.max(1, Math.round(el.scrollHeight));
@@ -753,7 +795,6 @@ export class HtmlTextLayer {
             const res = (this.core?.pixi?.app?.renderer?.resolution) || 1;
             const worldH = (measured * res) / s;
             // Узнаём текущую ширину в мире
-            const obj = (this.core.state.state.objects || []).find(o => o.id === objectId);
             const worldW = obj?.width || 0;
             const position = obj?.position || null;
             if (worldW > 0 && position) {

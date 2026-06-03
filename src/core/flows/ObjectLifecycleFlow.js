@@ -10,13 +10,20 @@ import {
     UpdateShapeStyleCommand,
 } from '../commands/index.js';
 
-const TEXT_STYLE_PROPS = ['fontFamily', 'fontSize', 'color', 'backgroundColor', 'markdown'];
+const TEXT_STYLE_PROPS = ['fontFamily', 'fontSize', 'color', 'backgroundColor', 'markdown', 'bold', 'italic', 'underline', 'strikethrough', 'textAlign', 'lineHeight', 'listType'];
+const TEXT_STYLE_PROPERTY_LEVEL = ['fontFamily', 'markdown', 'bold', 'italic', 'underline', 'strikethrough', 'textAlign', 'lineHeight', 'listType'];
 const TEXT_STYLE_DEFAULTS = {
     fontFamily: 'Roboto, Arial, sans-serif',
     fontSize: 18,
     color: '#000000',
     backgroundColor: 'transparent',
     markdown: false,
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false,
+    textAlign: 'left',
+    listType: 'none',
 };
 
 const NOTE_STYLE_PROPS = ['fontFamily', 'fontSize', 'textColor', 'backgroundColor'];
@@ -117,12 +124,12 @@ function tryCreateTextStyleCommand(core, object, objectId, updates) {
     let property = null;
     let newValue = null;
 
-    if (updates.properties?.fontFamily !== undefined && Object.keys(updates).length === 1) {
-        property = 'fontFamily';
-        newValue = updates.properties.fontFamily;
-    } else if (updates.properties?.markdown !== undefined && Object.keys(updates).length === 1) {
-        property = 'markdown';
-        newValue = updates.properties.markdown;
+    if (updates.properties && Object.keys(updates).length === 1) {
+        const propKeys = Object.keys(updates.properties);
+        if (propKeys.length === 1 && TEXT_STYLE_PROPERTY_LEVEL.includes(propKeys[0])) {
+            property = propKeys[0];
+            newValue = updates.properties[property];
+        }
     } else if (updates.fontSize !== undefined && !updates.properties && Object.keys(updates).length === 1) {
         property = 'fontSize';
         newValue = typeof updates.fontSize === 'string' ? parseInt(updates.fontSize, 10) : updates.fontSize;
@@ -136,7 +143,7 @@ function tryCreateTextStyleCommand(core, object, objectId, updates) {
 
     if (!property || !TEXT_STYLE_PROPS.includes(property)) return false;
 
-    const oldValue = property === 'fontFamily' || property === 'markdown'
+    const oldValue = TEXT_STYLE_PROPERTY_LEVEL.includes(property)
         ? (object.properties?.[property] ?? TEXT_STYLE_DEFAULTS[property])
         : (object[property] ?? object.properties?.[property] ?? TEXT_STYLE_DEFAULTS[property]);
 
@@ -405,6 +412,22 @@ export function setupObjectLifecycleFlow(core) {
                     if (Object.keys(styleUpdates).length > 0) {
                         instance.setStyle(styleUpdates);
                     }
+                }
+            }
+
+            if (object.type === 'drawing' && updates.properties && instance.setStyle) {
+                const styleUpdates = {};
+                if (updates.properties.strokeColor !== undefined) {
+                    styleUpdates.strokeColor = updates.properties.strokeColor;
+                }
+                if (updates.properties.strokeWidth !== undefined) {
+                    styleUpdates.strokeWidth = updates.properties.strokeWidth;
+                }
+                if (updates.properties.mode !== undefined) {
+                    styleUpdates.mode = updates.properties.mode;
+                }
+                if (Object.keys(styleUpdates).length > 0) {
+                    instance.setStyle(styleUpdates);
                 }
             }
         }

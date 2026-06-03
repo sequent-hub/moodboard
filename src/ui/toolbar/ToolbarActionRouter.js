@@ -94,7 +94,7 @@ export class ToolbarActionRouter {
             this.toolbar.eventBus.emit(Events.Place.Set, {
                 type: 'note',
                 properties: {
-                    content: 'Новая записка',
+                    content: '',
                     fontFamily: 'Caveat, Arial, cursive',
                     fontSize: 32,
                     width: 250,

@@ -168,9 +168,11 @@ export function bindTextEditorInteractions(controller, {
     textarea,
     isNewCreation,
     isNote,
+    isShape,
     autoSize,
     updateNoteEditor,
     finalize,
+    listType,
 }) {
     const blurHandler = () => {
         const editorObjectId = controller?.textEditor?.objectId || null;
@@ -191,18 +193,48 @@ export function bindTextEditorInteractions(controller, {
     };
 
     const keydownHandler = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            finalize(true);
+        const isList = listType && listType !== 'none';
+        if (e.key === 'Enter') {
+            if (isList && !e.shiftKey) {
+                e.preventDefault();
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const value = textarea.value;
+                const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+                const lineEnd = value.indexOf('\n', start);
+                const curLineEnd = lineEnd === -1 ? value.length : lineEnd;
+                const currentLine = value.slice(lineStart, curLineEnd);
+                if (currentLine.trim() === '' && start === end) {
+                    finalize(true);
+                } else {
+                    textarea.setRangeText('\n', start, end, 'end');
+                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            } else if (isList && e.shiftKey) {
+                e.preventDefault();
+                finalize(true);
+            } else if (!e.shiftKey) {
+                e.preventDefault();
+                finalize(true);
+            }
+            // Shift+Enter в режиме без списка: нативный перевод строки
         } else if (e.key === 'Escape') {
             e.preventDefault();
             finalize(false);
         }
     };
 
-    const inputHandler = !isNote
-        ? autoSize
-        : () => { try { if (updateNoteEditor) updateNoteEditor(); } catch (_) {} };
+    // Записка и фигура имеют фиксированные границы — autoSize по вводу им не нужен.
+    // Для фигуры autoSize раздувал поле до minWBound (120px) и при textAlign:center
+    // уносил текст вправо от фигуры. Поэтому ввод в фигуре границы не меняет.
+    let inputHandler;
+    if (isNote) {
+        inputHandler = () => { try { if (updateNoteEditor) updateNoteEditor(); } catch (_) {} };
+    } else if (isShape) {
+        inputHandler = () => {};
+    } else {
+        inputHandler = autoSize;
+    }
 
     textarea.addEventListener('blur', blurHandler);
     textarea.addEventListener('keydown', keydownHandler);

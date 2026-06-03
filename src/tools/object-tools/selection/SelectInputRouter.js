@@ -1,6 +1,17 @@
 import { Events } from '../../../core/events/Events.js';
 
 const DRAG_START_THRESHOLD_PX = 4;
+const TEXT_EDITOR_STYLE_KEYS = ['fontFamily', 'fontSize', 'color', 'backgroundColor', 'markdown', 'bold', 'italic', 'underline', 'strikethrough', 'textAlign', 'lineHeight', 'listType', 'listChecked'];
+
+function pickTextEditorProperties(properties = {}) {
+    const picked = {};
+    TEXT_EDITOR_STYLE_KEYS.forEach((key) => {
+        if (properties[key] !== undefined) {
+            picked[key] = properties[key];
+        }
+    });
+    return picked;
+}
 
 export function onMouseDown(event) {
     // Если активен текстовый редактор, закрываем его при клике вне
@@ -212,20 +223,27 @@ export function onDoubleClick(event) {
         const isNote = !!(pix && pix._mb && pix._mb.type === 'note');
         const isFile = !!(pix && pix._mb && pix._mb.type === 'file');
         const isShape = !!(pix && pix._mb && pix._mb.type === 'shape');
+        const isFrame = !!(pix && pix._mb && pix._mb.type === 'frame');
 
         if (isText) {
             // Получаем позицию объекта для редактирования
             const posData = { objectId: hitResult.object, position: null };
             this.emit(Events.Tool.GetObjectPosition, posData);
 
-            // Получаем содержимое из properties объекта
-            const textContent = pix._mb?.properties?.content || '';
+            // Передаём в inline-editor не только контент, но и текущие текстовые стили:
+            // иначе теряются listType/textAlign/lineHeight и Enter/визуальное совпадение
+            // в режиме редактирования расходятся со статичным рендером.
+            const textProperties = pix._mb?.properties || {};
+            const textContent = textProperties.content || '';
 
             this.emit(Events.Tool.ObjectEdit, {
                 id: hitResult.object,
                 type: 'text',
                 position: posData.position,
-                properties: { content: textContent },
+                properties: {
+                    ...pickTextEditorProperties(textProperties),
+                    content: textContent,
+                },
                 caretClick: {
                     clientX: event?.originalEvent?.clientX,
                     clientY: event?.originalEvent?.clientY
@@ -284,6 +302,17 @@ export function onDoubleClick(event) {
             return;
         }
 
+        if (isFrame) {
+            const frameProps = pix._mb?.properties || {};
+            this.emit(Events.Tool.ObjectEdit, {
+                id: hitResult.object,
+                type: 'frame',
+                properties: { title: frameProps.title || 'Фрейм' },
+                create: false,
+            });
+            return;
+        }
+
         this.editObject(hitResult.object);
     }
 }
@@ -313,6 +342,8 @@ export function onKeyDown(event) {
         if (event.key === 'Escape') {
             if (this.textEditor.objectType === 'file') {
                 this._closeFileNameEditor(false);
+            } else if (this.textEditor.objectType === 'frame') {
+                this._closeFrameTitleEditor(false);
             } else {
                 this._closeTextEditor(false);
             }

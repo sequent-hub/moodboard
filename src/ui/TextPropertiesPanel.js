@@ -19,6 +19,7 @@ import {
     getObjectGeometry,
     getObjectProperties,
     getSelectedTextObjectId,
+    LINE_HEIGHT_DEFAULT,
     syncPixiTextProperties,
 } from './text-properties/TextPropertiesPanelMapper.js';
 import {
@@ -77,7 +78,6 @@ export class TextPropertiesPanel {
 
     updateFromSelection() {
         if (this.isTextEditing) {
-            this.hide();
             return;
         }
 
@@ -214,6 +214,67 @@ export class TextPropertiesPanel {
         this._updateTextAppearance(this.currentId, { backgroundColor });
     }
 
+    _toggleFormat(prop) {
+        if (!this.currentId) {
+            return;
+        }
+
+        const properties = getObjectProperties(this.eventBus, this.currentId);
+        const newValue = !(properties ? Boolean(properties[prop]) : false);
+
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: { properties: { [prop]: newValue } },
+        });
+        this._updateTextAppearance(this.currentId, { [prop]: newValue });
+
+        const btnMap = {
+            bold: this.boldBtn,
+            italic: this.italicBtn,
+            underline: this.underlineBtn,
+            strikethrough: this.strikethroughBtn,
+        };
+        if (btnMap[prop]) {
+            btnMap[prop].classList.toggle('is-active', newValue);
+        }
+    }
+
+    _changeTextAlign(v) {
+        if (!this.currentId) {
+            return;
+        }
+
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: { properties: { textAlign: v } },
+        });
+        this._updateTextAppearance(this.currentId, { textAlign: v });
+    }
+
+    _changeListType(v) {
+        if (!this.currentId) {
+            return;
+        }
+
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: { properties: { listType: v } },
+        });
+        this._updateTextAppearance(this.currentId, { listType: v });
+    }
+
+    _changeLineHeight(n) {
+        if (!this.currentId) {
+            return;
+        }
+
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: { properties: { lineHeight: n } },
+        });
+        this._updateTextAppearance(this.currentId, { lineHeight: n });
+    }
+
     _changeMarkdown(markdown) {
         if (!this.currentId) {
             return;
@@ -253,6 +314,16 @@ export class TextPropertiesPanel {
         if (this.markdownToggle) {
             this.markdownToggle.checked = values.markdown;
         }
+
+        if (this.boldBtn) this.boldBtn.classList.toggle('is-active', values.bold);
+        if (this.italicBtn) this.italicBtn.classList.toggle('is-active', values.italic);
+        if (this.underlineBtn) this.underlineBtn.classList.toggle('is-active', values.underline);
+        if (this.strikethroughBtn) this.strikethroughBtn.classList.toggle('is-active', values.strikethrough);
+        if (this.alignControl) this.alignControl.value = values.textAlign;
+        if (this.listControl) this.listControl.value = values.listType;
+        if (this.lineHeightSlider) {
+            this.lineHeightSlider.value = String(values.lineHeight !== null ? values.lineHeight : LINE_HEIGHT_DEFAULT);
+        }
     }
 
     reposition() {
@@ -291,6 +362,17 @@ export class TextPropertiesPanel {
         }
 
         if (this.panel.contains(event.target)) {
+            return;
+        }
+
+        if (typeof event.target.closest === 'function' && event.target.closest('.moodboard-text-editor')) {
+            return;
+        }
+
+        // Клики внутри canvas-контейнера управляются через EventBus (SelectionClear).
+        // Без этой проверки тот же mousedown, который вызвал SelectionAdd → showFor,
+        // немедленно дотекает до capture-listener и закрывает только что открытую панель.
+        if (this.container.contains(event.target)) {
             return;
         }
 

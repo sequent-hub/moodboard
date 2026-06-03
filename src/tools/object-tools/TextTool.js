@@ -39,7 +39,12 @@ export class TextTool extends BaseTool {
             color: '#000000',
             textAlign: 'left',
             fontWeight: 'normal',
-            fontStyle: 'normal'
+            fontStyle: 'normal',
+            bold: false,
+            italic: false,
+            underline: false,
+            strikethrough: false,
+            listType: 'none',
         };
     }
     

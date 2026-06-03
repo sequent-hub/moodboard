@@ -22,7 +22,6 @@ export function attachTextPropertiesPanelEventBridge(panel) {
         },
         onTextEditStart: () => {
             panel.isTextEditing = true;
-            panel.hide();
         },
         onTextEditEnd: () => {
             panel.isTextEditing = false;

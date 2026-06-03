@@ -123,6 +123,7 @@ export class PlacementInputRouter {
 
         let props = host.pending.properties || {};
         const isTextWithEditing = host.pending.type === 'text' && props.editOnCreate;
+        const isShapeType = host.pending.type === 'shape';
         const isImage = host.pending.type === 'image';
         const isFile = host.pending.type === 'file';
         const presetSize = {
@@ -250,12 +251,32 @@ export class PlacementInputRouter {
                     y: Math.round(worldPoint.y - side / 2)
                 };
             }
+            if (isShapeType) {
+                const handleShapeCreated = (objectData) => {
+                    if (objectData.type === 'shape') {
+                        host.eventBus.off(Events.Object.Created, handleShapeCreated);
+                        host.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+                        setTimeout(() => {
+                            host.eventBus.emit(Events.Tool.ObjectEdit, {
+                                object: {
+                                    id: objectData.id,
+                                    type: 'shape',
+                                    position: objectData.position,
+                                    properties: { content: '' }
+                                },
+                                create: true
+                            });
+                        }, 50);
+                    }
+                };
+                host.eventBus.on(Events.Object.Created, handleShapeCreated);
+            }
             host.payloadFactory.emitGenericPlacement(host.pending.type, position, props);
         }
 
         host.pending = null;
         host.hideGhost();
-        if (!isTextWithEditing && !(isFile && props.selectFileOnPlace)) {
+        if (!isTextWithEditing && !isShapeType && !(isFile && props.selectFileOnPlace)) {
             host.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
         }
     }

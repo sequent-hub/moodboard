@@ -20,6 +20,7 @@ import { NotePropertiesPanel } from '../../ui/NotePropertiesPanel.js';
 import { FilePropertiesPanel } from '../../ui/FilePropertiesPanel.js';
 import { ConnectorPropertiesPanel } from '../../ui/ConnectorPropertiesPanel.js';
 import { ShapePropertiesPanel } from '../../ui/ShapePropertiesPanel.js';
+import { DrawingPropertiesPanel } from '../../ui/DrawingPropertiesPanel.js';
 import { ChatWindow } from '../../ui/chat/ChatWindow.js';
 import { bindToolbarEvents, bindTopbarEvents } from '../integration/MoodBoardEventBindings.js';
 
@@ -152,6 +153,7 @@ function initHtmlLayersAndPanels(board) {
     board.filePropertiesPanel = new FilePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.connectorPropertiesPanel = new ConnectorPropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.shapePropertiesPanel = new ShapePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
+    board.drawingPropertiesPanel = new DrawingPropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
 }
 
 export function createMoodBoardUi(board) {
