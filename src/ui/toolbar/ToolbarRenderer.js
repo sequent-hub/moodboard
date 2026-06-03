@@ -11,6 +11,8 @@ export class ToolbarRenderer {
 
         const newTools = [
             { id: 'select', iconName: 'select', title: 'Инструмент выделения (V)', type: 'activate-select' },
+            { id: 'lasso', iconName: 'lasso', title: 'Лассо — произвольное выделение', type: 'activate-lasso' },
+            { id: 'laser', iconName: 'laser', title: 'Лазерная указка', type: 'activate-laser' },
             { id: 'pan', iconName: 'pan', title: 'Панорамирование (Пробел)', type: 'activate-pan' },
             { id: 'divider', type: 'divider' },
             { id: 'text-add', iconName: 'text-add', title: 'Добавить текст', type: 'text-add' },
@@ -19,6 +21,10 @@ export class ToolbarRenderer {
             // { id: 'image2', iconName: 'image', title: 'Добавить картинку', type: 'image2-add' },
             { id: 'shapes', iconName: 'shapes', title: 'Фигуры', type: 'custom-shapes' },
             { id: 'pencil', iconName: 'pencil', title: 'Рисование', type: 'custom-draw' },
+            { id: 'connector', iconName: 'connector', title: 'Коннектор', type: 'connector-add' },
+            ...(this.toolbar.enableComments
+                ? [{ id: 'comments', iconName: 'comments', title: 'Комментарий', type: 'custom-comments' }]
+                : []),
             { id: 'attachments', iconName: 'attachments', title: 'Файлы', type: 'custom-attachments' },
             { id: 'emoji', iconName: 'emoji', title: 'Эмоджи', type: 'custom-emoji' }
         ];

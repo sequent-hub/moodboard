@@ -9,7 +9,19 @@ export class GroupDeleteCommand extends BaseCommand {
     constructor(coreMoodboard, objectIds) {
         super('group_delete', `Удалить группу (${objectIds.length} объектов)`);
         this.coreMoodboard = coreMoodboard;
-        this.objectIds = Array.isArray(objectIds) ? [...objectIds] : [];
+        const baseIds = new Set(Array.isArray(objectIds) ? objectIds : []);
+        // Вариант B: атомарно удаляем коннекторы, привязанные к удаляемым объектам
+        const allObjects = coreMoodboard.state.getObjects();
+        for (const obj of allObjects) {
+            if (obj.type === 'connector') {
+                const start = obj.properties?.start?.boundId;
+                const end = obj.properties?.end?.boundId;
+                if ((start && baseIds.has(start)) || (end && baseIds.has(end))) {
+                    baseIds.add(obj.id);
+                }
+            }
+        }
+        this.objectIds = [...baseIds];
     }
 
     async execute() {

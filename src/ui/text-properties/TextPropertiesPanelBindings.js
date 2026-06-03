@@ -74,6 +74,12 @@ export function bindTextPropertiesPanelControls(panel) {
     };
     document.addEventListener('click', panel._onBgDocumentClick);
 
+    if (panel.markdownToggle) {
+        panel.markdownToggle.addEventListener('change', (event) => {
+            panel._changeMarkdown(event.target.checked);
+        });
+    }
+
     panel._bindingsAttached = true;
 }
 

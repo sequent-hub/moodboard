@@ -30,6 +30,8 @@ vi.mock('pixi.js', () => {
     const createContainerMock = () => ({
         addChild: vi.fn(),
         pivot: { set: vi.fn(), x: 0, y: 0 },
+        scale: { set: vi.fn(), x: 1, y: 1 },
+        eventMode: 'auto',
         x: 0,
         y: 0,
         rotation: 0,

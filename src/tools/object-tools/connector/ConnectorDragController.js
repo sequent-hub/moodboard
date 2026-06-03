@@ -11,12 +11,21 @@ import {
 const DRAG_THRESHOLD = 4;
 /** Порог «у кромки» в CSS-пикселях. */
 const EDGE_THRESHOLD_CSS = 10;
+/** Порог магнита к коннектору цели — строго больше EDGE_THRESHOLD_CSS, иначе грань перехватит. */
+const ANCHOR_SNAP_CSS = 16;
 /** Радиус поиска ближайшего объекта при клике по якорю (world-px). */
 const CLICK_FIND_RADIUS = 400;
 /** Зазор между дубликатом и источником при автосоздании (world-px). */
 const CLONE_GAP = 40;
 /** Типы объектов, к которым можно привязать коннектор (из ConnectionAnchorsLayer). */
 const ALLOWED_BIND_TYPES = new Set(['shape', 'note', 'image', 'text', 'simple-text', 'file']);
+/** Нормализованные якоря коннекторов: top, right, bottom, left. */
+const TARGET_ANCHORS = [
+    { x: 0.5, y: 0 },
+    { x: 1,   y: 0.5 },
+    { x: 0.5, y: 1 },
+    { x: 0,   y: 0.5 },
+];
 
 /**
  * Обрабатывает жест «pointerdown на точке подключения → drag → drop»
@@ -92,6 +101,23 @@ export class ConnectorDragController {
         return { x: posData.position.x, y: posData.position.y, ...sizeData.size };
     }
 
+    /**
+     * Возвращает ближайший якорь из TARGET_ANCHORS в пределах ANCHOR_SNAP_CSS от worldPt,
+     * иначе null. Приоритет выше грани — вызывать в _resolveEnd первым.
+     */
+    _snapToAnchor(bounds, worldPt) {
+        const scale = this._world()?.scale?.x || 1;
+        const thr = ANCHOR_SNAP_CSS / scale;
+        let best = null, bestDist = thr;
+        for (const a of TARGET_ANCHORS) {
+            const ax = bounds.x + a.x * bounds.width;
+            const ay = bounds.y + a.y * bounds.height;
+            const d = Math.hypot(worldPt.x - ax, worldPt.y - ay);
+            if (d <= bestDist) { bestDist = d; best = a; }
+        }
+        return best;
+    }
+
     /** Возвращает true, если worldPt находится в пределах EDGE_THRESHOLD_CSS от кромки. */
     _nearEdge(bounds, worldPt) {
         const scale = this._world()?.scale?.x || 1;
@@ -116,6 +142,12 @@ export class ConnectorDragController {
         if (objectId && objectId !== sourceBoundId) {
             const bounds = this._objectBounds(objectId);
             if (bounds) {
+                // ПРИОРИТЕТ 1: магнит к коннектору (середина грани)
+                const snapAnchor = this._snapToAnchor(bounds, worldPt);
+                if (snapAnchor) {
+                    return { boundId: objectId, anchor: snapAnchor, isPrecise: true, isExact: false };
+                }
+                // ПРИОРИТЕТ 2: произвольная точка грани
                 if (this._nearEdge(bounds, worldPt)) {
                     return {
                         boundId: objectId,
@@ -124,6 +156,7 @@ export class ConnectorDragController {
                         isExact: false,
                     };
                 }
+                // ПРИОРИТЕТ 3: центр объекта
                 return { boundId: objectId, anchor: { x: 0.5, y: 0.5 }, isPrecise: false, isExact: false };
             }
         }
@@ -150,19 +183,33 @@ export class ConnectorDragController {
 
         if (!this._previewGraphics) return;
 
-        const worldPt = this._toWorld(e.clientX, e.clientY);
-        const fromPt  = terminalWorldPoint(this.eventBus, this._sourceTerminal);
-        drawPreview(this._previewGraphics, fromPt, worldPt);
+        const worldPt  = this._toWorld(e.clientX, e.clientY);
+        const fromPt   = terminalWorldPoint(this.eventBus, this._sourceTerminal);
 
         this._highlightGraphics.clear();
         const objectId = this._hitTest(e.clientX, e.clientY);
+        let previewEnd = worldPt;
         if (objectId && objectId !== this._sourceTerminal?.boundId) {
             const bounds = this._objectBounds(objectId);
             if (bounds) {
                 this._highlightGraphics.lineStyle({ width: 2, color: 0x2563EB, alpha: 0.85 });
                 this._highlightGraphics.drawRect(bounds.x, bounds.y, bounds.width, bounds.height);
+                // Подводим превью к коннектору, если курсор в зоне магнита
+                const snapAnchor = this._snapToAnchor(bounds, worldPt);
+                if (snapAnchor) {
+                    previewEnd = {
+                        x: bounds.x + snapAnchor.x * bounds.width,
+                        y: bounds.y + snapAnchor.y * bounds.height,
+                    };
+                    // Подсвечиваем конкретный коннектор
+                    this._highlightGraphics.lineStyle(0);
+                    this._highlightGraphics.beginFill(0x2563EB, 1);
+                    this._highlightGraphics.drawCircle(previewEnd.x, previewEnd.y, 6);
+                    this._highlightGraphics.endFill();
+                }
             }
         }
+        drawPreview(this._previewGraphics, fromPt, previewEnd);
     }
 
     _onUp(e) {

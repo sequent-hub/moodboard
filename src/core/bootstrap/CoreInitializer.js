@@ -59,6 +59,10 @@ export async function initializeCoreTools(core) {
     const connectorTool = new connectorToolModule.ConnectorTool(core.eventBus, core);
     core.toolManager.registerTool(connectorTool);
 
+    const laserToolModule = await import('../../tools/object-tools/LaserPointerTool.js');
+    const laserTool = new laserToolModule.LaserPointerTool(core.eventBus);
+    core.toolManager.registerTool(laserTool);
+
     core.selectTool = selectTool;
     core.toolManager.activateTool('select');
 

@@ -346,6 +346,17 @@ export class CoreMoodBoard {
     }
 
     createObject(type, position, properties = {}, extraData = {}) {
+        const validType = typeof type === 'string' && type.length > 0;
+        const validPos = position && typeof position === 'object'
+            && typeof position.x === 'number' && typeof position.y === 'number';
+        if (!validType || !validPos) {
+            console.error(
+                '[MoodBoard] createObject: неверные аргументы. Ожидается createObject(type, position, properties, extraData), ' +
+                'где type — непустая строка, position — { x: number, y: number }.',
+                { type, position }
+            );
+            return null;
+        }
         const exists = (id) => {
             const inState = (this.state.state.objects || []).some(o => o.id === id);
             const inPixi = this.pixi?.objects?.has ? this.pixi.objects.has(id) : false;
@@ -513,6 +524,19 @@ export class CoreMoodBoard {
                 return objectData;
             }
         } catch (_) { /* no-op */ }
+
+        const loadId = objectData?.id ?? '(без id)';
+        const validType = typeof objectData?.type === 'string' && objectData.type.length > 0;
+        const pos = objectData?.position;
+        const validPos = pos && typeof pos === 'object'
+            && typeof pos.x === 'number' && typeof pos.y === 'number';
+        if (!validType || !validPos) {
+            console.warn(
+                `[MoodBoard] Пропуск объекта при загрузке (${loadId}): невалидные type или position`,
+                objectData
+            );
+            return null;
+        }
 
         // Инициализируем флаг компенсации пивота для загруженных объектов.
         // В state координаты хранятся как левый-верх. PIXI позиционирует по центру (anchor/pivot по центру),

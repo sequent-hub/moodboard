@@ -153,6 +153,20 @@ export const Events = {
 	Draw: {
 		BrushSet: 'draw:brush:set',
 	},
+
+	Lasso: {
+		ModeSet: 'lasso:mode:set',
+	},
+
+	Comment: {
+		PinCreated: 'comment:pin:created',
+		ThreadOpened: 'comment:thread:opened',
+		MessageAdded: 'comment:message:added',
+		Resolved: 'comment:resolved',
+		Deleted: 'comment:deleted',
+		RemoteUpdated: 'comment:remote:updated',
+		OpenDraftAt: 'comment:open:draft:at',
+	},
 };
 
 

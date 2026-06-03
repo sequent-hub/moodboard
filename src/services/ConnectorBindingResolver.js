@@ -73,6 +73,26 @@ function clipRayToAABB(from, to, hw, hh) {
     };
 }
 
+/**
+ * Грань и единичная внешняя нормаль из нормализованного якоря [0..1].
+ * Возвращает локальные координаты (центр объекта = 0,0): на какой кромке сидит якорь
+ * и куда смотрит нормаль. Координата вдоль кромки сохраняется из якоря.
+ *
+ * @returns {{ dir: {x:number,y:number}, point: {x:number,y:number} }}
+ */
+function faceFromAnchor(anchor, width, height, hw, hh) {
+    const ax  = Math.max(0, Math.min(1, anchor?.x ?? 0.5));
+    const ay  = Math.max(0, Math.min(1, anchor?.y ?? 0.5));
+    const lax = ax * width  - hw;
+    const lay = ay * height - hh;
+    const dTop = ay, dBottom = 1 - ay, dLeft = ax, dRight = 1 - ax;
+    const min = Math.min(dTop, dBottom, dLeft, dRight);
+    if (min === dTop)    return { dir: { x: 0,  y: -1 }, point: { x: lax,  y: -hh } };
+    if (min === dBottom) return { dir: { x: 0,  y: 1  }, point: { x: lax,  y: hh  } };
+    if (min === dLeft)   return { dir: { x: -1, y: 0  }, point: { x: -hw,  y: lay } };
+    return                      { dir: { x: 1,  y: 0  }, point: { x: hw,   y: lay } };
+}
+
 // ---------------------------------------------------------------------------
 
 export class ConnectorBindingResolver {
@@ -170,6 +190,98 @@ export class ConnectorBindingResolver {
             : { x: cx + exitLocal.x, y: cy + exitLocal.y };
 
         return worldExit;
+    }
+
+    /**
+     * Разрешает терминал в дескриптор {point, dir} — точку на грани и внешнюю нормаль.
+     * Используется для elbow и bezier, где выход обязан быть перпендикулярен грани.
+     *
+     * @param {Object} terminal
+     *   Привязанный:  { boundId, anchor:{x,y}, isPrecise, isExact }
+     *   Свободный:    { point:{x,y} }
+     * @param {Object|null} target
+     * @param {{ x: number, y: number }|null} otherCenter
+     *   Центр другого объекта (или свободная точка другого конца) для выбора стороны.
+     * @returns {{ point: {x:number,y:number}, dir: {x:number,y:number} }}
+     */
+    static resolveWithSide(terminal, target, otherCenter = null) {
+        // Свободный терминал: точка как есть, dir — к другому концу
+        if (!terminal?.boundId) {
+            const pt = { x: terminal?.point?.x ?? 0, y: terminal?.point?.y ?? 0 };
+            const dx = otherCenter ? otherCenter.x - pt.x : 0;
+            const dy = otherCenter ? otherCenter.y - pt.y : 0;
+            const len = Math.hypot(dx, dy);
+            const dir = len > 1e-6 ? { x: dx / len, y: dy / len } : { x: 1, y: 0 };
+            return { point: pt, dir };
+        }
+
+        if (!target) {
+            return { point: { x: 0, y: 0 }, dir: { x: 1, y: 0 } };
+        }
+
+        const left   = target.position?.x ?? 0;
+        const top    = target.position?.y ?? 0;
+        const width  = target.width  ?? target.properties?.width  ?? 0;
+        const height = target.height ?? target.properties?.height ?? 0;
+        const angle  = target.rotation ?? target.properties?.rotation ?? 0;
+
+        const cx = left + width  / 2;
+        const cy = top  + height / 2;
+        const hw = width  / 2;
+        const hh = height / 2;
+
+        // Вектор к другому объекту в локальных координатах цели
+        const rawDx = (otherCenter?.x ?? cx) - cx;
+        const rawDy = (otherCenter?.y ?? cy) - cy;
+        const localD = angle !== 0
+            ? rotateVector({ x: rawDx, y: rawDy }, -angle)
+            : { x: rawDx, y: rawDy };
+
+        let localDir;
+        let facePoint;
+
+        // Привязка к конкретной точке-коннектору (isPrecise): грань и нормаль берём
+        // из самого якоря — коннектор обязан выходить именно из той точки, куда привязан,
+        // а не из геометрически ближайшей грани.
+        if (terminal.isPrecise && hw > 0 && hh > 0) {
+            const face = faceFromAnchor(terminal.anchor, width, height, hw, hh);
+            localDir  = face.dir;
+            facePoint = face.point;
+        } else if (Math.abs(localD.x) >= Math.abs(localD.y)) {
+            // Привязка к центру → выбор грани по доминирующей оси к другому объекту
+            if (localD.x >= 0) {
+                localDir  = { x: 1, y: 0 };
+                facePoint = { x: hw, y: 0 };
+            } else {
+                localDir  = { x: -1, y: 0 };
+                facePoint = { x: -hw, y: 0 };
+            }
+        } else if (localD.y >= 0) {
+            localDir  = { x: 0, y: 1 };
+            facePoint = { x: 0, y: hh };
+        } else {
+            localDir  = { x: 0, y: -1 };
+            facePoint = { x: 0, y: -hh };
+        }
+
+        // Перевод в world-space
+        const worldFace = angle !== 0
+            ? {
+                x: cx + rotateVector(facePoint, angle).x,
+                y: cy + rotateVector(facePoint, angle).y,
+              }
+            : { x: cx + facePoint.x, y: cy + facePoint.y };
+
+        const worldDirRaw = angle !== 0 ? rotateVector(localDir, angle) : localDir;
+        const dLen = Math.hypot(worldDirRaw.x, worldDirRaw.y);
+        const dir  = dLen > 1e-6
+            ? { x: worldDirRaw.x / dLen, y: worldDirRaw.y / dLen }
+            : { x: 1, y: 0 };
+
+        return {
+            point: { x: Math.round(worldFace.x), y: Math.round(worldFace.y) },
+            dir,
+        };
     }
 }
 

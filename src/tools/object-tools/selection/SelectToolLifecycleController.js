@@ -8,6 +8,7 @@ import { GroupResizeController } from './GroupResizeController.js';
 import { GroupRotateController } from './GroupRotateController.js';
 import { GroupDragController } from './GroupDragController.js';
 import { BoxSelectController } from './BoxSelectController.js';
+import { LassoSelectController } from './LassoSelectController.js';
 
 export function activateSelectTool(app, defaultCursor, superActivate) {
     superActivate();
@@ -66,6 +67,13 @@ export function activateSelectTool(app, defaultCursor, superActivate) {
             setSelection: (ids) => this.setSelection(ids),
             clearSelection: () => this.clearSelection(),
             rectIntersectsRect: (a, b) => this.rectIntersectsRect(a, b)
+        });
+        this._lassoSelect = new LassoSelectController({
+            app,
+            selection: this.selection,
+            emit: (event, payload) => this.emit(event, payload),
+            setSelection: (ids) => this.setSelection(ids),
+            clearSelection: () => this.clearSelection()
         });
     } else if (!app) {
         console.log('❌ PIXI app не передан в activate');

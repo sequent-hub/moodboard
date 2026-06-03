@@ -22,6 +22,7 @@ export class IconLoader {
                 import('../assets/icons/image.svg?raw'),
                 import('../assets/icons/shapes.svg?raw'),
                 import('../assets/icons/pencil.svg?raw'),
+                import('../assets/icons/connector.svg?raw'),
                 import('../assets/icons/comments.svg?raw'),
                 import('../assets/icons/attachments.svg?raw'),
                 import('../assets/icons/emoji.svg?raw'),
@@ -29,14 +30,16 @@ export class IconLoader {
                 import('../assets/icons/clear.svg?raw'),
                 import('../assets/icons/undo.svg?raw'),
                 import('../assets/icons/redo.svg?raw'),
-                import('../assets/icons/mindmap.svg?raw')
+                import('../assets/icons/mindmap.svg?raw'),
+                import('../assets/icons/lasso.svg?raw'),
+                import('../assets/icons/laser.svg?raw')
             ]);
 
             // Сохраняем иконки в кэш
             const iconNames = [
                 'select', 'pan', 'text-add', 'note', 'image', 'shapes',
-                'pencil', 'comments', 'attachments', 'emoji', 'frame',
-                'clear', 'undo', 'redo', 'mindmap'
+                'pencil', 'connector', 'comments', 'attachments', 'emoji', 'frame',
+                'clear', 'undo', 'redo', 'mindmap', 'lasso', 'laser'
             ];
 
             iconNames.forEach((name, index) => {
@@ -191,7 +194,7 @@ export class IconLoader {
     loadFallbackIcons() {
         const iconNames = [
             'select', 'pan', 'text-add', 'note', 'image', 'shapes',
-            'pencil', 'comments', 'attachments', 'emoji', 'frame',
+            'pencil', 'connector', 'comments', 'attachments', 'emoji', 'frame',
             'clear', 'undo', 'redo', 'mindmap'
         ];
 

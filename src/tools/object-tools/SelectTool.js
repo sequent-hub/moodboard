@@ -206,6 +206,20 @@ export class SelectTool extends BaseTool {
     endBoxSelect() {
         return endBoxSelectViaController.call(this);
     }
+
+    startLassoSelect(event) {
+        this.isLassoSelect = true;
+        if (this._lassoSelect) this._lassoSelect.start({ x: event.x, y: event.y }, this.isMultiSelect);
+    }
+
+    updateLassoSelect(event) {
+        if (this._lassoSelect) this._lassoSelect.update({ x: event.x, y: event.y });
+    }
+
+    endLassoSelect() {
+        this.isLassoSelect = false;
+        if (this._lassoSelect) this._lassoSelect.end();
+    }
     rectIntersectsRect(a, b) {
         return !(
             b.x > a.x + a.width ||

@@ -12,6 +12,7 @@ import {
     buildBackgroundColorUpdate,
     buildFontFamilyUpdate,
     buildFontSizeUpdate,
+    buildMarkdownUpdate,
     buildTextColorUpdate,
     getControlValuesFromProperties,
     getFallbackControlValues,
@@ -213,6 +214,19 @@ export class TextPropertiesPanel {
         this._updateTextAppearance(this.currentId, { backgroundColor });
     }
 
+    _changeMarkdown(markdown) {
+        if (!this.currentId) {
+            return;
+        }
+
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: buildMarkdownUpdate(markdown),
+        });
+
+        this._updateTextAppearance(this.currentId, { markdown });
+    }
+
     _updateTextAppearance(objectId, properties) {
         applyTextAppearanceToDom(objectId, properties);
         syncPixiTextProperties(this.eventBus, objectId, properties);
@@ -236,6 +250,9 @@ export class TextPropertiesPanel {
         this.fontSizeSelect.value = values.fontSize;
         this._updateCurrentColorButton(values.color);
         this._updateCurrentBgColorButton(values.backgroundColor);
+        if (this.markdownToggle) {
+            this.markdownToggle.checked = values.markdown;
+        }
     }
 
     reposition() {

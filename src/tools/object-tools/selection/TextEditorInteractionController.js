@@ -146,10 +146,11 @@ export function createTextEditorFinalize(controller, {
             });
         } else {
             if (isNewCreation) {
-                controller.eventBus.emit(Events.Tool.UpdateObjectContent, { objectId, content: value });
-                controller.eventBus.emit(Events.Object.StateChanged, {
+                const oldContent = typeof initialContent === 'string' ? initialContent : '';
+                controller.eventBus.emit(Events.Object.ContentChange, {
                     objectId,
-                    updates: { properties: { content: value } },
+                    oldContent,
+                    newContent: value,
                 });
             } else {
                 const oldContent = typeof initialContent === 'string' ? initialContent : '';
@@ -292,10 +293,11 @@ export function closeTextEditorFromState(controller, commit) {
         });
     } else {
         if (isNewCreation) {
-            controller.eventBus.emit(Events.Tool.UpdateObjectContent, { objectId, content: value });
-            controller.eventBus.emit(Events.Object.StateChanged, {
+            const oldContent = typeof initialContent === 'string' ? initialContent : '';
+            controller.eventBus.emit(Events.Object.ContentChange, {
                 objectId,
-                updates: { properties: { content: value } },
+                oldContent,
+                newContent: value,
             });
         } else {
             controller.eventBus.emit(Events.Object.ContentChange, {

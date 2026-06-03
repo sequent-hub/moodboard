@@ -52,9 +52,9 @@ export class UpdateTextStyleCommand extends BaseCommand {
 
         const { property } = this;
 
-        if (property === 'fontFamily') {
+        if (property === 'fontFamily' || property === 'markdown') {
             if (!object.properties) object.properties = {};
-            object.properties.fontFamily = value;
+            object.properties[property] = value;
         } else {
             object[property] = value;
         }
@@ -69,8 +69,8 @@ export class UpdateTextStyleCommand extends BaseCommand {
 
         syncPixiTextProperties(this.coreMoodboard.eventBus, this.objectId, { [property]: value });
 
-        const updates = property === 'fontFamily'
-            ? { properties: { fontFamily: value } }
+        const updates = (property === 'fontFamily' || property === 'markdown')
+            ? { properties: { [property]: value } }
             : { [property]: value };
         this.coreMoodboard.eventBus.emit(Events.Object.StateChanged, {
             objectId: this.objectId,
@@ -85,6 +85,7 @@ function _propertyLabel(property) {
         fontSize: 'размер шрифта',
         color: 'цвет текста',
         backgroundColor: 'фон текста',
+        markdown: 'markdown-режим',
     };
     return labels[property] || property;
 }

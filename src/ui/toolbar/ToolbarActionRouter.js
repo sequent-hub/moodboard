@@ -27,8 +27,34 @@ export class ToolbarActionRouter {
             this.toolbar.closeEmojiPopup();
             this.toolbar.eventBus.emit(Events.Place.Set, null);
             this.toolbar.placeSelectedButtonId = null;
+            this.toolbar.eventBus.emit(Events.Lasso.ModeSet, { active: false });
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
             this.toolbar.setActiveToolbarButton('select');
+            return true;
+        }
+
+        if (toolType === 'activate-lasso') {
+            this.toolbar.animateButton(button);
+            this.toolbar.closeShapesPopup();
+            this.toolbar.closeDrawPopup();
+            this.toolbar.closeEmojiPopup();
+            this.toolbar.eventBus.emit(Events.Place.Set, null);
+            this.toolbar.placeSelectedButtonId = null;
+            this.toolbar.eventBus.emit(Events.Lasso.ModeSet, { active: true });
+            this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
+            this.toolbar.setActiveToolbarButton('lasso');
+            return true;
+        }
+
+        if (toolType === 'activate-laser') {
+            this.toolbar.animateButton(button);
+            this.toolbar.closeShapesPopup();
+            this.toolbar.closeDrawPopup();
+            this.toolbar.closeEmojiPopup();
+            this.toolbar.eventBus.emit(Events.Place.Set, null);
+            this.toolbar.placeSelectedButtonId = null;
+            this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'laser' });
+            this.toolbar.setActiveToolbarButton('laser');
             return true;
         }
 
@@ -148,10 +174,8 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
-            this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-            this.toolbar.placeSelectedButtonId = 'comments';
-            this.toolbar.setActiveToolbarButton('place');
-            this.toolbar.eventBus.emit(Events.Place.Set, { type: 'comment', properties: { width: 72, height: 72 } });
+            this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'comment' });
+            this.toolbar.setActiveToolbarButton('comment');
             return true;
         }
 
@@ -179,6 +203,18 @@ export class ToolbarActionRouter {
             return true;
         }
 
+        if (toolType === 'connector-add') {
+            this.toolbar.animateButton(button);
+            this.toolbar.closeShapesPopup();
+            this.toolbar.closeDrawPopup();
+            this.toolbar.closeEmojiPopup();
+            this.toolbar.eventBus.emit(Events.Place.Set, null);
+            this.toolbar.placeSelectedButtonId = null;
+            this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'connector' });
+            this.toolbar.setActiveToolbarButton('connector');
+            return true;
+        }
+
         if (toolType === 'custom-shapes') {
             this.toolbar.animateButton(button);
             this.toolbar.toggleShapesPopup(button);
@@ -195,6 +231,7 @@ export class ToolbarActionRouter {
             this.toolbar.toggleDrawPopup(button);
             this.toolbar.closeShapesPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.eventBus.emit(Events.Lasso.ModeSet, { active: false });
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'draw' });
             this.toolbar.setActiveToolbarButton('draw');
             return true;

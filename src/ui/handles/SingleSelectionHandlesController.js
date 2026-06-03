@@ -15,6 +15,10 @@ export class SingleSelectionHandlesController {
             this.host.hide();
             return;
         }
+        if (mb.type === 'connector') {
+            this.host.hide();
+            return;
+        }
 
         const worldBounds = this.host.positioningService.getSingleSelectionWorldBounds(id, pixi);
         this.host._showBounds(worldBounds, id);

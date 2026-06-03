@@ -124,8 +124,12 @@ export function onMouseDown(event) {
                 return;
             }
         }
-        // Иначе — начинаем рамку выделения
-        this.startBoxSelect(event);
+        // Иначе — начинаем рамку выделения (или лассо в режиме лассо)
+        if (this.lassoMode) {
+            this.startLassoSelect(event);
+        } else {
+            this.startBoxSelect(event);
+        }
     }
 }
 
@@ -158,6 +162,8 @@ export function onMouseMove(event) {
         }
     } else if (this.isDragging || this.isGroupDragging) {
         this.updateDrag(event);
+    } else if (this.isLassoSelect) {
+        this.updateLassoSelect(event);
     } else if (this.isBoxSelect) {
         this.updateBoxSelect(event);
     } else {
@@ -186,6 +192,8 @@ export function onMouseUp(event) {
         this.endRotate();
     } else if (this.isDragging || this.isGroupDragging) {
         this.endDrag();
+    } else if (this.isLassoSelect) {
+        this.endLassoSelect();
     } else if (this.isBoxSelect) {
         this.endBoxSelect();
     }
@@ -203,6 +211,7 @@ export function onDoubleClick(event) {
         const isText = !!(pix && pix._mb && pix._mb.type === 'text');
         const isNote = !!(pix && pix._mb && pix._mb.type === 'note');
         const isFile = !!(pix && pix._mb && pix._mb.type === 'file');
+        const isShape = !!(pix && pix._mb && pix._mb.type === 'shape');
 
         if (isText) {
             // Получаем позицию объекта для редактирования
@@ -256,6 +265,25 @@ export function onDoubleClick(event) {
             });
             return;
         }
+
+        if (isShape) {
+            const posData = { objectId: hitResult.object, position: null };
+            this.emit(Events.Tool.GetObjectPosition, posData);
+            const shapeContent = pix._mb?.properties?.content || '';
+            this.emit(Events.Tool.ObjectEdit, {
+                id: hitResult.object,
+                type: 'shape',
+                position: posData.position,
+                properties: { content: shapeContent },
+                caretClick: {
+                    clientX: event?.originalEvent?.clientX,
+                    clientY: event?.originalEvent?.clientY,
+                },
+                create: false,
+            });
+            return;
+        }
+
         this.editObject(hitResult.object);
     }
 }

@@ -86,6 +86,7 @@ export function getControlValuesFromProperties(properties) {
         fontSize: String(properties.fontSize || 18),
         color: properties.color || '#000000',
         backgroundColor: properties.backgroundColor !== undefined ? properties.backgroundColor : 'transparent',
+        markdown: properties.markdown === true,
     };
 }
 
@@ -95,6 +96,7 @@ export function getFallbackControlValues() {
         fontSize: '18',
         color: '#000000',
         backgroundColor: 'transparent',
+        markdown: false,
     };
 }
 
@@ -119,6 +121,12 @@ export function buildTextColorUpdate(color) {
 export function buildBackgroundColorUpdate(backgroundColor) {
     return {
         backgroundColor,
+    };
+}
+
+export function buildMarkdownUpdate(markdown) {
+    return {
+        properties: { markdown },
     };
 }
 

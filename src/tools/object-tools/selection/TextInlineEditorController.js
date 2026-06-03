@@ -51,6 +51,7 @@ export function openTextEditor(object, create = false) {
 
     // Определяем тип объекта
     const isNote = objectType === 'note';
+    const isShape = objectType === 'shape';
 
     // Проверяем, что position существует
     if (!position) {
@@ -207,6 +208,11 @@ export function openTextEditor(object, create = false) {
         effectiveFontPx,
         lineHeightPx: lhInitial,
     });
+
+    // Shape: текст по центру, textarea покрывает весь bounds фигуры
+    if (isShape) {
+        textarea.style.textAlign = 'center';
+    }
 
     wrapper.appendChild(textarea);
     // Убрана зелёная рамка вокруг поля ввода по требованию
@@ -403,7 +409,7 @@ export function openTextEditor(object, create = false) {
         }
     }
     // Автоподгон
-    const syncRegularTextSizeToObject = !isNote && objectId
+    const syncRegularTextSizeToObject = !isNote && !isShape && objectId
         ? ({ widthPx, heightPx }) => {
             try {
                 const scaleX = (worldLayerRef?.scale?.x) || 1;
@@ -428,8 +434,8 @@ export function openTextEditor(object, create = false) {
         onSizeChange: syncRegularTextSizeToObject,
     });
 
-    // Вызываем autoSize только для обычного текста
-    if (!isNote) {
+    // autoSize только для обычного текста; shape имеет фиксированные bounds фигуры
+    if (!isNote && !isShape) {
         autoSize();
     }
     textarea.focus();

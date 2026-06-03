@@ -80,9 +80,9 @@ function sanitizeColor(value, fallback = 0xB0B0B0) {
     return Math.max(0, Math.min(0xFFFFFF, Math.round(n)));
 }
 
-const DEFAULT_CROSS_COLOR = 0xC2C2C2;       // 194,194,194
-const DEFAULT_MID_CROSS_COLOR = 0xA7A7A7;   // 167,167,167
-const DEFAULT_SMALL_CROSS_COLOR = 0xCDCDCD; // 205,205,205
+const DEFAULT_CROSS_COLOR = 0xCFD3DB;       // 207,211,219 — крупная сетка, чуть заметнее
+const DEFAULT_MID_CROSS_COLOR = 0xD6DAE1;   // 214,218,225 — средний участок
+const DEFAULT_SMALL_CROSS_COLOR = 0xDDE0E6; // 221,224,230 — плотная сетка, самый тихий
 const COLOR_BAND_HIGH = 'high';
 const COLOR_BAND_MID = 'mid';
 const COLOR_BAND_SMALL = 'small';

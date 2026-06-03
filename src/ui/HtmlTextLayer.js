@@ -2,6 +2,7 @@ import gsap from 'gsap';
 import { CustomEase } from 'gsap/CustomEase';
 import { Events } from '../core/events/Events.js';
 import * as PIXI from 'pixi.js';
+import { renderRichText, hasMath } from '../utils/richText.js';
 
 gsap.registerPlugin(CustomEase);
 const TEXT_HOVER_EASE = 'hoverLiftSpring';
@@ -15,6 +16,33 @@ const TEXT_BACK_DUR  = 0.18;
 const prefersReducedMotion =
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+// Сильные сигналы markdown-разметки: заголовки, блоки/инлайн-код, цитаты,
+// списки (маркированные и нумерованные), таблицы, ссылки, жирный/курсив.
+// Намеренно консервативно, чтобы обычный однострочный текст не считался markdown.
+function looksLikeMarkdown(text) {
+    if (!text || typeof text !== 'string') return false;
+    return (
+        /^#{1,6}\s+/m.test(text) ||
+        /```/.test(text) ||
+        /`[^`]+`/.test(text) ||
+        /^>\s+/m.test(text) ||
+        /^\s*[-*+]\s+/m.test(text) ||
+        /^\s*\d+\.\s+/m.test(text) ||
+        /^\s*\|.*\|.*$/m.test(text) ||
+        /\[[^\]]+\]\([^)]+\)/.test(text) ||
+        /(\*\*|__)[^*_\s][^*_]*(\*\*|__)/.test(text)
+    );
+}
+
+// Итоговое решение: явный флаг (true/false) перебивает авто-детект, иначе —
+// по содержимому. Формулы KaTeX тоже включают богатый рендер: текст с одной
+// формулой без markdown-разметки должен рендериться через renderRichText.
+function resolveMarkdown(properties, content) {
+    if (properties?.markdown === true) return true;
+    if (properties?.markdown === false) return false;
+    return looksLikeMarkdown(content) || hasMath(content);
+}
 
 /**
  * HtmlTextLayer — рисует текст как HTML-элементы поверх PIXI для максимальной чёткости
@@ -54,7 +82,7 @@ export class HtmlTextLayer {
         // Подписки
         this.eventBus.on(Events.Object.Created, ({ objectId, objectData }) => {
             if (!objectData) return;
-            if (objectData.type === 'text' || objectData.type === 'simple-text') {
+            if (objectData.type === 'text' || objectData.type === 'simple-text' || objectData.type === 'shape') {
                 this._ensureTextEl(objectId, objectData);
                 this.updateOne(objectId);
             }
@@ -113,7 +141,15 @@ export class HtmlTextLayer {
             console.log(`🔍 HtmlTextLayer: обновляю содержимое для объекта ${objectId}:`, content);
             const el = this.idToEl.get(objectId);
             if (el && typeof content === 'string') {
-                el.textContent = content;
+                const _obj = this.core?.state?.state?.objects?.find(o => o.id === objectId);
+                const isMarkdown = resolveMarkdown(_obj?.properties, content);
+                this._syncElementContent(el, content, isMarkdown);
+                if (el.classList.contains('mb-text--md') !== isMarkdown) {
+                    el.classList.toggle('mb-text--md', isMarkdown);
+                    el.style.whiteSpace = isMarkdown ? 'normal' : 'pre';
+                    el.style.overflowWrap = isMarkdown ? 'break-word' : '';
+                    if (!isMarkdown) el.style.padding = '0';
+                }
                 console.log(`🔍 HtmlTextLayer: содержимое обновлено для ${objectId}:`, content);
             } else {
                 console.warn(`❌ HtmlTextLayer: не удалось обновить содержимое для ${objectId}:`, { el: !!el, content });
@@ -283,7 +319,7 @@ export class HtmlTextLayer {
         console.log(`🔍 HtmlTextLayer: rebuildFromState, найдено объектов:`, objs.length);
         
         objs.forEach((o) => {
-            if (o.type === 'text' || o.type === 'simple-text') {
+            if (o.type === 'text' || o.type === 'simple-text' || o.type === 'shape') {
                 console.log(`🔍 HtmlTextLayer: создаю HTML-элемент для текстового объекта:`, o);
                 this._ensureTextEl(o.id, o);
             }
@@ -294,6 +330,34 @@ export class HtmlTextLayer {
     _ensureTextEl(objectId, objectData) {
         if (!this.layer || !objectId) return;
         if (this.idToEl.has(objectId)) return;
+
+        // Shape: flex-оверлей по центру bounds фигуры; pointer-events: none — клики проходят к PIXI
+        if (objectData.type === 'shape') {
+            const el = document.createElement('div');
+            el.className = 'mb-text mb-shape-text';
+            el.dataset.id = objectId;
+            const textProps = objectData.properties?.text || {};
+            const shapeFontSize = textProps.fontSize || 16;
+            el.style.fontFamily = textProps.fontFamily || 'Inter, sans-serif';
+            el.style.fontSize = `${shapeFontSize}px`;
+            el.style.color = textProps.color || '#111111';
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.justifyContent = 'center';
+            el.style.textAlign = 'center';
+            el.style.overflow = 'hidden';
+            el.style.pointerEvents = 'none';
+            el.style.whiteSpace = 'pre-wrap';
+            el.style.wordBreak = 'break-word';
+            el.style.lineHeight = '1.4';
+            el.dataset.baseFontSize = String(shapeFontSize);
+            const content = objectData.properties?.content || '';
+            el.textContent = content;
+            this.layer.appendChild(el);
+            this.idToEl.set(objectId, el);
+            this._hoverStates.set(objectId, { ty: 0, sc: 1 });
+            return;
+        }
         
         console.log(`🔍 HtmlTextLayer: создаю HTML-элемент для текста ${objectId}:`, objectData);
         
@@ -318,20 +382,21 @@ export class HtmlTextLayer {
             return Math.round(fs * 1.18);
         })();
 
-        el.classList.add('mb-text');
+        const content = objectData.content || objectData.properties?.content || '';
+        const isMarkdown = resolveMarkdown(objectData.properties, content);
+        if (isMarkdown) el.classList.add('mb-text--md');
         el.style.color = color;
         el.style.fontFamily = fontFamily;
         el.style.backgroundColor = backgroundColor === 'transparent' ? '' : backgroundColor;
         el.style.lineHeight = `${baseLineHeight}px`;
-        // Выравнивание рендеринга с textarea
-        el.style.whiteSpace = 'pre';
+        el.style.whiteSpace = isMarkdown ? 'normal' : 'pre';
         el.style.overflow = 'visible';
+        if (isMarkdown) el.style.overflowWrap = 'break-word';
         el.style.letterSpacing = '0px';
         el.style.fontKerning = 'normal';
         el.style.textRendering = 'optimizeLegibility';
-        el.style.padding = '0'; // без внутренних отступов
-        const content = objectData.content || objectData.properties?.content || '';
-        el.textContent = content;
+        if (!isMarkdown) el.style.padding = '0';
+        this._syncElementContent(el, content, isMarkdown);
         // Базовые размеры сохраняем в dataset
         const fs = objectData.fontSize || objectData.properties?.fontSize || 32;
         const bw = Math.max(1, objectData.width || objectData.properties?.baseW || 160);
@@ -369,8 +434,14 @@ export class HtmlTextLayer {
         const el = this.idToEl.get(objectId);
         if (!el || !this.core) return;
 
-        // Лениво вешаем PIXI pointer-слушатели на хит-rect текста (он уже создан к моменту updateOne)
-        this._ensurePixiHover(objectId);
+        // obj нужен раньше, чтобы охранять hover-lift и shape-специфичные пути
+        const obj = (this.core.state.state.objects || []).find(o => o.id === objectId);
+        if (!obj) return;
+
+        // Hover-lift только для text/simple-text (shape использует собственный PIXI-hover)
+        if (obj.type !== 'shape') {
+            this._ensurePixiHover(objectId);
+        }
 
         console.log(`🔍 HtmlTextLayer: обновляю позицию для текста ${objectId}`);
 
@@ -379,8 +450,6 @@ export class HtmlTextLayer {
         const tx = world?.x || 0;
         const ty = world?.y || 0;
         const res = (this.core?.pixi?.app?.renderer?.resolution) || 1;
-        const obj = (this.core.state.state.objects || []).find(o => o.id === objectId);
-        if (!obj) return;
         const x = obj.position?.x || 0;
         const y = obj.position?.y || 0;
         const w = obj.width || 0;
@@ -397,8 +466,8 @@ export class HtmlTextLayer {
         const baseH = parseFloat(el.dataset.baseH || '36') || 36;
         const scaleX = w && baseW ? (w / baseW) : 1;
         const scaleY = h && baseH ? (h / baseH) : 1;
-        // Для записок также не масштабируем шрифт от размера блока — редактор совпадает точно
-        const sObj = (obj?.type === 'text' || obj?.type === 'simple-text' || obj?.type === 'note')
+        // Для text/note/shape не масштабируем шрифт от размера блока — только зум
+        const sObj = (obj?.type === 'text' || obj?.type === 'simple-text' || obj?.type === 'note' || obj?.type === 'shape')
             ? 1
             : Math.min(scaleX, scaleY);
         const sCss = s / res;
@@ -489,21 +558,49 @@ export class HtmlTextLayer {
         const rotatePart = angle ? `rotate(${angle}deg)` : '';
         el.style.transformOrigin = 'center center';
         el.style.transform = [hoverPart, rotatePart].filter(Boolean).join(' ');
+        // Shape: обновляем шрифт/цвет из properties.text и baseFontSize, остальное — без изменений
+        if (obj.type === 'shape') {
+            const textProps = obj.properties?.text || {};
+            const newShapeFS = textProps.fontSize || 16;
+            if (el.dataset.baseFontSize !== String(newShapeFS)) {
+                el.dataset.baseFontSize = String(newShapeFS);
+            }
+            el.style.fontFamily = textProps.fontFamily || 'Inter, sans-serif';
+            el.style.color = textProps.color || '#111111';
+            el.style.fontWeight = textProps.bold ? 'bold' : '';
+            el.style.fontStyle = textProps.italic ? 'italic' : '';
+            const shapeContent = obj.properties?.content || '';
+            if (el.textContent !== shapeContent) el.textContent = shapeContent;
+            return;
+        }
+
         // Текст
         const content = obj.content || obj.properties?.content;
+        const isMarkdown = resolveMarkdown(obj.properties, content);
         if (typeof content === 'string') {
-            el.textContent = content;
-            console.log(`🔍 HtmlTextLayer: содержимое обновлено в updateOne для ${objectId}:`, content);
+            const contentChanged = this._syncElementContent(el, content, isMarkdown);
+            if (contentChanged) {
+                console.log(`🔍 HtmlTextLayer: содержимое обновлено в updateOne для ${objectId}:`, content);
+            }
+        }
+
+        // Синхронизируем markdown-класс и whitespace при каждом обновлении (поддержка live-переключения)
+        const hasMdClass = el.classList.contains('mb-text--md');
+        if (hasMdClass !== isMarkdown) {
+            el.classList.toggle('mb-text--md', isMarkdown);
+            el.style.whiteSpace = isMarkdown ? 'normal' : 'pre';
+            el.style.overflowWrap = isMarkdown ? 'break-word' : '';
+            if (!isMarkdown) el.style.padding = '0';
         }
 
         // Гарантируем, что рамка не прилипает к тексту справа: ширина блока всегда
         // не меньше реальной ширины текста + правый отступ. Слой ручек строит рамку
         // по getBoundingClientRect этого .mb-text, поэтому запас распространяется и на неё.
-        // Применяем ко всем объектам (в т.ч. старым, сохранённым без запаса) и независимо
-        // от шрифта. Без поворота: width:auto у absolute-элемента = ширина контента.
+        // Для markdown-элементов блок не применяется: перенос слов управляется CSS,
+        // и width:auto сломал бы wrapping.
         try {
             const hasContent = !!(el.textContent && el.textContent.trim());
-            if (hasContent && !angle) {
+            if (hasContent && !angle && !isMarkdown) {
                 const rightMargin = Math.ceil(fontSizePx * 0.7) + 6;
                 const prevWidth = el.style.width;
                 el.style.width = 'auto';
@@ -537,6 +634,42 @@ export class HtmlTextLayer {
             visibility: el.style.visibility,
             textContent: el.textContent
         });
+    }
+
+    /** Обновляет innerHTML/textContent только при реальной смене content или флага markdown */
+    _syncElementContent(el, content, isMarkdown) {
+        if (typeof content !== 'string') return false;
+        const mdFlag = isMarkdown ? '1' : '0';
+        if (el.dataset.renderedContent === content && el.dataset.renderedMd === mdFlag) return false;
+        if (isMarkdown) {
+            el.innerHTML = renderRichText(content);
+        } else {
+            el.textContent = content;
+        }
+        el.dataset.renderedContent = content;
+        el.dataset.renderedMd = mdFlag;
+        return true;
+    }
+
+    /** Только hover-transform + поворот, без пересчёта позиции/размеров/контента */
+    _applyHoverTransform(objectId) {
+        const el = this.idToEl.get(objectId);
+        if (!el || !this.core) return;
+        const obj = (this.core.state.state.objects || []).find(o => o.id === objectId);
+        if (!obj) return;
+        const pixiObj = this.core?.pixi?.objects?.get ? this.core.pixi.objects.get(objectId) : null;
+        const angle = (pixiObj && typeof pixiObj.rotation === 'number')
+            ? (pixiObj.rotation * 180 / Math.PI)
+            : (obj.rotation || obj.transform?.rotation || 0);
+        const hover = this._hoverStates.get(objectId);
+        const hoverTy = hover?.ty ?? 0;
+        const hoverSc = hover?.sc ?? 1;
+        const hoverPart = (Math.abs(hoverTy) > 0.001 || Math.abs(hoverSc - 1) > 0.001)
+            ? `translate3d(0, ${hoverTy}px, 0) scale(${hoverSc})`
+            : '';
+        const rotatePart = angle ? `rotate(${angle}deg)` : '';
+        el.style.transformOrigin = 'center center';
+        el.style.transform = [hoverPart, rotatePart].filter(Boolean).join(' ');
     }
 
     /** Лениво вешает pointerover/pointerout на PIXI хит-rect текста */
@@ -586,8 +719,8 @@ export class HtmlTextLayer {
             sc: TEXT_HOVER_SC,
             duration: TEXT_HOVER_DUR,
             ease: TEXT_HOVER_EASE,
-            onUpdate: () => this.updateOne(objectId),
-            onComplete: () => this.updateOne(objectId),
+            onUpdate: () => this._applyHoverTransform(objectId),
+            onComplete: () => this._applyHoverTransform(objectId),
         });
     }
 
@@ -601,8 +734,8 @@ export class HtmlTextLayer {
             sc: 1,
             duration: TEXT_BACK_DUR,
             ease: 'power2.out',
-            onUpdate: () => this.updateOne(objectId),
-            onComplete: () => this.updateOne(objectId),
+            onUpdate: () => this._applyHoverTransform(objectId),
+            onComplete: () => this._applyHoverTransform(objectId),
         });
     }
 

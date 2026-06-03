@@ -12,6 +12,7 @@ export function createTextPropertiesPanelState() {
         currentBgColorButton: null,
         bgColorDropdown: null,
         bgColorInput: null,
+        markdownToggle: null,
         _bindingsAttached: false,
         _eventBridgeAttached: false,
         _eventBridgeHandlers: null,

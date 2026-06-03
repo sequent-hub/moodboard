@@ -115,19 +115,37 @@ describe('HoverLiftController — фрейм без hover-«pop»', () => {
 
     afterEach(() => { hl.destroy(); });
 
-    it('фрейму не навешиваются pointerover/pointerout — нет подъёма и скачка', () => {
+    it('фрейм получает hover-lift (pointerover/pointerout) и статичную тень', () => {
         const frame = createPixiObject('frame-1', 'frame');
         hl.attach(frame, { type: 'frame', width: 400, height: 240 });
 
         const overCalls = frame.on.mock.calls.filter(c => c[0] === 'pointerover');
         const outCalls = frame.on.mock.calls.filter(c => c[0] === 'pointerout');
-        expect(overCalls.length).toBe(0);
-        expect(outCalls.length).toBe(0);
+        expect(overCalls.length).toBe(1);
+        expect(outCalls.length).toBe(1);
 
         const entry = hl._entries.get(frame);
-        expect(entry).toBeTruthy();        // запись и статичная тень остаются
-        expect(entry._onOver).toBeUndefined();
+        expect(entry).toBeTruthy();
+        expect(entry._onOver).toBeTypeOf('function');
         expect(entry.shadow).toBeTruthy();
+    });
+
+    it('фрейм, как и image, снапбэкает зависший твин при ResizeStart', () => {
+        const frame = createPixiObject('frame-2', 'frame');
+        hl.attach(frame, { type: 'frame', width: 400, height: 240 });
+        const entry = hl._entries.get(frame);
+        const preset = { liftPx: 4, scaleMul: 1.02 };
+
+        hl._onOver(frame, preset, entry);
+        hl._onOut(frame, preset, entry);
+        const lingering = entry.tween;
+        expect(lingering).toBeTruthy();
+
+        eb.emit(Events.Tool.ResizeStart, { object: 'frame-2', handle: 'se' });
+
+        expect(lingering.kill).toHaveBeenCalled();
+        expect(entry.tween).toBeNull();
+        expect(frame.y).toBe(entry.baseY);
     });
 
     it('обычный объект (image) hover-обработчики получает', () => {
