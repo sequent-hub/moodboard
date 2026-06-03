@@ -56,6 +56,10 @@ const BOARD_IMAGE_STEP = 320;
 const BOARD_IMAGE_GAP = BOARD_IMAGE_STEP - BOARD_IMAGE_WIDTH;
 // Скорость перестановки AI-изображений на доске и въезда заглушек регулируется здесь.
 const BOARD_IMAGE_REARRANGE_MS = 520;
+// На сколько колонок «справа» появляется блок-заглушка перед въездом в финальную позицию.
+const BOARD_IMAGE_PENDING_ENTER_FACTOR = 1.6;
+// Каскад между блоками одного батча (мс): пользователь видит, что они приезжают друг за другом.
+const BOARD_IMAGE_PENDING_STAGGER_MS = 90;
 const REFERENCE_DRAG_PREVIEW_SIZE = 96;
 
 const MODEL_OPTIONS = [
@@ -137,14 +141,16 @@ export class ChatWindow {
         this._attached = false;
         this._boardImageMessageIds = new Set();
         this._shiftedForImageBatchKeys = new Set();
-        this._pendingOverlayEls = [];
-        this._pendingOverlayMessageIds = new Set();
+        this._boardImageShiftHistory = new Map();
+        this._pendingOverlays = new Map();
+        this._pendingOverlayTimers = new Map();
         this._boardImageShiftAnimations = new Map();
         this._boardCursor = null;
         this._draggedReferenceObject = null;
         this._draggedReferenceStartPosition = null;
         this._referenceDragPreview = null;
         this._referenceDragHandlers = null;
+        this._clearSelectionOnSendClick = null;
     }
 
     attach() {
@@ -165,10 +171,15 @@ export class ChatWindow {
                 statusBar: this._refs.statusBar
             },
             {
-                onSubmit: (text, attachments) => this._session.send(text, this._getImageRequestOptions()),
+                onSubmit: (text, attachments) => {
+                    this._clearBoardSelection();
+                    return this._session.send(text, { ...this._getImageRequestOptions(), referenceImages: attachments });
+                },
                 onAbort: () => this._session.abort()
             }
         );
+        this._clearSelectionOnSendClick = () => this._clearBoardSelection();
+        this._refs.send.addEventListener('click', this._clearSelectionOnSendClick);
         this._composer.attach();
         this._attachReferenceDragEvents();
 
@@ -255,9 +266,13 @@ export class ChatWindow {
         this._cancelBoardImageShiftAnimations();
         this._clearReferenceDragState();
         if (this._unsubscribe) { this._unsubscribe(); this._unsubscribe = null; }
+        if (this._clearSelectionOnSendClick && this._refs?.send) {
+            this._refs.send.removeEventListener('click', this._clearSelectionOnSendClick);
+            this._clearSelectionOnSendClick = null;
+        }
         this._detachReferenceDragEvents();
         this._shiftedForImageBatchKeys.clear();
-        this._pendingOverlayMessageIds.clear();
+        this._boardImageShiftHistory.clear();
         this._composer?.destroy();
         this._extendedPromptModal?.destroy();
         this._contentTypeMenu?.destroy();
@@ -280,6 +295,15 @@ export class ChatWindow {
 
     destroy() {
         this.detach();
+    }
+
+    _clearBoardSelection() {
+        if (typeof this._boardCore?.selectTool?.clearSelection === 'function') {
+            this._boardCore.selectTool.clearSelection();
+            return;
+        }
+
+        this._boardCore?.eventBus?.emit(Events.Tool.SelectionClear);
     }
 
     _updateCountPillIcon() {
@@ -314,6 +338,9 @@ export class ChatWindow {
     _render(state) {
         if (!this._attached && !this._refs) return;
         this._syncGeneratedImagesToBoard(state.messages);
+        if (state.status !== 'streaming') {
+            this._revertFailedBatchShifts(state.messages);
+        }
         this._messageList.render(state.messages);
         this._contentTypeMenu.refresh();
         this._modelMenu.refresh();
@@ -327,9 +354,17 @@ export class ChatWindow {
     }
 
     _updatePendingImages(messages) {
-        this._clearPendingOverlays();
-
         const pending = (messages || []).filter((m) => m.pending && m.kind === 'image');
+        const activeIds = new Set(pending.map((m) => m.id));
+
+        for (const [id, record] of this._pendingOverlays) {
+            if (!activeIds.has(id)) {
+                record.el.remove();
+                this._pendingOverlays.delete(id);
+                this._cancelPendingOverlayTimer(id);
+            }
+        }
+
         if (pending.length === 0) return;
 
         const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
@@ -341,27 +376,31 @@ export class ChatWindow {
         const ratio = wr / hr;
         const wScreen = Math.round(BOARD_IMAGE_WIDTH * s);
         const hScreen = Math.round(wScreen / ratio);
+        const enterDistance = Math.round(BOARD_IMAGE_STEP * s * BOARD_IMAGE_PENDING_ENTER_FACTOR);
 
-        for (const message of pending) {
+        let newIndex = 0;
+        pending.forEach((message) => {
             const slot = this._getImageBatchSlot(messages, message.id, s);
             const left = Math.round(slot.x - wScreen / 2);
             const top = Math.round(slot.y - hScreen / 2);
 
+            const existing = this._pendingOverlays.get(message.id);
+            if (existing) {
+                const el = existing.el;
+                el.style.left = `${left}px`;
+                el.style.top = `${top}px`;
+                el.style.width = `${wScreen}px`;
+                el.style.height = `${hScreen}px`;
+                el.style.setProperty('--moodboard-chat-board-animation-ms', `${BOARD_IMAGE_REARRANGE_MS}ms`);
+                el.style.setProperty('--moodboard-chat-pending-enter-x', `${enterDistance}px`);
+                return;
+            }
+
             const overlay = document.createElement('div');
-            overlay.className = 'moodboard-chat__pending-overlay';
+            overlay.className = 'moodboard-chat__pending-overlay moodboard-chat__pending-overlay--enter';
             overlay.style.cssText = `left:${left}px;top:${top}px;width:${wScreen}px;height:${hScreen}px`;
             overlay.style.setProperty('--moodboard-chat-board-animation-ms', `${BOARD_IMAGE_REARRANGE_MS}ms`);
-            overlay.style.setProperty('--moodboard-chat-pending-enter-x', `${Math.round(BOARD_IMAGE_STEP * s)}px`);
-
-            if (!this._pendingOverlayMessageIds.has(message.id)) {
-                overlay.classList.add('moodboard-chat__pending-overlay--enter');
-                this._pendingOverlayMessageIds.add(message.id);
-                this._scheduleAnimationFrame(() => {
-                    if (overlay.isConnected) {
-                        overlay.classList.add('moodboard-chat__pending-overlay--entered');
-                    }
-                });
-            }
+            overlay.style.setProperty('--moodboard-chat-pending-enter-x', `${enterDistance}px`);
 
             const label = document.createElement('span');
             label.className = 'moodboard-chat__pending-image-label';
@@ -369,15 +408,52 @@ export class ChatWindow {
             overlay.appendChild(label);
 
             document.body.appendChild(overlay);
-            this._pendingOverlayEls.push(overlay);
+
+            // Принудительный reflow: фиксируем стартовое состояние (translateX справа + opacity 0)
+            // в layout до переключения класса. Без этого браузер может смерджить два состояния
+            // в один кадр и transition не запустится — заглушка появится мгновенно.
+            void overlay.offsetWidth;
+
+            this._pendingOverlays.set(message.id, { el: overlay });
+
+            const stagger = newIndex * BOARD_IMAGE_PENDING_STAGGER_MS;
+            newIndex += 1;
+
+            const trigger = () => {
+                if (!overlay.isConnected) return;
+                overlay.classList.remove('moodboard-chat__pending-overlay--enter');
+                overlay.classList.add('moodboard-chat__pending-overlay--entered');
+            };
+
+            if (stagger > 0) {
+                const timer = setTimeout(() => {
+                    this._pendingOverlayTimers.delete(message.id);
+                    this._scheduleAnimationFrame(trigger);
+                }, stagger);
+                this._pendingOverlayTimers.set(message.id, timer);
+            } else {
+                this._scheduleAnimationFrame(trigger);
+            }
+        });
+    }
+
+    _cancelPendingOverlayTimer(id) {
+        const timer = this._pendingOverlayTimers.get(id);
+        if (timer !== undefined) {
+            clearTimeout(timer);
+            this._pendingOverlayTimers.delete(id);
         }
     }
 
     _clearPendingOverlays() {
-        for (const el of this._pendingOverlayEls) {
-            el.remove();
+        for (const record of this._pendingOverlays.values()) {
+            record.el.remove();
         }
-        this._pendingOverlayEls = [];
+        this._pendingOverlays.clear();
+        for (const timer of this._pendingOverlayTimers.values()) {
+            clearTimeout(timer);
+        }
+        this._pendingOverlayTimers.clear();
     }
 
     _getImageRequestOptions() {
@@ -406,11 +482,15 @@ export class ChatWindow {
         const onDragEnd = (data) => {
             void this._handleReferenceDragEnd(data);
         };
+        const onSelectionAdd = (data) => {
+            void this._handleSelectionAdd(data);
+        };
 
-        this._referenceDragHandlers = { onCursorMove, onDragStart, onDragEnd };
+        this._referenceDragHandlers = { onCursorMove, onDragStart, onDragEnd, onSelectionAdd };
         eventBus.on(Events.UI.CursorMove, onCursorMove);
         eventBus.on(Events.Tool.DragStart, onDragStart);
         eventBus.on(Events.Tool.DragEnd, onDragEnd);
+        eventBus.on(Events.Tool.SelectionAdd, onSelectionAdd);
     }
 
     _detachReferenceDragEvents() {
@@ -421,7 +501,17 @@ export class ChatWindow {
         eventBus.off(Events.UI.CursorMove, handlers.onCursorMove);
         eventBus.off(Events.Tool.DragStart, handlers.onDragStart);
         eventBus.off(Events.Tool.DragEnd, handlers.onDragEnd);
+        eventBus.off(Events.Tool.SelectionAdd, handlers.onSelectionAdd);
         this._referenceDragHandlers = null;
+    }
+
+    async _handleSelectionAdd(data = {}) {
+        const objectId = data?.object;
+        const object = this._boardCore?.state?.state?.objects?.find((item) => item?.id === objectId);
+        
+        if (!isReferenceImageObject(object)) return;
+
+        await this._addImageObjectAsReference(object);
     }
 
     _handleReferenceDragStart(data = {}) {
@@ -591,7 +681,7 @@ export class ChatWindow {
         if (this._shiftedForImageBatchKeys.has(batchKey)) return;
 
         this._shiftedForImageBatchKeys.add(batchKey);
-        this._shiftBoardAiImagesLeft(this._getImageBatchWorldBounds(messages, messageId, scale));
+        this._shiftBoardAiImagesLeft(this._getImageBatchWorldBounds(messages, messageId, scale), batchKey);
     }
 
     _getImageBatchWorldBounds(messages, messageId, scale = 1) {
@@ -611,7 +701,7 @@ export class ChatWindow {
         };
     }
 
-    _shiftBoardAiImagesLeft(nextBatchBounds) {
+    _shiftBoardAiImagesLeft(nextBatchBounds, batchKey) {
         const aiObjects = this._getBoardAiImageObjects();
         if (aiObjects.length === 0 || !nextBatchBounds) return;
 
@@ -621,14 +711,56 @@ export class ChatWindow {
 
         const ids = new Set(aiObjects.map((object) => object.id));
         const objects = this._boardCore?.state?.state?.objects;
+        const shiftRecord = [];
         for (const id of ids) {
             const obj = objects?.find((item) => item.id === id);
             if (obj?.position) {
-                this._animateBoardImageToPosition(
-                    id,
-                    obj.position,
-                    { x: Math.round(obj.position.x - shift), y: obj.position.y }
-                );
+                const from = { x: obj.position.x, y: obj.position.y };
+                const to = { x: Math.round(obj.position.x - shift), y: obj.position.y };
+                shiftRecord.push({ id, from });
+                this._animateBoardImageToPosition(id, from, to);
+            }
+        }
+
+        if (batchKey && shiftRecord.length > 0) {
+            this._boardImageShiftHistory.set(batchKey, shiftRecord);
+        }
+    }
+
+    _revertBoardImageShiftForBatch(batchKey) {
+        const record = this._boardImageShiftHistory.get(batchKey);
+        if (!record) return;
+
+        const objects = this._boardCore?.state?.state?.objects;
+        for (const { id, from } of record) {
+            const obj = objects?.find((item) => item.id === id);
+            if (obj?.position) {
+                this._animateBoardImageToPosition(id, obj.position, from);
+            }
+        }
+
+        this._boardImageShiftHistory.delete(batchKey);
+        this._shiftedForImageBatchKeys.delete(batchKey);
+    }
+
+    _revertFailedBatchShifts(messages) {
+        if (this._boardImageShiftHistory.size === 0) return;
+
+        for (const batchKey of [...this._boardImageShiftHistory.keys()]) {
+            if (batchKey === 'unknown') continue;
+
+            const messageIds = batchKey.split('|');
+            const batchMessages = messageIds
+                .map((id) => messages?.find((m) => m.id === id))
+                .filter(Boolean);
+
+            if (batchMessages.length === 0) continue;
+
+            const allResolved = batchMessages.every((m) => !m.pending);
+            const anyImage = batchMessages.some((m) => Boolean(m.imageBase64));
+
+            if (allResolved && !anyImage) {
+                this._revertBoardImageShiftForBatch(batchKey);
             }
         }
     }

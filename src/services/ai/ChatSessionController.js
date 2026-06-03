@@ -154,6 +154,7 @@ export class ChatSessionController {
                             widthRatio: options.widthRatio,
                             heightRatio: options.heightRatio,
                             model: options.model,
+                            referenceImages: options.referenceImages,
                             signal: abort.signal
                         })
                         .then((result) => {

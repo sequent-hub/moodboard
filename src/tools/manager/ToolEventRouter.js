@@ -561,6 +561,10 @@ export class ToolEventRouter {
     static handleKeyDown(manager, event) {
         this.handleHotkeys(manager, event);
 
+        if (ToolManagerGuards.shouldIgnoreHotkeys(event)) {
+            return;
+        }
+
         if (!manager.activeTool) return;
 
         const toolEvent = {
@@ -580,6 +584,10 @@ export class ToolEventRouter {
     }
 
     static handleKeyUp(manager, event) {
+        if (ToolManagerGuards.shouldIgnoreHotkeys(event)) {
+            return;
+        }
+
         if (!manager.activeTool) return;
 
         const toolEvent = {

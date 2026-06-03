@@ -1,3 +1,5 @@
+import { isInputElement } from '../../core/keyboard/KeyboardContextGuards.js';
+
 export class ToolManagerGuards {
     static isCursorLockedToActiveTool(manager) {
         return !!manager.activeTool && manager.activeTool.name !== 'select';
@@ -18,7 +20,7 @@ export class ToolManagerGuards {
     }
 
     static shouldIgnoreHotkeys(event) {
-        return event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA';
+        return isInputElement(event.target);
     }
 
     static isAuxPanStart(manager, event) {

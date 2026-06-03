@@ -115,17 +115,20 @@ export class AiClient {
      * @param {number} [args.seed]
      * @param {string} [args.mimeType]
      * @param {string} [args.model]
+     * @param {File[]} [args.referenceImages]
      * @param {AbortSignal} [args.signal]
      * @returns {Promise<{operationId: string, imageBase64: string, mimeType: string}>}
      */
-    async generateImage({ signal, ...payload }) {
+    async generateImage({ signal, referenceImages: files, ...payload }) {
+        const referenceImages = await filesToBase64(files);
+        const body = referenceImages ? { ...payload, referenceImages } : payload;
         const res = await this._fetch(`${this._baseUrl}/yandex-art/image`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
             },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(body),
             signal
         });
         if (!res.ok) {
@@ -221,4 +224,29 @@ async function safeReadError(res) {
     } catch {
         return res.statusText;
     }
+}
+
+/**
+ * Конвертирует массив File в [{mimeType, data}] с base64-encoded данными.
+ * Возвращает undefined, если массив пустой или не передан.
+ *
+ * @param {File[]|undefined} files
+ * @returns {Promise<Array<{mimeType: string, data: string}>|undefined>}
+ */
+async function filesToBase64(files) {
+    if (!Array.isArray(files) || files.length === 0) return undefined;
+    return Promise.all(
+        files.map(async (file) => {
+            const buffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return {
+                mimeType: file.type || 'image/png',
+                data: btoa(binary)
+            };
+        })
+    );
 }

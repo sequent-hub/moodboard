@@ -724,6 +724,7 @@
     background-size: 200% 100%;
     animation: moodboard-pending-shimmer 5.76s linear infinite;
     border-radius: 12px;
+    box-shadow: 8px 8px 24px rgba(0, 0, 0, 0.12);
     overflow: hidden;
     pointer-events: none;
     z-index: 10;
