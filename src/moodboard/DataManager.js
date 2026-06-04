@@ -131,11 +131,39 @@ export class DataManager {
                 window.moodboardMindmapHtmlTextLayer.rebuildFromState();
                 window.moodboardMindmapHtmlTextLayer.updateAll();
             }
+            // Нормализуем геометрию майндмапа после загрузки. Устаревшие доски могли
+            // сохранить растянутые координаты (раньше зазор между узлами зависел от
+            // зума). Перелейаут с фиксированным мировым зазором приводит их к норме.
+            // board:loaded для этого не годится: он эмитится при инициализации ядра
+            // на пустой доске, до загрузки объектов и подписки слоя ручек.
+            this._relayoutMindmapAfterLoad();
             if (window.moodboardMindmapConnectionLayer) {
                 window.moodboardMindmapConnectionLayer.updateAll();
             }
         }, 100);
 
+    }
+
+    /**
+     * Приводит геометрию майндмапа к норме после загрузки доски.
+     * Запускается дважды: сразу (по сохранённым размерам) и с задержкой —
+     * чтобы перехватить узлы после авто-фита ширины/высоты текста.
+     */
+    _relayoutMindmapAfterLoad() {
+        const run = () => {
+            const renderer = window.moodboardHtmlHandlesLayer?.domRenderer;
+            if (renderer?.relayoutAllMindmapCompounds) {
+                renderer.relayoutAllMindmapCompounds();
+            }
+        };
+        run();
+        setTimeout(run, 80);
+        setTimeout(() => {
+            run();
+            if (window.moodboardMindmapConnectionLayer) {
+                window.moodboardMindmapConnectionLayer.updateAll();
+            }
+        }, 250);
     }
     
     /**

@@ -68,13 +68,9 @@ function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
         });
     if (siblings.length === 0) return;
 
-    const app = core?.pixi?.app;
-    const worldLayer = core?.pixi?.worldLayer || app?.stage;
-    const rendererRes = app?.renderer?.resolution || 1;
-    const worldScale = worldLayer?.scale?.x || 1;
-    const baseGapWorld = Math.max(1, Math.round((10 * rendererRes) / worldScale));
-    const gapWorld = Math.max(1, Math.round(baseGapWorld * MINDMAP_CHILD_GAP_MULTIPLIER));
-    const verticalGapWorld = Math.max(1, Math.round(baseGapWorld * MINDMAP_CHILD_VERTICAL_GAP_MULTIPLIER));
+    const baseGapWorld = 10;
+    const gapWorld = baseGapWorld * MINDMAP_CHILD_GAP_MULTIPLIER;
+    const verticalGapWorld = Math.max(1, baseGapWorld * MINDMAP_CHILD_VERTICAL_GAP_MULTIPLIER);
 
     const byParentBySide = new Map();
     const childrenByParent = new Map();
@@ -1349,12 +1345,8 @@ export class HandlesDomRenderer {
 
         if (isMindmapTarget) {
             const emitChildMindmapFromSource = (direction) => {
-                const app = this.host.core?.pixi?.app;
-                const worldLayer = this.host.core?.pixi?.worldLayer || app?.stage;
-                const rendererRes = app?.renderer?.resolution || 1;
-                const worldScale = worldLayer?.scale?.x || 1;
-                const baseGapWorld = Math.max(1, Math.round((10 * rendererRes) / worldScale));
-                const gapWorld = Math.max(1, Math.round(baseGapWorld * MINDMAP_CHILD_GAP_MULTIPLIER));
+                const baseGapWorld = 10;
+                const gapWorld = baseGapWorld * MINDMAP_CHILD_GAP_MULTIPLIER;
                 const childWidth = Math.max(1, Math.round(MINDMAP_LAYOUT.width * MINDMAP_CHILD_WIDTH_FACTOR));
                 const childHeight = Math.max(1, Math.round(MINDMAP_LAYOUT.height * MINDMAP_CHILD_HEIGHT_FACTOR));
                 const childPaddingX = Math.max(1, Math.round(MINDMAP_LAYOUT.paddingX * MINDMAP_CHILD_PADDING_FACTOR));
