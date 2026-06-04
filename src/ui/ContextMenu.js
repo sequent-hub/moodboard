@@ -13,6 +13,8 @@ export class ContextMenu {
         // Флаг состояния объекта
         this.destroyed = false;
 
+        this.enableComments = false;
+
         this.createElement();
         this.attachEvents();
     }
@@ -303,6 +305,25 @@ export class ContextMenu {
             });
             list.appendChild(itemImg);
 
+            // Добавить комментарий (только если фича включена)
+            if (this.enableComments) {
+                const commentItem = document.createElement('div');
+                commentItem.className = 'moodboard-contextmenu__item';
+                const commentIcon = document.createElement('span');
+                commentIcon.className = 'moodboard-contextmenu__item-icon';
+                commentIcon.textContent = '💬';
+                const commentLabel = document.createElement('span');
+                commentLabel.className = 'moodboard-contextmenu__label';
+                commentLabel.textContent = 'Добавить комментарий';
+                commentItem.appendChild(commentIcon);
+                commentItem.appendChild(commentLabel);
+                commentItem.addEventListener('click', () => {
+                    this.hide();
+                    this.eventBus.emit(Events.Comment.OpenDraftAt, { screenX: this.lastX, screenY: this.lastY });
+                });
+                list.appendChild(commentItem);
+            }
+
             // Разделитель
             const divider = document.createElement('div');
             divider.className = 'moodboard-contextmenu__divider';
@@ -340,6 +361,10 @@ export class ContextMenu {
 
         // По умолчанию — пусто
         this.element.innerHTML = '<div style="padding:8px 12px; color:#888;">(пусто)</div>';
+    }
+
+    setEnableComments(val) {
+        this.enableComments = !!val;
     }
 
     /**

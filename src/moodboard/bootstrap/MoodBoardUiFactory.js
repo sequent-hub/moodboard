@@ -10,13 +10,17 @@ import { MindmapHtmlTextLayer } from '../../ui/mindmap/MindmapHtmlTextLayer.js';
 import { MindmapConnectionLayer } from '../../ui/mindmap/MindmapConnectionLayer.js';
 import { MindmapCollapseLayer } from '../../ui/mindmap/MindmapCollapseLayer.js';
 import { ConnectorLayer } from '../../ui/connectors/ConnectorLayer.js';
+import { ConnectorLabelLayer } from '../../ui/connectors/ConnectorLabelLayer.js';
 import { ConnectionAnchorsLayer } from '../../ui/connectors/ConnectionAnchorsLayer.js';
+import { ConnectorHandlesLayer } from '../../ui/connectors/ConnectorHandlesLayer.js';
 import { HtmlHandlesLayer } from '../../ui/HtmlHandlesLayer.js';
-import { CommentPopover } from '../../ui/CommentPopover.js';
 import { TextPropertiesPanel } from '../../ui/TextPropertiesPanel.js';
 import { FramePropertiesPanel } from '../../ui/FramePropertiesPanel.js';
 import { NotePropertiesPanel } from '../../ui/NotePropertiesPanel.js';
 import { FilePropertiesPanel } from '../../ui/FilePropertiesPanel.js';
+import { ConnectorPropertiesPanel } from '../../ui/ConnectorPropertiesPanel.js';
+import { ShapePropertiesPanel } from '../../ui/ShapePropertiesPanel.js';
+import { DrawingPropertiesPanel } from '../../ui/DrawingPropertiesPanel.js';
 import { ChatWindow } from '../../ui/chat/ChatWindow.js';
 import { bindToolbarEvents, bindTopbarEvents } from '../integration/MoodBoardEventBindings.js';
 
@@ -29,6 +33,7 @@ function initToolbar(board) {
             emojiBasePath: board.options.emojiBasePath || null,
         }
     );
+    board.toolbar.enableComments = !!board.options.enableComments;
 
     if (typeof window !== 'undefined') {
         window.reloadIcon = (iconName) => board.toolbar.reloadToolbarIcon(iconName);
@@ -88,6 +93,9 @@ function initContextMenu(board) {
         board.canvasContainer,
         board.coreMoodboard.eventBus
     );
+    if (board.options.enableComments) {
+        board.contextMenu.setEnableComments(true);
+    }
 }
 
 function initChatWindow(board) {
@@ -110,9 +118,17 @@ function initHtmlLayersAndPanels(board) {
 
     board.connectorLayer = new ConnectorLayer(board.coreMoodboard.eventBus, board.coreMoodboard);
     board.connectorLayer.attach();
+    board.coreMoodboard.connectorLayer = board.connectorLayer;
+
+    board.connectorLabelLayer = new ConnectorLabelLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
+    board.connectorLabelLayer.attach();
+    board.coreMoodboard.connectorLabelLayer = board.connectorLabelLayer;
 
     board.connectionAnchorsLayer = new ConnectionAnchorsLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
     board.connectionAnchorsLayer.attach();
+
+    board.connectorHandlesLayer = new ConnectorHandlesLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
+    board.connectorHandlesLayer.attach();
 
     board.htmlHandlesLayer = new HtmlHandlesLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
     board.htmlHandlesLayer.attach();
@@ -123,12 +139,11 @@ function initHtmlLayersAndPanels(board) {
         window.moodboardMindmapConnectionLayer = board.mindmapConnectionLayer;
         window.moodboardMindmapCollapseLayer = board.mindmapCollapseLayer;
         window.moodboardConnectorLayer = board.connectorLayer;
+        window.moodboardConnectorLabelLayer = board.connectorLabelLayer;
         window.moodboardConnectionAnchorsLayer = board.connectionAnchorsLayer;
+        window.moodboardConnectorHandlesLayer = board.connectorHandlesLayer;
         window.moodboardHtmlHandlesLayer = board.htmlHandlesLayer;
     }
-
-    board.commentPopover = new CommentPopover(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
-    board.commentPopover.attach();
 
     board.textPropertiesPanel = new TextPropertiesPanel(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
     board.textPropertiesPanel.attach();
@@ -136,6 +151,9 @@ function initHtmlLayersAndPanels(board) {
     board.framePropertiesPanel = new FramePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.notePropertiesPanel = new NotePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.filePropertiesPanel = new FilePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
+    board.connectorPropertiesPanel = new ConnectorPropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
+    board.shapePropertiesPanel = new ShapePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
+    board.drawingPropertiesPanel = new DrawingPropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
 }
 
 export function createMoodBoardUi(board) {

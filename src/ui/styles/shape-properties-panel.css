@@ -1,0 +1,250 @@
+/* Shape Properties Panel */
+
+.shape-properties-panel {
+    position: absolute;
+    pointer-events: auto;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+    font-size: 12px;
+    font-family: 'Roboto', Arial, sans-serif;
+    z-index: 10000;
+    white-space: nowrap;
+    user-select: none;
+    min-width: 0;
+}
+
+.spp-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 14px;
+    height: 40px;
+    box-sizing: border-box;
+}
+
+.spp-row + .spp-row {
+    border-top: 1px solid #f0f0f0;
+}
+
+.spp-sep {
+    width: 1px;
+    height: 18px;
+    background: #e0e0e0;
+    margin: 0 6px;
+    flex-shrink: 0;
+}
+
+/* Icon buttons */
+.spp-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+    color: #444;
+    flex-shrink: 0;
+    transition: background 0.12s;
+}
+.spp-btn:hover { background: #f0f0f0; }
+.spp-btn.spp-btn--active {
+    background: #EFF6FF;
+    border-color: #2563EB;
+    color: #2563EB;
+}
+
+/* Popover trigger buttons (wider, show label) */
+.spp-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: 'Roboto', Arial, sans-serif;
+    color: #333;
+    flex-shrink: 0;
+    transition: background 0.12s;
+}
+.spp-trigger:hover { background: #f5f5f5; }
+.spp-trigger svg { flex-shrink: 0; }
+
+/* Label */
+.spp-label {
+    font-size: 11px;
+    color: #888;
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+
+/* Color swatch button */
+.spp-color-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    display: block;
+    box-sizing: border-box;
+    position: relative;
+}
+
+/* Select */
+.spp-select {
+    height: 26px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 0 6px;
+    font-size: 12px;
+    font-family: 'Roboto', Arial, sans-serif;
+    background: #fff;
+    cursor: pointer;
+    color: #333;
+    flex-shrink: 0;
+}
+.spp-select--font { min-width: 110px; }
+.spp-select--size { min-width: 54px; }
+
+/* Radius row: compact */
+.spp-radius-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.spp-radius-slider {
+    width: 64px;
+    height: 4px;
+    cursor: pointer;
+    accent-color: #2563EB;
+}
+
+/* ── Popovers ─────────────────────────────────────────────────────────────── */
+
+.spp-popover {
+    position: absolute;
+    z-index: 10001;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+    padding: 10px;
+    display: none;
+}
+
+/* Shape kind grid */
+.spp-kind-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 40px);
+    gap: 6px;
+}
+.spp-kind-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid #e0e0e0;
+    border-radius: 7px;
+    background: #fafafa;
+    cursor: pointer;
+    padding: 0;
+    gap: 2px;
+    font-size: 9px;
+    color: #666;
+    transition: background 0.12s, border-color 0.12s;
+}
+.spp-kind-btn:hover { background: #f0f0f0; border-color: #ccc; }
+.spp-kind-btn.spp-kind-btn--active {
+    background: #EFF6FF;
+    border-color: #2563EB;
+    color: #2563EB;
+}
+.spp-kind-btn svg { display: block; }
+
+/* Color palette */
+.spp-color-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 26px);
+    gap: 5px;
+    margin-bottom: 6px;
+}
+.spp-color-swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    padding: 0;
+    box-sizing: border-box;
+    position: relative;
+    display: block;
+    transition: transform 0.1s;
+}
+.spp-color-swatch:hover { transform: scale(1.1); }
+.spp-color-swatch--white { border-color: #ccc; }
+.spp-color-swatch .spp-tick {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 8px;
+    height: 5px;
+    transform: translate(-50%, -50%) rotate(315deg) scaleX(-1);
+    border-right: 2px solid #111;
+    border-bottom: 2px solid #111;
+    display: none;
+    pointer-events: none;
+}
+.spp-color-swatch--active .spp-tick { display: block; }
+
+/* Border popover layout */
+.spp-border-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 200px;
+}
+.spp-border-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.spp-border-label {
+    font-size: 11px;
+    color: #888;
+    min-width: 68px;
+    flex-shrink: 0;
+}
+.spp-style-btns {
+    display: flex;
+    gap: 4px;
+}
+.spp-slider-full {
+    flex: 1;
+    height: 4px;
+    cursor: pointer;
+    accent-color: #2563EB;
+    min-width: 80px;
+}
+.spp-slider-value {
+    font-size: 11px;
+    color: #555;
+    min-width: 28px;
+    text-align: right;
+}

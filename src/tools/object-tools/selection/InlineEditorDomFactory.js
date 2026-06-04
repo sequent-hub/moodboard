@@ -30,6 +30,42 @@ export function createFileNameEditorWrapper() {
     return wrapper;
 }
 
+export function createFrameTitleEditorWrapper() {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'moodboard-frame-title-editor';
+    wrapper.style.cssText = `
+            position: absolute;
+            z-index: 1000;
+            background: white;
+            border: 2px solid #2563eb;
+            border-radius: 6px;
+            padding: 3px 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-width: 100px;
+            max-width: 320px;
+            font-family: Inter, system-ui, -apple-system, Arial, sans-serif;
+        `;
+    return wrapper;
+}
+
+export function createFrameTitleEditorInput(title) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = title;
+    input.style.cssText = `
+            border: none;
+            outline: none;
+            background: transparent;
+            font-family: Inter, system-ui, -apple-system, Arial, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            width: 100%;
+            padding: 1px 2px;
+            color: #1f2937;
+        `;
+    return input;
+}
+
 export function createFileNameEditorInput(fileName) {
     const input = document.createElement('input');
     input.type = 'text';

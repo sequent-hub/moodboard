@@ -74,6 +74,33 @@ export function bindTextPropertiesPanelControls(panel) {
     };
     document.addEventListener('click', panel._onBgDocumentClick);
 
+    if (panel.markdownToggle) {
+        panel.markdownToggle.addEventListener('change', (event) => {
+            panel._changeMarkdown(event.target.checked);
+        });
+    }
+
+    [
+        [panel.boldBtn, 'bold'],
+        [panel.italicBtn, 'italic'],
+        [panel.underlineBtn, 'underline'],
+        [panel.strikethroughBtn, 'strikethrough'],
+    ].forEach(([btn, prop]) => {
+        if (btn) btn.addEventListener('click', () => panel._toggleFormat(prop));
+    });
+
+    if (panel.alignControl) {
+        panel.alignControl.addEventListener('change', (e) => panel._changeTextAlign(e.target.value));
+    }
+
+    if (panel.listControl) {
+        panel.listControl.addEventListener('change', (e) => panel._changeListType(e.target.value));
+    }
+
+    if (panel.lineHeightSlider) {
+        panel.lineHeightSlider.addEventListener('input', (e) => panel._changeLineHeight(parseFloat(e.target.value)));
+    }
+
     panel._bindingsAttached = true;
 }
 

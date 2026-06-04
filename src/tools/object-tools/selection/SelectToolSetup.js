@@ -64,6 +64,10 @@ export function initializeSelectToolState(instance) {
     instance.selectionGraphics = null; // PIXI.Graphics для визуализации рамки
     instance.initialSelectionBeforeBox = null; // снимок выделения перед началом box-select
 
+    // Режим лассо-выделения (произвольный контур вместо прямоугольника)
+    instance.lassoMode = false;
+    instance.isLassoSelect = false;
+
     instance.textEditor = {
         active: false,
         objectId: null,
@@ -96,6 +100,8 @@ export function registerSelectToolCoreSubscriptions(instance) {
         const objectType = object.type || (object.object && object.object.type) || 'text';
         if (objectType === 'file') {
             instance._openFileNameEditor(object, object.create || false);
+        } else if (objectType === 'frame') {
+            instance._openFrameTitleEditor(object, object.create || false);
         } else if (objectType === 'mindmap') {
             instance._openMindmapEditor(object, object.create || false);
         } else {
@@ -121,11 +127,16 @@ export function registerSelectToolCoreSubscriptions(instance) {
         }
     };
 
-    instance._coreHandlers = { onDuplicateReady, onGroupDuplicateReady, onObjectEdit, onObjectDeleted };
+    const onLassoModeSet = (data) => {
+        instance.lassoMode = !!(data && data.active);
+    };
+
+    instance._coreHandlers = { onDuplicateReady, onGroupDuplicateReady, onObjectEdit, onObjectDeleted, onLassoModeSet };
     instance.eventBus.on(Events.Tool.DuplicateReady, onDuplicateReady);
     instance.eventBus.on(Events.Tool.GroupDuplicateReady, onGroupDuplicateReady);
     instance.eventBus.on(Events.Tool.ObjectEdit, onObjectEdit);
     instance.eventBus.on(Events.Object.Deleted, onObjectDeleted);
+    instance.eventBus.on(Events.Lasso.ModeSet, onLassoModeSet);
 }
 
 export function unregisterSelectToolCoreSubscriptions(instance) {
@@ -135,5 +146,6 @@ export function unregisterSelectToolCoreSubscriptions(instance) {
     instance.eventBus.off(Events.Tool.GroupDuplicateReady, onGroupDuplicateReady);
     instance.eventBus.off(Events.Tool.ObjectEdit, onObjectEdit);
     instance.eventBus.off(Events.Object.Deleted, onObjectDeleted);
+    instance.eventBus.off(Events.Lasso.ModeSet, onLassoModeSet);
     instance._coreHandlers = null;
 }

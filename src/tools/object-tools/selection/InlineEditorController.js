@@ -10,6 +10,10 @@ import {
     closeMindmapEditor as closeMindmapEditorViaController,
     openMindmapEditor as openMindmapEditorViaController,
 } from './MindmapInlineEditorController.js';
+import {
+    closeFrameTitleEditor as closeFrameTitleEditorViaController,
+    openFrameTitleEditor as openFrameTitleEditorViaController,
+} from './FrameTitleInlineEditorController.js';
 
 export function openTextEditor(object, create = false) {
     return openTextEditorViaController.call(this, object, create);
@@ -36,4 +40,12 @@ export function closeTextEditor(commit) {
 
 export function closeMindmapEditor(commit) {
     return closeMindmapEditorViaController.call(this, commit);
+}
+
+export function openFrameTitleEditor(object, create = false) {
+    return openFrameTitleEditorViaController.call(this, object, create);
+}
+
+export function closeFrameTitleEditor(commit) {
+    return closeFrameTitleEditorViaController.call(this, commit);
 }

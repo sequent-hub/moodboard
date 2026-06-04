@@ -8,6 +8,7 @@ import { GroupResizeController } from './GroupResizeController.js';
 import { GroupRotateController } from './GroupRotateController.js';
 import { GroupDragController } from './GroupDragController.js';
 import { BoxSelectController } from './BoxSelectController.js';
+import { LassoSelectController } from './LassoSelectController.js';
 
 export function activateSelectTool(app, defaultCursor, superActivate) {
     superActivate();
@@ -67,6 +68,13 @@ export function activateSelectTool(app, defaultCursor, superActivate) {
             clearSelection: () => this.clearSelection(),
             rectIntersectsRect: (a, b) => this.rectIntersectsRect(a, b)
         });
+        this._lassoSelect = new LassoSelectController({
+            app,
+            selection: this.selection,
+            emit: (event, payload) => this.emit(event, payload),
+            setSelection: (ids) => this.setSelection(ids),
+            clearSelection: () => this.clearSelection()
+        });
     } else if (!app) {
         console.log('❌ PIXI app не передан в activate');
     } else {
@@ -76,10 +84,12 @@ export function activateSelectTool(app, defaultCursor, superActivate) {
 export function deactivateSelectTool(superDeactivate) {
     superDeactivate();
 
-    // Закрываем текстовый/файловый редактор если открыт
+    // Закрываем текстовый/файловый/frame редактор если открыт
     if (this.textEditor.active) {
         if (this.textEditor.objectType === 'file') {
             this._closeFileNameEditor(true);
+        } else if (this.textEditor.objectType === 'frame') {
+            this._closeFrameTitleEditor(true);
         } else {
             this._closeTextEditor(true);
         }

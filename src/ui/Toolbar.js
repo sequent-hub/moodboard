@@ -48,7 +48,6 @@ export class Toolbar {
 
         this._toolActivatedHandler = ({ tool }) => {
             this.setActiveToolbarButton(tool);
-            // Draw palette must stay open only while draw tool is active.
             if (tool !== 'draw') {
                 this.closeDrawPopup();
             }

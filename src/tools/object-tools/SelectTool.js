@@ -28,7 +28,9 @@ import {
     openFileNameEditor as openFileNameEditorViaController,
     closeFileNameEditor as closeFileNameEditorViaController,
     closeTextEditor as closeTextEditorViaController,
-    closeMindmapEditor as closeMindmapEditorViaController
+    closeMindmapEditor as closeMindmapEditorViaController,
+    openFrameTitleEditor as openFrameTitleEditorViaController,
+    closeFrameTitleEditor as closeFrameTitleEditorViaController,
 } from './selection/InlineEditorController.js';
 import {
     hitTest as hitTestViaService,
@@ -206,6 +208,20 @@ export class SelectTool extends BaseTool {
     endBoxSelect() {
         return endBoxSelectViaController.call(this);
     }
+
+    startLassoSelect(event) {
+        this.isLassoSelect = true;
+        if (this._lassoSelect) this._lassoSelect.start({ x: event.x, y: event.y }, this.isMultiSelect);
+    }
+
+    updateLassoSelect(event) {
+        if (this._lassoSelect) this._lassoSelect.update({ x: event.x, y: event.y });
+    }
+
+    endLassoSelect() {
+        this.isLassoSelect = false;
+        if (this._lassoSelect) this._lassoSelect.end();
+    }
     rectIntersectsRect(a, b) {
         return !(
             b.x > a.x + a.width ||
@@ -344,6 +360,14 @@ export class SelectTool extends BaseTool {
 
     _closeMindmapEditor(commit) {
         return closeMindmapEditorViaController.call(this, commit);
+    }
+
+    _openFrameTitleEditor(object, create = false) {
+        return openFrameTitleEditorViaController.call(this, object, create);
+    }
+
+    _closeFrameTitleEditor(commit) {
+        return closeFrameTitleEditorViaController.call(this, commit);
     }
 
     destroy() {

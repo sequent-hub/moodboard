@@ -389,24 +389,29 @@ export class DrawingTool extends BaseTool {
                 const props = meta.properties || {};
                 const pts = Array.isArray(props.points) ? props.points : [];
                 if (pts.length >= 2) {
-                    // Оценка масштабов
+                    // Масштаб берём из локальных границ (не зависят от zoom) — как в _containsPoint DrawingObject
+                    const lb = typeof pixi.getLocalBounds === 'function' ? pixi.getLocalBounds() : b;
                     const baseW = props.baseWidth || 1;
                     const baseH = props.baseHeight || 1;
-                    const scaleX = baseW ? (b.width / baseW) : 1;
-                    const scaleY = baseH ? (b.height / baseH) : 1;
+                    const scaleX = baseW ? (lb.width / baseW) : 1;
+                    const scaleY = baseH ? (lb.height / baseH) : 1;
                     const eraserThresh = Math.max(6, (props.strokeWidth || 2) / 2 + radius);
                     // трансформируем сегмент ластика в локальные координаты фигуры
                     const localPrev = pixi.toLocal(new PIXI.Point(prevGlobal.x, prevGlobal.y));
                     const localCurr = pixi.toLocal(new PIXI.Point(currGlobal.x, currGlobal.y));
-                    // Проверяем пересечение с каждым отрезком рисунка
+                    // Проверяем пересечение отрезка ластика с каждым отрезком рисунка.
+                    // Используем отрезок→отрезок, а не точка→отрезок: при быстром движении
+                    // оба конца сегмента ластика могут быть дальше threshold, но сам отрезок
+                    // пересекает линию — именно это давало «раз через раз» при быстром мазке.
                     for (let i = 0; i < pts.length - 1 && !intersects; i++) {
                         const ax = pts[i].x * scaleX;
                         const ay = pts[i].y * scaleY;
                         const bx = pts[i + 1].x * scaleX;
                         const by = pts[i + 1].y * scaleY;
-                        const d = this._distancePointToSegment(localPrev.x, localPrev.y, ax, ay, bx, by);
-                        const d2 = this._distancePointToSegment(localCurr.x, localCurr.y, ax, ay, bx, by);
-                        if (Math.min(d, d2) <= eraserThresh) intersects = true;
+                        if (this._distanceSegmentToSegment(
+                            localPrev.x, localPrev.y, localCurr.x, localCurr.y,
+                            ax, ay, bx, by
+                        ) <= eraserThresh) intersects = true;
                     }
                 }
             }
@@ -444,6 +449,30 @@ export class DrawingTool extends BaseTool {
         const cx = ax + t * abx;
         const cy = ay + t * aby;
         return Math.hypot(px - cx, py - cy);
+    }
+
+    // Минимальное расстояние между отрезком p1→p2 и отрезком q1→q2.
+    // Возвращает 0 если отрезки пересекаются — гарантирует стирание при
+    // быстром поперечном движении, когда ни одна из концевых точек не близка к линии.
+    _distanceSegmentToSegment(p1x, p1y, p2x, p2y, q1x, q1y, q2x, q2y) {
+        if (this._segmentsIntersect(p1x, p1y, p2x, p2y, q1x, q1y, q2x, q2y)) return 0;
+        return Math.min(
+            this._distancePointToSegment(p1x, p1y, q1x, q1y, q2x, q2y),
+            this._distancePointToSegment(p2x, p2y, q1x, q1y, q2x, q2y),
+            this._distancePointToSegment(q1x, q1y, p1x, p1y, p2x, p2y),
+            this._distancePointToSegment(q2x, q2y, p1x, p1y, p2x, p2y)
+        );
+    }
+
+    _segmentsIntersect(p1x, p1y, p2x, p2y, q1x, q1y, q2x, q2y) {
+        const d1x = p2x - p1x, d1y = p2y - p1y;
+        const d2x = q2x - q1x, d2y = q2y - q1y;
+        const cross = d1x * d2y - d1y * d2x;
+        if (Math.abs(cross) < 1e-10) return false; // параллельны или коллинеарны
+        const dx = q1x - p1x, dy = q1y - p1y;
+        const t = (dx * d2y - dy * d2x) / cross;
+        const u = (dx * d1y - dy * d1x) / cross;
+        return t >= 0 && t <= 1 && u >= 0 && u <= 1;
     }
 }
 

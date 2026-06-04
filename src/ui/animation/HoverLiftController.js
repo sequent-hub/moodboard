@@ -108,11 +108,12 @@ export class HoverLiftController {
         const hasStaticShadow = type === 'image' || type === 'frame';
         const restAlpha = hasStaticShadow ? IMAGE_REST_ALPHA : 0;
         const restDistance = hasStaticShadow ? IMAGE_REST_DISTANCE : 8;
-        // Фрейм — крупный структурный контейнер. Hover-«pop» (scale + подъём)
-        // на нём бессмысленен и создаёт видимый скачок в переходе hover→resize/drag:
-        // объект приподнимается на hover, а в момент нажатия мгновенно
-        // возвращается к базе. Оставляем фрейму только статичную тень, без подъёма.
-        const liftEnabled = type !== 'frame';
+        // Hover-«pop» (scale + подъём) включён в т.ч. для фрейма. Скачок в
+        // переходе hover→resize/drag снимается мгновенным snapBack по событиям
+        // ResizeStart/DragStart/SelectionAdd (см. _snapBack* ниже): к моменту
+        // нажатия объект уже возвращён к базе. Логические габариты фрейма для
+        // resize считаются из state, а не из scaled-pixi, поэтому ресайз с
+        // координатной математикой hover не пересекается.
 
         const shadow = createShadowFilter(restAlpha, restDistance);
         pixiObject.filters = [...(pixiObject.filters || []), shadow];
@@ -128,8 +129,6 @@ export class HoverLiftController {
             tween: null,
         };
         this._entries.set(pixiObject, entry);
-
-        if (!liftEnabled) return;
 
         const w = objectData?.width ?? objectData?.properties?.width ?? 100;
         const h = objectData?.height ?? objectData?.properties?.height ?? 100;

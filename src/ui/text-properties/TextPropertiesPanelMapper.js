@@ -17,6 +17,18 @@ export const FONT_OPTIONS = [
 
 export const FONT_SIZE_OPTIONS = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 60, 72];
 
+// Допустимые значения выравнивания и типов списка (контракт хранения в properties)
+export const TEXT_ALIGN_VALUES = ['left', 'center', 'right', 'justify'];
+export const LIST_TYPE_VALUES = ['none', 'bullet', 'numbered', 'checkbox'];
+
+// Границы слайдера межстрочного интервала (множитель). DEFAULT — стартовое
+// положение слайдера, когда у объекта ещё нет явного lineHeight (рендер при этом
+// продолжает использовать адаптивный расчёт до первого изменения пользователем).
+export const LINE_HEIGHT_MIN = 1.0;
+export const LINE_HEIGHT_MAX = 2.5;
+export const LINE_HEIGHT_STEP = 0.1;
+export const LINE_HEIGHT_DEFAULT = 1.3;
+
 export const TEXT_COLOR_PRESETS = [
     { color: '#000000', name: '#000000' },
     { color: '#404040', name: '#404040' },
@@ -86,6 +98,14 @@ export function getControlValuesFromProperties(properties) {
         fontSize: String(properties.fontSize || 18),
         color: properties.color || '#000000',
         backgroundColor: properties.backgroundColor !== undefined ? properties.backgroundColor : 'transparent',
+        markdown: properties.markdown === true,
+        bold: properties.bold === true,
+        italic: properties.italic === true,
+        underline: properties.underline === true,
+        strikethrough: properties.strikethrough === true,
+        textAlign: properties.textAlign || 'left',
+        lineHeight: typeof properties.lineHeight === 'number' ? properties.lineHeight : null,
+        listType: properties.listType || 'none',
     };
 }
 
@@ -95,6 +115,14 @@ export function getFallbackControlValues() {
         fontSize: '18',
         color: '#000000',
         backgroundColor: 'transparent',
+        markdown: false,
+        bold: false,
+        italic: false,
+        underline: false,
+        strikethrough: false,
+        textAlign: 'left',
+        lineHeight: null,
+        listType: 'none',
     };
 }
 
@@ -122,6 +150,16 @@ export function buildBackgroundColorUpdate(backgroundColor) {
     };
 }
 
+export function buildMarkdownUpdate(markdown) {
+    return {
+        properties: { markdown },
+    };
+}
+
+export function buildPropertyUpdate(key, value) {
+    return { properties: { [key]: value } };
+}
+
 export function applyTextAppearanceToDom(objectId, properties) {
     const htmlElement = document.querySelector(`[data-id="${objectId}"]`);
     if (!htmlElement) {
@@ -143,6 +181,24 @@ export function applyTextAppearanceToDom(objectId, properties) {
         } else {
             htmlElement.style.backgroundColor = properties.backgroundColor;
         }
+    }
+    if (properties.bold !== undefined) {
+        htmlElement.style.fontWeight = properties.bold ? 'bold' : '';
+    }
+    if (properties.italic !== undefined) {
+        htmlElement.style.fontStyle = properties.italic ? 'italic' : '';
+    }
+    if (properties.underline !== undefined || properties.strikethrough !== undefined) {
+        const parts = [];
+        if (properties.underline === true) parts.push('underline');
+        if (properties.strikethrough === true) parts.push('line-through');
+        htmlElement.style.textDecoration = parts.join(' ');
+    }
+    if (properties.textAlign !== undefined) {
+        htmlElement.style.textAlign = properties.textAlign;
+    }
+    if (typeof properties.lineHeight === 'number') {
+        htmlElement.style.lineHeight = String(properties.lineHeight);
     }
 }
 

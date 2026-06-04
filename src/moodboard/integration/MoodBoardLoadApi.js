@@ -1,7 +1,16 @@
 import { Events } from '../../core/events/Events.js';
 
+const BOARD_DEFAULTS = {
+    backgroundColor: '#daeefb',
+    grid: { type: 'cross' },
+};
+
 function getSeedData(board) {
-    return board.data || { objects: [] };
+    const data = board.data || { objects: [] };
+    if (!data.settings) {
+        return { ...data, settings: { ...BOARD_DEFAULTS } };
+    }
+    return data;
 }
 
 function invokeOnLoad(board, payload) {

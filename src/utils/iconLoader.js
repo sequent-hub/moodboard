@@ -22,6 +22,7 @@ export class IconLoader {
                 import('../assets/icons/image.svg?raw'),
                 import('../assets/icons/shapes.svg?raw'),
                 import('../assets/icons/pencil.svg?raw'),
+                import('../assets/icons/connector.svg?raw'),
                 import('../assets/icons/comments.svg?raw'),
                 import('../assets/icons/attachments.svg?raw'),
                 import('../assets/icons/emoji.svg?raw'),
@@ -29,14 +30,16 @@ export class IconLoader {
                 import('../assets/icons/clear.svg?raw'),
                 import('../assets/icons/undo.svg?raw'),
                 import('../assets/icons/redo.svg?raw'),
-                import('../assets/icons/mindmap.svg?raw')
+                import('../assets/icons/mindmap.svg?raw'),
+                import('../assets/icons/lasso.svg?raw'),
+                import('../assets/icons/laser.svg?raw')
             ]);
 
             // Сохраняем иконки в кэш
             const iconNames = [
                 'select', 'pan', 'text-add', 'note', 'image', 'shapes',
-                'pencil', 'comments', 'attachments', 'emoji', 'frame',
-                'clear', 'undo', 'redo', 'mindmap'
+                'pencil', 'connector', 'comments', 'attachments', 'emoji', 'frame',
+                'clear', 'undo', 'redo', 'mindmap', 'lasso', 'laser'
             ];
 
             iconNames.forEach((name, index) => {
@@ -74,11 +77,7 @@ export class IconLoader {
   <path d="M8 5L8 19M16 5L16 19M5 8L19 8M5 16L19 16" 
         stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
 </svg>`,
-            'text-add': `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-  <path d="M4 6H20M4 12H20M4 18H12M16 18V22M16 18H20" 
-        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-</svg>`,
+            'text-add': `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16"/><path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2"/><path d="M9 20h6"/></svg>`,
             'note': `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
   <rect x="3" y="3" width="18" height="18" rx="2" fill="#fbbf24" stroke="currentColor" stroke-width="2"/>
@@ -117,9 +116,9 @@ export class IconLoader {
   <circle cx="16" cy="10" r="1" fill="currentColor"/>
   <path d="M8 16C8 16 10 18 12 18C14 18 16 16 16 16" stroke="currentColor" stroke-width="2" fill="none"/>
 </svg>`,
-            'frame': `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-  <rect x="3" y="3" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"/>
+            'frame': `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none">
+  <rect x="1.5" y="1.5" width="17" height="17" rx="2.5" stroke="currentColor" stroke-width="2"/>
+  <rect x="1.5" y="1.5" width="7.5" height="5.5" rx="2.5" stroke="currentColor" stroke-width="2"/>
 </svg>`,
             'clear': `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
@@ -191,7 +190,7 @@ export class IconLoader {
     loadFallbackIcons() {
         const iconNames = [
             'select', 'pan', 'text-add', 'note', 'image', 'shapes',
-            'pencil', 'comments', 'attachments', 'emoji', 'frame',
+            'pencil', 'connector', 'comments', 'attachments', 'emoji', 'frame',
             'clear', 'undo', 'redo', 'mindmap'
         ];
 
@@ -213,7 +212,7 @@ export class IconLoader {
         const fallbacks = {
             'select': '<svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
             'pan': '<svg width="20" height="20" viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
-            'text-add': '<svg width="20" height="20" viewBox="0 0 20 20"><text x="10" y="15" text-anchor="middle" font-size="16" fill="currentColor">T+</text></svg>',
+            'text-add': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16"/><path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2"/><path d="M9 20h6"/></svg>',
             'note': '<svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="2" width="16" height="16" rx="2" fill="#fbbf24"/></svg>',
             'image': '<svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="2" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
             'shapes': '<svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="2" width="6" height="6"/><circle cx="14" cy="5" r="3"/><polygon points="10,14 13,18 7,18"/></svg>',
@@ -221,7 +220,7 @@ export class IconLoader {
             'comments': '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M2 4C2 2.89543 2.89543 2 4 2H16C17.1046 2 18 2.89543 18 4V12C18 13.1046 17.1046 14 16 14H8L4 18V4Z" fill="currentColor"/></svg>',
             'attachments': '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M8 2C6.89543 2 6 2.89543 6 4V12C6 14.2091 7.79086 16 10 16C12.2091 16 14 14.2091 14 12V6C14 5.44772 13.5523 5 13 5C12.4477 5 12 5.44772 12 6V12C12 13.1046 11.1046 14 10 14C8.89543 14 8 13.1046 8 12V4C8 3.44772 8.44772 3 9 3C9.55228 3 10 3.44772 10 4V12C10 12.5523 9.55228 13 9 13C8.44772 13 8 12.5523 8 12V4Z" fill="currentColor"/></svg>',
             'emoji': '<svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="7" cy="8" r="1"/><circle cx="13" cy="8" r="1"/><path d="M7 13C7 13 8.5 15 10 15C11.5 15 13 13 13 13" stroke="currentColor" stroke-width="1" fill="none"/></svg>',
-            'frame': '<svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="2" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+            'frame': '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="1.5" y="1.5" width="17" height="17" rx="2.5" stroke="currentColor" stroke-width="2"/><rect x="1.5" y="1.5" width="7.5" height="5.5" rx="2.5" stroke="currentColor" stroke-width="2"/></svg>',
             'clear': '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M3 6H17L16 18H4L3 6Z" fill="currentColor"/></svg>',
             'undo': '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M8 4L3 9L8 14" stroke="currentColor" stroke-width="2" fill="none"/></svg>',
             'redo': '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M12 4L17 9L12 14" stroke="currentColor" stroke-width="2" fill="none"/></svg>',

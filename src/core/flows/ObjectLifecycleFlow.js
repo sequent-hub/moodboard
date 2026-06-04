@@ -6,14 +6,24 @@ import {
     UpdateTextStyleCommand,
     UpdateNoteStyleCommand,
     UpdateFramePropertiesCommand,
+    UpdateConnectorCommand,
+    UpdateShapeStyleCommand,
 } from '../commands/index.js';
 
-const TEXT_STYLE_PROPS = ['fontFamily', 'fontSize', 'color', 'backgroundColor'];
+const TEXT_STYLE_PROPS = ['fontFamily', 'fontSize', 'color', 'backgroundColor', 'markdown', 'bold', 'italic', 'underline', 'strikethrough', 'textAlign', 'lineHeight', 'listType'];
+const TEXT_STYLE_PROPERTY_LEVEL = ['fontFamily', 'markdown', 'bold', 'italic', 'underline', 'strikethrough', 'textAlign', 'lineHeight', 'listType'];
 const TEXT_STYLE_DEFAULTS = {
     fontFamily: 'Roboto, Arial, sans-serif',
     fontSize: 18,
     color: '#000000',
     backgroundColor: 'transparent',
+    markdown: false,
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false,
+    textAlign: 'left',
+    listType: 'none',
 };
 
 const NOTE_STYLE_PROPS = ['fontFamily', 'fontSize', 'textColor', 'backgroundColor'];
@@ -23,6 +33,64 @@ const NOTE_STYLE_DEFAULTS = {
     textColor: 0x1a1a1a,
     backgroundColor: 0xfff9c4,
 };
+
+/**
+ * Если updates содержит color или shape-properties — создаёт UpdateShapeStyleCommand и выполняет её.
+ * Защищена от рекурсии: при emit из команды (_fromCommand=true) object уже обновлён,
+ * oldValue === newValue для всех полей → hasChanges = false → return false.
+ * @returns {boolean} true, если команда создана и применена
+ */
+const SHAPE_PROP_KEYS = ['kind', 'cornerRadius', 'borderColor', 'borderWidth', 'borderStyle', 'borderOpacity'];
+
+function tryCreateShapeStyleCommand(core, object, objectId, updates) {
+    if (object.type !== 'shape') return false;
+
+    const hasColor = 'color' in updates;
+    const hasProps = updates.properties &&
+        Object.keys(updates.properties).some(k => SHAPE_PROP_KEYS.includes(k));
+
+    if (!hasColor && !hasProps) return false;
+
+    const newSnapshot = {};
+    const oldSnapshot = {};
+    let hasChanges = false;
+
+    if (hasColor) {
+        const oldColor = object.color;
+        const newColor = updates.color;
+        if (oldColor !== newColor) {
+            oldSnapshot.color = oldColor;
+            newSnapshot.color = newColor;
+            hasChanges = true;
+        }
+    }
+
+    if (hasProps) {
+        oldSnapshot.properties = {};
+        newSnapshot.properties = {};
+        for (const key of SHAPE_PROP_KEYS) {
+            if (key in updates.properties) {
+                const oldVal = object.properties?.[key];
+                const newVal = updates.properties[key];
+                if (oldVal !== newVal) {
+                    oldSnapshot.properties[key] = oldVal;
+                    newSnapshot.properties[key] = newVal;
+                    hasChanges = true;
+                }
+            }
+        }
+        if (Object.keys(newSnapshot.properties).length === 0) {
+            delete oldSnapshot.properties;
+            delete newSnapshot.properties;
+        }
+    }
+
+    if (!hasChanges) return false;
+
+    const command = new UpdateShapeStyleCommand(core, objectId, oldSnapshot, newSnapshot);
+    core.history.executeCommand(command);
+    return true;
+}
 
 /**
  * Если updates.properties содержит ровно одно свойство стиля записки — создаёт UpdateNoteStyleCommand.
@@ -56,9 +124,12 @@ function tryCreateTextStyleCommand(core, object, objectId, updates) {
     let property = null;
     let newValue = null;
 
-    if (updates.properties?.fontFamily !== undefined && Object.keys(updates).length === 1) {
-        property = 'fontFamily';
-        newValue = updates.properties.fontFamily;
+    if (updates.properties && Object.keys(updates).length === 1) {
+        const propKeys = Object.keys(updates.properties);
+        if (propKeys.length === 1 && TEXT_STYLE_PROPERTY_LEVEL.includes(propKeys[0])) {
+            property = propKeys[0];
+            newValue = updates.properties[property];
+        }
     } else if (updates.fontSize !== undefined && !updates.properties && Object.keys(updates).length === 1) {
         property = 'fontSize';
         newValue = typeof updates.fontSize === 'string' ? parseInt(updates.fontSize, 10) : updates.fontSize;
@@ -72,13 +143,57 @@ function tryCreateTextStyleCommand(core, object, objectId, updates) {
 
     if (!property || !TEXT_STYLE_PROPS.includes(property)) return false;
 
-    const oldValue = property === 'fontFamily'
-        ? (object.properties?.fontFamily ?? TEXT_STYLE_DEFAULTS.fontFamily)
+    const oldValue = TEXT_STYLE_PROPERTY_LEVEL.includes(property)
+        ? (object.properties?.[property] ?? TEXT_STYLE_DEFAULTS[property])
         : (object[property] ?? object.properties?.[property] ?? TEXT_STYLE_DEFAULTS[property]);
 
     if (oldValue === newValue) return false;
 
     const command = new UpdateTextStyleCommand(core, objectId, property, oldValue, newValue);
+    core.history.executeCommand(command);
+    return true;
+}
+
+const CONNECTOR_STYLE_KEYS = ['stroke', 'width', 'dash', 'route', 'head'];
+
+/**
+ * Если updates.properties.style содержит поля стиля коннектора —
+ * создаёт UpdateConnectorCommand и выполняет её через историю.
+ * Также обрабатывает start/end (для swap-кнопки).
+ * @returns {boolean} true — команда применена, дальнейшая обработка не нужна
+ */
+function tryCreateConnectorStyleCommand(core, object, objectId, updates) {
+    if (object.type !== 'connector') return false;
+    if (!updates.properties) return false;
+
+    const { style, start, end } = updates.properties;
+
+    // Проверяем, что в updates.properties только style/start/end (и нет посторонних ключей)
+    const allowedKeys = new Set(['style', 'start', 'end', 'locked']);
+    const hasOtherKeys = Object.keys(updates.properties).some(k => !allowedKeys.has(k));
+    if (hasOtherKeys) return false;
+    // Должно быть хотя бы одно из: style, start, end
+    if (!style && start === undefined && end === undefined
+        && updates.properties.locked === undefined) return false;
+
+    const commandUpdates = {};
+    if (style !== undefined) commandUpdates.style = style;
+    if (start !== undefined) commandUpdates.start = start;
+    if (end   !== undefined) commandUpdates.end   = end;
+
+    // locked хранится в properties напрямую, не через UpdateConnectorCommand
+    if (updates.properties.locked !== undefined) {
+        if (!object.properties) object.properties = {};
+        object.properties.locked = updates.properties.locked;
+        if (Object.keys(commandUpdates).length === 0) {
+            core.state.markDirty();
+            return true;
+        }
+    }
+
+    if (Object.keys(commandUpdates).length === 0) return false;
+
+    const command = new UpdateConnectorCommand(core, objectId, commandUpdates);
     core.history.executeCommand(command);
     return true;
 }
@@ -131,7 +246,18 @@ export function setupObjectLifecycleFlow(core) {
 
     core.eventBus.on(Events.Tool.HitTest, (data) => {
         const result = core.pixi.hitTest(data.x, data.y);
-        data.result = result;
+        if (result.type !== 'object' && core.connectorLayer) {
+            const worldLayer = core.pixi.worldLayer;
+            const worldPoint = worldLayer.toLocal({ x: data.x, y: data.y });
+            const id = core.connectorLayer.hitTest(worldPoint);
+            if (id) {
+                data.result = { type: 'object', object: id, pixiObject: core.pixi.objects.get(id) };
+            } else {
+                data.result = result;
+            }
+        } else {
+            data.result = result;
+        }
     });
 
     core.eventBus.on(Events.Tool.GetObjectPosition, (data) => {
@@ -228,8 +354,14 @@ export function setupObjectLifecycleFlow(core) {
         const noteStyleChange = tryCreateNoteStyleCommand(core, object, objectId, updates);
         if (noteStyleChange) return;
 
+        const shapeStyleChange = tryCreateShapeStyleCommand(core, object, objectId, updates);
+        if (shapeStyleChange) return;
+
         const textStyleChange = tryCreateTextStyleCommand(core, object, objectId, updates);
         if (textStyleChange) return;
+
+        const connectorStyleChange = tryCreateConnectorStyleCommand(core, object, objectId, updates);
+        if (connectorStyleChange) return;
 
         const framePropsChange = tryCreateFramePropertiesCommand(core, object, objectId, updates);
         if (framePropsChange) return;
@@ -280,6 +412,22 @@ export function setupObjectLifecycleFlow(core) {
                     if (Object.keys(styleUpdates).length > 0) {
                         instance.setStyle(styleUpdates);
                     }
+                }
+            }
+
+            if (object.type === 'drawing' && updates.properties && instance.setStyle) {
+                const styleUpdates = {};
+                if (updates.properties.strokeColor !== undefined) {
+                    styleUpdates.strokeColor = updates.properties.strokeColor;
+                }
+                if (updates.properties.strokeWidth !== undefined) {
+                    styleUpdates.strokeWidth = updates.properties.strokeWidth;
+                }
+                if (updates.properties.mode !== undefined) {
+                    styleUpdates.mode = updates.properties.mode;
+                }
+                if (Object.keys(styleUpdates).length > 0) {
+                    instance.setStyle(styleUpdates);
                 }
             }
         }

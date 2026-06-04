@@ -40,22 +40,28 @@ export class FrameObject {
         this.graphics = new PIXI.Graphics();
         this.container.addChild(this.graphics);
         
-        // Текст заголовка
-        this.baseFontSize = 14; // Сохраняем оригинальный размер шрифта
-        this.currentWorldScale = 1.0; // Текущий масштаб мира
-        this.originalTitle = this.title; // Сохраняем оригинальный заголовок
+        // Заголовок фрейма — слой над верхней границей с собственной подложкой
+        this.baseFontSize = 14;
+        this.currentWorldScale = 1.0;
+        this.originalTitle = this.title;
+
+        // Под-контейнер: масштаб компенсирует зум, поэтому заголовок всегда одного размера на экране
+        this.titleLayer = new PIXI.Container();
+        this.titleLayer.eventMode = 'none'; // не перехватывать указатель
+
+        this.titleBg = new PIXI.Graphics();
+        this.titleLayer.addChild(this.titleBg);
+
         this.titleText = new PIXI.Text(this.title, {
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: 'Inter, Arial, sans-serif',
             fontSize: this.baseFontSize,
             fill: 0x333333,
-            fontWeight: 'bold'
+            fontWeight: '500'
         });
-        // Размещаем заголовок внутри верхней части фрейма, чтобы не влиять на внешние границы
         this.titleText.anchor.set(0, 0);
-        this.titleText.scale.set(1); // Инициализируем базовый масштаб
-        this.titleText.x = 8;
-        this.titleText.y = 4;
-        this.container.addChild(this.titleText);
+        this.titleLayer.addChild(this.titleText);
+
+        this.container.addChild(this.titleLayer);
         
         // Подписываемся на события зума для компенсации масштабирования заголовка
         if (this.eventBus) {
@@ -68,6 +74,24 @@ export class FrameObject {
             this.eventBus.on(Events.Tool.SelectionRemove, this._boundOnSelectionRemove);
             this.eventBus.on(Events.Tool.SelectionClear, this._boundOnSelectionClear);
         }
+
+        // Логические габариты фрейма = только прямоугольник, без плавающего
+        // заголовка над верхней границей. Заголовок — отдельный слой с
+        // отрицательным y, и по умолчанию он раздул бы getLocalBounds вверх.
+        // Через него width/height контейнера считает GetObjectPosition
+        // (position.y = centerY - height/2) — лишняя высота сверху уводила
+        // рамку выделения вверх. Переопределяем getLocalBounds, чтобы
+        // width/height отражали именно прямоугольник. getBounds НЕ трогаем:
+        // hover-lift DropShadowFilter берёт область из getBounds, и заголовок
+        // не должен обрезаться фильтром.
+        this.container.getLocalBounds = (rect) => {
+            const b = rect || new PIXI.Rectangle();
+            b.x = 0;
+            b.y = 0;
+            b.width = this.width;
+            b.height = this.height;
+            return b;
+        };
 
         this._draw(this.width, this.height, this.fillColor);
         // Применяем начальный масштаб и обрезку заголовка
@@ -114,6 +138,27 @@ export class FrameObject {
     _onSelectionClear(data) {
         const myId = this.objectData?.id ?? this.container?._mb?.objectId;
         if (data?.objects?.includes(myId)) this.setBorderVisible(true);
+    }
+
+    /**
+     * Применить текущий масштаб мира к заголовку.
+     * Нужно при создании объекта: viewport-зум восстанавливается раньше,
+     * чем фрейм успевает подписаться на ZoomPercent, поэтому стартовый зум
+     * до него не доходит и заголовок остаётся в мировом масштабе (мелкий).
+     * @param {number} worldScale Текущий масштаб мира (world.scale.x)
+     */
+    applyWorldScale(worldScale) {
+        if (typeof worldScale !== 'number' || !(worldScale > 0)) return;
+        this.currentWorldScale = worldScale;
+        this._updateTitleScale();
+    }
+
+    hideTitle() {
+        if (this.titleLayer) this.titleLayer.visible = false;
+    }
+
+    showTitle() {
+        if (this.titleLayer) this.titleLayer.visible = true;
     }
 
     /**
@@ -213,98 +258,113 @@ export class FrameObject {
     }
 
     /**
-     * Обновить масштаб заголовка для компенсации зума
+     * Масштаб и позиция слоя заголовка — компенсируем зум, держим постоянный экранный размер
      */
     _updateTitleScale() {
-        if (!this.titleText) return;
-        
-        // Компенсируем зум мира обратным масштабированием заголовка
+        if (!this.titleLayer) return;
+
         const compensationScale = 1 / this.currentWorldScale;
-        
-        // Используем scale вместо fontSize для избежания размытия
-        this.titleText.scale.set(compensationScale);
-        
-        // Корректируем позицию заголовка с учетом изменения масштаба
-        this.titleText.x = 8 * compensationScale;
-        this.titleText.y = 4 * compensationScale;
-        
-        // Обновляем текст с учетом нового масштаба
+
+        // Весь слой масштабируется обратно → содержимое выглядит одинаково на любом зуме
+        this.titleLayer.scale.set(compensationScale);
+
+        // Высота подложки в базовых пикселях: baseFontSize + 4px сверху + 4px снизу
+        const labelBaseH = this.baseFontSize + 8;
+        const gap = 4; // зазор между нижним краем подписи и верхней границей фрейма
+
+        // Позиционируем над фреймом (y=0 — верхний край фрейма в локальных координатах контейнера)
+        this.titleLayer.x = 0;
+        this.titleLayer.y = -Math.round((labelBaseH + gap) * compensationScale);
+
         this._updateTitleText();
     }
 
     /**
-     * Обновить текст заголовка с учетом доступной ширины
+     * Обновить текст заголовка и перерисовать подложку
      */
     _updateTitleText() {
         if (!this.titleText) return;
 
         const truncatedText = this._truncateTextToFit(this.originalTitle);
         this.titleText.text = truncatedText;
+        this._redrawTitleBg();
     }
 
     /**
-     * Обрезать текст до доступной ширины с добавлением многоточия
+     * Нарисовать скруглённую подложку под текущую ширину текста
+     */
+    _redrawTitleBg() {
+        if (!this.titleBg || !this.titleText) return;
+
+        const padH = 8; // горизонтальный отступ с каждой стороны
+        const padV = 4; // вертикальный отступ с каждой стороны
+
+        // Измеряем текст в базовых единицах
+        const style = new PIXI.TextStyle({
+            fontFamily: this.titleText.style.fontFamily,
+            fontSize: this.baseFontSize,
+            fontWeight: this.titleText.style.fontWeight
+        });
+        const metrics = PIXI.TextMetrics.measureText(this.titleText.text || '', style);
+
+        const bgW = Math.max(1, Math.round(metrics.width + padH * 2));
+        const bgH = Math.round(this.baseFontSize + padV * 2);
+
+        const g = this.titleBg;
+        g.clear();
+        try {
+            g.lineStyle({ width: 1, color: this.strokeColor, alpha: 1 });
+        } catch (_) {
+            g.lineStyle(1, this.strokeColor, 1);
+        }
+        g.beginFill(0xFFFFFF, 1);
+        g.drawRoundedRect(0, 0, bgW, bgH, 6);
+        g.endFill();
+
+        // Текст внутри подложки
+        this.titleText.x = padH;
+        this.titleText.y = padV;
+    }
+
+    /**
+     * Обрезать текст до ширины фрейма (потолок) с добавлением многоточия.
+     * Сравниваем в базовых пикселях — слой уже компенсирует зум отдельно.
      * @param {string} text Исходный текст
-     * @returns {string} Обрезанный текст с многоточием или оригинальный текст
+     * @returns {string} Обрезанный текст или оригинал
      */
     _truncateTextToFit(text) {
         if (!text || !this.titleText) return text;
 
-        // Компенсация масштаба для правильного расчета размеров
-        const compensationScale = 1 / this.currentWorldScale;
-        
-        // Доступная ширина = ширина фрейма - отступы слева и справа (с учетом масштаба)
-        const leftPadding = 8 * compensationScale;
-        const rightPadding = 8 * compensationScale;
-        const availableWidth = this.width - leftPadding - rightPadding;
+        // Подложка не должна быть шире самого фрейма (8px паддинг с каждой стороны)
+        const availableWidth = Math.max(1, this.width - 16);
 
-        // Создаем временный стиль для измерения текста
-        // Используем базовый размер шрифта, а масштаб учтем отдельно
         const style = new PIXI.TextStyle({
             fontFamily: this.titleText.style.fontFamily,
             fontSize: this.baseFontSize,
             fontWeight: this.titleText.style.fontWeight
         });
 
-        // Измеряем ширину оригинального текста с учетом масштаба
         const textMetrics = PIXI.TextMetrics.measureText(text, style);
-        const scaledTextWidth = textMetrics.width * compensationScale;
-        
-        // Если текст помещается, возвращаем его как есть
-        if (scaledTextWidth <= availableWidth) {
-            return text;
-        }
+        if (textMetrics.width <= availableWidth) return text;
 
-        // Измеряем ширину многоточия с учетом масштаба
         const ellipsisMetrics = PIXI.TextMetrics.measureText('...', style);
-        const ellipsisWidth = ellipsisMetrics.width * compensationScale;
-        
-        // Доступная ширина для текста без многоточия
-        const textAvailableWidth = availableWidth - ellipsisWidth;
-        
-        if (textAvailableWidth <= 0) {
-            return '...';
-        }
+        const textAvailableWidth = availableWidth - ellipsisMetrics.width;
+        if (textAvailableWidth <= 0) return '...';
 
-        // Бинарный поиск оптимальной длины текста
         let left = 0;
         let right = text.length;
         let result = '';
-
         while (left <= right) {
             const mid = Math.floor((left + right) / 2);
             const subText = text.substring(0, mid);
-            const subTextMetrics = PIXI.TextMetrics.measureText(subText, style);
-            const scaledSubTextWidth = subTextMetrics.width * compensationScale;
-
-            if (scaledSubTextWidth <= textAvailableWidth) {
+            const subMetrics = PIXI.TextMetrics.measureText(subText, style);
+            if (subMetrics.width <= textAvailableWidth) {
                 result = subText;
                 left = mid + 1;
             } else {
                 right = mid - 1;
             }
         }
-
         return result + '...';
     }
 

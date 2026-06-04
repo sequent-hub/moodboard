@@ -93,6 +93,9 @@ export class PixiEngine {
                 if (pixiObject._mb.type === 'mindmap' && pixiObject._mb.instance && typeof pixiObject._mb.instance.redrawForZoom === 'function') {
                     pixiObject._mb.instance.redrawForZoom(s);
                 }
+                if (pixiObject._mb.type === 'frame' && pixiObject._mb.instance && typeof pixiObject._mb.instance.applyWorldScale === 'function') {
+                    pixiObject._mb.instance.applyWorldScale(s);
+                }
             } catch (_) {}
         } else {
             console.warn(`Unknown object type: ${objectData.type}`);
@@ -182,6 +185,26 @@ export class PixiEngine {
 
 
         }
+    }
+
+    /**
+     * Подгоняет рендерер под новый размер вьюпорта (CSS px).
+     * Без этого WebGL drawing buffer и инлайн-размер канваса остаются от
+     * старого размера: после ресайза окна канвас не покрывает контейнер,
+     * и справа проступает фон рабочей области (визуально — «перекрытие контента»).
+     */
+    resize(width, height) {
+        const w = Math.max(1, Math.floor(width));
+        const h = Math.max(1, Math.floor(height));
+        const renderer = this.app?.renderer;
+        if (!renderer) return;
+        // DPR мог измениться при переносе окна между мониторами — синхронизируем,
+        // иначе buffer остаётся в старом разрешении и правая часть «мылится».
+        const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
+        if (renderer.resolution !== dpr) {
+            renderer.resolution = dpr;
+        }
+        renderer.resize(w, h);
     }
 
     // Добавление/обновление сетки в gridLayer

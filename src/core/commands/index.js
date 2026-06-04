@@ -18,3 +18,6 @@ export { UpdateTextStyleCommand } from './UpdateTextStyleCommand.js';
 export { UpdateNoteStyleCommand } from './UpdateNoteStyleCommand.js';
 export { UpdateFramePropertiesCommand } from './UpdateFramePropertiesCommand.js';
 export { UpdateFrameTypeCommand } from './UpdateFrameTypeCommand.js';
+export { CreateConnectorCommand } from './CreateConnectorCommand.js';
+export { UpdateConnectorCommand } from './UpdateConnectorCommand.js';
+export { UpdateShapeStyleCommand } from './UpdateShapeStyleCommand.js';

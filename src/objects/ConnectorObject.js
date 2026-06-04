@@ -29,8 +29,8 @@ export class ConnectorObject {
             stroke: 0x2563EB,
             width:  2,
             dash:   false,
-            head: { start: false, end: true },
-            route: 'straight',
+            head: { start: 'none', end: 'arrow' },
+            route: 'elbow',
             ...(props.style || {}),
         };
 

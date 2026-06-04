@@ -51,6 +51,7 @@ export function openTextEditor(object, create = false) {
 
     // Определяем тип объекта
     const isNote = objectType === 'note';
+    const isShape = objectType === 'shape';
 
     // Проверяем, что position существует
     if (!position) {
@@ -156,6 +157,9 @@ export function openTextEditor(object, create = false) {
 
     // Вычисляем межстрочный интервал; подгоняем к реальным значениям HTML-отображения
     let lhInitial = computeTextEditorLineHeightPx(effectiveFontPx);
+    if (typeof properties.lineHeight === 'number') {
+        lhInitial = Math.round(effectiveFontPx * properties.lineHeight);
+    }
     try {
         if (objectId) {
             if (objectType === 'note') {
@@ -207,6 +211,15 @@ export function openTextEditor(object, create = false) {
         effectiveFontPx,
         lineHeightPx: lhInitial,
     });
+    if (properties.textAlign) {
+        textarea.style.textAlign = properties.textAlign;
+    }
+
+    // Shape: текст по центру, textarea покрывает весь bounds фигуры
+    if (isShape) {
+        textarea.style.textAlign = 'center';
+        textarea.placeholder = '';
+    }
 
     wrapper.appendChild(textarea);
     // Убрана зелёная рамка вокруг поля ввода по требованию
@@ -311,6 +324,49 @@ export function openTextEditor(object, create = false) {
             toScreen,
         });
         updateNoteEditor = noteSetup.updateNoteEditor;
+    } else if (isShape) {
+        // Shape: редактор занимает весь bounds фигуры, текст вертикально центрирован
+        const viewResShape = (this.app?.renderer?.resolution) ||
+            (view.width && view.clientWidth ? view.width / view.clientWidth : 1);
+        const worldLayerShape = this.textEditor.world || this.app?.stage;
+        const sShape = worldLayerShape?.scale?.x || 1;
+        const sCssShape = sShape / viewResShape;
+
+        let shapeW = 100, shapeH = 100;
+        if (initialSize) {
+            shapeW = initialSize.width;
+            shapeH = initialSize.height;
+        } else if (objectId) {
+            const sizeData = { objectId, size: null };
+            this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+            if (sizeData.size) { shapeW = sizeData.size.width; shapeH = sizeData.size.height; }
+        }
+
+        const shapeCssW = Math.max(1, Math.round(shapeW * sCssShape));
+        const shapeCssH = Math.max(1, Math.round(shapeH * sCssShape));
+        // Центрируем каретку по вертикали: padding-top = (высота фигуры - высота одной строки) / 2
+        const oneLinePx = Math.max(1, Math.round(effectiveFontPx * 1.4));
+        const paddingTopShape = Math.max(0, Math.round((shapeCssH - oneLinePx) / 2));
+
+        wrapper.style.left = `${Math.round(screenPos.x)}px`;
+        wrapper.style.top = `${Math.round(screenPos.y)}px`;
+        wrapper.style.width = `${shapeCssW}px`;
+        wrapper.style.height = `${shapeCssH}px`;
+
+        textarea.style.width = `${shapeCssW}px`;
+        textarea.style.height = `${shapeCssH}px`;
+        textarea.style.boxSizing = 'border-box';
+        // display:block убирает baseline-смещение inline-block textarea внутри wrapper'а
+        // (wrapper наследует line-height ~24px от body, из-за чего на сильном отдалении
+        // textarea съезжает вниз от фигуры на фиксированные ~11px независимо от зума).
+        // padding-bottom:0 перебивает CSS .moodboard-text-input (5px), чтобы не раздувать
+        // высоту поля относительно крошечной фигуры.
+        textarea.style.display = 'block';
+        textarea.style.paddingTop = `${paddingTopShape}px`;
+        textarea.style.paddingBottom = '0px';
+
+        this.textEditor._cssLeftPx = Math.round(screenPos.x);
+        this.textEditor._cssTopPx = Math.round(screenPos.y);
     } else {
         const {
             leftPx,
@@ -377,7 +433,7 @@ export function openTextEditor(object, create = false) {
     }
 
     // Если создаём новый текст — длина поля ровно как placeholder
-    if (create && !isNote) {
+    if (create && !isNote && !isShape) {
         // +25% — запас на Caveat vs Arial: при незагруженном Caveat span рендерится в Arial,
         // а Caveat (рукописный шрифт) заметно шире для кириллицы.
         const startWidth = Math.max(1, Math.ceil(measureTextEditorPlaceholderWidth(textarea, 'Напишите что-нибудь') * 1.25));
@@ -391,8 +447,8 @@ export function openTextEditor(object, create = false) {
         minHBound = startHeight;
     }
 
-    // Для записок размеры уже установлены выше, пропускаем эту логику
-    if (!isNote && !create) {
+    // Для записок и фигур размеры уже установлены выше, пропускаем эту логику
+    if (!isNote && !isShape && !create) {
         if (initialWpx) {
             textarea.style.width = `${initialWpx}px`;
             wrapper.style.width = `${initialWpx}px`;
@@ -403,7 +459,7 @@ export function openTextEditor(object, create = false) {
         }
     }
     // Автоподгон
-    const syncRegularTextSizeToObject = !isNote && objectId
+    const syncRegularTextSizeToObject = !isNote && !isShape && objectId
         ? ({ widthPx, heightPx }) => {
             try {
                 const scaleX = (worldLayerRef?.scale?.x) || 1;
@@ -428,8 +484,8 @@ export function openTextEditor(object, create = false) {
         onSizeChange: syncRegularTextSizeToObject,
     });
 
-    // Вызываем autoSize только для обычного текста
-    if (!isNote) {
+    // autoSize только для обычного текста; shape имеет фиксированные bounds фигуры
+    if (!isNote && !isShape) {
         autoSize();
     }
     textarea.focus();
@@ -448,6 +504,7 @@ export function openTextEditor(object, create = false) {
         position,
         properties: { fontSize },
         objectType,
+        listType: properties.listType || 'none',
         _phStyle: styleEl,
         initialContent: content,
         isNewCreation: !!create,
@@ -488,9 +545,11 @@ export function openTextEditor(object, create = false) {
         textarea,
         isNewCreation,
         isNote,
+        isShape,
         autoSize,
         updateNoteEditor,
         finalize,
+        listType: properties.listType || 'none',
     });
 }
 

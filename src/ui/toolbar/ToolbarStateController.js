@@ -14,9 +14,12 @@ export class ToolbarStateController {
 
         const map = {
             select: 'select',
+            lasso: 'lasso',
             pan: 'pan',
             draw: 'pencil',
-            text: 'text-add'
+            laser: 'laser',
+            text: 'text-add',
+            connector: 'connector'
         };
 
         let btnId = map[toolName];

@@ -54,7 +54,11 @@ export function bindToolbarEvents(board) {
         }
         const createdObject = board.actionHandler.handleToolbarAction(action);
         if (createdObject?.id) {
-            focusCreatedObject(board, createdObject);
+            // Рисунки карандашом/кистью не выделяем и не переключаем инструмент:
+            // пользователь должен сразу продолжить рисовать следующий штрих.
+            if (action?.type !== 'drawing') {
+                focusCreatedObject(board, createdObject);
+            }
         }
     });
 

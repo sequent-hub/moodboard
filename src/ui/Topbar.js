@@ -16,7 +16,7 @@ export class Topbar {
         this.icons = this.iconLoader.icons;
         // Палитра кнопки заливки и соответствие цвету фона доски
         this._palette = [
-            { id: 1, name: 'default-light', btnHex: '#B3E5FC', board: '#f7fbff' },
+            { id: 1, name: 'default-light', btnHex: '#d6e8f7', board: '#f0f6fc' },
             { id: 2, name: 'mint-light',    btnHex: '#E8F5E9', board: '#f8fff7' },
             { id: 3, name: 'peach-light',   btnHex: '#FFF3E0', board: '#fffcf7' },
             { id: 4, name: 'gray-light',    btnHex: '#f5f5f5', board: '#f5f5f5' },
@@ -246,7 +246,7 @@ export class Topbar {
         const pop = document.createElement('div');
         pop.className = 'moodboard-topbar__paint-popover';
         // Пять цветов кнопок-палитры и соответствующие цвета фона доски
-        // 1: фон #f7fbff, кнопка #B3E5FC
+        // 1: фон #f0f6fc, кнопка #d6e8f7
         // 2: фон #f8fff7, кнопка #E8F5E9
         // 3: фон #fffcf7, кнопка #FFF3E0
         // 4: фон #f5f5f5, кнопка #f5f5f5

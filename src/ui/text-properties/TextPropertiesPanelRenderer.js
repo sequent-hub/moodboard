@@ -4,6 +4,7 @@ import {
     FONT_SIZE_OPTIONS,
     TEXT_COLOR_PRESETS,
 } from './TextPropertiesPanelMapper.js';
+import { createTextFormatControls } from './TextFormatControls.js';
 
 export function createTextPropertiesPanelRenderer(panelInstance) {
     const panel = document.createElement('div');
@@ -148,6 +149,29 @@ function createFontControls(panelInstance, panel) {
     panel.appendChild(bgColorLabel);
 
     createCompactBackgroundSelector(panelInstance, panel);
+
+    const mdSeparator = document.createElement('div');
+    mdSeparator.style.cssText = 'width:1px;height:18px;background:#e0e0e0;margin:0 6px;flex-shrink:0;';
+    panel.appendChild(mdSeparator);
+
+    const mdId = `tpp-md-${Date.now()}`;
+    panelInstance.markdownToggle = document.createElement('input');
+    panelInstance.markdownToggle.type = 'checkbox';
+    panelInstance.markdownToggle.id = mdId;
+    panelInstance.markdownToggle.className = 'tpp-md-toggle';
+    panelInstance.markdownToggle.style.cssText = 'width:14px;height:14px;cursor:pointer;flex-shrink:0;';
+
+    const mdLabel = document.createElement('label');
+    mdLabel.htmlFor = mdId;
+    mdLabel.textContent = 'MD';
+    mdLabel.title = 'Отображать как Markdown';
+    mdLabel.className = 'tpp-label';
+    mdLabel.style.cssText = 'cursor:pointer;user-select:none;';
+
+    panel.appendChild(panelInstance.markdownToggle);
+    panel.appendChild(mdLabel);
+
+    createTextFormatControls(panelInstance, panel);
 }
 
 function createCompactColorSelector(panelInstance, panel) {

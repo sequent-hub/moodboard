@@ -42,8 +42,17 @@ export class MoodBoard {
             onSave: null,
             onLoad: null,
             onDestroy: null,
+            enableComments: false,
+            currentUser: null,
+            comments: null,
             ...options
         };
+
+        /** @type {{ applyRemote: (event: object) => void } | null} */
+        this.comments = null;
+        this.commentService = null;
+        this.commentPinLayer = null;
+        this.commentThreadPopover = null;
         
         this.data = data;
         
@@ -183,6 +192,19 @@ export class MoodBoard {
      * Очистка ресурсов
      */
     destroy() {
+        if (this.commentPinLayer) {
+            this.commentPinLayer.destroy();
+            this.commentPinLayer = null;
+        }
+        if (this.commentThreadPopover) {
+            this.commentThreadPopover.destroy();
+            this.commentThreadPopover = null;
+        }
+        if (this.commentService) {
+            this.commentService.destroy();
+            this.commentService = null;
+        }
+        this.comments = null;
         destroyMoodBoard(this);
     }
     

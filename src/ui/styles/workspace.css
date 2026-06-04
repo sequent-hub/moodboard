@@ -1,5 +1,22 @@
 /* Fonts */
 @font-face {
+    font-family: 'Inter';
+    src: url('../../assets/fonts/inter/inter-latin-400-normal.woff2') format('woff2'),
+         url('../../assets/fonts/inter/inter-cyrillic-400-normal.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Inter';
+    src: url('../../assets/fonts/inter/inter-latin-500-normal.woff2') format('woff2'),
+         url('../../assets/fonts/inter/inter-cyrillic-500-normal.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
     font-family: 'GeistSans';
     src: url('../../assets/fonts/geist/geist-sans-latin-100-normal.ttf') format('truetype');
     font-weight: 100;
@@ -295,13 +312,138 @@
     word-break: break-word;
     pointer-events: none;
     user-select: none;
-    padding-top: 5px;
-    padding-bottom: 5px;
+    padding-top: 0.3em;
+    padding-bottom: 0.3em;
     box-sizing: border-box;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     margin: 0;
     letter-spacing: normal;
+}
+
+/* Markdown-режим текстового объекта: блочный рендер, перенос по словам */
+.mb-text--md {
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.mb-text--md h1,
+.mb-text--md h2,
+.mb-text--md h3,
+.mb-text--md h4,
+.mb-text--md h5,
+.mb-text--md h6 {
+    margin: 0.875em 0 0.375em;
+    line-height: 1.25;
+    font-weight: 600;
+}
+
+.mb-text--md h1 { font-size: 1.4em; }
+.mb-text--md h2 { font-size: 1.2em; }
+.mb-text--md h3 { font-size: 1.1em; }
+.mb-text--md h4,
+.mb-text--md h5,
+.mb-text--md h6 { font-size: 1em; }
+
+.mb-text--md p {
+    margin: 0 0 0.5em;
+}
+
+.mb-text--md p:last-child {
+    margin-bottom: 0;
+}
+
+.mb-text--md ul,
+.mb-text--md ol {
+    margin: 0 0 0.5em;
+    padding-left: 1.25em;
+}
+
+.mb-text--md li {
+    margin: 0.125em 0;
+}
+
+.mb-text--md strong,
+.mb-text--md b {
+    font-weight: 600;
+}
+
+.mb-text--md em,
+.mb-text--md i {
+    font-style: italic;
+}
+
+.mb-text--md code {
+    padding: 0.125em 0.3125em;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.08);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 0.9em;
+}
+
+.mb-text--md pre {
+    margin: 0.375em 0;
+    padding: 0.625em 0.75em;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.06);
+    overflow-x: auto;
+}
+
+.mb-text--md pre code {
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: 0.88em;
+    line-height: 1.5;
+}
+
+.mb-text--md blockquote {
+    margin: 0.375em 0;
+    padding: 0.25em 0.625em;
+    border-left: 3px solid rgba(0, 0, 0, 0.18);
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 0 6px 6px 0;
+}
+
+.mb-text--md table {
+    border-collapse: collapse;
+    margin: 0.375em 0;
+    font-size: 0.92em;
+}
+
+.mb-text--md th,
+.mb-text--md td {
+    padding: 0.3125em 0.5em;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.mb-text--md th {
+    background: rgba(0, 0, 0, 0.05);
+    font-weight: 600;
+    text-align: left;
+}
+
+.mb-text--md hr {
+    border: 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.12);
+    margin: 0.625em 0;
+}
+
+.mb-text--md img {
+    max-width: 100%;
+}
+
+/* KaTeX-формулы внутри текстового объекта */
+.mb-text--md .katex-display {
+    margin: 0.5em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.mb-text--md .katex {
+    /* Цвет формулы наследуется от цвета текстового объекта */
+    color: inherit;
 }
 
 .mb-text--mindmap {
@@ -858,6 +1000,115 @@
 }
 .moodboard-draw__grid > .moodboard-draw__row { display: contents; }
 .moodboard-draw__placeholder { min-width: 30px; min-height: 30px; }
+
+/* ── Новая панель рисования ─────────────────────────────────────── */
+.moodboard-toolbar__popup--draw {
+    min-width: 188px;
+    padding: 8px;
+    box-sizing: border-box;
+}
+.moodboard-draw__panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.moodboard-draw__tool-row {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-start;
+}
+.moodboard-draw__section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.moodboard-draw__section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.moodboard-draw__section-label {
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 500;
+}
+.moodboard-draw__thickness-value {
+    font-size: 11px;
+    color: #374151;
+    font-weight: 600;
+    min-width: 28px;
+    text-align: right;
+}
+.moodboard-draw__slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: #e5e7eb;
+    outline: none;
+    cursor: pointer;
+}
+.moodboard-draw__slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #374151;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.moodboard-draw__slider::-webkit-slider-thumb:hover { background: #111827; }
+.moodboard-draw__slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #374151;
+    cursor: pointer;
+    border: none;
+}
+.moodboard-draw__color-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 24px);
+    gap: 4px;
+}
+.moodboard-draw__color-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.12s, border-color 0.12s;
+    position: relative;
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+.moodboard-draw__color-btn:hover {
+    transform: scale(1.15);
+    border-color: #9ca3af;
+}
+.moodboard-draw__color-btn--active {
+    border-color: #374151 !important;
+    transform: scale(1.1);
+}
+.moodboard-draw__color-btn--custom {
+    background: conic-gradient(
+        #ef4444, #f97316, #facc15, #22c55e, #3b82f6, #8b5cf6, #ec4899, #ef4444
+    );
+    overflow: hidden;
+}
+.moodboard-draw__color-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+}
 .moodboard-emoji__section { margin-bottom: 8px; }
 .moodboard-emoji__title {
     font-size: 12px;

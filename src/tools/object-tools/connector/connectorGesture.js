@@ -1,5 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { Events } from '../../../core/events/Events.js';
+import { buildPath } from '../../../services/ConnectorRouter.js';
 
 /**
  * Переиспользуемые хелперы жеста коннектора.
@@ -53,33 +54,46 @@ export function computeAnchor(eventBus, objectId, worldPt) {
 }
 
 /**
- * Рисует превью линии со стрелкой в PIXI-графику (PIXI 7 API).
+ * Рисует превью коннектора со стрелкой в PIXI-графику (PIXI 7 API).
+ * Маршрут совпадает с тем, что будет создан при отпускании (по умолчанию 'elbow'),
+ * поэтому «резинка» во время перетаскивания выглядит как итоговый коннектор.
  * graphics — PIXI.Graphics, уже добавленный в worldLayer.
+ *
+ * @param {string} route 'straight'|'elbow'|'bezier' — должен совпадать с дефолтом createConnectorFromTerminals
  */
-export function drawPreview(graphics, fromWorldPt, toWorldPt) {
+export function drawPreview(graphics, fromWorldPt, toWorldPt, route = 'elbow') {
     graphics.clear();
 
-    graphics.lineStyle({ width: 2, color: 0x2563EB, alpha: 0.7, cap: 'round' });
-    graphics.moveTo(fromWorldPt.x, fromWorldPt.y);
-    graphics.lineTo(toWorldPt.x, toWorldPt.y);
+    // Без привязанной грани dir-векторы неизвестны → buildPath даёт H-V-H/V-H-V излом
+    const pts = buildPath(fromWorldPt, toWorldPt, route);
+    if (pts.length < 2) return;
 
-    const dx = toWorldPt.x - fromWorldPt.x;
-    const dy = toWorldPt.y - fromWorldPt.y;
+    graphics.lineStyle({ width: 2, color: 0x2563EB, alpha: 0.7, cap: 'round', join: 'round' });
+    graphics.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) {
+        graphics.lineTo(pts[i].x, pts[i].y);
+    }
+
+    // Наконечник по направлению последнего сегмента — открытый chevron,
+    // как у финального коннектора (ConnectorLayer.drawHead, kind='arrow').
+    const tip  = pts[pts.length - 1];
+    const prev = pts[pts.length - 2];
+    const dx = tip.x - prev.x;
+    const dy = tip.y - prev.y;
     const len = Math.hypot(dx, dy);
     if (len > 10) {
         const ux = dx / len;
         const uy = dy / len;
-        const aLen = 10;
-        const aAng = 0.4;
-        graphics.beginFill(0x2563EB, 0.7);
-        graphics.drawPolygon([
-            toWorldPt.x, toWorldPt.y,
-            toWorldPt.x - aLen * (ux * Math.cos(aAng)  - uy * Math.sin(aAng)),
-            toWorldPt.y - aLen * (uy * Math.cos(aAng)  + ux * Math.sin(aAng)),
-            toWorldPt.x - aLen * (ux * Math.cos(-aAng) - uy * Math.sin(-aAng)),
-            toWorldPt.y - aLen * (uy * Math.cos(-aAng) + ux * Math.sin(-aAng)),
-        ]);
-        graphics.endFill();
+        const px = -uy;
+        const py =  ux;
+        const aLen  = 12;
+        const aHalf = 5;
+        const bx = tip.x - ux * aLen;
+        const by = tip.y - uy * aLen;
+        graphics.lineStyle({ width: 2, color: 0x2563EB, alpha: 0.7, cap: 'round', join: 'round' });
+        graphics.moveTo(bx + px * aHalf, by + py * aHalf);
+        graphics.lineTo(tip.x, tip.y);
+        graphics.lineTo(bx - px * aHalf, by - py * aHalf);
     }
 }
 
@@ -102,7 +116,7 @@ export function createConnectorFromTerminals(core, eventBus, sourceTerminal, end
             width: 2,
             dash: false,
             head: { start: false, end: true },
-            route: 'straight',
+            route: 'elbow',
         },
     });
 }
