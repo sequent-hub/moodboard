@@ -60,7 +60,6 @@ const BOARD_IMAGE_REARRANGE_MS = 520;
 const BOARD_IMAGE_PENDING_ENTER_FACTOR = 1.6;
 // Каскад между блоками одного батча (мс): пользователь видит, что они приезжают друг за другом.
 const BOARD_IMAGE_PENDING_STAGGER_MS = 90;
-const REFERENCE_DRAG_PREVIEW_SIZE = 96;
 
 const MODEL_OPTIONS = [
     {
@@ -145,12 +144,12 @@ export class ChatWindow {
         this._pendingOverlays = new Map();
         this._pendingOverlayTimers = new Map();
         this._boardImageShiftAnimations = new Map();
-        this._boardCursor = null;
-        this._draggedReferenceObject = null;
-        this._draggedReferenceStartPosition = null;
-        this._referenceDragPreview = null;
-        this._referenceDragHandlers = null;
         this._clearSelectionOnSendClick = null;
+        this._selectionHandlers = null;
+        // Окно от BoxSelectStart до BoxSelectCommit: в это время SelectionAdd
+        // приходит на каждый mousemove и не должен пушить превью в чат —
+        // финальный набор картинок мы получим из BoxSelectCommit по strict-contains.
+        this._boxSelectActive = false;
     }
 
     attach() {
@@ -180,7 +179,7 @@ export class ChatWindow {
         this._clearSelectionOnSendClick = () => this._clearBoardSelection();
         this._refs.send.addEventListener('click', this._clearSelectionOnSendClick);
         this._composer.attach();
-        this._attachReferenceDragEvents();
+        this._attachSelectionEvents();
 
         this._extendedPromptModal = new ChatExtendedPromptModal(
             this._container,
@@ -263,13 +262,12 @@ export class ChatWindow {
         if (!this._attached) return;
         this._clearPendingOverlays();
         this._cancelBoardImageShiftAnimations();
-        this._clearReferenceDragState();
         if (this._unsubscribe) { this._unsubscribe(); this._unsubscribe = null; }
         if (this._clearSelectionOnSendClick && this._refs?.send) {
             this._refs.send.removeEventListener('click', this._clearSelectionOnSendClick);
             this._clearSelectionOnSendClick = null;
         }
-        this._detachReferenceDragEvents();
+        this._detachSelectionEvents();
         this._shiftedForImageBatchKeys.clear();
         this._boardImageShiftHistory.clear();
         this._composer?.destroy();
@@ -465,175 +463,94 @@ export class ChatWindow {
         };
     }
 
-    _attachReferenceDragEvents() {
+    _attachSelectionEvents() {
         const eventBus = this._boardCore?.eventBus;
-        if (!eventBus || typeof eventBus.on !== 'function' || this._referenceDragHandlers) return;
+        if (!eventBus || typeof eventBus.on !== 'function' || this._selectionHandlers) return;
 
-        const onCursorMove = ({ x, y } = {}) => {
-            if (Number.isFinite(x) && Number.isFinite(y)) {
-                this._boardCursor = { x, y };
-                this._updateReferenceDragPreview();
-            }
-        };
-        const onDragStart = (data) => {
-            this._handleReferenceDragStart(data);
-        };
-        const onDragEnd = (data) => {
-            void this._handleReferenceDragEnd(data);
-        };
         const onSelectionAdd = (data) => {
             void this._handleSelectionAdd(data);
         };
+        const onSelectionRemove = (data) => {
+            const objectId = data?.object;
+            if (objectId) this._composer?.removeAttachmentForObject?.(objectId);
+        };
+        const onSelectionClear = () => {
+            this._composer?.removeAllBoardAttachments?.();
+        };
+        const onBoxSelectStart = () => {
+            this._boxSelectActive = true;
+        };
+        const onBoxSelectCommit = (data) => {
+            void this._handleBoxSelectCommit(data);
+        };
 
-        this._referenceDragHandlers = { onCursorMove, onDragStart, onDragEnd, onSelectionAdd };
-        eventBus.on(Events.UI.CursorMove, onCursorMove);
-        eventBus.on(Events.Tool.DragStart, onDragStart);
-        eventBus.on(Events.Tool.DragEnd, onDragEnd);
+        this._selectionHandlers = {
+            onSelectionAdd,
+            onSelectionRemove,
+            onSelectionClear,
+            onBoxSelectStart,
+            onBoxSelectCommit
+        };
         eventBus.on(Events.Tool.SelectionAdd, onSelectionAdd);
+        eventBus.on(Events.Tool.SelectionRemove, onSelectionRemove);
+        eventBus.on(Events.Tool.SelectionClear, onSelectionClear);
+        eventBus.on(Events.Tool.BoxSelectStart, onBoxSelectStart);
+        eventBus.on(Events.Tool.BoxSelectCommit, onBoxSelectCommit);
     }
 
-    _detachReferenceDragEvents() {
+    _detachSelectionEvents() {
         const eventBus = this._boardCore?.eventBus;
-        const handlers = this._referenceDragHandlers;
+        const handlers = this._selectionHandlers;
         if (!eventBus || typeof eventBus.off !== 'function' || !handlers) return;
 
-        eventBus.off(Events.UI.CursorMove, handlers.onCursorMove);
-        eventBus.off(Events.Tool.DragStart, handlers.onDragStart);
-        eventBus.off(Events.Tool.DragEnd, handlers.onDragEnd);
         eventBus.off(Events.Tool.SelectionAdd, handlers.onSelectionAdd);
-        this._referenceDragHandlers = null;
+        eventBus.off(Events.Tool.SelectionRemove, handlers.onSelectionRemove);
+        eventBus.off(Events.Tool.SelectionClear, handlers.onSelectionClear);
+        eventBus.off(Events.Tool.BoxSelectStart, handlers.onBoxSelectStart);
+        eventBus.off(Events.Tool.BoxSelectCommit, handlers.onBoxSelectCommit);
+        this._selectionHandlers = null;
+        this._boxSelectActive = false;
     }
 
     async _handleSelectionAdd(data = {}) {
+        // Во время box-select каждый mousemove перевыставляет selection и снова
+        // эмитит SelectionAdd для тех же id. Финальный набор reference-картинок
+        // мы получим из BoxSelectCommit по strict-contains, поэтому здесь молчим.
+        if (this._boxSelectActive) return;
+
         const objectId = data?.object;
         const object = this._boardCore?.state?.state?.objects?.find((item) => item?.id === objectId);
-        
+
         if (!isReferenceImageObject(object)) return;
 
         await this._addImageObjectAsReference(object);
     }
 
-    _handleReferenceDragStart(data = {}) {
-        const objectId = data?.object;
-        const object = this._boardCore?.state?.state?.objects?.find((item) => item?.id === objectId);
-        this._draggedReferenceObject = isReferenceImageObject(object) ? object : null;
-        this._draggedReferenceStartPosition = this._draggedReferenceObject?.position
-            ? { ...this._draggedReferenceObject.position }
-            : null;
-        this._updateReferenceDragPreview();
-    }
+    async _handleBoxSelectCommit(data = {}) {
+        this._boxSelectActive = false;
+        const ids = Array.isArray(data?.selected) ? data.selected : (Array.isArray(data?.objects) ? data.objects : []);
+        if (!ids.length || !this._composer) return;
 
-    async _handleReferenceDragEnd(data = {}) {
-        const isDropTarget = this._isBoardCursorOverInput();
-        const objectId = data?.object;
-        const object = this._boardCore?.state?.state?.objects?.find((item) => item?.id === objectId);
-        const startPosition = this._draggedReferenceStartPosition;
-        this._clearReferenceDragState();
-        if (!isDropTarget || !isReferenceImageObject(object)) return null;
-
-        this._restoreReferenceObjectPosition(objectId, startPosition);
-        await this._addImageObjectAsReference(object);
-    }
-
-    _restoreReferenceObjectPosition(objectId, position) {
-        if (!objectId || !position) return;
-
-        const updatePosition = this._boardCore?.updateObjectPositionDirect;
-        if (typeof updatePosition === 'function') {
-            updatePosition.call(this._boardCore, objectId, position, { snap: false });
-            return;
+        const all = this._boardCore?.state?.state?.objects ?? [];
+        const byId = new Map(all.map((item) => [item?.id, item]));
+        const seen = new Set();
+        for (const id of ids) {
+            if (!id || seen.has(id)) continue;
+            seen.add(id);
+            const obj = byId.get(id);
+            if (!obj || !isReferenceImageObject(obj)) continue;
+            await this._addImageObjectAsReference(obj);
         }
-
-        const object = this._boardCore?.state?.state?.objects?.find((item) => item?.id === objectId);
-        if (object?.position) {
-            object.position = { ...position };
-        }
-    }
-
-    _updateReferenceDragPreview() {
-        const object = this._draggedReferenceObject;
-        if (!object || !this._isBoardCursorOverInput()) {
-            this._hideReferenceDragPreview();
-            return;
-        }
-
-        const src = getImageObjectSource(object);
-        if (!src) {
-            this._hideReferenceDragPreview();
-            return;
-        }
-
-        const preview = this._ensureReferenceDragPreview(object, src);
-        const { clientX, clientY } = this._getBoardCursorClientPosition();
-        preview.style.left = `${Math.round(clientX)}px`;
-        preview.style.top = `${Math.round(clientY)}px`;
-        this._refs?.textarea?.closest?.('.moodboard-chat__input-row')?.classList.add('is-reference-drop-target');
-    }
-
-    _ensureReferenceDragPreview(object, src) {
-        if (!this._referenceDragPreview) {
-            const preview = document.createElement('img');
-            preview.className = 'moodboard-chat__reference-drag-preview';
-            preview.alt = getImageObjectFileName(object, src);
-            preview.width = REFERENCE_DRAG_PREVIEW_SIZE;
-            preview.height = REFERENCE_DRAG_PREVIEW_SIZE;
-            document.body.appendChild(preview);
-            this._referenceDragPreview = preview;
-        }
-
-        if (this._referenceDragPreview.src !== src) {
-            this._referenceDragPreview.src = src;
-        }
-        this._referenceDragPreview.alt = getImageObjectFileName(object, src);
-
-        return this._referenceDragPreview;
-    }
-
-    _hideReferenceDragPreview() {
-        this._referenceDragPreview?.remove();
-        this._referenceDragPreview = null;
-        this._refs?.textarea?.closest?.('.moodboard-chat__input-row')?.classList.remove('is-reference-drop-target');
-    }
-
-    _clearReferenceDragState() {
-        this._draggedReferenceObject = null;
-        this._draggedReferenceStartPosition = null;
-        this._boardCursor = null;
-        this._hideReferenceDragPreview();
-    }
-
-    _isBoardCursorOverInput() {
-        const cursor = this._boardCursor;
-        const inputRow = this._refs?.textarea?.closest?.('.moodboard-chat__input-row');
-        if (!cursor || !inputRow) return false;
-
-        const containerRect = this._container.getBoundingClientRect?.();
-        const rect = inputRow.getBoundingClientRect();
-        const { clientX, clientY } = this._getBoardCursorClientPosition(containerRect);
-
-        return clientX >= rect.left
-            && clientX <= rect.right
-            && clientY >= rect.top
-            && clientY <= rect.bottom;
-    }
-
-    _getBoardCursorClientPosition(containerRect = null) {
-        const rect = containerRect || this._container.getBoundingClientRect?.();
-        const cursor = this._boardCursor || { x: 0, y: 0 };
-
-        return {
-            clientX: (rect?.left || 0) + cursor.x,
-            clientY: (rect?.top || 0) + cursor.y
-        };
     }
 
     async _addImageObjectAsReference(object) {
         if (!object || !this._composer) return;
+        if (this._composer.hasAttachmentForObject?.(object.id)) return;
 
         try {
             const file = await createFileFromImageObject(object);
             if (!file) return;
-            this._composer.addAttachment(file);
+            this._composer.addAttachment(file, { sourceObjectId: object.id });
             this._composer.focus();
         } catch (err) {
             console.warn('[ChatWindow] cannot add selected image reference:', err);

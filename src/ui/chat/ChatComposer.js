@@ -25,7 +25,12 @@ export class ChatComposer {
         this._statusBar = refs.statusBar ?? null;
         this._handlers = handlers;
         this._listeners = [];
-        /** @type {File[]} */
+        /**
+         * Внутреннее хранилище вложений. `sourceObjectId` нужен для дедупа
+         * reference-картинок, которые приходят из box-select / клика по объекту:
+         * один объект на доске = одно превью в композере.
+         * @type {{ file: File, sourceObjectId: string|null }[]}
+         */
         this._attachments = [];
     }
 
@@ -76,11 +81,52 @@ export class ChatComposer {
         this._textarea.focus();
     }
 
-    addAttachment(file) {
+    /**
+     * @param {File} file
+     * @param {{ sourceObjectId?: string|null }} [options] — `sourceObjectId`
+     *   передаётся для reference-картинок с доски; дубликаты по этому id игнорируются.
+     */
+    addAttachment(file, options = {}) {
         if (!file) return;
-        this._attachments.push(file);
+        const sourceObjectId = options?.sourceObjectId ?? null;
+        if (sourceObjectId && this._attachments.some((entry) => entry.sourceObjectId === sourceObjectId)) {
+            return;
+        }
+        this._attachments.push({ file, sourceObjectId });
         this._renderAttachmentsPreview();
         this._refreshSendState();
+    }
+
+    hasAttachmentForObject(sourceObjectId) {
+        if (!sourceObjectId) return false;
+        return this._attachments.some((entry) => entry.sourceObjectId === sourceObjectId);
+    }
+
+    /**
+     * Удаляет превью конкретного объекта доски. Вызывается при снятии фокуса с изображения.
+     * @param {string} sourceObjectId
+     */
+    removeAttachmentForObject(sourceObjectId) {
+        if (!sourceObjectId) return;
+        const before = this._attachments.length;
+        this._attachments = this._attachments.filter((entry) => entry.sourceObjectId !== sourceObjectId);
+        if (this._attachments.length !== before) {
+            this._renderAttachmentsPreview();
+            this._refreshSendState();
+        }
+    }
+
+    /**
+     * Удаляет все превью, добавленные с доски (sourceObjectId !== null).
+     * Файловые вложения (скрепка) не затрагиваются.
+     */
+    removeAllBoardAttachments() {
+        const before = this._attachments.length;
+        this._attachments = this._attachments.filter((entry) => entry.sourceObjectId === null);
+        if (this._attachments.length !== before) {
+            this._renderAttachmentsPreview();
+            this._refreshSendState();
+        }
     }
 
     destroy() {
@@ -95,7 +141,7 @@ export class ChatComposer {
         const hasAttachments = this._attachments.length > 0;
         if (!trimmed && !hasAttachments) return;
         if (this._send.dataset.state === 'streaming') return;
-        const attachments = [...this._attachments];
+        const attachments = this._attachments.map((entry) => entry.file);
         this._handlers.onSubmit?.(trimmed, attachments);
     }
 
@@ -110,7 +156,7 @@ export class ChatComposer {
         const files = Array.from(this._fileInput.files || []);
         if (!files.length) return;
         for (const file of files) {
-            this._attachments.push(file);
+            this._attachments.push({ file, sourceObjectId: null });
         }
         this._fileInput.value = '';
         this._renderAttachmentsPreview();
@@ -134,8 +180,8 @@ export class ChatComposer {
         inputRow?.classList.add('has-attachments');
         this._textarea.placeholder = 'Опишите правку, изменение или стилевое направление эталонного изображения';
         for (let i = 0; i < this._attachments.length; i++) {
-            const file = this._attachments[i];
-            const item = this._buildAttachmentItem(file, i);
+            const entry = this._attachments[i];
+            const item = this._buildAttachmentItem(entry.file, i);
             container.appendChild(item);
         }
     }

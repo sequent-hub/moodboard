@@ -202,28 +202,10 @@
     transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 
-.moodboard-chat__input-row.is-reference-drop-target {
-    background: rgba(99, 102, 241, 0.08);
-    box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.22);
-}
-
 .moodboard-chat__textarea-row {
     display: flex;
     align-items: flex-start;
     gap: 8px;
-}
-
-.moodboard-chat__reference-drag-preview {
-    position: fixed;
-    z-index: 2700;
-    width: 96px;
-    height: 96px;
-    object-fit: cover;
-    border-radius: 10px;
-    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.24);
-    transform: translate(-50%, -50%) scale(0.92);
-    pointer-events: none;
-    opacity: 0.96;
 }
 
 .moodboard-chat__input-row.has-attachments .moodboard-chat__textarea-row .moodboard-chat__pill-wrapper {

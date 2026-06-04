@@ -1,8 +1,24 @@
 import * as PIXI from 'pixi.js';
 
+import { Events } from '../../../core/events/Events.js';
+
 /**
- * BoxSelectController — управление рамкой выделения и выбором по пересечению
+ * BoxSelectController — управление рамкой выделения и выбором по пересечению.
+ *
+ * Помимо обычного `setSelection` по intersection, на завершение жеста (`end`)
+ * эмитит `Tool.BoxSelectCommit` с дополнительным набором `objects` — id объектов,
+ * чьи bbox целиком содержатся в финальном rect (strict contains). Этот канал
+ * нужен подписчикам, которым важно отличать «попали целиком» от «зацепили краем»
+ * (например, добавление reference-картинок в чат-композер).
  */
+function isRectContainedInRect(outer, inner) {
+    if (!outer || !inner) return false;
+    return inner.x >= outer.x
+        && inner.y >= outer.y
+        && inner.x + inner.width <= outer.x + outer.width
+        && inner.y + inner.height <= outer.y + outer.height;
+}
+
 export class BoxSelectController {
     constructor({ app, selection, emit, setSelection, clearSelection, rectIntersectsRect }) {
         this.app = app;
@@ -32,6 +48,7 @@ export class BoxSelectController {
             this.selectionGraphics.name = 'selection-box';
             this.app.stage.addChild(this.selectionGraphics);
         }
+        this.emit(Events.Tool.BoxSelectStart, {});
     }
 
     update(mouse) {
@@ -78,13 +95,17 @@ export class BoxSelectController {
         const y = Math.min(this.selectionBox.startY, this.selectionBox.endY);
         const w = Math.abs(this.selectionBox.endX - this.selectionBox.startX);
         const h = Math.abs(this.selectionBox.endY - this.selectionBox.startY);
+        let commitBox = null;
+        let containedIds = [];
+        let matched = [];
         if (w >= 2 && h >= 2) {
             const box = { x, y, width: w, height: h };
+            commitBox = box;
             const request = { objects: [] };
             this.emit('get:all:objects', request);
-            const matched = [];
             for (const item of request.objects) {
                 if (this.rectIntersectsRect(box, item.bounds)) matched.push(item.id);
+                if (isRectContainedInRect(box, item.bounds)) containedIds.push(item.id);
             }
             if (matched.length > 0) {
                 if (this.isMultiSelect) {
@@ -94,6 +115,7 @@ export class BoxSelectController {
                 }
             }
         }
+        this.emit(Events.Tool.BoxSelectCommit, { box: commitBox, objects: containedIds, selected: matched });
         this.isActive = false;
         this.selectionBox = null;
         if (this.selectionGraphics && this.selectionGraphics.parent) this.selectionGraphics.parent.removeChild(this.selectionGraphics);

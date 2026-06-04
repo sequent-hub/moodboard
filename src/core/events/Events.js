@@ -9,6 +9,8 @@ export const Events = {
 		SelectionRemove: 'tool:selection:remove',
 		SelectionClear: 'tool:selection:clear',
 		SelectionAll: 'tool:selection:all',
+		BoxSelectStart: 'tool:box:select:start',
+		BoxSelectCommit: 'tool:box:select:commit',
 		HitTest: 'tool:hit:test',
 		GetSelection: 'tool:get:selection',
 		GetAllObjects: 'tool:get:all:objects',
