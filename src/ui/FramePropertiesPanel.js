@@ -39,6 +39,9 @@ export class FramePropertiesPanel {
         this._handlers.onPanUpdate = () => {
             if (this.currentId) this._repositionThrottled();
         };
+        this._handlers.onViewportChanged = () => {
+            if (this.currentId) this._repositionThrottled();
+        };
         this._handlers.onActivated = ({ tool }) => {
             if (tool !== 'select') this.hide();
         };
@@ -75,6 +78,7 @@ export class FramePropertiesPanel {
         this.eventBus.on(Events.Tool.RotateUpdate, this._handlers.onRotateUpdate);
         this.eventBus.on(Events.UI.ZoomPercent, this._handlers.onZoomPercent);
         this.eventBus.on(Events.Tool.PanUpdate, this._handlers.onPanUpdate);
+        this.eventBus.on(Events.Viewport.Changed, this._handlers.onViewportChanged);
         this.eventBus.on(Events.Tool.Activated, this._handlers.onActivated);
         this.eventBus.on(Events.Object.StateChanged, this._handlers.onStateChanged);
         this.eventBus.on(Events.History.Changed, this._handlers.onHistoryChanged);
@@ -659,6 +663,7 @@ export class FramePropertiesPanel {
             this.eventBus.off(Events.Tool.RotateUpdate, this._handlers.onRotateUpdate);
             this.eventBus.off(Events.UI.ZoomPercent, this._handlers.onZoomPercent);
             this.eventBus.off(Events.Tool.PanUpdate, this._handlers.onPanUpdate);
+            this.eventBus.off(Events.Viewport.Changed, this._handlers.onViewportChanged);
             this.eventBus.off(Events.Tool.Activated, this._handlers.onActivated);
             this.eventBus.off(Events.Object.StateChanged, this._handlers.onStateChanged);
             this.eventBus.off(Events.History.Changed, this._handlers.onHistoryChanged);

@@ -600,6 +600,7 @@ export function openMindmapEditor(object, create = false) {
         [Events.Tool.GroupRotateUpdate, onGroupSync],
         [Events.UI.ZoomPercent, () => syncEditorBoundsToObject()],
         [Events.Tool.PanUpdate, () => syncEditorBoundsToObject()],
+        [Events.Viewport.Changed, () => syncEditorBoundsToObject()],
     ]);
 
     const initialContent = String(properties.content || '');

@@ -33,9 +33,12 @@ export class CommentPinLayer {
         this._onPinClick = this._onPinClick.bind(this);
         this._onPinPointerDown = this._onPinPointerDown.bind(this);
         this._onRemote = () => this.rebuild();
-        /** Показывать ли resolved-пины. По умолчанию true. */
+        /** Показывать ли resolved-пины. По умолчанию true. Управляется CommentsBar. */
         this.showResolved = true;
-        this._filterBtn = null;
+        this._onResolvedFilterChanged = ({ showResolved }) => {
+            this.showResolved = !!showResolved;
+            this._applyResolvedFilter();
+        };
         /** true — последний pointerup завершил drag; следующий click должен быть проигнорирован */
         this._lastDragWasMoved = false;
         /** Черновой пин (показывается до создания первого сообщения треда) */
@@ -59,18 +62,8 @@ export class CommentPinLayer {
         });
         this.container.appendChild(this.layer);
 
-        this._filterBtn = document.createElement('button');
-        this._filterBtn.type = 'button';
-        this._filterBtn.className = 'comment-pin-layer__filter-btn';
-        this._filterBtn.addEventListener('click', () => {
-            this.showResolved = !this.showResolved;
-            this._syncFilterBtn();
-            this._applyResolvedFilter();
-        });
-        this.layer.appendChild(this._filterBtn);
-        this._syncFilterBtn();
-
         const ev = [
+            [Events.Comment.ResolvedFilterChanged, this._onResolvedFilterChanged],
             [Events.Viewport.Changed, this._onReproject],
             [Events.Tool.PanUpdate, this._onReproject],
             [Events.UI.ZoomPercent, this._onReproject],
@@ -103,7 +96,6 @@ export class CommentPinLayer {
         if (this._onResize) window.removeEventListener('resize', this._onResize);
         this.pinEls.clear();
         this.pinWraps.clear();
-        this._filterBtn = null;
         this._hideDraftPin();
         if (this.layer) this.layer.remove();
         this.layer = null;
@@ -125,12 +117,6 @@ export class CommentPinLayer {
         }
         this.reprojectAll();
         this._applyResolvedFilter();
-    }
-
-    _syncFilterBtn() {
-        if (!this._filterBtn) return;
-        this._filterBtn.textContent = this.showResolved ? 'Скрыть решённые' : 'Показать все';
-        this._filterBtn.setAttribute('aria-pressed', String(!this.showResolved));
     }
 
     _applyResolvedFilter() {

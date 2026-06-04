@@ -114,6 +114,8 @@ export class MindmapHtmlTextLayer {
 
         this.eventBus.on(Events.UI.ZoomPercent, () => this.updateAll());
         this.eventBus.on(Events.Tool.PanUpdate, () => this.updateAll());
+        this._onViewportChanged = () => this.updateAll();
+        this.eventBus.on(Events.Viewport.Changed, this._onViewportChanged);
         this.eventBus.on(Events.UI.TextEditEnd, ({ objectId }) => {
             if (objectId && this.idToEl.has(objectId)) this._scheduleAutoFit(objectId);
         });
@@ -178,6 +180,10 @@ export class MindmapHtmlTextLayer {
     }
 
     destroy() {
+        if (this._onViewportChanged && this.eventBus) {
+            this.eventBus.off(Events.Viewport.Changed, this._onViewportChanged);
+            this._onViewportChanged = null;
+        }
         for (const [id, state] of this._hoverStates) {
             gsap.killTweensOf(state);
             this._detachPixiHover(id);

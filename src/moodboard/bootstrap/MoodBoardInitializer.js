@@ -4,8 +4,10 @@ import { createMoodBoardUi } from './MoodBoardUiFactory.js';
 import { bindSaveCallbacks } from '../integration/MoodBoardEventBindings.js';
 import { CommentService } from '../../services/comments/CommentService.js';
 import { CommentPinLayer } from '../../ui/comments/CommentPinLayer.js';
+import { CommentsBar } from '../../ui/CommentsBar.js';
 import { CommentThreadPopover } from '../../ui/comments/CommentThreadPopover.js';
 import { CommentTool } from '../../tools/object-tools/CommentTool.js';
+import { CommentListPanel } from '../../ui/comments/CommentListPanel.js';
 
 export async function wireCommentsSubsystem(board) {
     if (!board.options.enableComments || !board.options.comments) return;
@@ -36,6 +38,12 @@ export async function wireCommentsSubsystem(board) {
         board.commentService
     );
     board.commentPinLayer.attach();
+
+    board.commentsBar = new CommentsBar(board.workspaceElement, core.eventBus);
+    board.commentsBar.attach();
+
+    board.commentListPanel = new CommentListPanel(board.workspaceElement, core.eventBus, core, board.commentService);
+    board.commentListPanel.attach();
 
     const commentTool = new CommentTool(
         core.eventBus,

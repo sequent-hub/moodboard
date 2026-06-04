@@ -91,6 +91,7 @@ export class ConnectionAnchorsLayer {
             [Events.Tool.GroupResizeUpdate, () => this.update()],
             [Events.Tool.RotateUpdate, () => this.update()],
             [Events.Tool.PanUpdate, () => this.update()],
+            [Events.Viewport.Changed, () => this.update()],
             [Events.UI.ZoomPercent, () => this.update()],
             [Events.History.Changed, () => this.update()],
             [Events.Board.Loaded, () => this.update()]

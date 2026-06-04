@@ -53,6 +53,7 @@ export class ConnectorLabelLayer {
             [Events.Tool.GroupDragUpdate,   redraw],
             [Events.Tool.GroupResizeUpdate, redraw],
             [Events.Tool.PanUpdate,         redraw],
+            [Events.Viewport.Changed,       redraw],
             [Events.UI.ZoomPercent,         redraw],
         ];
 

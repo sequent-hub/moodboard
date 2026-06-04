@@ -247,6 +247,7 @@ export function setupLayerAndViewportFlow(core) {
         const s = world?.scale?.x || 1;
         world.x = view.clientWidth / 2 - worldX * s;
         world.y = view.clientHeight / 2 - worldY * s;
+        core.eventBus.emit(Events.Viewport.Changed);
     });
 
     core.eventBus.on(Events.Tool.GroupDragStart, (data) => {

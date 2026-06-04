@@ -15,6 +15,7 @@ export function attachTextPropertiesPanelEventBridge(panel) {
         onRotateUpdate: () => panel.reposition(),
         onZoomPercent: () => panel.reposition(),
         onPanUpdate: () => panel.reposition(),
+        onViewportChanged: () => panel.reposition(),
         onDeleted: ({ objectId }) => {
             if (panel.currentId && objectId === panel.currentId) {
                 panel.hide();
@@ -43,6 +44,7 @@ export function attachTextPropertiesPanelEventBridge(panel) {
     panel.eventBus.on(Events.Tool.RotateUpdate, panel._eventBridgeHandlers.onRotateUpdate);
     panel.eventBus.on(Events.UI.ZoomPercent, panel._eventBridgeHandlers.onZoomPercent);
     panel.eventBus.on(Events.Tool.PanUpdate, panel._eventBridgeHandlers.onPanUpdate);
+    panel.eventBus.on(Events.Viewport.Changed, panel._eventBridgeHandlers.onViewportChanged);
     panel.eventBus.on(Events.Object.Deleted, panel._eventBridgeHandlers.onDeleted);
     panel.eventBus.on(Events.UI.TextEditStart, panel._eventBridgeHandlers.onTextEditStart);
     panel.eventBus.on(Events.UI.TextEditEnd, panel._eventBridgeHandlers.onTextEditEnd);
@@ -66,6 +68,7 @@ export function detachTextPropertiesPanelEventBridge(panel) {
     panel.eventBus.off(Events.Tool.RotateUpdate, panel._eventBridgeHandlers.onRotateUpdate);
     panel.eventBus.off(Events.UI.ZoomPercent, panel._eventBridgeHandlers.onZoomPercent);
     panel.eventBus.off(Events.Tool.PanUpdate, panel._eventBridgeHandlers.onPanUpdate);
+    panel.eventBus.off(Events.Viewport.Changed, panel._eventBridgeHandlers.onViewportChanged);
     panel.eventBus.off(Events.Object.Deleted, panel._eventBridgeHandlers.onDeleted);
     panel.eventBus.off(Events.UI.TextEditStart, panel._eventBridgeHandlers.onTextEditStart);
     panel.eventBus.off(Events.UI.TextEditEnd, panel._eventBridgeHandlers.onTextEditEnd);

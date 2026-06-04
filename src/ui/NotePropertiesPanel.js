@@ -45,6 +45,8 @@ export class NotePropertiesPanel {
         this.eventBus.on(Events.Tool.PanUpdate, () => {
             if (this.currentId) this.reposition();
         });
+        this._onViewportChanged = () => { if (this.currentId) this.reposition(); };
+        this.eventBus.on(Events.Viewport.Changed, this._onViewportChanged);
 
         // Скрываем панель при активации других инструментов
         this.eventBus.on(Events.Tool.Activated, ({ tool }) => {
@@ -596,6 +598,10 @@ export class NotePropertiesPanel {
     }
 
     destroy() {
+        if (this._onViewportChanged && this.eventBus?.off) {
+            this.eventBus.off(Events.Viewport.Changed, this._onViewportChanged);
+            this._onViewportChanged = null;
+        }
         if (this._onStateChanged && this.eventBus?.off) {
             this.eventBus.off(Events.Object.StateChanged, this._onStateChanged);
             this._onStateChanged = null;

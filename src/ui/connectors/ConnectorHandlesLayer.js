@@ -89,6 +89,7 @@ export class ConnectorHandlesLayer {
         on(Events.Tool.GroupResizeUpdate,  () => this._reposition());
         on(Events.Tool.RotateUpdate,       () => this._reposition());
         on(Events.Tool.PanUpdate,          () => this._reposition());
+        on(Events.Viewport.Changed,        () => this._reposition());
         on(Events.UI.ZoomPercent,          () => this._reposition());
         on(Events.History.Changed,         () => this._reposition());
 

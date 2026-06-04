@@ -95,6 +95,7 @@ export function registerNoteEditorSync(controller, { objectId, updateNoteEditor 
     const listeners = [
         [Events.UI.ZoomPercent, onZoom],
         [Events.Tool.PanUpdate, onPan],
+        [Events.Viewport.Changed, onPan],
         [Events.Tool.DragUpdate, onDrag],
         [Events.Tool.ResizeUpdate, onResize],
         [Events.Tool.RotateUpdate, onRotate],

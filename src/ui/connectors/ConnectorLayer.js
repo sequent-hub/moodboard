@@ -275,6 +275,7 @@ export class ConnectorLayer {
             [Events.Tool.GroupResizeUpdate,  () => this.updateAll()],
             [Events.Tool.RotateUpdate,       () => this.updateAll()],
             [Events.Tool.PanUpdate,          () => this.updateAll()],
+            [Events.Viewport.Changed,        () => this.updateAll()],
             [Events.UI.ZoomPercent,          () => this.updateAll()],
             [Events.History.Changed,         () => this.updateAll()],
             [Events.Board.Loaded,            () => this.updateAll()],

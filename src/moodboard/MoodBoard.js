@@ -53,6 +53,7 @@ export class MoodBoard {
         this.commentService = null;
         this.commentPinLayer = null;
         this.commentThreadPopover = null;
+        this.commentListPanel = null;
         
         this.data = data;
         
@@ -199,6 +200,10 @@ export class MoodBoard {
         if (this.commentThreadPopover) {
             this.commentThreadPopover.destroy();
             this.commentThreadPopover = null;
+        }
+        if (this.commentListPanel) {
+            this.commentListPanel.destroy();
+            this.commentListPanel = null;
         }
         if (this.commentService) {
             this.commentService.destroy();

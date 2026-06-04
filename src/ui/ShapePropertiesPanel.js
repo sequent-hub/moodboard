@@ -130,6 +130,7 @@ export class ShapePropertiesPanel {
             this.eventBus.off(Events.Tool.RotateUpdate,       H.onRotateUpdate);
             this.eventBus.off(Events.UI.ZoomPercent,          H.onZoom);
             this.eventBus.off(Events.Tool.PanUpdate,          H.onPan);
+            this.eventBus.off(Events.Viewport.Changed,        H.onViewportChanged);
             this.eventBus.off(Events.Tool.Activated,          H.onActivated);
             this.eventBus.off(Events.Object.StateChanged,     H.onStateChanged);
             this.eventBus.off(Events.History.Changed,         H.onHistoryChanged);
@@ -172,6 +173,7 @@ export class ShapePropertiesPanel {
         H.onRotateUpdate    = () => this._repositionThrottled();
         H.onZoom            = () => { if (this.currentId) this._repositionThrottled(); };
         H.onPan             = () => { if (this.currentId) this._repositionThrottled(); };
+        H.onViewportChanged = () => { if (this.currentId) this._repositionThrottled(); };
         H.onActivated       = ({ tool }) => { if (tool !== 'select') this.hide(); };
         H.onStateChanged    = ({ objectId }) => {
             if (this.currentId && objectId === this.currentId &&
@@ -205,6 +207,7 @@ export class ShapePropertiesPanel {
         this.eventBus.on(Events.Tool.RotateUpdate,       H.onRotateUpdate);
         this.eventBus.on(Events.UI.ZoomPercent,          H.onZoom);
         this.eventBus.on(Events.Tool.PanUpdate,          H.onPan);
+        this.eventBus.on(Events.Viewport.Changed,        H.onViewportChanged);
         this.eventBus.on(Events.Tool.Activated,          H.onActivated);
         this.eventBus.on(Events.Object.StateChanged,     H.onStateChanged);
         this.eventBus.on(Events.History.Changed,         H.onHistoryChanged);

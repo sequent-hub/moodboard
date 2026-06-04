@@ -21,6 +21,7 @@ export function attachConnectorPropertiesPanelEventBridge(inst) {
 
         onZoomPercent:     () => { if (inst.currentId) inst.reposition(); },
         onPanUpdate:       () => { if (inst.currentId) inst.reposition(); },
+        onViewportChanged: () => { if (inst.currentId) inst.reposition(); },
 
         onDeleted: (objectId) => {
             if (inst.currentId && objectId === inst.currentId) inst.hide();
@@ -65,6 +66,7 @@ export function attachConnectorPropertiesPanelEventBridge(inst) {
 
     eb.on(Events.UI.ZoomPercent,       h.onZoomPercent);
     eb.on(Events.Tool.PanUpdate,       h.onPanUpdate);
+    eb.on(Events.Viewport.Changed,     h.onViewportChanged);
 
     eb.on(Events.Object.Deleted,       h.onDeleted);
     eb.on(Events.Tool.Activated,       h.onToolActivated);
@@ -100,6 +102,7 @@ export function detachConnectorPropertiesPanelEventBridge(inst) {
 
     eb.off(Events.UI.ZoomPercent,       h.onZoomPercent);
     eb.off(Events.Tool.PanUpdate,       h.onPanUpdate);
+    eb.off(Events.Viewport.Changed,     h.onViewportChanged);
 
     eb.off(Events.Object.Deleted,       h.onDeleted);
     eb.off(Events.Tool.Activated,       h.onToolActivated);

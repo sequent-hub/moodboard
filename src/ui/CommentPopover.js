@@ -40,6 +40,8 @@ export class CommentPopover {
         this.eventBus.on(Events.Tool.RotateUpdate, () => this.reposition());
         this.eventBus.on(Events.UI.ZoomPercent, () => this.reposition());
         this.eventBus.on(Events.Tool.PanUpdate, () => this.reposition());
+        this._onViewportChanged = () => this.reposition();
+        this.eventBus.on(Events.Viewport.Changed, this._onViewportChanged);
         this.eventBus.on(Events.Object.Deleted, ({ objectId }) => {
             if (this.currentId && objectId === this.currentId) this.hide();
             // По желанию можно очистить: this.commentsById.delete(objectId);
@@ -48,6 +50,10 @@ export class CommentPopover {
 
     destroy() {
         this.hide();
+        if (this._onViewportChanged && this.eventBus?.off) {
+            this.eventBus.off(Events.Viewport.Changed, this._onViewportChanged);
+            this._onViewportChanged = null;
+        }
         if (this.layer) this.layer.remove();
         this.layer = null;
     }

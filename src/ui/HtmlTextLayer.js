@@ -214,6 +214,8 @@ export class HtmlTextLayer {
         // На все операции зума/пэна — полное обновление
         this.eventBus.on(Events.UI.ZoomPercent, () => this.updateAll());
         this.eventBus.on(Events.Tool.PanUpdate, () => this.updateAll());
+        this._onViewportChanged = () => this.updateAll();
+        this.eventBus.on(Events.Viewport.Changed, this._onViewportChanged);
         // Обновления в реальном времени при перетаскивании/ресайзе/повороте
         this.eventBus.on(Events.Tool.DragUpdate, ({ object }) => this.updateOne(object));
         this.eventBus.on(Events.Tool.ResizeUpdate, ({ object }) => this.updateOne(object));
@@ -306,6 +308,10 @@ export class HtmlTextLayer {
         this._hoveredTextId = null;
         // Отписываемся от событий
         if (this.eventBus) {
+            if (this._onViewportChanged) {
+                this.eventBus.off(Events.Viewport.Changed, this._onViewportChanged);
+                this._onViewportChanged = null;
+            }
             if (this._onTransformStart) {
                 this.eventBus.off(Events.Tool.DragStart, this._onTransformStart);
                 this.eventBus.off(Events.Tool.GroupDragStart, this._onTransformStart);

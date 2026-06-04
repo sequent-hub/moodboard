@@ -161,6 +161,7 @@ export class MindmapCollapseLayer {
             [Events.Tool.GroupDragUpdate,    reposition],
             [Events.Tool.GroupResizeUpdate,  reposition],
             [Events.Tool.PanUpdate,          reposition],
+            [Events.Viewport.Changed,        reposition],
             [Events.UI.ZoomPercent,          reposition],
             [Events.Object.TransformUpdated, reposition],
         ];
