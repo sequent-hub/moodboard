@@ -144,8 +144,10 @@ export class ChatWindow {
         this._pendingOverlays = new Map();
         this._pendingOverlayTimers = new Map();
         this._boardImageShiftAnimations = new Map();
+        this._pendingBatchOffsets = new Map();
         this._clearSelectionOnSendClick = null;
         this._selectionHandlers = null;
+        this._viewportHandlers = null;
         // Окно от BoxSelectStart до BoxSelectCommit: в это время SelectionAdd
         // приходит на каждый mousemove и не должен пушить превью в чат —
         // финальный набор картинок мы получим из BoxSelectCommit по strict-contains.
@@ -180,6 +182,7 @@ export class ChatWindow {
         this._refs.send.addEventListener('click', this._clearSelectionOnSendClick);
         this._composer.attach();
         this._attachSelectionEvents();
+        this._attachViewportSync();
 
         this._extendedPromptModal = new ChatExtendedPromptModal(
             this._container,
@@ -268,8 +271,10 @@ export class ChatWindow {
             this._clearSelectionOnSendClick = null;
         }
         this._detachSelectionEvents();
+        this._detachViewportSync();
         this._shiftedForImageBatchKeys.clear();
         this._boardImageShiftHistory.clear();
+        this._pendingBatchOffsets.clear();
         this._composer?.destroy();
         this._extendedPromptModal?.destroy();
         this._contentTypeMenu?.destroy();
@@ -338,6 +343,7 @@ export class ChatWindow {
         if (state.status !== 'streaming') {
             this._revertFailedBatchShifts(state.messages);
         }
+        this._cleanupPlacedBatchOffsets(state.messages);
         this._messageList.render(state.messages);
         this._contentTypeMenu.refresh();
         this._modelMenu.refresh();
@@ -367,35 +373,62 @@ export class ChatWindow {
         const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
         const s = world?.scale?.x || 1;
 
-        this._shiftExistingImagesForBatch(messages, pending[0].id, s);
+        // Смещаем уже размещённые board-объекты для каждого батча (дедупликация внутри метода)
+        const shiftedBids = new Set();
+        for (const m of pending) {
+            const bid = m.batchId || m.id;
+            if (!shiftedBids.has(bid)) {
+                shiftedBids.add(bid);
+                this._shiftExistingImagesForBatch(messages, m.id, s);
+            }
+        }
 
-        const [wr, hr] = parseFormatRatio(this._formatId);
-        const ratio = wr / hr;
-        const wScreen = Math.round(BOARD_IMAGE_WIDTH * s);
-        const hScreen = Math.round(wScreen / ratio);
-        const enterDistance = Math.round(BOARD_IMAGE_STEP * s * BOARD_IMAGE_PENDING_ENTER_FACTOR);
+        // Смещаем pending-оверлеи для новых батчей (от старших к новейшему)
+        const pendingBatchMeta = [];
+        const seenBids = new Set();
+        for (const m of pending) {
+            if (m.batchId && !seenBids.has(m.batchId)) {
+                seenBids.add(m.batchId);
+                pendingBatchMeta.push({
+                    batchId: m.batchId,
+                    count: pending.filter((pm) => pm.batchId === m.batchId).length
+                });
+            }
+        }
+        for (const { batchId, count } of pendingBatchMeta) {
+            this._shiftPendingOverlaysForNewBatch(batchId, count, s);
+        }
+
+        const enterDistance = this._computeEnterDistance(messages, pending, s, Math.round(BOARD_IMAGE_WIDTH * s));
 
         let newIndex = 0;
         pending.forEach((message) => {
-            const slot = this._getImageBatchSlot(messages, message.id, s);
-            const left = Math.round(slot.x - wScreen / 2);
-            const top = Math.round(slot.y - hScreen / 2);
-
             const existing = this._pendingOverlays.get(message.id);
             if (existing) {
-                const el = existing.el;
-                el.style.left = `${left}px`;
-                el.style.top = `${top}px`;
-                el.style.width = `${wScreen}px`;
-                el.style.height = `${hScreen}px`;
-                el.style.setProperty('--moodboard-chat-board-animation-ms', `${BOARD_IMAGE_REARRANGE_MS}ms`);
-                el.style.setProperty('--moodboard-chat-pending-enter-x', `${enterDistance}px`);
+                // Мировые координаты оверлея зафиксированы в момент создания батча.
+                // Пересчитываем только экранную позицию из сохранённых world-координат,
+                // чтобы пан холста между рендерами не сдвигал worldX/worldY —
+                // иначе размещение реального изображения попадёт в неправильную точку.
+                const [wr2, hr2] = parseFormatRatio(this._formatId);
+                const wScreen2 = Math.round(BOARD_IMAGE_WIDTH * s);
+                const hScreen2 = Math.round(wScreen2 / (wr2 / hr2));
+                const screenLayout = {
+                    left: Math.round(existing.worldX * s + (world?.x || 0) - wScreen2 / 2),
+                    top: Math.round(existing.worldY * s + (world?.y || 0) - hScreen2 / 2),
+                    width: wScreen2,
+                    height: hScreen2,
+                    worldX: existing.worldX,
+                    worldY: existing.worldY
+                };
+                this._applyPendingOverlayScreenLayout(existing.el, screenLayout, { animate: true, enterDistance });
                 return;
             }
 
+            const layout = this._computePendingOverlayScreenLayout(messages, message.id, s);
+
             const overlay = document.createElement('div');
             overlay.className = 'moodboard-chat__pending-overlay moodboard-chat__pending-overlay--enter';
-            overlay.style.cssText = `left:${left}px;top:${top}px;width:${wScreen}px;height:${hScreen}px`;
+            overlay.style.cssText = `left:${layout.left}px;top:${layout.top}px;width:${layout.width}px;height:${layout.height}px`;
             overlay.style.setProperty('--moodboard-chat-board-animation-ms', `${BOARD_IMAGE_REARRANGE_MS}ms`);
             overlay.style.setProperty('--moodboard-chat-pending-enter-x', `${enterDistance}px`);
 
@@ -404,14 +437,19 @@ export class ChatWindow {
             label.textContent = 'В процессе...';
             overlay.appendChild(label);
 
-            document.body.appendChild(overlay);
+            (this._container ?? document.body).appendChild(overlay);
 
             // Принудительный reflow: фиксируем стартовое состояние (translateX справа + opacity 0)
             // в layout до переключения класса. Без этого браузер может смерджить два состояния
             // в один кадр и transition не запустится — заглушка появится мгновенно.
             void overlay.offsetWidth;
 
-            this._pendingOverlays.set(message.id, { el: overlay });
+            this._pendingOverlays.set(message.id, {
+                el: overlay,
+                batchId: message.batchId,
+                worldX: layout.worldX,
+                worldY: layout.worldY
+            });
 
             const stagger = newIndex * BOARD_IMAGE_PENDING_STAGGER_MS;
             newIndex += 1;
@@ -442,6 +480,39 @@ export class ChatWindow {
         }
     }
 
+    /**
+     * Вычисляет расстояние входа заглушки так, чтобы новая заглушка въезжала справа
+     * от уже размещённых AI-изображений на доске, а не накрывала их во время анимации
+     * сдвига. Без этого при N>1 изображений в батче enter-расстояние фиксированное
+     * (512px) не покрывало ширину существующего ряда (940px для трёх изображений),
+     * и заглушка пересекалась с ещё не ушедшими влево картинками.
+     */
+    _computeEnterDistance(messages, pending, scale, wScreen) {
+        const baseEnter = Math.round(BOARD_IMAGE_STEP * scale * BOARD_IMAGE_PENDING_ENTER_FACTOR);
+
+        const aiObjects = this._getBoardAiImageObjects();
+        if (aiObjects.length === 0) return baseEnter;
+
+        const firstNewPending = pending.find((m) => !this._pendingOverlays.has(m.id));
+        if (!firstNewPending) return baseEnter;
+
+        const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
+        const worldX = world?.x || 0;
+        const existingRight_world = Math.max(...aiObjects.map((obj) => obj.position.x + getBoardObjectWidth(obj)));
+        const existingRight_screen = Math.round(existingRight_world * scale + worldX);
+
+        const step = Math.round(BOARD_IMAGE_STEP * scale);
+        const gap = Math.round(BOARD_IMAGE_GAP * scale);
+
+        const slot = this._getImageBatchSlot(messages, firstNewPending.id, scale);
+        const batch = findImageGenerationBatch(messages, firstNewPending.id);
+        const leftmostSlotX = Math.round(slot.x - batch.index * step);
+        const leftmostFinalLeft = leftmostSlotX - Math.round(wScreen / 2);
+
+        const neededEnter = existingRight_screen - leftmostFinalLeft + gap;
+        return Math.max(baseEnter, Math.ceil(neededEnter));
+    }
+
     _clearPendingOverlays() {
         for (const record of this._pendingOverlays.values()) {
             record.el.remove();
@@ -451,6 +522,54 @@ export class ChatWindow {
             clearTimeout(timer);
         }
         this._pendingOverlayTimers.clear();
+        this._pendingBatchOffsets.clear();
+    }
+
+    _shiftPendingOverlaysForNewBatch(batchId, count, scale) {
+        if (!batchId || this._pendingBatchOffsets.has(batchId)) return;
+
+        const step = Math.round(BOARD_IMAGE_STEP * scale);
+        const shiftAmount = count * step;
+
+        for (const [existingId, offset] of this._pendingBatchOffsets) {
+            this._pendingBatchOffsets.set(existingId, offset - shiftAmount);
+        }
+        this._pendingBatchOffsets.set(batchId, 0);
+
+        let existingOverlaysShifted = false;
+        const messages = this._session?.getState?.()?.messages || [];
+        for (const [messageId, record] of this._pendingOverlays) {
+            if (record.batchId === batchId) continue;
+            const layout = this._computePendingOverlayScreenLayout(messages, messageId, scale);
+            record.worldX = layout.worldX;
+            record.worldY = layout.worldY;
+            this._applyPendingOverlayScreenLayout(record.el, layout, { animate: true });
+            existingOverlaysShifted = true;
+        }
+
+        // Когда существующие заглушки сдвигаются влево, уже размещённые AI-изображения
+        // на доске должны сдвинуться на то же расстояние — иначе они окажутся
+        // правее заглушек и перекроются ими.
+        if (!existingOverlaysShifted) return;
+
+        const worldShift = shiftAmount / scale;
+        for (const obj of this._getBoardAiImageObjects()) {
+            if (obj?.position) {
+                const from = { x: obj.position.x, y: obj.position.y };
+                const to = { x: Math.round(obj.position.x - worldShift), y: obj.position.y };
+                this._animateBoardImageToPosition(obj.id, from, to);
+            }
+        }
+    }
+
+    _cleanupPlacedBatchOffsets(messages) {
+        if (this._pendingBatchOffsets.size === 0) return;
+        for (const batchId of [...this._pendingBatchOffsets.keys()]) {
+            const batchMessages = (messages || []).filter((m) => m.batchId === batchId);
+            if (batchMessages.length === 0 || batchMessages.every((m) => !m.pending)) {
+                this._pendingBatchOffsets.delete(batchId);
+            }
+        }
     }
 
     _getImageRequestOptions() {
@@ -461,6 +580,107 @@ export class ChatWindow {
             model: this._modelId === 'yandex' ? 'yandex-art' : undefined,
             imageCount: parseImageCount(this._countId)
         };
+    }
+
+    _computePendingOverlayScreenLayout(messages, messageId, scale = 1) {
+        const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
+        const s = scale || world?.scale?.x || 1;
+        const [wr, hr] = parseFormatRatio(this._formatId);
+        const ratio = wr / hr;
+        const wScreen = Math.round(BOARD_IMAGE_WIDTH * s);
+        const hScreen = Math.round(wScreen / ratio);
+        const slot = this._getImageBatchSlot(messages, messageId, s);
+        const worldX = (slot.x - (world?.x || 0)) / s;
+        const worldY = (slot.y - (world?.y || 0)) / s;
+        const screenX = Math.round(worldX * s + (world?.x || 0));
+        const screenY = Math.round(worldY * s + (world?.y || 0));
+
+        return {
+            left: Math.round(screenX - wScreen / 2),
+            top: Math.round(screenY - hScreen / 2),
+            width: wScreen,
+            height: hScreen,
+            worldX,
+            worldY
+        };
+    }
+
+    _applyPendingOverlayScreenLayout(el, layout, { animate = false, enterDistance } = {}) {
+        el.style.left = `${layout.left}px`;
+        el.style.top = `${layout.top}px`;
+        el.style.width = `${layout.width}px`;
+        el.style.height = `${layout.height}px`;
+        if (!animate) return;
+
+        el.style.setProperty('--moodboard-chat-board-animation-ms', `${BOARD_IMAGE_REARRANGE_MS}ms`);
+        if (enterDistance != null) {
+            el.style.setProperty('--moodboard-chat-pending-enter-x', `${enterDistance}px`);
+        }
+    }
+
+    /**
+     * Пересчитывает screen-позиции заглушек из world-координат — вместе с AI-изображениями на доске при pan/zoom.
+     */
+    _syncPendingOverlaysToViewport({ disableTransition = false, recomputeWorld = false } = {}) {
+        if (this._pendingOverlays.size === 0) return;
+
+        const messages = this._session?.getState?.()?.messages;
+        const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
+        const s = world?.scale?.x || 1;
+        const [wr, hr] = parseFormatRatio(this._formatId);
+        const wScreen = Math.round(BOARD_IMAGE_WIDTH * s);
+        const hScreen = Math.round(wScreen / (wr / hr));
+
+        for (const [messageId, record] of this._pendingOverlays) {
+            if (recomputeWorld || typeof record.worldX !== 'number' || typeof record.worldY !== 'number') {
+                const layout = this._computePendingOverlayScreenLayout(messages, messageId, s);
+                record.worldX = layout.worldX;
+                record.worldY = layout.worldY;
+            }
+
+            const screenX = Math.round(record.worldX * s + (world?.x || 0));
+            const screenY = Math.round(record.worldY * s + (world?.y || 0));
+            const el = record.el;
+            if (disableTransition) {
+                el.style.transition = 'none';
+            }
+            el.style.left = `${Math.round(screenX - wScreen / 2)}px`;
+            el.style.top = `${Math.round(screenY - hScreen / 2)}px`;
+            el.style.width = `${wScreen}px`;
+            el.style.height = `${hScreen}px`;
+            if (disableTransition) {
+                void el.offsetWidth;
+                el.style.removeProperty('transition');
+            }
+        }
+    }
+
+    _attachViewportSync() {
+        const eventBus = this._boardCore?.eventBus;
+        if (!eventBus || typeof eventBus.on !== 'function' || this._viewportHandlers) return;
+
+        const onPanUpdate = () => {
+            this._syncPendingOverlaysToViewport({ disableTransition: true });
+        };
+        const onViewportChange = () => {
+            this._syncPendingOverlaysToViewport({ disableTransition: true, recomputeWorld: false });
+        };
+
+        this._viewportHandlers = { onPanUpdate, onViewportChange };
+        eventBus.on(Events.Tool.PanUpdate, onPanUpdate);
+        eventBus.on(Events.UI.ZoomPercent, onViewportChange);
+        eventBus.on(Events.Viewport.Changed, onViewportChange);
+    }
+
+    _detachViewportSync() {
+        const eventBus = this._boardCore?.eventBus;
+        const handlers = this._viewportHandlers;
+        if (!eventBus || typeof eventBus.off !== 'function' || !handlers) return;
+
+        eventBus.off(Events.Tool.PanUpdate, handlers.onPanUpdate);
+        eventBus.off(Events.UI.ZoomPercent, handlers.onViewportChange);
+        eventBus.off(Events.Viewport.Changed, handlers.onViewportChange);
+        this._viewportHandlers = null;
     }
 
     _attachSelectionEvents() {
@@ -563,7 +783,8 @@ export class ChatWindow {
         const step = Math.round(BOARD_IMAGE_STEP * scale);
         const count = Math.max(batch.count, 1);
         const index = Math.min(Math.max(batch.index, 0), count - 1);
-        const leftmostCenter = anchor.x - ((count - 1) * step) / 2;
+        const batchOffset = batch.batchId ? (this._pendingBatchOffsets.get(batch.batchId) ?? 0) : 0;
+        const leftmostCenter = anchor.x - ((count - 1) * step) / 2 + batchOffset;
 
         return {
             x: Math.round(leftmostCenter + index * step),
@@ -762,11 +983,24 @@ export class ChatWindow {
         const s = world?.scale?.x || 1;
         const messages = this._session.getState().messages;
         this._shiftExistingImagesForBatch(messages, msg.id, s);
-        const slot = this._getImageBatchSlot(messages, msg.id, s);
-        
+
+        // Pending-оверлей хранит worldX/worldY, зафиксированные в момент начала генерации.
+        // Используем их чтобы разместить изображение в той же мировой точке,
+        // независимо от того, сдвинул ли пользователь холст пока шла генерация.
+        const pendingRecord = this._pendingOverlays.get(msg.id);
+        let x, y;
+        if (pendingRecord && typeof pendingRecord.worldX === 'number' && typeof pendingRecord.worldY === 'number') {
+            x = Math.round(pendingRecord.worldX * s + (world?.x || 0));
+            y = Math.round(pendingRecord.worldY * s + (world?.y || 0));
+        } else {
+            const slot = this._getImageBatchSlot(messages, msg.id, s);
+            x = slot.x;
+            y = slot.y;
+        }
+
         this._boardCore.eventBus.emit(Events.UI.PasteImageAt, {
-            x: slot.x,
-            y: slot.y,
+            x,
+            y,
             src: dataUrl,
             name: 'ai-generated.jpg',
             skipUpload: true
@@ -828,13 +1062,25 @@ function findImageGenerationBatch(messages, messageId) {
         return { index: 0, count: 1 };
     }
 
+    const target = list[targetIndex];
+    if (target?.batchId) {
+        const batchMessages = list.filter((m) => m.batchId === target.batchId);
+        const index = batchMessages.findIndex((m) => m.id === messageId);
+        return {
+            index: Math.max(index, 0),
+            count: batchMessages.length,
+            ids: batchMessages.map((m) => m.id),
+            batchId: target.batchId
+        };
+    }
+
     let start = targetIndex;
-    while (start > 0 && isImageGenerationMessage(list[start - 1])) {
+    while (start > 0 && isImageGenerationMessage(list[start - 1]) && !list[start - 1].batchId) {
         start--;
     }
 
     let end = targetIndex;
-    while (end + 1 < list.length && isImageGenerationMessage(list[end + 1])) {
+    while (end + 1 < list.length && isImageGenerationMessage(list[end + 1]) && !list[end + 1].batchId) {
         end++;
     }
 

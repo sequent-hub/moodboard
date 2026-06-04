@@ -34,8 +34,9 @@
     scroll-behavior: smooth;
 }
 
+/* TODO: установить flex, когда будем прикручивать историю */
 .moodboard-chat__history.is-visible {
-    display: flex;
+    display: none;
 }
 
 .moodboard-chat__msg {
@@ -703,6 +704,7 @@
     pointer-events: none;
     z-index: 10;
     transition:
+        left var(--moodboard-chat-board-animation-ms) cubic-bezier(0.22, 1, 0.36, 1),
         transform var(--moodboard-chat-board-animation-ms) cubic-bezier(0.22, 1, 0.36, 1),
         opacity var(--moodboard-chat-board-animation-ms) ease;
     will-change: transform, opacity;

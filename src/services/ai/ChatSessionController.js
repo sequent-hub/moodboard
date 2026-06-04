@@ -41,6 +41,7 @@ export class ChatSessionController {
         this._settingsStorage = settingsStorage || (typeof localStorage !== 'undefined' ? localStorage : null);
         this._listeners = new Set();
         this._abort = null;
+        this._aborts = new Map();
 
         this._state = {
             messages: this._history.load().map((m) => (m.pending ? { ...m, pending: false, error: m.error || 'Прервано' } : m)),
@@ -103,10 +104,11 @@ export class ChatSessionController {
     }
 
     abort() {
-        if (this._abort) {
-            try { this._abort.abort(); } catch { /* noop */ }
-            this._abort = null;
+        for (const controller of this._aborts.values()) {
+            try { controller.abort(); } catch { /* noop */ }
         }
+        this._aborts.clear();
+        this._abort = null;
     }
 
     /**
@@ -116,14 +118,15 @@ export class ChatSessionController {
      */
     async send(text, options = {}) {
         const trimmed = (text || '').trim();
-        if (!trimmed || this._state.status === 'streaming') return;
+        if (!trimmed) return;
 
         const imageCount = normalizeImageCount(options.imageCount);
+        const batchId = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const userMsg = makeMessage('user', trimmed);
         const assistantMsgs = Array.from({ length: imageCount }, (_, index) => makeMessage(
             'assistant',
             imageCount > 1 ? `Генерируется изображение ${index + 1} из ${imageCount}…` : '',
-            { provider: 'yandex-art', pending: true, kind: 'image' }
+            { provider: 'yandex-art', pending: true, kind: 'image', batchId }
         ));
 
         this._state = {
@@ -136,6 +139,7 @@ export class ChatSessionController {
         this._emit();
 
         const abort = new AbortController();
+        this._aborts.set(batchId, abort);
         this._abort = abort;
         let lastError = null;
 
@@ -174,11 +178,13 @@ export class ChatSessionController {
                 })
             );
         } finally {
-            this._abort = null;
+            this._aborts.delete(batchId);
+            this._abort = this._aborts.size > 0 ? [...this._aborts.values()][this._aborts.size - 1] : null;
+            const stillStreaming = this._state.messages.some((m) => m.pending);
             this._state = {
                 ...this._state,
-                status: lastError ? 'error' : 'idle',
-                error: lastError
+                status: stillStreaming ? 'streaming' : (lastError ? 'error' : 'idle'),
+                error: stillStreaming ? this._state.error : lastError
             };
             this._history.save(this._state.messages);
             this._emit();

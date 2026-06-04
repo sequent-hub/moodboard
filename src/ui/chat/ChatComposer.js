@@ -47,7 +47,7 @@ export class ChatComposer {
         });
         this._on(this._send, 'click', () => {
             if (this._send.dataset.state === 'streaming') {
-                this._handlers.onAbort?.();
+                if (this._hasContent()) this._submit();
             } else {
                 this._submit();
             }
@@ -140,7 +140,6 @@ export class ChatComposer {
         const trimmed = text.trim();
         const hasAttachments = this._attachments.length > 0;
         if (!trimmed && !hasAttachments) return;
-        if (this._send.dataset.state === 'streaming') return;
         const attachments = this._attachments.map((entry) => entry.file);
         this._textarea.value = '';
         this._attachments = [];
@@ -148,6 +147,10 @@ export class ChatComposer {
         if (this._attachmentsPreview) this._renderAttachmentsPreview();
         this._refreshSendState();
         this._handlers.onSubmit?.(trimmed, attachments);
+    }
+
+    _hasContent() {
+        return this._textarea.value.trim().length > 0 || this._attachments.length > 0;
     }
 
     _refreshSendState() {
