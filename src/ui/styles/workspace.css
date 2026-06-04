@@ -764,10 +764,10 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 10px;
+    padding: 8px;
     background: #fff;
     border: 1px solid #e0e0e0;
-    border-radius: 10px;
+    border-radius: 9999px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.12);
     z-index: 3000;
     pointer-events: auto;
@@ -834,10 +834,10 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 10px;
+    padding: 8px;
     background: #fff;
     border: 1px solid #e0e0e0;
-    border-radius: 10px;
+    border-radius: 9999px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.12);
     z-index: 3000;
 }
