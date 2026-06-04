@@ -6,6 +6,7 @@ import { IconLoader } from '../utils/iconLoader.js';
 import { ToolbarDialogsController } from './toolbar/ToolbarDialogsController.js';
 import { ToolbarPopupsController } from './toolbar/ToolbarPopupsController.js';
 import { ToolbarActionRouter } from './toolbar/ToolbarActionRouter.js';
+import { ReactionsPopupController } from './toolbar/ReactionsPopupController.js';
 import { ToolbarTooltipController } from './toolbar/ToolbarTooltipController.js';
 import { ToolbarStateController } from './toolbar/ToolbarStateController.js';
 import { ToolbarRenderer } from './toolbar/ToolbarRenderer.js';
@@ -27,6 +28,7 @@ export class Toolbar {
 
         this.dialogsController = new ToolbarDialogsController(this);
         this.popupsController = new ToolbarPopupsController(this);
+        this.reactionsController = new ReactionsPopupController(this);
         this.actionRouter = new ToolbarActionRouter(this);
         this.tooltipController = new ToolbarTooltipController(this);
         this.stateController = new ToolbarStateController(this);
@@ -134,18 +136,21 @@ export class Toolbar {
             const isInsideDrawPopup = this.drawPopupEl && this.drawPopupEl.contains(e.target);
             const isInsideEmojiPopup = this.emojiPopupEl && this.emojiPopupEl.contains(e.target);
             const isInsideFramePopup = this.framePopupEl && this.framePopupEl.contains(e.target);
+            const isInsideReactionsPopup = this.reactionsPopupEl && this.reactionsPopupEl.contains(e.target);
             const isShapesButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--shapes');
             const isDrawButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--pencil');
             const isEmojiButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--emoji');
             const isFrameButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--frame');
+            const isReactionsButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--reactions');
             const isDrawActive = !!(this.element && this.element.querySelector('.moodboard-toolbar__button--pencil.moodboard-toolbar__button--active'));
 
-            if (!isInsideToolbar && !isInsideShapesPopup && !isShapesButton && !isInsideDrawPopup && !isDrawButton && !isInsideEmojiPopup && !isEmojiButton && !isInsideFramePopup && !isFrameButton) {
+            if (!isInsideToolbar && !isInsideShapesPopup && !isShapesButton && !isInsideDrawPopup && !isDrawButton && !isInsideEmojiPopup && !isEmojiButton && !isInsideFramePopup && !isFrameButton && !isInsideReactionsPopup && !isReactionsButton) {
                 this.closeShapesPopup();
                 if (!isDrawActive) {
                     this.closeDrawPopup();
                 }
                 this.closeEmojiPopup();
+                this.closeReactionsPopup();
                 this.closeFramePopup();
             }
         };
@@ -248,6 +253,25 @@ export class Toolbar {
 
     closeEmojiPopup() {
         return this.popupsController.closeEmojiPopup();
+    }
+
+    /**
+     * Всплывающая панель реакций (UI)
+     */
+    createReactionsPopup() {
+        return this.reactionsController.createReactionsPopup();
+    }
+
+    toggleReactionsPopup(anchorButton) {
+        return this.reactionsController.toggleReactionsPopup(anchorButton);
+    }
+
+    openReactionsPopup(anchorButton) {
+        return this.reactionsController.openReactionsPopup(anchorButton);
+    }
+
+    closeReactionsPopup() {
+        return this.reactionsController.closeReactionsPopup();
     }
 
     /**

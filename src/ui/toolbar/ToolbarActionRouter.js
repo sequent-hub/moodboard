@@ -25,6 +25,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Place.Set, null);
             this.toolbar.placeSelectedButtonId = null;
             this.toolbar.eventBus.emit(Events.Lasso.ModeSet, { active: false });
@@ -38,6 +39,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Place.Set, null);
             this.toolbar.placeSelectedButtonId = null;
             this.toolbar.eventBus.emit(Events.Lasso.ModeSet, { active: true });
@@ -51,6 +53,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Place.Set, null);
             this.toolbar.placeSelectedButtonId = null;
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'laser' });
@@ -63,6 +66,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'pan' });
             this.toolbar.setActiveToolbarButton('pan');
             return true;
@@ -73,6 +77,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
             this.toolbar.placeSelectedButtonId = 'text';
             this.toolbar.setActiveToolbarButton('place');
@@ -88,6 +93,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
             this.toolbar.placeSelectedButtonId = 'note';
             this.toolbar.setActiveToolbarButton('place');
@@ -111,6 +117,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
             this.toolbar.placeSelectedButtonId = 'mindmap';
             this.toolbar.setActiveToolbarButton('place');
@@ -143,6 +150,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
             this.toolbar.placeSelectedButtonId = 'frame';
             this.toolbar.setActiveToolbarButton('place');
@@ -156,6 +164,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.openImageDialog();
             return true;
         }
@@ -165,6 +174,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.openImageObject2Dialog();
             return true;
         }
@@ -174,6 +184,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'comment' });
             this.toolbar.setActiveToolbarButton('comment');
             return true;
@@ -184,6 +195,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.openFileDialog();
             return true;
         }
@@ -193,6 +205,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
             this.toolbar.placeSelectedButtonId = 'frame-tool';
             this.toolbar.setActiveToolbarButton('place');
@@ -208,6 +221,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Place.Set, null);
             this.toolbar.placeSelectedButtonId = null;
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'connector' });
@@ -220,6 +234,7 @@ export class ToolbarActionRouter {
             this.toolbar.toggleShapesPopup(button);
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
             this.toolbar.placeSelectedButtonId = 'shapes';
             this.toolbar.setActiveToolbarButton('place');
@@ -231,6 +246,7 @@ export class ToolbarActionRouter {
             this.toolbar.toggleDrawPopup(button);
             this.toolbar.closeShapesPopup();
             this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Lasso.ModeSet, { active: false });
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'draw' });
             this.toolbar.setActiveToolbarButton('draw');
@@ -242,8 +258,21 @@ export class ToolbarActionRouter {
             this.toolbar.toggleEmojiPopup(button);
             this.toolbar.closeShapesPopup();
             this.toolbar.closeDrawPopup();
+            this.toolbar.closeReactionsPopup();
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
             this.toolbar.placeSelectedButtonId = 'emoji';
+            this.toolbar.setActiveToolbarButton('place');
+            return true;
+        }
+
+        if (toolType === 'custom-reactions') {
+            this.toolbar.animateButton(button);
+            this.toolbar.toggleReactionsPopup(button);
+            this.toolbar.closeShapesPopup();
+            this.toolbar.closeDrawPopup();
+            this.toolbar.closeEmojiPopup();
+            this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+            this.toolbar.placeSelectedButtonId = 'reactions';
             this.toolbar.setActiveToolbarButton('place');
             return true;
         }

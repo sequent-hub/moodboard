@@ -26,7 +26,8 @@ export class ToolbarRenderer {
                 ? [{ id: 'comments', iconName: 'comments', title: 'Комментарий', type: 'custom-comments' }]
                 : []),
             { id: 'attachments', iconName: 'attachments', title: 'Файлы', type: 'custom-attachments' },
-            { id: 'emoji', iconName: 'emoji', title: 'Эмоджи', type: 'custom-emoji' }
+            { id: 'emoji', iconName: 'emoji', title: 'Эмоджи', type: 'custom-emoji' },
+            { id: 'reactions', iconName: 'reactions', title: 'Реакции', type: 'custom-reactions' }
         ];
 
         const existingTools = [
@@ -52,6 +53,7 @@ export class ToolbarRenderer {
         this.toolbar.createShapesPopup();
         this.toolbar.createDrawPopup();
         this.toolbar.createEmojiPopup();
+        this.toolbar.createReactionsPopup();
         this.toolbar.createFramePopup();
 
         this.toolbar.eventBus.on(Events.Tool.Activated, this.toolbar._toolActivatedHandler);

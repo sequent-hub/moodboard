@@ -32,14 +32,15 @@ export class IconLoader {
                 import('../assets/icons/redo.svg?raw'),
                 import('../assets/icons/mindmap.svg?raw'),
                 import('../assets/icons/lasso.svg?raw'),
-                import('../assets/icons/laser.svg?raw')
+                import('../assets/icons/laser.svg?raw'),
+                import('../assets/icons/reactions.svg?raw')
             ]);
 
             // Сохраняем иконки в кэш
             const iconNames = [
                 'select', 'pan', 'text-add', 'note', 'image', 'shapes',
                 'pencil', 'connector', 'comments', 'attachments', 'emoji', 'frame',
-                'clear', 'undo', 'redo', 'mindmap', 'lasso', 'laser'
+                'clear', 'undo', 'redo', 'mindmap', 'lasso', 'laser', 'reactions'
             ];
 
             iconNames.forEach((name, index) => {
@@ -191,7 +192,7 @@ export class IconLoader {
         const iconNames = [
             'select', 'pan', 'text-add', 'note', 'image', 'shapes',
             'pencil', 'connector', 'comments', 'attachments', 'emoji', 'frame',
-            'clear', 'undo', 'redo', 'mindmap'
+            'clear', 'undo', 'redo', 'mindmap', 'reactions'
         ];
 
         iconNames.forEach(name => {
@@ -224,7 +225,8 @@ export class IconLoader {
             'clear': '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M3 6H17L16 18H4L3 6Z" fill="currentColor"/></svg>',
             'undo': '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M8 4L3 9L8 14" stroke="currentColor" stroke-width="2" fill="none"/></svg>',
             'redo': '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M12 4L17 9L12 14" stroke="currentColor" stroke-width="2" fill="none"/></svg>',
-            'mindmap': '<svg width="20" height="20" viewBox="0 0 20 20"><circle cx="4" cy="4" r="2" fill="currentColor"/><circle cx="16" cy="4" r="2" fill="currentColor"/><circle cx="4" cy="16" r="2" fill="currentColor"/><circle cx="16" cy="16" r="2" fill="currentColor"/><rect x="7" y="8" width="6" height="4" rx="2" fill="currentColor"/><path d="M6 5L8 8M14 8L16 5M8 12L6 15M12 12L14 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
+            'mindmap': '<svg width="20" height="20" viewBox="0 0 20 20"><circle cx="4" cy="4" r="2" fill="currentColor"/><circle cx="16" cy="4" r="2" fill="currentColor"/><circle cx="4" cy="16" r="2" fill="currentColor"/><circle cx="16" cy="16" r="2" fill="currentColor"/><rect x="7" y="8" width="6" height="4" rx="2" fill="currentColor"/><path d="M6 5L8 8M14 8L16 5M8 12L6 15M12 12L14 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+            'reactions': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>'
         };
 
         return fallbacks[iconName] || fallbacks['select'];
