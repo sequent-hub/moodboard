@@ -35,7 +35,7 @@
 }
 
 .moodboard-chat__history.is-visible {
-    display: none;
+    display: flex;
 }
 
 .moodboard-chat__msg {
@@ -989,17 +989,32 @@
 
 /* ── Пины комментариев ───────────────────────────────────────────── */
 
-.comment-pin {
+/* Positioned-обёртка: занимает место в DOM-потоке, задаёт 28×28 */
+.comment-pin-wrap {
     position: absolute;
     width: 28px;
     height: 28px;
+    pointer-events: none;
+}
+
+.comment-pin {
+    /* position: relative — children (avatar/initials) абсолютны относительно кнопки */
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: hidden; /* clip аватара по кругу без влияния на badge (он в wrap, не в кнопке) */
     border-radius: 50%;
-    border: 2px solid #7c4dff;
+    border: 2px solid var(--pin-color, #7c4dff);
     background: #fff;
     padding: 0;
-    cursor: pointer;
+    cursor: grab;
     box-sizing: border-box;
     transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.comment-pin:active {
+    cursor: grabbing;
 }
 
 .comment-pin:hover {
@@ -1008,8 +1023,52 @@
 }
 
 .comment-pin--resolved {
-    border-color: #9CA3AF;
-    opacity: 0.65;
+    border-color: #22C55E;
+    opacity: 0.85;
+}
+
+/* Зелёный индикатор-галочка resolved: позиционируется в правом нижнем углу wrap */
+.comment-pin__resolved-badge {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #22C55E;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid #fff;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+/* Аватар автора: заполняет кнопку, обрезается через overflow:hidden родителя */
+.comment-pin__avatar {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+/* Fallback инициала, если аватара нет */
+.comment-pin__initials {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    color: #7c4dff;
+    pointer-events: none;
+    user-select: none;
 }
 
 /* Бейдж непрочитанных */
@@ -1036,7 +1095,7 @@
 .comment-pin-layer__filter-btn {
     position: absolute;
     bottom: 16px;
-    right: 16px;
+    right: 260px;
     padding: 5px 12px;
     border: 1px solid #E5E7EB;
     border-radius: 20px;
@@ -1048,7 +1107,7 @@
     pointer-events: auto;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
     transition: background 120ms ease, color 120ms ease;
-    z-index: 1;
+    z-index: 3000;
 }
 
 .comment-pin-layer__filter-btn:hover {
@@ -1068,9 +1127,14 @@
     background: #fff;
     border-radius: 16px;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.06);
-    overflow: hidden;
+    overflow: visible;
     font-family: 'Roboto', Arial, sans-serif;
     color: #374151;
+    /* сброс наследования от .moodboard-chat */
+    bottom: auto;
+    transform: none;
+    width: auto;
+    left: auto;
 }
 
 .comment-thread-popover__header {
@@ -1097,29 +1161,188 @@
     letter-spacing: 0;
 }
 
-.comment-thread-popover__close,
+/* ── Кнопки шапки: единая геометрия 24×24 и центрирование ─────────── */
+
+.comment-thread-popover__delete-btn,
+.comment-thread-popover__color-btn,
+.comment-thread-popover__resolve,
+.comment-thread-popover__close {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+}
+
+/* Корзина и крестик: голые иконки, квадрат → круг при наведении */
+.comment-thread-popover__delete-btn,
+.comment-thread-popover__close {
+    border: 0;
+    background: transparent;
+    color: #6B7280;
+    border-radius: 6px;
+    transition: background 100ms ease, color 100ms ease, border-radius 100ms ease;
+}
+
+.comment-thread-popover__close:hover {
+    background: #F3F4F6;
+    color: #374151;
+    border-radius: 50%;
+}
+
+.comment-thread-popover__delete-btn:hover {
+    background: #FEF2F2;
+    color: #EF4444;
+    border-radius: 50%;
+}
+
+.comment-thread-popover--draft .comment-thread-popover__delete-btn {
+    display: none;
+}
+
+/* Галочка «решить»: круглый чип с обводкой */
 .comment-thread-popover__resolve {
+    border: 1.5px solid #D1D5DB !important;
+    border-radius: 50%;
+    color: #6B7280;
+    background: transparent;
+    transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
+}
+
+.comment-thread-popover__resolve:hover {
+    border-color: #22C55E !important;
+    color: #22C55E;
+    background: #F0FDF4;
+}
+
+.comment-thread-popover__resolve--resolved {
+    border-color: #22C55E !important;
+    color: #22C55E;
+    background: #DCFCE7;
+}
+
+.comment-thread-popover__resolve--resolved:hover {
+    border-color: #16A34A !important;
+    color: #16A34A;
+    background: #BBF7D0;
+}
+
+/* ── Кнопка цвета: круглая заливка, радиус и размер как у галочки ──── */
+
+.comment-thread-popover__color-wrap {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}
+
+.comment-thread-popover__color-btn {
+    border-radius: 50%;
+    border: 2px solid rgba(0, 0, 0, 0.18);
+    transition: border-color 100ms ease;
+}
+
+.comment-thread-popover__color-btn:hover {
+    border-color: rgba(0, 0, 0, 0.4);
+}
+
+.comment-thread-popover__palette {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 30;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.06);
+    padding: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    width: 116px;
+}
+
+.comment-thread-popover__palette-swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    padding: 0;
+    cursor: pointer;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    transition: transform 100ms ease, border-color 100ms ease;
+}
+
+.comment-thread-popover__palette-swatch:hover {
+    transform: scale(1.2);
+    border-color: rgba(0, 0, 0, 0.25);
+}
+
+.comment-thread-popover__palette-swatch--active {
+    border-color: rgba(0, 0, 0, 0.5);
+    transform: scale(1.1);
+}
+
+.comment-thread-popover__delete {
     flex: 0 0 auto;
     border: 0;
     background: transparent;
     cursor: pointer;
     font-size: 12px;
     font-family: inherit;
-    color: #6B7280;
+    color: #EF4444;
     padding: 3px 7px;
     border-radius: 6px;
-    transition: background 100ms ease, color 100ms ease;
+    transition: background 100ms ease;
 }
 
-.comment-thread-popover__close:hover,
-.comment-thread-popover__resolve:hover {
-    background: #F3F4F6;
-    color: #374151;
+.comment-thread-popover__delete:hover {
+    background: #FEF2F2;
 }
 
-.comment-thread-popover__resolve {
-    font-weight: 500;
-    color: #4338CA;
+.comment-thread-popover--draft .comment-thread-popover__delete {
+    display: none;
+}
+
+.comment-thread-popover__swatches {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #F3F4F6;
+    flex-shrink: 0;
+}
+
+.comment-thread-popover--draft .comment-thread-popover__swatches {
+    display: none;
+}
+
+.comment-thread-popover__swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    padding: 0;
+    cursor: pointer;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    transition: transform 100ms ease, border-color 100ms ease;
+}
+
+.comment-thread-popover__swatch:hover {
+    transform: scale(1.2);
+    border-color: rgba(0, 0, 0, 0.25);
+}
+
+.comment-thread-popover__swatch--active {
+    border-color: rgba(0, 0, 0, 0.5);
+    transform: scale(1.1);
 }
 
 .comment-thread-popover__history {
@@ -1137,10 +1360,82 @@
     display: none;
 }
 
-.comment-thread-popover__time {
+/* Строка сообщения: аватар слева + колонка (мета + текст) */
+.comment-thread-msg {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.comment-thread-msg__avatar-wrap {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #EDE9FE;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.comment-thread-msg__avatar {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.comment-thread-msg__initials {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    color: #7c4dff;
+    user-select: none;
+}
+
+.comment-thread-msg__col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.comment-thread-msg__meta {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.comment-thread-msg__name {
+    font-size: 11px;
+    font-weight: 600;
+    color: #374151;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+}
+
+.comment-thread-msg__time {
     font-size: 10px;
     color: #9CA3AF;
-    margin-bottom: 1px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.comment-thread-msg__body {
+    font-size: 12px;
+    color: #374151;
+    line-height: 1.45;
+    word-break: break-word;
 }
 
 .comment-thread-popover__footer {

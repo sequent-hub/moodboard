@@ -165,9 +165,13 @@ export const Events = {
 		ThreadOpened: 'comment:thread:opened',
 		MessageAdded: 'comment:message:added',
 		Resolved: 'comment:resolved',
+		ColorChanged: 'comment:color:changed',
 		Deleted: 'comment:deleted',
 		RemoteUpdated: 'comment:remote:updated',
 		OpenDraftAt: 'comment:open:draft:at',
+		ThreadDeleted: 'comment:thread:deleted',
+		DraftOpened: 'comment:draft:opened',
+		DraftClosed: 'comment:draft:closed',
 	},
 };
 

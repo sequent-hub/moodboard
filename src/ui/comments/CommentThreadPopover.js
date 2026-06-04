@@ -3,6 +3,19 @@ import { Events } from '../../core/events/Events.js';
 import { ChatComposer } from '../chat/ChatComposer.js';
 
 const ARROW_UP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
+const CHECKMARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+const TRASH_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/></svg>`;
+
+const PALETTE = ['#5B5FE9', '#1E88E5', '#00A88F', '#34A853', '#F2A600', '#F2622E', '#E5484D', '#9B51E0'];
+
+function _pluralize(n, one, two, five) {
+    const m = Math.abs(n) % 100;
+    const m1 = m % 10;
+    if (m >= 11 && m <= 19) return five;
+    if (m1 === 1) return one;
+    if (m1 >= 2 && m1 <= 4) return two;
+    return five;
+}
 
 /** Лента сообщений треда (структура как ChatMessageList, автор вместо роли). */
 class CommentMessageList {
@@ -22,23 +35,47 @@ class CommentMessageList {
         const fragment = document.createDocumentFragment();
         for (const msg of messages) {
             const wrap = document.createElement('div');
-            wrap.className = 'moodboard-chat__msg moodboard-chat__msg--user';
-            const role = document.createElement('div');
-            role.className = 'moodboard-chat__msg-role';
-            role.textContent = msg.authorLabel || 'Участник';
-            const body = document.createElement('div');
-            body.className = 'moodboard-chat__msg-body';
-            body.textContent = msg.content || '';
-            if (msg.created_at) {
-                const time = document.createElement('div');
-                time.className = 'comment-thread-popover__time';
-                time.textContent = this._formatTime(msg.created_at);
-                wrap.appendChild(role);
-                wrap.appendChild(time);
+            wrap.className = 'comment-thread-msg';
+
+            const avatarWrap = document.createElement('div');
+            avatarWrap.className = 'comment-thread-msg__avatar-wrap';
+            if (msg.authorAvatar) {
+                const img = document.createElement('img');
+                img.className = 'comment-thread-msg__avatar';
+                img.src = msg.authorAvatar;
+                img.alt = '';
+                avatarWrap.appendChild(img);
             } else {
-                wrap.appendChild(role);
+                const initials = document.createElement('span');
+                initials.className = 'comment-thread-msg__initials';
+                initials.textContent = (msg.authorLabel || '?').charAt(0).toUpperCase();
+                avatarWrap.appendChild(initials);
             }
-            wrap.appendChild(body);
+
+            const col = document.createElement('div');
+            col.className = 'comment-thread-msg__col';
+
+            const meta = document.createElement('div');
+            meta.className = 'comment-thread-msg__meta';
+            const name = document.createElement('span');
+            name.className = 'comment-thread-msg__name';
+            name.textContent = msg.authorLabel || 'Участник';
+            meta.appendChild(name);
+            if (msg.created_at) {
+                const time = document.createElement('span');
+                time.className = 'comment-thread-msg__time';
+                time.textContent = this._formatTime(msg.created_at);
+                meta.appendChild(time);
+            }
+
+            const body = document.createElement('div');
+            body.className = 'comment-thread-msg__body';
+            body.textContent = msg.content || '';
+
+            col.appendChild(meta);
+            col.appendChild(body);
+            wrap.appendChild(avatarWrap);
+            wrap.appendChild(col);
             fragment.appendChild(wrap);
         }
         this._root.replaceChildren(fragment);
@@ -51,7 +88,15 @@ class CommentMessageList {
     _formatTime(iso) {
         try {
             const d = new Date(iso);
-            return d.toLocaleString(undefined, { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+            const diffMs = Date.now() - d.getTime();
+            const diffMin = Math.floor(diffMs / 60000);
+            if (diffMin < 1) return 'только что';
+            if (diffMin < 60) return `${diffMin} ${_pluralize(diffMin, 'минуту', 'минуты', 'минут')} назад`;
+            const diffH = Math.floor(diffMin / 60);
+            if (diffH < 24) return `${diffH} ${_pluralize(diffH, 'час', 'часа', 'часов')} назад`;
+            const diffD = Math.floor(diffH / 24);
+            if (diffD < 8) return `${diffD} ${_pluralize(diffD, 'день', 'дня', 'дней')} назад`;
+            return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
         } catch (_) {
             return '';
         }
@@ -73,10 +118,14 @@ export class CommentThreadPopover {
         this.composer = null;
         this.currentThreadId = null;
         this._draftWorld = null;
+        this._colorBtn = null;
+        this._paletteEl = null;
+        this._paletteOpen = false;
         this._onDocMouseDown = this._onDocMouseDown.bind(this);
         this._onThreadOpened = this._onThreadOpened.bind(this);
         this._onRemote = () => this._refreshIfOpen();
         this._onOpenDraftAt = this._onOpenDraftAt.bind(this);
+        this._onThreadDeleted = this._onThreadDeleted.bind(this);
     }
 
     attach() {
@@ -94,6 +143,7 @@ export class CommentThreadPopover {
         this.eventBus.on(Events.Comment.RemoteUpdated, this._onRemote);
         this.eventBus.on(Events.Comment.MessageAdded, this._onRemote);
         this.eventBus.on(Events.Comment.OpenDraftAt, this._onOpenDraftAt);
+        this.eventBus.on(Events.Comment.ThreadDeleted, this._onThreadDeleted);
         this.eventBus.on(Events.Viewport.Changed, () => this.reposition());
         this.eventBus.on(Events.Tool.PanUpdate, () => this.reposition());
         this.eventBus.on(Events.UI.ZoomPercent, () => this.reposition());
@@ -105,6 +155,7 @@ export class CommentThreadPopover {
         this.eventBus.off(Events.Comment.RemoteUpdated, this._onRemote);
         this.eventBus.off(Events.Comment.MessageAdded, this._onRemote);
         this.eventBus.off(Events.Comment.OpenDraftAt, this._onOpenDraftAt);
+        this.eventBus.off(Events.Comment.ThreadDeleted, this._onThreadDeleted);
         if (this.layer) this.layer.remove();
         this.layer = null;
         if (this.composer) this.composer.destroy();
@@ -117,6 +168,7 @@ export class CommentThreadPopover {
         this._renderMessages([]);
         this.repositionAtWorld(worldPos.x, worldPos.y);
         this.composer?.focus();
+        this.eventBus.emit(Events.Comment.DraftOpened, { x: worldPos.x, y: worldPos.y });
     }
 
     _onOpenDraftAt({ screenX, screenY }) {
@@ -145,9 +197,12 @@ export class CommentThreadPopover {
 
     hide() {
         this.currentThreadId = null;
+        const wasDraft = this._draftWorld != null;
         this._draftWorld = null;
         if (this.popover) this.popover.style.display = 'none';
+        this._closePalette();
         this._disarmOutsideClose();
+        if (wasDraft) this.eventBus.emit(Events.Comment.DraftClosed, {});
     }
 
     reposition() {
@@ -166,16 +221,19 @@ export class CommentThreadPopover {
         if (!this.popover) return;
         const pinLayer = this._worldPointToCss(worldX, worldY);
         if (!pinLayer) return;
-        const left = Math.round(pinLayer.left + 16);
-        const top = Math.round(pinLayer.top);
+        // Смещение согласовано с _positionNearPinEl: wrap находится на -14px (PIN_SIZE/2)
+        // от центра пина, попап — на +42px от левого края обёртки.
+        const left = Math.round(pinLayer.left + 28);
+        const top = Math.round(pinLayer.top - 14);
         this.popover.style.left = `${left}px`;
         this.popover.style.top = `${top}px`;
     }
 
     _positionNearPinEl(pinEl) {
         if (!this.popover || !pinEl) return;
-        const left = Math.round(parseFloat(pinEl.style.left || '0') + 32);
-        const top = Math.round(parseFloat(pinEl.style.top || '0'));
+        const wrap = pinEl.closest('.comment-pin-wrap') || pinEl;
+        const left = Math.round(parseFloat(wrap.style.left || '0') + 42);
+        const top = Math.round(parseFloat(wrap.style.top || '0'));
         this.popover.style.left = `${left}px`;
         this.popover.style.top = `${top}px`;
     }
@@ -216,7 +274,7 @@ export class CommentThreadPopover {
 
     _createPopover() {
         const el = document.createElement('div');
-        el.className = 'comment-thread-popover moodboard-chat';
+        el.className = 'comment-thread-popover';
         Object.assign(el.style, {
             position: 'absolute',
             pointerEvents: 'auto',
@@ -226,21 +284,71 @@ export class CommentThreadPopover {
             maxWidth: '360px',
         });
 
+        // Шапка: [...] | ● | spacer | ✓ | ✕
         const header = document.createElement('div');
         header.className = 'comment-thread-popover__header';
-        const title = document.createElement('div');
-        title.className = 'comment-thread-popover__title moodboard-chat__msg-role';
+
+        // Кнопка удаления треда
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'comment-thread-popover__delete-btn';
+        deleteBtn.setAttribute('aria-label', 'Удалить тред');
+        deleteBtn.innerHTML = TRASH_SVG;
+        deleteBtn.addEventListener('click', () => this._onDeleteClick());
+
+        // Обёртка кружка-цвета + всплывающая палитра
+        const colorWrap = document.createElement('div');
+        colorWrap.className = 'comment-thread-popover__color-wrap';
+
+        const colorBtn = document.createElement('button');
+        colorBtn.type = 'button';
+        colorBtn.className = 'comment-thread-popover__color-btn';
+        colorBtn.setAttribute('aria-label', 'Цвет треда');
+        colorBtn.style.background = PALETTE[0];
+        this._colorBtn = colorBtn;
+
+        const palette = document.createElement('div');
+        palette.className = 'comment-thread-popover__palette';
+        palette.hidden = true;
+        for (const hex of PALETTE) {
+            const sw = document.createElement('button');
+            sw.type = 'button';
+            sw.className = 'comment-thread-popover__palette-swatch';
+            sw.style.background = hex;
+            sw.dataset.color = hex;
+            sw.addEventListener('click', () => {
+                if (this.currentThreadId != null) {
+                    this.commentService.setThreadColor(this.currentThreadId, hex).catch(console.error);
+                }
+                this._setActiveSwatchByColor(hex);
+                this._closePalette();
+            });
+            palette.appendChild(sw);
+        }
+        this._paletteEl = palette;
+        colorBtn.addEventListener('click', () => this._paletteOpen ? this._closePalette() : this._openPalette());
+        colorWrap.appendChild(colorBtn);
+        colorWrap.appendChild(palette);
+
+        const spacer = document.createElement('div');
+        spacer.style.flex = '1';
+
+        const resolveBtn = document.createElement('button');
+        resolveBtn.type = 'button';
+        resolveBtn.className = 'comment-thread-popover__resolve';
+        resolveBtn.setAttribute('aria-label', 'Отметить решённым');
+        resolveBtn.innerHTML = CHECKMARK_SVG;
+        resolveBtn.addEventListener('click', () => this._toggleResolve());
+
         const close = document.createElement('button');
         close.type = 'button';
         close.className = 'comment-thread-popover__close';
         close.textContent = '✕';
         close.addEventListener('click', () => this.hide());
-        const resolveBtn = document.createElement('button');
-        resolveBtn.type = 'button';
-        resolveBtn.className = 'comment-thread-popover__resolve';
-        resolveBtn.textContent = 'Resolve';
-        resolveBtn.addEventListener('click', () => this._toggleResolve());
-        header.appendChild(title);
+
+        header.appendChild(deleteBtn);
+        header.appendChild(colorWrap);
+        header.appendChild(spacer);
         header.appendChild(resolveBtn);
         header.appendChild(close);
 
@@ -282,7 +390,35 @@ export class CommentThreadPopover {
         const messages = (thread.messages?.items || []).map((m) => this._toListMessage(m));
         this._renderMessages(messages);
         if (this._resolveBtn) {
-            this._resolveBtn.textContent = thread.resolved ? 'Открыть снова' : 'Resolve';
+            this._resolveBtn.classList.toggle('comment-thread-popover__resolve--resolved', !!thread.resolved);
+            this._resolveBtn.setAttribute('aria-label', thread.resolved ? 'Открыть снова' : 'Отметить решённым');
+        }
+        const titleEl = this.popover?.querySelector('.comment-thread-popover__title');
+        if (titleEl) titleEl.textContent = thread.resolved ? 'Комментарий (решён)' : 'Комментарий';
+        this._setActiveSwatchByColor(thread.color || null);
+    }
+
+    _setActiveSwatchByColor(color) {
+        if (this._colorBtn) this._colorBtn.style.background = color || PALETTE[0];
+        if (!this._paletteEl) return;
+        for (const sw of this._paletteEl.querySelectorAll('.comment-thread-popover__palette-swatch')) {
+            sw.classList.toggle('comment-thread-popover__palette-swatch--active', sw.dataset.color === color);
+        }
+    }
+
+    _onThreadDeleted({ threadId }) {
+        if (String(threadId) === String(this.currentThreadId)) {
+            this.hide();
+        }
+    }
+
+    async _onDeleteClick() {
+        if (this.currentThreadId == null) return;
+        try {
+            await this.commentService.deleteThread(this.currentThreadId);
+            this.hide();
+        } catch (err) {
+            console.error('Comment delete failed:', err);
         }
     }
 
@@ -294,11 +430,14 @@ export class CommentThreadPopover {
         const uid = this.commentService.currentUser?.id;
         const isSelf = uid != null && m.user_id != null && String(m.user_id) === String(uid);
         const author = m.author_name || (isSelf ? 'Вы' : 'Участник');
+        const cu = this.commentService.currentUser;
+        const avatarUrl = m.author_avatar || (isSelf ? cu?.avatar || null : null);
         return {
             id: String(m.id),
             role: isSelf ? 'user' : 'assistant',
             content: this._stripHtml(m.content || ''),
             authorLabel: author,
+            authorAvatar: avatarUrl || null,
             created_at: m.created_at,
         };
     }
@@ -329,6 +468,7 @@ export class CommentThreadPopover {
                 const thread = await this.commentService.createThread(payload);
                 this._draftWorld = null;
                 this.currentThreadId = thread?.id ?? null;
+                this.eventBus.emit(Events.Comment.DraftClosed, {});
                 if (thread) {
                     if (this.popover) this.popover.classList.remove('comment-thread-popover--draft');
                     this._renderThread(thread);
@@ -366,8 +506,23 @@ export class CommentThreadPopover {
 
     _onDocMouseDown(e) {
         if (!this.popover || this.popover.style.display === 'none') return;
-        if (this.popover.contains(e.target)) return;
+        if (this.popover.contains(e.target)) {
+            if (this._paletteOpen && !this._paletteEl?.contains(e.target) && !this._colorBtn?.contains(e.target)) {
+                this._closePalette();
+            }
+            return;
+        }
         this.hide();
+    }
+
+    _openPalette() {
+        if (this._paletteEl) this._paletteEl.hidden = false;
+        this._paletteOpen = true;
+    }
+
+    _closePalette() {
+        if (this._paletteEl) this._paletteEl.hidden = true;
+        this._paletteOpen = false;
     }
 
     _worldPointToCss(worldX, worldY) {

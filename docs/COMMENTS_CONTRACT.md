@@ -41,6 +41,7 @@
 | `author_name` | string | NULL; fallback как в `comments.author_name` (импорт / гость) |
 | `created_at` | timestamp | |
 | `updated_at` | timestamp | |
+| `color` | string(7) | NULL; hex из палитры §2.10, default NULL |
 | `deleted_at` | timestamp | NULL; soft-delete (`SoftDeletes`) |
 
 **Индексы:** `(board_id)`, `(board_id, deleted_at)`, `(anchor_object_id)` — для выборки и orphan-обработки.
@@ -135,6 +136,7 @@ Card::query()
   "thread_id": 7,
   "user_id": 5,
   "author_name": "Иван Петров",
+  "author_avatar": "https://example.com/avatars/5.jpg",
   "content": "<p>Текст с @упоминанием</p>",
   "created_at": "2026-06-03T12:00:00.000000Z",
   "updated_at": "2026-06-03T12:00:00.000000Z"
@@ -142,6 +144,7 @@ Card::query()
 ```
 
 - `author_name` = `$comment->user?->name ?? $comment->author_name ?? null`
+- `author_avatar` = `$comment->user?->avatar ?? null`
 - `user_id` — int или null
 
 **Thread** (`serializeThread`):
@@ -156,17 +159,21 @@ Card::query()
   "anchor_dx": 12.0,
   "anchor_dy": -8.0,
   "detached": false,
+  "color": null,
   "resolved": false,
   "resolved_at": null,
   "resolved_by": null,
   "created_by": 5,
   "author_name": "Иван Петров",
+  "author_avatar": "https://example.com/avatars/5.jpg",
   "created_at": "2026-06-03T11:00:00.000000Z",
   "updated_at": "2026-06-03T12:00:00.000000Z",
   "messages_count": 3,
   "unread_count": 1
 }
 ```
+
+- `author_avatar` = `$thread->creator?->avatar ?? null`
 
 **ThreadWithMessages** — `serializeThread` + вложенный блок сообщений (как `data.items` у карточных комментариев):
 
@@ -363,9 +370,117 @@ Soft-delete сообщения.
 | update message | автор сообщения |
 | delete message | автор **или** admin на доске |
 | resolve thread | `canEditBoardContent($board)` |
+| move thread pin | `canEditBoardContent($board)` |
+| set thread color | `canEditBoardContent($board)` |
+| delete thread | автор треда **или** admin на доске |
 | list / read | участник `board_user` с role |
 
 Класс: `App\Policies\MoodboardCommentPolicy` — зеркало `CommentPolicy`.
+
+### 2.9. `PATCH /api/v2/moodboard/{boardId}/comments/{thread}/position`
+
+Переместить пин треда (обновить позицию и/или привязку к объекту).
+
+**Request:**
+
+```json
+{
+  "x": 700.0,
+  "y": 520.5,
+  "anchor_object_id": "obj-uuid-2",
+  "anchor_dx": 5.0,
+  "anchor_dy": -3.0,
+  "detached": false
+}
+```
+
+| Поле | Правила |
+|---|---|
+| `x`, `y` | required, numeric |
+| `anchor_object_id` | optional, string\|null |
+| `anchor_dx`, `anchor_dy` | required_with `anchor_object_id`, numeric |
+| `detached` | optional, boolean |
+
+**Сервер:** обновляет `x`, `y`; при наличии `anchor_object_id` — обновляет привязку (`anchor_object_id`, `anchor_dx`, `anchor_dy`); при наличии `detached` — устанавливает флаг.
+
+**Policy:** `canEditBoardContent($kanbanBoard)` — как resolve.
+
+**Response 200:**
+
+```json
+{
+  "data": "/* serializeThread (без messages) */"
+}
+```
+
+**Ошибки:** 403, 404 `{ "message": "Thread not found" }`, 422.
+
+---
+
+### 2.10. `PATCH /api/v2/moodboard/{boardId}/comments/{thread}/color`
+
+Установить или сбросить цвет пина треда.
+
+**Request:**
+
+```json
+{
+  "color": "#5B5FE9"
+}
+```
+
+| Поле | Правила |
+|---|---|
+| `color` | present, nullable; если не null — string, один из допустимых hex: `#5B5FE9` `#1E88E5` `#00A88F` `#34A853` `#F2A600` `#F2622E` `#E5484D` `#9B51E0`; `null` — сброс цвета |
+
+**Response 200:**
+
+```json
+{
+  "data": "/* serializeThread (без messages) */"
+}
+```
+
+**Policy:** `canEditBoardContent()`.
+
+**Ошибки:** 403, 404 `{ "message": "Thread not found" }`, 422.
+
+#### Палитра (полный список допустимых значений)
+
+| Hex | Название |
+|---|---|
+| `#5B5FE9` | Индиго |
+| `#1E88E5` | Синий |
+| `#00A88F` | Бирюзовый |
+| `#34A853` | Зелёный |
+| `#F2A600` | Жёлтый |
+| `#F2622E` | Оранжевый |
+| `#E5484D` | Красный |
+| `#9B51E0` | Фиолетовый |
+
+---
+
+### 2.11. `DELETE /api/v2/moodboard/{boardId}/comments/threads/{thread}`
+
+Удалить тред вместе со всеми сообщениями (soft-delete).
+
+**Response 200:**
+
+```json
+{
+  "data": {
+    "id": 7,
+    "board_id": "12345",
+    "deleted": true
+  }
+}
+```
+
+**Policy:** `Gate::authorize('deleteThread', [MoodboardComment::class, $threadModel, $board])` — автор треда (`created_by === Auth::id()`) **или** `$user->isAdminOnBoard()`.
+
+**Поведение сервера:** soft-delete треда + всех его сообщений; broadcast `thread.deleted` (§3.3).
+
+**Ошибки:** 403, 404 `{ "message": "Thread not found" }`.
 
 ---
 
@@ -411,11 +526,12 @@ Broadcast::channel('moodboard.{boardId}', function ($user, $boardId) {
 | `action` | Когда | `thread` | `message` | `changes` |
 |---|---|---|---|---|
 | `thread.created` | POST create thread | ThreadWithMessages (с первым message) | первое Message | — |
-| `thread.updated` | orphan detach, смена anchor cache | serializeThread | null | `{ "detached": true, "x", "y" }` |
+| `thread.updated` | orphan detach, смена anchor cache; **перемещение пина** (PATCH .../position); **цвет** (PATCH .../color) | serializeThread | null | orphan: `{ "detached": true, "x", "y" }`; перемещение: `{ "x", "y", "anchor_object_id", "anchor_dx", "anchor_dy", "detached" }`; цвет: `{ "color": "#hex" }` |
 | `thread.resolved` | PATCH resolve | serializeThread | null | `{ "resolved": bool }` |
 | `comment.created` | POST reply | serializeThread (без messages) | Message | — |
 | `comment.updated` | PATCH message | null | Message | — |
 | `comment.deleted` | DELETE message | `{ "id", "board_id" }` | `{ "id", "thread_id", "deleted": true }` | — |
+| `thread.deleted` | DELETE thread (§2.11) | `{ id, board_id }` | null | — |
 
 ### 3.4. Подписка на хосте (интеграция)
 
@@ -483,6 +599,19 @@ interface CommentsAdapter {
   updateMessage(boardId: string, messageId: number, content: string): Promise<Message>;
 
   deleteMessage(boardId: string, messageId: number): Promise<{ id: number; thread_id: number; deleted: true }>;
+
+  moveThread(boardId: string, threadId: number, payload: {
+    x: number;
+    y: number;
+    anchor_object_id?: string | null;
+    anchor_dx?: number | null;
+    anchor_dy?: number | null;
+    detached?: boolean;
+  }): Promise<Thread>;
+
+  setThreadColor(boardId: string, threadId: number, color: string): Promise<Thread>;
+
+  deleteThread(boardId: string, threadId: number): Promise<{ id: number; deleted: true }>;
 }
 ```
 
@@ -500,7 +629,7 @@ moodboard.comments.applyRemote(event)
 
 Поведение:
 
-1. Обновить локальный store тредов/сообщений по `action`.
+1. Обновить локальный store тредов/сообщений по `action`. При `thread.deleted` — удалить тред из store по `event.thread.id`, emit `Comment.ThreadDeleted`.
 2. Emit `Events.Comment.RemoteUpdated` (§4.4) с `{ action, thread, message, changes }`.
 3. Перепроецировать пины на canvas (§5).
 4. Игнорировать эхо собственных оптимистичных операций, если `message.id` / `thread.id` уже применён (dedup по id).
@@ -519,6 +648,8 @@ Comment: {
   Resolved:       'comment:resolved',
   Deleted:        'comment:deleted',
   RemoteUpdated:  'comment:remote:updated',
+  OpenDraftAt:    'comment:open:draft:at',
+  ThreadDeleted:  'comment:thread:deleted',
 }
 ```
 
@@ -532,6 +663,8 @@ Comment: {
 | `Comment.Resolved` | Изменён resolved-статус | `{ threadId: number, resolved: boolean, resolvedBy?: number }` |
 | `Comment.Deleted` | Удалено сообщение | `{ threadId: number, messageId: number }` |
 | `Comment.RemoteUpdated` | После `applyRemote` | `{ action: string, boardId: string, thread?: object, message?: object, changes?: object }` |
+| `Comment.OpenDraftAt` | UI запросил открытие нового комментария по screen-позиции | `{ screenX: number, screenY: number }` |
+| `Comment.ThreadDeleted` | Тред удалён локально (`deleteThread`) или через realtime (`thread.deleted`) | `{ threadId: number }` |
 
 **Подписки UI:** `Viewport.Changed`, `Events.Tool.PanUpdate`, `Events.UI.ZoomPercent`, `Events.Object.TransformUpdated`, `Events.Object.Deleted` — для перепроекции пинов (замена легаси `CommentPopover.reposition()`).
 
@@ -623,6 +756,8 @@ pinWorldY = object.position.y + anchor_dy
 - [ ] Screen-позиции пинов — integer после проекции
 - [ ] Orphan: `detached=true`, тред не удаляется
 - [ ] Автор на сервере — `Auth::id()`, не из тела запроса
+- [ ] `author_avatar` присутствует в `serializeThread` и `serializeMessage` (REST и broadcast)
+- [ ] Позиция пина персистится через `PATCH .../position`, рассылается как `thread.updated`
 
 ---
 
@@ -636,12 +771,15 @@ pinWorldY = object.position.y + anchor_dy
 4. `PATCH  /api/v2/moodboard/{boardId}/comments/{thread}/resolve`
 5. `PATCH  /api/v2/moodboard/{boardId}/comments/{message}`
 6. `DELETE /api/v2/moodboard/{boardId}/comments/{message}`
+7. `PATCH  /api/v2/moodboard/{boardId}/comments/{thread}/position`
+8. `PATCH  /api/v2/moodboard/{boardId}/comments/{thread}/color`
+9. `DELETE /api/v2/moodboard/{boardId}/comments/threads/{thread}`
 
 ### WebSocket
 
 - **Канал:** `moodboard.{boardId}` (PrivateChannel)
 - **Laravel-событие:** `MoodboardCommentEvent`
-- **Значения `action`:** `thread.created`, `thread.updated`, `thread.resolved`, `comment.created`, `comment.updated`, `comment.deleted`
+- **Значения `action`:** `thread.created`, `thread.updated`, `thread.resolved`, `thread.deleted`, `comment.created`, `comment.updated`, `comment.deleted`
 
 ### EventBus (библиотека)
 
@@ -651,3 +789,5 @@ pinWorldY = object.position.y + anchor_dy
 - `comment:resolved` — `Comment.Resolved`
 - `comment:deleted` — `Comment.Deleted`
 - `comment:remote:updated` — `Comment.RemoteUpdated`
+- `comment:open:draft:at` — `Comment.OpenDraftAt`
+- `comment:thread:deleted` — `Comment.ThreadDeleted`

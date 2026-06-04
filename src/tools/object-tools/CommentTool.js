@@ -11,7 +11,7 @@ export class CommentTool extends BaseTool {
         this.core = core;
         this.commentService = commentService;
         this.threadPopover = threadPopover;
-        this.cursor = 'crosshair';
+        this.cursor = CommentTool._buildCursor();
         this.app = null;
         this.world = null;
     }
@@ -65,5 +65,21 @@ export class CommentTool extends BaseTool {
         if (!this.world) return { x, y };
         const local = this.world.toLocal(new PIXI.Point(x, y));
         return { x: local.x, y: local.y };
+    }
+
+    /**
+     * Строит CSS-курсор: залитый пузырь комментария с острым углом снизу слева.
+     * Hotspot совпадает с острием уголка (2, 30).
+     */
+    static _buildCursor() {
+        const svg = [
+            '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">',
+            '<path d="M12 2 C6.477 2 2 6.477 2 12 C2 14.8 3.1 17.3 5 19.2 L2 22 L7 20.5',
+            ' C8.5 21.4 10.2 22 12 22 C17.523 22 22 17.523 22 12 C22 6.477 17.523 2 12 2 Z"',
+            ' fill="#193042" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>',
+            '</svg>',
+        ].join('');
+        const url = `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}")`;
+        return `${url} 2 22, crosshair`;
     }
 }

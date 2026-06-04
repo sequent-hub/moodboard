@@ -101,6 +101,77 @@ export class CommentService {
         return thread;
     }
 
+    async moveThread(threadId, payload) {
+        if (!this.adapter?.moveThread) {
+            throw new Error('CommentsAdapter.moveThread is not configured');
+        }
+        const prev = this.getThread(threadId);
+        if (!prev) return null;
+        this._upsertThread({ ...prev, ...payload });
+        try {
+            const thread = await this.adapter.moveThread(this.boardId, threadId, payload);
+            if (thread) {
+                this._upsertThread({ ...this.getThread(threadId), ...thread });
+                this.eventBus.emit(Events.Comment.RemoteUpdated, {
+                    action: 'thread.updated',
+                    boardId: this.boardId,
+                    thread,
+                    message: null,
+                    changes: payload,
+                });
+            }
+            return thread;
+        } catch (err) {
+            console.error('[CommentService] moveThread error', err);
+            this._upsertThread(prev);
+            this.eventBus.emit(Events.Comment.RemoteUpdated, {
+                action: 'thread.updated',
+                boardId: this.boardId,
+                thread: prev,
+                message: null,
+                changes: null,
+            });
+            return null;
+        }
+    }
+
+    async setThreadColor(threadId, color) {
+        if (!this.adapter?.setThreadColor) {
+            throw new Error('CommentsAdapter.setThreadColor is not configured');
+        }
+        const prev = this.getThread(threadId);
+        if (!prev) return null;
+        this._upsertThread({ ...prev, color });
+        this.eventBus.emit(Events.Comment.ColorChanged, { threadId, color });
+        try {
+            const thread = await this.adapter.setThreadColor(this.boardId, threadId, color);
+            if (thread) this._upsertThread({ ...this.getThread(threadId), ...thread });
+            return thread;
+        } catch (err) {
+            console.error('[CommentService] setThreadColor error', err);
+            this._upsertThread(prev);
+            this.eventBus.emit(Events.Comment.ColorChanged, { threadId, color: prev.color ?? null });
+            return null;
+        }
+    }
+
+    async deleteThread(threadId) {
+        if (!this.adapter?.deleteThread) {
+            throw new Error('CommentsAdapter.deleteThread is not configured');
+        }
+        await this.adapter.deleteThread(this.boardId, threadId);
+        const id = Number(threadId);
+        const thread = this.threads.get(id);
+        this.threads.delete(id);
+        this._appliedThreadIds.delete(id);
+        if (thread?.messages?.items) {
+            for (const m of thread.messages.items) {
+                if (m?.id != null) this._appliedMessageIds.delete(Number(m.id));
+            }
+        }
+        this.eventBus.emit(Events.Comment.ThreadDeleted, { threadId });
+    }
+
     async updateMessage(messageId, content) {
         return this.adapter.updateMessage(this.boardId, messageId, content);
     }
@@ -182,6 +253,16 @@ export class CommentService {
                         thread.messages.items = thread.messages.items.filter((m) => m.id !== message.id);
                         thread.messages.count = thread.messages.items.length;
                     }
+                }
+                break;
+            }
+            case 'thread.deleted': {
+                const deletedId = event.thread?.id;
+                if (deletedId != null) {
+                    const nid = Number(deletedId);
+                    this.threads.delete(nid);
+                    this._appliedThreadIds.delete(nid);
+                    this.eventBus.emit(Events.Comment.ThreadDeleted, { threadId: deletedId });
                 }
                 break;
             }

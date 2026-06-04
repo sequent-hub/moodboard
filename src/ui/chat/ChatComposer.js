@@ -142,6 +142,11 @@ export class ChatComposer {
         if (!trimmed && !hasAttachments) return;
         if (this._send.dataset.state === 'streaming') return;
         const attachments = this._attachments.map((entry) => entry.file);
+        this._textarea.value = '';
+        this._attachments = [];
+        this._resizeTextarea();
+        if (this._attachmentsPreview) this._renderAttachmentsPreview();
+        this._refreshSendState();
         this._handlers.onSubmit?.(trimmed, attachments);
     }
 
