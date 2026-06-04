@@ -405,7 +405,10 @@ export class CoreMoodBoard {
                 properties = { ...(properties || {}), title: 'Фрейм 1' };
             }
         }
-        const snappedCreatePos = this.gridSnapResolver
+        // Рисованные объекты (drawing) должны оставаться ровно там, где их нарисовали —
+        // примагничивание bbox к сетке сдвигало бы готовую линию относительно превью.
+        const shouldSnap = this.gridSnapResolver && type !== 'drawing';
+        const snappedCreatePos = shouldSnap
             ? this.gridSnapResolver.snapWorldTopLeft(position, {
                 width: initialWidth,
                 height: initialHeight,

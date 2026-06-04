@@ -5,6 +5,11 @@ import * as PIXI from 'pixi.js';
 /** Максимум точек в одном штрихе (decimation при превышении). */
 const MAX_POINTS = 5000;
 
+/** Шаг примагничивания угла (45°) при зажатом Shift. */
+const SNAP_STEP = Math.PI / 4;
+/** Допуск примагничивания: ±8° вокруг каждого кратного 45°. */
+const SNAP_TOLERANCE = (8 * Math.PI) / 180;
+
 /**
  * Инструмент рисования (карандаш)
  */
@@ -21,6 +26,10 @@ export class DrawingTool extends BaseTool {
         this.tempGraphics = null;
         this.app = null;
         this.world = null;
+
+        // Якорная точка для режима прямой линии (Shift)
+        this._straightAnchor = null;
+        this._shiftDown = false;
 
         // Параметры кисти по умолчанию
         this.brush = {
@@ -124,6 +133,7 @@ export class DrawingTool extends BaseTool {
         this.world.addChild(this.tempGraphics);
 
         const p = this._toWorld(event.x, event.y);
+        this._straightAnchor = { ...p };
         this.points.push(p);
         this._redrawTemporary();
     }
@@ -131,11 +141,23 @@ export class DrawingTool extends BaseTool {
     onMouseMove(event) {
         super.onMouseMove(event);
         if (!this.isDrawing) return;
+
         const p = this._toWorld(event.x, event.y);
+        const isStraight = !!(event.originalEvent?.shiftKey) && this.brush.mode !== 'eraser';
+
+        if (isStraight) {
+            const end = this._snapEndpoint(this._straightAnchor, p);
+            this.points = [this._straightAnchor, end];
+            this._redrawTemporary();
+            return;
+        }
+
         const prev = this.points[this.points.length - 1];
         // Фильтр слишком частых точек
         if (!prev || Math.hypot(p.x - prev.x, p.y - prev.y) >= 1) {
             this.points.push(p);
+            // Обновляем якорь — при отпускании Shift штрих продолжится с текущей точки
+            this._straightAnchor = { ...p };
             // Ластик: при движении удаляем все фигуры, пересекаемые текущим сегментом
             if (this.brush.mode === 'eraser' && prev) {
                 this._eraserSweep(prev, p);
@@ -153,6 +175,26 @@ export class DrawingTool extends BaseTool {
         }
     }
 
+    onKeyDown(event) {
+        if (event.key === 'Shift' && this.isDrawing && this.brush.mode !== 'eraser') {
+            this._shiftDown = true;
+            // Перерисовываем прямую до текущей позиции курсора
+            if (this.currentPoint) {
+                const p = this._toWorld(this.currentPoint.x, this.currentPoint.y);
+                const end = this._snapEndpoint(this._straightAnchor, p);
+                this.points = [this._straightAnchor, end];
+                this._redrawTemporary();
+            }
+        }
+    }
+
+    onKeyUp(event) {
+        if (event.key === 'Shift' && this.isDrawing && this.brush.mode !== 'eraser') {
+            this._shiftDown = false;
+            // При отпускании Shift якорь уже актуален — продолжение в freehand-режиме
+        }
+    }
+
     onMouseUp(event) {
         super.onMouseUp(event);
         this._finishAndCommit();
@@ -161,6 +203,8 @@ export class DrawingTool extends BaseTool {
     _finishAndCommit() {
         if (!this.isDrawing) return;
         this.isDrawing = false;
+        this._straightAnchor = null;
+        this._shiftDown = false;
 
         // Если ластик — чистим временную линию и выходим (удаление уже произошло onMouseDown)
         if (this.brush.mode === 'eraser') {
@@ -196,11 +240,15 @@ export class DrawingTool extends BaseTool {
         if (pointsToUse.length > MAX_POINTS) {
             pointsToUse = this._decimatePoints(pointsToUse, MAX_POINTS);
         }
-        // Нормализуем точки относительно левого-верхнего угла
-        const normPoints = pointsToUse.map(pt => ({ x: pt.x - minX, y: pt.y - minY }));
+
+        // position — целая (округлённая) точка; нормализуем точки от тех же значений,
+        // иначе дробный остаток minX/minY сдвигал бы геометрию относительно position.
+        const posX = Math.round(minX);
+        const posY = Math.round(minY);
+        const normPoints = pointsToUse.map(pt => ({ x: pt.x - posX, y: pt.y - posY }));
 
         // Создаем объект типа drawing через существующий пайплайн
-        const position = { x: Math.round(minX), y: Math.round(minY) };
+        const position = { x: posX, y: posY };
         const properties = {
             points: normPoints,
             strokeColor: this.brush.color,
@@ -333,6 +381,29 @@ export class DrawingTool extends BaseTool {
         const pen = pts[pts.length - 2];
         const last = pts[pts.length - 1];
         g.quadraticCurveTo(pen.x, pen.y, last.x, last.y);
+    }
+
+    /**
+     * Примагничивает конечную точку прямой к ближайшему кратному 45°,
+     * если угол попадает в допуск SNAP_TOLERANCE. Длина линии сохраняется.
+     * Если отрезок слишком короткий или угол вне зоны — возвращает p без изменений.
+     */
+    _snapEndpoint(anchor, p) {
+        const dx = p.x - anchor.x;
+        const dy = p.y - anchor.y;
+        const len = Math.hypot(dx, dy);
+        if (len < 1) return p;
+
+        const angle = Math.atan2(dy, dx);
+        const snapped = Math.round(angle / SNAP_STEP) * SNAP_STEP;
+
+        if (Math.abs(angle - snapped) <= SNAP_TOLERANCE) {
+            return {
+                x: anchor.x + Math.cos(snapped) * len,
+                y: anchor.y + Math.sin(snapped) * len
+            };
+        }
+        return p;
     }
 
     _toWorld(x, y) {
