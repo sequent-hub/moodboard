@@ -4,6 +4,7 @@ import { ChatSessionController } from '../../services/ai/ChatSessionController.j
 import { Events } from '../../core/events/Events.js';
 
 import { buildChatDom } from './ChatWindowRenderer.js';
+import { formatChatErrorForDisplay } from './formatChatError.js';
 import { ChatMessageList } from './ChatMessageList.js';
 import { ChatComposer } from './ChatComposer.js';
 import { ChatPillMenu } from './ChatPillMenu.js';
@@ -145,7 +146,6 @@ export class ChatWindow {
         this._pendingOverlayTimers = new Map();
         this._boardImageShiftAnimations = new Map();
         this._pendingBatchOffsets = new Map();
-        this._clearSelectionOnSendClick = null;
         this._selectionHandlers = null;
         this._viewportHandlers = null;
         // Окно от BoxSelectStart до BoxSelectCommit: в это время SelectionAdd
@@ -178,8 +178,6 @@ export class ChatWindow {
                 onAbort: () => this._session.abort()
             }
         );
-        this._clearSelectionOnSendClick = () => this._clearBoardSelection();
-        this._refs.send.addEventListener('click', this._clearSelectionOnSendClick);
         this._composer.attach();
         this._attachSelectionEvents();
         this._attachViewportSync();
@@ -266,10 +264,6 @@ export class ChatWindow {
         this._clearPendingOverlays();
         this._cancelBoardImageShiftAnimations();
         if (this._unsubscribe) { this._unsubscribe(); this._unsubscribe = null; }
-        if (this._clearSelectionOnSendClick && this._refs?.send) {
-            this._refs.send.removeEventListener('click', this._clearSelectionOnSendClick);
-            this._clearSelectionOnSendClick = null;
-        }
         this._detachSelectionEvents();
         this._detachViewportSync();
         this._shiftedForImageBatchKeys.clear();
@@ -354,6 +348,26 @@ export class ChatWindow {
         this._updateCountPillIcon();
         this._composer.setStreaming(state.status === 'streaming');
         this._updatePendingImages(state.status === 'streaming' ? state.messages : []);
+
+        const errorBlock = this._refs.errorBlock;
+        const wasVisible = errorBlock.classList.contains('is-visible');
+        const isError = state.error && state.error !== 'Отменено';
+
+        if (isError) {
+            errorBlock.textContent = formatChatErrorForDisplay(state.error);
+            errorBlock.classList.add('is-visible');
+        } else {
+            errorBlock.classList.remove('is-visible');
+        }
+
+        const isVisible = errorBlock.classList.contains('is-visible');
+        if (!wasVisible && isVisible) {
+            requestAnimationFrame(() => {
+                this._pushBoardImagesUpIfNeeded();
+            });
+        } else if (wasVisible && !isVisible) {
+            this._pullBoardImagesDownIfNeeded();
+        }
     }
 
     _updatePendingImages(messages) {
@@ -795,9 +809,23 @@ export class ChatWindow {
     _getImageGroupAnchor() {
         const composerRect = this._refs?.composer?.getBoundingClientRect?.();
         if (composerRect) {
+            let y = composerRect.top - 250;
+            
+            const errorBlock = this._refs?.errorBlock;
+            if (errorBlock && errorBlock.classList.contains('is-visible')) {
+                const errorRect = errorBlock.getBoundingClientRect();
+                // Низ картинок примерно y + 150.
+                // Хотим чтобы errorRect.top был хотя бы y + 150 + 16 (gap)
+                // То есть y + 166 <= errorRect.top
+                const minY = errorRect.top - 166;
+                if (y > minY) {
+                    y = minY;
+                }
+            }
+            
             return {
                 x: Math.round(composerRect.left + composerRect.width / 2),
-                y: Math.round(composerRect.top - 250)
+                y: Math.round(y)
             };
         }
 
@@ -898,6 +926,58 @@ export class ChatWindow {
 
             if (allResolved && !anyImage) {
                 this._revertBoardImageShiftForBatch(batchKey);
+            }
+        }
+    }
+
+    _pushBoardImagesUpIfNeeded() {
+        const errorBlock = this._refs.errorBlock;
+        if (!errorBlock) return;
+        const errorRect = errorBlock.getBoundingClientRect();
+        
+        const aiObjects = this._getBoardAiImageObjects();
+        if (aiObjects.length === 0) return;
+
+        const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
+        const s = world?.scale?.x || 1;
+
+        let maxOverlap = 0;
+        for (const obj of aiObjects) {
+            if (!obj.position) continue;
+            const height = getBoardObjectHeight(obj);
+            const bottomWorld = obj.position.y + height;
+            const bottomScreen = bottomWorld * s + (world?.y || 0);
+
+            const overlap = bottomScreen - (errorRect.top - 16);
+            if (overlap > maxOverlap) {
+                maxOverlap = overlap;
+            }
+        }
+
+        if (maxOverlap > 0) {
+            const shiftWorld = Math.ceil(maxOverlap / s);
+            this._errorShiftAmount = shiftWorld;
+            for (const obj of aiObjects) {
+                if (obj.position) {
+                    const from = { x: obj.position.x, y: obj.position.y };
+                    const to = { x: obj.position.x, y: obj.position.y - shiftWorld };
+                    this._animateBoardImageToPosition(obj.id, from, to);
+                }
+            }
+        }
+    }
+
+    _pullBoardImagesDownIfNeeded() {
+        if (!this._errorShiftAmount) return;
+        const shiftWorld = this._errorShiftAmount;
+        this._errorShiftAmount = 0;
+
+        const aiObjects = this._getBoardAiImageObjects();
+        for (const obj of aiObjects) {
+            if (obj.position) {
+                const from = { x: obj.position.x, y: obj.position.y };
+                const to = { x: obj.position.x, y: obj.position.y + shiftWorld };
+                this._animateBoardImageToPosition(obj.id, from, to);
             }
         }
     }
@@ -1181,6 +1261,11 @@ function createNamedBlob(blob, name) {
 function getBoardObjectWidth(object) {
     const width = object?.width ?? object?.properties?.width ?? BOARD_IMAGE_WIDTH;
     return Number.isFinite(width) ? Math.max(1, Math.round(width)) : BOARD_IMAGE_WIDTH;
+}
+
+function getBoardObjectHeight(object) {
+    const height = object?.height ?? object?.properties?.height ?? BOARD_IMAGE_WIDTH;
+    return Number.isFinite(height) ? Math.max(1, Math.round(height)) : BOARD_IMAGE_WIDTH;
 }
 
 function easeOutCubic(progress) {

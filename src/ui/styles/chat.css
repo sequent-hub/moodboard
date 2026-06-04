@@ -731,6 +731,30 @@
     pointer-events: none;
 }
 
+/* Блок ошибки сервера */
+.moodboard-chat__error-block {
+    display: none;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    --color-shadow: lab(5.0601% 0 0 / .04);
+    box-shadow:
+        0 0 0 1px lab(5.0601% 0 0 / .0784),
+        0 2px 8px -1.5px var(--color-shadow),
+        0 5px 8px -3px var(--color-shadow),
+        0 12px 12px -8px var(--color-shadow),
+        0 24px 24px -8px var(--color-shadow);
+    color: #B91C1C;
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.moodboard-chat__error-block.is-visible {
+    display: block;
+}
+
 /* Попап настроек */
 .moodboard-chat__settings-popup {
     position: absolute;

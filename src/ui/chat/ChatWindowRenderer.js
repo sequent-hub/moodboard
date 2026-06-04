@@ -21,6 +21,9 @@ export function buildChatDom() {
     history.setAttribute('role', 'log');
     history.setAttribute('aria-live', 'polite');
 
+    const errorBlock = createDiv('moodboard-chat__error-block');
+    errorBlock.setAttribute('aria-live', 'assertive');
+
     const composer = createDiv('moodboard-chat__composer');
 
     const statusBar = createDiv('moodboard-chat__status-bar');
@@ -35,7 +38,8 @@ export function buildChatDom() {
         history,
         composer,
         statusBar,
-        pendingImages
+        pendingImages,
+        errorBlock
     };
 
     composer.appendChild(buildInputRow(refs => Object.assign(rendererRefs, refs)));
@@ -43,6 +47,7 @@ export function buildChatDom() {
 
     root.appendChild(history);
     root.appendChild(pendingImages);
+    root.appendChild(errorBlock);
     root.appendChild(statusBar);
     root.appendChild(composer);
 
