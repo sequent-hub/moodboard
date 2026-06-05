@@ -20,6 +20,18 @@
     color: #374151;
 }
 
+/* Fallback: на экранах < 1540px центрированный чат перекрывает правый кластер —
+   поднимаем чат над кластером и прижимаем к правому краю */
+@media (max-width: 1540px) {
+    .moodboard-chat {
+        left: auto;
+        right: 16px;
+        bottom: 84px;
+        transform: none;
+        width: min(720px, calc(100% - 32px));
+    }
+}
+
 .moodboard-chat__history {
     max-height: 360px;
     overflow-y: auto;
