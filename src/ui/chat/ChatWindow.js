@@ -146,6 +146,9 @@ export class ChatWindow {
         this._pendingOverlayTimers = new Map();
         this._boardImageShiftAnimations = new Map();
         this._pendingBatchOffsets = new Map();
+        this._aiImageLaneSlots = new Map();
+        this._draggingAiImageIds = new Set();
+        this._aiImageLaneHandlers = null;
         this._selectionHandlers = null;
         this._viewportHandlers = null;
         // Окно от BoxSelectStart до BoxSelectCommit: в это время SelectionAdd
@@ -181,6 +184,7 @@ export class ChatWindow {
         this._composer.attach();
         this._attachSelectionEvents();
         this._attachViewportSync();
+        this._attachAiImageLaneEvents();
 
         this._extendedPromptModal = new ChatExtendedPromptModal(
             this._container,
@@ -266,9 +270,12 @@ export class ChatWindow {
         if (this._unsubscribe) { this._unsubscribe(); this._unsubscribe = null; }
         this._detachSelectionEvents();
         this._detachViewportSync();
+        this._detachAiImageLaneEvents();
         this._shiftedForImageBatchKeys.clear();
         this._boardImageShiftHistory.clear();
         this._pendingBatchOffsets.clear();
+        this._aiImageLaneSlots.clear();
+        this._draggingAiImageIds.clear();
         this._composer?.destroy();
         this._extendedPromptModal?.destroy();
         this._contentTypeMenu?.destroy();
@@ -434,11 +441,13 @@ export class ChatWindow {
                     worldX: existing.worldX,
                     worldY: existing.worldY
                 };
+                this._reserveAiImageLaneSlotForMessage(message.id, existing.worldX, existing.worldY);
                 this._applyPendingOverlayScreenLayout(existing.el, screenLayout, { animate: true, enterDistance });
                 return;
             }
 
             const layout = this._computePendingOverlayScreenLayout(messages, message.id, s);
+            this._reserveAiImageLaneSlotForMessage(message.id, layout.worldX, layout.worldY);
 
             const overlay = document.createElement('div');
             overlay.className = 'moodboard-chat__pending-overlay moodboard-chat__pending-overlay--enter';
@@ -512,7 +521,8 @@ export class ChatWindow {
 
         const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
         const worldX = world?.x || 0;
-        const existingRight_world = Math.max(...aiObjects.map((obj) => obj.position.x + getBoardObjectWidth(obj)));
+        const existingRight_world = this._getAiImageLaneRightBoundary(aiObjects);
+        if (!Number.isFinite(existingRight_world)) return baseEnter;
         const existingRight_screen = Math.round(existingRight_world * scale + worldX);
 
         const step = Math.round(BOARD_IMAGE_STEP * scale);
@@ -557,6 +567,7 @@ export class ChatWindow {
             const layout = this._computePendingOverlayScreenLayout(messages, messageId, scale);
             record.worldX = layout.worldX;
             record.worldY = layout.worldY;
+            this._reserveAiImageLaneSlotForMessage(messageId, layout.worldX, layout.worldY);
             this._applyPendingOverlayScreenLayout(record.el, layout, { animate: true });
             existingOverlaysShifted = true;
         }
@@ -569,8 +580,25 @@ export class ChatWindow {
         const worldShift = shiftAmount / scale;
         for (const obj of this._getBoardAiImageObjects()) {
             if (obj?.position) {
+                const key = getAiImageLaneKeyForObject(obj);
+                const currentSlot = this._getAiImageLaneSlotForObject(obj);
                 const from = { x: obj.position.x, y: obj.position.y };
-                const to = { x: Math.round(obj.position.x - worldShift), y: obj.position.y };
+                if (this._draggingAiImageIds.has(obj.id)) {
+                    this._reserveAiImageLaneSlotForObject(obj);
+                    continue;
+                }
+                const to = {
+                    x: Math.round((currentSlot?.x ?? obj.position.x) - worldShift),
+                    y: currentSlot?.y ?? obj.position.y
+                };
+                if (key) {
+                    this._aiImageLaneSlots.set(key, {
+                        x: to.x,
+                        y: to.y,
+                        width: currentSlot?.width ?? getBoardObjectWidth(obj),
+                        height: currentSlot?.height ?? getBoardObjectHeight(obj)
+                    });
+                }
                 this._animateBoardImageToPosition(obj.id, from, to);
             }
         }
@@ -655,6 +683,7 @@ export class ChatWindow {
             const screenX = Math.round(record.worldX * s + (world?.x || 0));
             const screenY = Math.round(record.worldY * s + (world?.y || 0));
             const el = record.el;
+            this._reserveAiImageLaneSlotForMessage(messageId, record.worldX, record.worldY);
             if (disableTransition) {
                 el.style.transition = 'none';
             }
@@ -695,6 +724,62 @@ export class ChatWindow {
         eventBus.off(Events.UI.ZoomPercent, handlers.onViewportChange);
         eventBus.off(Events.Viewport.Changed, handlers.onViewportChange);
         this._viewportHandlers = null;
+    }
+
+    _attachAiImageLaneEvents() {
+        const eventBus = this._boardCore?.eventBus;
+        if (!eventBus || typeof eventBus.on !== 'function' || this._aiImageLaneHandlers) return;
+
+        const onDragStart = (data) => {
+            this._startAiImageLaneDrag([data?.object]);
+        };
+        const onDragUpdate = (data) => {
+            this._updateAiImageLaneDrag([data?.object]);
+        };
+        const onDragEnd = (data) => {
+            this._updateAiImageLaneDrag([data?.object]);
+            this._endAiImageLaneDrag([data?.object]);
+        };
+        const onGroupDragStart = (data) => {
+            this._startAiImageLaneDrag(data?.objects);
+        };
+        const onGroupDragUpdate = (data) => {
+            this._updateAiImageLaneDrag(data?.objects);
+        };
+        const onGroupDragEnd = (data) => {
+            this._updateAiImageLaneDrag(data?.objects);
+            this._endAiImageLaneDrag(data?.objects);
+        };
+
+        this._aiImageLaneHandlers = {
+            onDragStart,
+            onDragUpdate,
+            onDragEnd,
+            onGroupDragStart,
+            onGroupDragUpdate,
+            onGroupDragEnd
+        };
+
+        eventBus.on(Events.Tool.DragStart, onDragStart);
+        eventBus.on(Events.Tool.DragUpdate, onDragUpdate);
+        eventBus.on(Events.Tool.DragEnd, onDragEnd);
+        eventBus.on(Events.Tool.GroupDragStart, onGroupDragStart);
+        eventBus.on(Events.Tool.GroupDragUpdate, onGroupDragUpdate);
+        eventBus.on(Events.Tool.GroupDragEnd, onGroupDragEnd);
+    }
+
+    _detachAiImageLaneEvents() {
+        const eventBus = this._boardCore?.eventBus;
+        const handlers = this._aiImageLaneHandlers;
+        if (!eventBus || typeof eventBus.off !== 'function' || !handlers) return;
+
+        eventBus.off(Events.Tool.DragStart, handlers.onDragStart);
+        eventBus.off(Events.Tool.DragUpdate, handlers.onDragUpdate);
+        eventBus.off(Events.Tool.DragEnd, handlers.onDragEnd);
+        eventBus.off(Events.Tool.GroupDragStart, handlers.onGroupDragStart);
+        eventBus.off(Events.Tool.GroupDragUpdate, handlers.onGroupDragUpdate);
+        eventBus.off(Events.Tool.GroupDragEnd, handlers.onGroupDragEnd);
+        this._aiImageLaneHandlers = null;
     }
 
     _attachSelectionEvents() {
@@ -870,7 +955,8 @@ export class ChatWindow {
         const aiObjects = this._getBoardAiImageObjects();
         if (aiObjects.length === 0 || !nextBatchBounds) return;
 
-        const existingRight = Math.max(...aiObjects.map((object) => object.position.x + getBoardObjectWidth(object)));
+        const existingRight = this._getAiImageLaneRightBoundary(aiObjects);
+        if (!Number.isFinite(existingRight)) return;
         const shift = Math.ceil(existingRight + BOARD_IMAGE_GAP - nextBatchBounds.left);
         if (shift <= 0) return;
 
@@ -880,9 +966,28 @@ export class ChatWindow {
         for (const id of ids) {
             const obj = objects?.find((item) => item.id === id);
             if (obj?.position) {
+                const key = getAiImageLaneKeyForObject(obj);
+                const currentSlot = this._getAiImageLaneSlotForObject(obj);
                 const from = { x: obj.position.x, y: obj.position.y };
-                const to = { x: Math.round(obj.position.x - shift), y: obj.position.y };
-                shiftRecord.push({ id, from });
+                if (this._draggingAiImageIds.has(id)) {
+                    this._reserveAiImageLaneSlotForObject(obj);
+                    continue;
+                }
+                const fromSlot = currentSlot ? { ...currentSlot } : null;
+                const to = {
+                    x: Math.round((currentSlot?.x ?? obj.position.x) - shift),
+                    y: currentSlot?.y ?? obj.position.y
+                };
+                const toSlot = {
+                    x: to.x,
+                    y: to.y,
+                    width: currentSlot?.width ?? getBoardObjectWidth(obj),
+                    height: currentSlot?.height ?? getBoardObjectHeight(obj)
+                };
+                if (key) {
+                    this._aiImageLaneSlots.set(key, toSlot);
+                }
+                shiftRecord.push({ id, from, fromSlot });
                 this._animateBoardImageToPosition(id, from, to);
             }
         }
@@ -897,9 +1002,13 @@ export class ChatWindow {
         if (!record) return;
 
         const objects = this._boardCore?.state?.state?.objects;
-        for (const { id, from } of record) {
+        for (const { id, from, fromSlot } of record) {
             const obj = objects?.find((item) => item.id === id);
             if (obj?.position) {
+                const key = getAiImageLaneKeyForObject(obj);
+                if (key && fromSlot) {
+                    this._aiImageLaneSlots.set(key, fromSlot);
+                }
                 this._animateBoardImageToPosition(id, obj.position, from);
             }
         }
@@ -1056,6 +1165,156 @@ export class ChatWindow {
         return objects.filter((object) => isBoardAiImageObject(object));
     }
 
+    _getBoardObjectById(objectId) {
+        const objects = this._boardCore?.state?.state?.objects;
+        if (!objectId || !Array.isArray(objects)) return null;
+
+        return objects.find((object) => object?.id === objectId) || null;
+    }
+
+    _startAiImageLaneDrag(ids) {
+        const objects = this._getAiImageObjectsByIds(ids);
+        if (objects.length === 0) return;
+
+        this._reserveCurrentAiImageLaneSlots();
+        for (const object of objects) {
+            this._draggingAiImageIds.add(object.id);
+        }
+    }
+
+    _updateAiImageLaneDrag(ids) {
+        const objects = this._getAiImageObjectsByIds(ids);
+        for (const object of objects) {
+            this._reserveAiImageLaneSlotForObject(object);
+        }
+    }
+
+    _endAiImageLaneDrag(ids) {
+        const objects = this._getAiImageObjectsByIds(ids);
+        for (const object of objects) {
+            this._draggingAiImageIds.delete(object.id);
+        }
+    }
+
+    _getAiImageObjectsByIds(ids) {
+        const list = Array.isArray(ids) ? ids : [];
+        const objects = [];
+
+        for (const id of list) {
+            const object = this._getBoardObjectById(id);
+            if (isBoardAiImageObject(object)) {
+                objects.push(object);
+            }
+        }
+
+        return objects;
+    }
+
+    _reserveCurrentAiImageLaneSlots() {
+        for (const object of this._getBoardAiImageObjects()) {
+            this._reserveAiImageLaneSlotForObject(object);
+        }
+    }
+
+    _reserveAiImageLaneSlotForObject(object) {
+        const key = getAiImageLaneKeyForObject(object);
+        if (!key || !object?.position) return null;
+
+        const slot = {
+            x: Math.round(object.position.x),
+            y: Math.round(object.position.y),
+            width: getBoardObjectWidth(object),
+            height: getBoardObjectHeight(object)
+        };
+        this._aiImageLaneSlots.set(key, slot);
+
+        return slot;
+    }
+
+    _reserveAiImageLaneSlotForMessage(messageId, centerWorldX, centerWorldY) {
+        if (!messageId || !Number.isFinite(centerWorldX) || !Number.isFinite(centerWorldY)) return null;
+
+        const [wr, hr] = parseFormatRatio(this._formatId);
+        const width = BOARD_IMAGE_WIDTH;
+        const height = Math.round(width / (wr / hr));
+        const slot = {
+            x: Math.round(centerWorldX - width / 2),
+            y: Math.round(centerWorldY - height / 2),
+            width,
+            height
+        };
+        this._aiImageLaneSlots.set(messageId, slot);
+
+        return slot;
+    }
+
+    _getAiImageLaneSlotForObject(object) {
+        const key = getAiImageLaneKeyForObject(object);
+        return (key && this._aiImageLaneSlots.get(key)) || this._reserveAiImageLaneSlotForObject(object);
+    }
+
+    _getAiImageLaneRightBoundary(objects = this._getBoardAiImageObjects(), excludeKey = null) {
+        const rights = [];
+
+        for (const object of objects) {
+            const key = getAiImageLaneKeyForObject(object);
+            if (key && key === excludeKey) continue;
+
+            const slot = this._getAiImageLaneSlotForObject(object);
+            if (slot) {
+                rights.push(slot.x + slot.width);
+            }
+        }
+
+        for (const [key, slot] of this._aiImageLaneSlots) {
+            if (key === excludeKey) continue;
+
+            if (slot && Number.isFinite(slot.x) && Number.isFinite(slot.width)) {
+                rights.push(slot.x + slot.width);
+            }
+        }
+
+        return rights.length > 0 ? Math.max(...rights) : null;
+    }
+
+    _resolveAiImageInsertPoint(msg, x, y, scale) {
+        const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
+        const s = scale || world?.scale?.x || 1;
+        const centerWorldX = (x - (world?.x || 0)) / s;
+        const centerWorldY = (y - (world?.y || 0)) / s;
+        let slot = this._reserveAiImageLaneSlotForMessage(msg.id, centerWorldX, centerWorldY);
+
+        if (slot && this._doesAiImageLaneSlotOverlap(slot, msg.id)) {
+            const right = this._getAiImageLaneRightBoundary(undefined, msg.id);
+            if (Number.isFinite(right)) {
+                slot = {
+                    ...slot,
+                    x: Math.round(right + BOARD_IMAGE_GAP)
+                };
+                this._aiImageLaneSlots.set(msg.id, slot);
+            }
+        }
+
+        if (!slot) return { x, y };
+
+        return {
+            x: Math.round((slot.x + slot.width / 2) * s + (world?.x || 0)),
+            y: Math.round((slot.y + slot.height / 2) * s + (world?.y || 0))
+        };
+    }
+
+    _doesAiImageLaneSlotOverlap(candidate, candidateKey) {
+        for (const [key, slot] of this._aiImageLaneSlots) {
+            if (key === candidateKey || !slot) continue;
+
+            if (rectsOverlap(candidate, slot)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     _addImageToBoard(msg) {
         if (!this._boardCore?.eventBus) return;
         const dataUrl = `data:${msg.mimeType || 'image/jpeg'};base64,${msg.imageBase64}`;
@@ -1077,12 +1336,14 @@ export class ChatWindow {
             x = slot.x;
             y = slot.y;
         }
+        const insertPoint = this._resolveAiImageInsertPoint(msg, x, y, s);
 
         this._boardCore.eventBus.emit(Events.UI.PasteImageAt, {
-            x,
-            y,
+            x: insertPoint.x,
+            y: insertPoint.y,
             src: dataUrl,
             name: 'ai-generated.jpg',
+            aiMessageId: msg.id,
             skipUpload: true
         });
     }
@@ -1186,6 +1447,19 @@ function isBoardAiImageObject(object) {
         && object.properties?.name === 'ai-generated.jpg'
         && object.position
         && Number.isFinite(object.position.x);
+}
+
+function getAiImageLaneKeyForObject(object) {
+    return object?.properties?.aiMessageId || object?.id || null;
+}
+
+function rectsOverlap(a, b) {
+    if (!a || !b) return false;
+
+    return a.x < b.x + b.width
+        && a.x + a.width > b.x
+        && a.y < b.y + b.height
+        && a.y + a.height > b.y;
 }
 
 function isReferenceImageObject(object) {

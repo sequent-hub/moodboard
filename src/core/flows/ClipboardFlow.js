@@ -286,7 +286,7 @@ export function setupClipboardFlow(core) {
         }
     });
 
-    core.eventBus.on(Events.UI.PasteImageAt, async ({ x, y, src, name, skipUpload }) => {
+    core.eventBus.on(Events.UI.PasteImageAt, async ({ x, y, src, name, skipUpload, aiMessageId }) => {
         if (!src) return;
         const uploaded = await ensureServerImage({ src, name, skipUpload });
         if (!uploaded?.src) return;
@@ -312,6 +312,7 @@ export function setupClipboardFlow(core) {
                 name: uploaded.name,
                 width: w,
                 height: h,
+                ...(aiMessageId ? { aiMessageId } : {}),
                 ...revitPayload.properties
             };
             const createdData = core.createObject(
