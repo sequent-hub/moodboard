@@ -10,6 +10,7 @@ import { ReactionsPopupController } from './toolbar/ReactionsPopupController.js'
 import { ToolbarTooltipController } from './toolbar/ToolbarTooltipController.js';
 import { ToolbarStateController } from './toolbar/ToolbarStateController.js';
 import { ToolbarRenderer } from './toolbar/ToolbarRenderer.js';
+import { ToolbarResponsiveController } from './toolbar/ToolbarResponsiveController.js';
 
 export class Toolbar {
     constructor(container, eventBus, theme = 'light', options = {}) {
@@ -33,6 +34,7 @@ export class Toolbar {
         this.tooltipController = new ToolbarTooltipController(this);
         this.stateController = new ToolbarStateController(this);
         this.renderer = new ToolbarRenderer(this);
+        this.responsiveController = new ToolbarResponsiveController(this);
         
         this.init();
     }
@@ -57,6 +59,7 @@ export class Toolbar {
         this.createToolbar();
         this.attachEvents();
         this.setupHistoryEvents();
+        this.responsiveController.attach();
     }
     
     /**
@@ -353,6 +356,11 @@ export class Toolbar {
      * Очистка ресурсов
      */
     destroy() {
+        if (this.responsiveController) {
+            this.responsiveController.destroy();
+            this.responsiveController = null;
+        }
+
         // Удаляем document-level listener (предотвращение утечки памяти)
         if (this._documentClickHandler) {
             document.removeEventListener('click', this._documentClickHandler);

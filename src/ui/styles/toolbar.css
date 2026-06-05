@@ -1,11 +1,16 @@
 /* Toolbar (split from workspace.css) */
 .moodboard-workspace__toolbar {
     position: absolute;
-    top: 50%;
+    top: 0;
+    bottom: 0;
     left: 16px;
-    transform: translateY(-50%);
     z-index: 3000;
     pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    box-sizing: border-box;
 }
 
 .moodboard-toolbar {
@@ -68,8 +73,12 @@
 .moodboard-toolbar__button--undo:hover:not(:disabled),
 .moodboard-toolbar__button--redo:hover:not(:disabled) { background: #80D8FF !important; }
 
+/* Overflow button hover — matching toolbar palette */
+.moodboard-toolbar__button--overflow:hover { background: #80D8FF !important; }
+
 /* Popups next to toolbar */
 .moodboard-toolbar__popup { position: absolute; top: 0; left: 64px; background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; box-shadow: 0 12px 28px rgba(0,0,0,0.18); z-index: 3200; padding: 8px; pointer-events: auto; }
+.moodboard-toolbar__popup--overflow { flex-direction: column; align-items: center; gap: 8px; min-width: 46px; }
 .moodboard-toolbar__popup--shapes { width: auto; }
 .moodboard-toolbar__popup--draw { width: auto; padding: 10px; }
 .moodboard-toolbar__popup--emoji { width: 360px; max-height: 420px; overflow: auto; padding: 8px 10px; }

@@ -740,11 +740,16 @@
 /* Toolbar Container */
 .moodboard-workspace__toolbar {
     position: absolute;
-    top: 50%;
+    top: 0;
+    bottom: 0;
     left: 16px;
-    transform: translateY(-50%);
     z-index: 3000;
-    pointer-events: none; /* чтобы клики проходили, сами кнопки включим */
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    box-sizing: border-box;
 }
 
 .moodboard-workspace__topbar {
