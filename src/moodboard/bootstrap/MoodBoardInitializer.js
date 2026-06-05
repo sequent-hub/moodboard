@@ -1,4 +1,5 @@
 import { CoreMoodBoard } from '../../core/index.js';
+import { BOARD_PALETTE } from '../../ui/boardPalette.js';
 import { createMoodBoardManagers, wireMoodBoardServices } from './MoodBoardManagersFactory.js';
 import { createMoodBoardUi } from './MoodBoardUiFactory.js';
 import { bindSaveCallbacks } from '../integration/MoodBoardEventBindings.js';
@@ -77,7 +78,7 @@ export async function initCoreMoodBoard(board) {
         boardId: board.options.boardId || 'workspace-board',
         width: canvasSize.width,
         height: canvasSize.height,
-        backgroundColor: board.options.theme === 'dark' ? 0x2a2a2a : 0xDAEEFB,
+        backgroundColor: board.options.theme === 'dark' ? 0x2a2a2a : parseInt(BOARD_PALETTE[0].board.replace('#', ''), 16),
         saveEndpoint: board.options.saveEndpoint,
         loadEndpoint: board.options.loadEndpoint,
     };

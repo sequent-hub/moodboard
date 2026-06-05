@@ -3,6 +3,7 @@
  */
 import { Events } from '../core/events/Events.js';
 import { TopbarIconLoader } from '../utils/topbarIconLoader.js';
+import { BOARD_PALETTE } from './boardPalette.js';
 
 export class Topbar {
     constructor(container, eventBus, theme = 'light') {
@@ -15,13 +16,7 @@ export class Topbar {
         this.iconLoader = new TopbarIconLoader();
         this.icons = this.iconLoader.icons;
         // Палитра кнопки заливки и соответствие цвету фона доски
-        this._palette = [
-            { id: 1, name: 'default-light', btnHex: '#d6e8f7', board: '#f0f6fc' },
-            { id: 2, name: 'mint-light',    btnHex: '#E8F5E9', board: '#f8fff7' },
-            { id: 3, name: 'peach-light',   btnHex: '#FFF3E0', board: '#fffcf7' },
-            { id: 4, name: 'gray-light',    btnHex: '#f5f5f5', board: '#f5f5f5' },
-            { id: 5, name: 'white',         btnHex: '#ffffff', board: '#ffffff' }
-        ];
+        this._palette = BOARD_PALETTE;
         this._pendingPaintHex = null;
         this.init();
     }
