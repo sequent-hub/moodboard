@@ -78,7 +78,7 @@ export async function initCoreMoodBoard(board) {
         boardId: board.options.boardId || 'workspace-board',
         width: canvasSize.width,
         height: canvasSize.height,
-        backgroundColor: board.options.theme === 'dark' ? 0x2a2a2a : parseInt(BOARD_PALETTE[0].board.replace('#', ''), 16),
+        backgroundColor: board.options.theme === 'dark' ? 0x2a2a2a : parseInt(BOARD_PALETTE[4].board.replace('#', ''), 16),
         saveEndpoint: board.options.saveEndpoint,
         loadEndpoint: board.options.loadEndpoint,
     };
