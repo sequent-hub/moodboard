@@ -45,8 +45,8 @@ const EXTEND_PROMPT_FIELD_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width=
 /** public/icons/google.svg — цветной логотип Google 36×36 */
 const MODEL_GOOGLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" fill="none" viewBox="0 0 36 36"><path fill="#4285F4" d="M29.251 18.49c0-.813-.073-1.596-.209-2.347H18.23v4.445h6.179c-.272 1.43-1.086 2.64-2.307 3.455v2.89h3.726c2.17-2.003 3.423-4.946 3.423-8.442"/><path fill="#34A853" d="M18.229 29.71c3.1 0 5.698-1.023 7.597-2.776l-3.725-2.89c-1.023.688-2.328 1.105-3.872 1.105-2.985 0-5.52-2.014-6.429-4.727H7.98v2.964c1.89 3.746 5.761 6.324 10.249 6.324"/><path fill="#FBBC05" d="M11.801 20.412a6.9 6.9 0 0 1-.365-2.181c0-.762.136-1.492.365-2.181v-2.964h-3.82A11.34 11.34 0 0 0 6.75 18.23c0 1.858.449 3.6 1.231 5.145l2.975-2.317z"/><path fill="#EA4335" d="M18.229 11.321c1.69 0 3.193.585 4.393 1.712l3.288-3.288c-1.994-1.857-4.582-2.995-7.681-2.995-4.488 0-8.36 2.578-10.249 6.335l3.82 2.964c.908-2.714 3.444-4.728 6.429-4.728"/></svg>`;
 
-/** Placeholder OpenAI GPT — буква G в круге, 36×36 */
-const MODEL_GPT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#10a37f"/><text x="18" y="23" text-anchor="middle" font-size="16" font-family="Arial,sans-serif" fill="#fff" font-weight="bold">G</text></svg>`;
+/** public/icons/gpt.svg — логотип GPT 36×36 */
+const MODEL_GPT_ICON = `<img src="/icons/gpt.svg" width="36" height="36" alt="" aria-hidden="true">`;
 
 /** Placeholder Alibaba Qwen — буква Q в круге, 36×36 */
 const MODEL_QWEN_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#6e42ca"/><text x="18" y="23" text-anchor="middle" font-size="16" font-family="Arial,sans-serif" fill="#fff" font-weight="bold">Q</text></svg>`;

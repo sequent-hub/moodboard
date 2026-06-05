@@ -68,6 +68,16 @@ const EXACT_MESSAGES_RU = {
         'Провайдер Yandex не настроен',
     'Provider "yandex-art" is not configured':
         'Провайдер «yandex-art» не настроен',
+    'OpenAI image provider is not configured':
+        'Провайдер OpenAI Images не настроен',
+    'OpenAI image response does not contain image data':
+        'В ответе OpenAI Images нет данных изображения',
+    'OpenAI image API returned non-JSON response':
+        'OpenAI Images вернул ответ не в формате JSON',
+    'OpenAI image operation timed out':
+        'Превышено время ожидания генерации OpenAI Images',
+    'Provider "openai-image" is not configured':
+        'Провайдер «openai-image» не настроен',
     'AI stream error':
         'Ошибка потока ответа ИИ',
     'AiClient.chatStream: empty response body':
@@ -95,6 +105,14 @@ const PREFIX_MESSAGES_RU = [
     {
         pattern: /^YandexART API error \((\d+)\)$/,
         format: ([, status]) => `Ошибка API YandexART (${status})`
+    },
+    {
+        pattern: /^OpenAI image API unreachable: (.+)$/,
+        format: ([, detail]) => `API OpenAI Images недоступен: ${detail}`
+    },
+    {
+        pattern: /^OpenAI image API error \((\d+)\)$/,
+        format: ([, status]) => `Ошибка API OpenAI Images (${status})`
     },
     {
         pattern: /^Yandex Operations API error \((\d+)\)$/,

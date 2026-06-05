@@ -106,8 +106,9 @@ export class AiClient {
     }
 
     /**
-     * Генерация изображения через YandexART.
+     * Генерация изображения через image-провайдера.
      * @param {object} args
+     * @param {string} [args.provider='yandex-art']
      * @param {string} args.prompt
      * @param {string} [args.negativePrompt]
      * @param {number} [args.widthRatio]
@@ -119,10 +120,10 @@ export class AiClient {
      * @param {AbortSignal} [args.signal]
      * @returns {Promise<{operationId: string, imageBase64: string, mimeType: string}>}
      */
-    async generateImage({ signal, referenceImages: files, ...payload }) {
+    async generateImage({ provider = 'yandex-art', signal, referenceImages: files, ...payload }) {
         const referenceImages = await filesToBase64(files);
         const body = referenceImages ? { ...payload, referenceImages } : payload;
-        const res = await this._fetch(`${this._baseUrl}/yandex-art/image`, {
+        const res = await this._fetch(`${this._baseUrl}/${provider}/image`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

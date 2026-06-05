@@ -10,7 +10,7 @@ import { CHAT_PRESETS, DEFAULT_PRESET_ID, getPresetById } from './ChatPresets.js
  *
  * Состояние:
  *   - messages: список сообщений (с временным assistant-сообщением во время стриминга)
- *   - providerId: текущий провайдер (yandex-art)
+ *   - providerId: текущий провайдер (yandex-art/openai-image)
  *   - presetId: текущий пресет промпта
  *   - settings: { systemPrompt, temperature, maxTokens }
  *   - status: 'idle' | 'streaming' | 'error'
@@ -112,21 +112,22 @@ export class ChatSessionController {
     }
 
     /**
-     * Отправляет user-сообщение и создаёт изображение через YandexART.
+     * Отправляет user-сообщение и создаёт изображение через выбранный image-провайдер.
      * @param {string} text
-     * @param {{widthRatio?: number, heightRatio?: number, model?: string, imageCount?: number}} [options]
+     * @param {{provider?: string, widthRatio?: number, heightRatio?: number, model?: string, imageCount?: number}} [options]
      */
     async send(text, options = {}) {
         const trimmed = (text || '').trim();
         if (!trimmed) return;
 
+        const provider = options.provider || 'yandex-art';
         const imageCount = normalizeImageCount(options.imageCount);
         const batchId = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const userMsg = makeMessage('user', trimmed);
         const assistantMsgs = Array.from({ length: imageCount }, (_, index) => makeMessage(
             'assistant',
             imageCount > 1 ? `Генерируется изображение ${index + 1} из ${imageCount}…` : '',
-            { provider: 'yandex-art', pending: true, kind: 'image', batchId }
+            { provider, pending: true, kind: 'image', batchId }
         ));
 
         this._state = {
@@ -154,6 +155,7 @@ export class ChatSessionController {
 
                     return this._client
                         .generateImage({
+                            provider,
                             prompt: trimmed,
                             widthRatio: options.widthRatio,
                             heightRatio: options.heightRatio,

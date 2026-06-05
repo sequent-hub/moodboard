@@ -90,7 +90,7 @@ const MODEL_OPTIONS = [
     {
         id: 'qwen',
         label: 'Qwen',
-        icon: ICONS.modelQwen,
+        icon: '<img src="/icons/qwen.svg" alt="" aria-hidden="true">',
         description: 'Alibaba'
     }
 ];
@@ -255,6 +255,7 @@ export class ChatWindow {
 
         const initialState = this._session.getState();
         this._markExistingBoardImages(initialState.messages);
+        this._reserveCurrentAiImageLaneSlots();
         this._unsubscribe = this._session.subscribe((state) => this._render(state));
         this._render(initialState);
 
@@ -616,7 +617,9 @@ export class ChatWindow {
 
     _getImageRequestOptions() {
         const [widthRatio, heightRatio] = parseFormatRatio(this._formatId);
+        const provider = this._modelId === 'gpt' ? 'openai-image' : 'yandex-art';
         return {
+            provider,
             widthRatio,
             heightRatio,
             model: this._modelId === 'yandex' ? 'yandex-art' : undefined,
@@ -1284,7 +1287,7 @@ export class ChatWindow {
         const centerWorldY = (y - (world?.y || 0)) / s;
         let slot = this._reserveAiImageLaneSlotForMessage(msg.id, centerWorldX, centerWorldY);
 
-        if (slot && this._doesAiImageLaneSlotOverlap(slot, msg.id)) {
+        if (slot && this._doesBoardAiImageOverlapSlot(slot, msg.id)) {
             const right = this._getAiImageLaneRightBoundary(undefined, msg.id);
             if (Number.isFinite(right)) {
                 slot = {
@@ -1303,9 +1306,17 @@ export class ChatWindow {
         };
     }
 
-    _doesAiImageLaneSlotOverlap(candidate, candidateKey) {
-        for (const [key, slot] of this._aiImageLaneSlots) {
-            if (key === candidateKey || !slot) continue;
+    _doesBoardAiImageOverlapSlot(candidate, excludeKey) {
+        for (const object of this._getBoardAiImageObjects()) {
+            const key = getAiImageLaneKeyForObject(object);
+            if (key === excludeKey) continue;
+
+            const slot = {
+                x: Math.round(object.position.x),
+                y: Math.round(object.position.y),
+                width: getBoardObjectWidth(object),
+                height: getBoardObjectHeight(object)
+            };
 
             if (rectsOverlap(candidate, slot)) {
                 return true;
@@ -1336,7 +1347,12 @@ export class ChatWindow {
             x = slot.x;
             y = slot.y;
         }
-        const insertPoint = this._resolveAiImageInsertPoint(msg, x, y, s);
+        const centerWorldX = (x - (world?.x || 0)) / s;
+        const centerWorldY = (y - (world?.y || 0)) / s;
+        const reservedSlot = this._reserveAiImageLaneSlotForMessage(msg.id, centerWorldX, centerWorldY);
+        const insertPoint = pendingRecord && reservedSlot && !this._doesBoardAiImageOverlapSlot(reservedSlot, msg.id)
+            ? { x, y }
+            : this._resolveAiImageInsertPoint(msg, x, y, s);
 
         this._boardCore.eventBus.emit(Events.UI.PasteImageAt, {
             x: insertPoint.x,
@@ -1444,7 +1460,7 @@ function isImageGenerationMessage(message) {
 function isBoardAiImageObject(object) {
     return Boolean(object?.id)
         && object.type === 'image'
-        && object.properties?.name === 'ai-generated.jpg'
+        && (object.properties?.name === 'ai-generated.jpg' || object.properties?.aiMessageId)
         && object.position
         && Number.isFinite(object.position.x);
 }
