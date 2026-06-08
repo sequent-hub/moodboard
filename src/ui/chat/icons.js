@@ -54,7 +54,12 @@ const MODEL_QWEN_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" heig
 /** Placeholder Yandex Alice — буква А в круге, 36×36 */
 const MODEL_ALICE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#fc3f1d"/><text x="18" y="23" text-anchor="middle" font-size="16" font-family="Arial,sans-serif" fill="#fff" font-weight="bold">А</text></svg>`;
 
+/** Иконка «Автоматический режим» — робот, 36×36, outline */
+const MODEL_BOT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>`;
+
 export const ICONS = {
+    bot: svg('<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>'),
+    modelBot: MODEL_BOT_ICON,
     image: IMAGE_ICON,
     video: VIDEO_ICON,
     bolt: svg('<path d="M13 3L4 14h6l-1 7 9-11h-6l1-7z"/>'),

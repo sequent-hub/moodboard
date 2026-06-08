@@ -66,7 +66,7 @@ const MODEL_OPTIONS = [
     {
         id: 'auto',
         label: 'Автоматический режим',
-        icon: ICONS.sparkles,
+        icon: ICONS.modelBot,
         description: 'Мы подберем модель для ваших задач.'
     },
     {
