@@ -26,7 +26,7 @@ const CONTENT_TYPE_OPTIONS = [
     }
 ];
 
-/** Порядок: портрет (строка 1), авто + альбом (строка 2) — соответствует грид-меню */
+/** Порядок: портрет (строка 1), альбом (строка 2), авто — крайнее правое */
 const FORMAT_OPTIONS = [
     { id: '1:1',   label: '1:1',   icon: RATIO_ICONS['1:1']   },
     { id: '4:5',   label: '4:5',   icon: RATIO_ICONS['4:5']   },
@@ -35,13 +35,13 @@ const FORMAT_OPTIONS = [
     { id: '2:3',   label: '2:3',   icon: RATIO_ICONS['2:3']   },
     { id: '9:16',  label: '9:16',  icon: RATIO_ICONS['9:16']  },
     { id: '1:2',   label: '1:2',   icon: RATIO_ICONS['1:2']   },
-    { id: 'auto',  label: 'Auto',  icon: RATIO_ICONS['auto']  },
     { id: '5:4',   label: '5:4',   icon: RATIO_ICONS['5:4']   },
     { id: '4:3',   label: '4:3',   icon: RATIO_ICONS['4:3']   },
     { id: '14:10', label: '14:10', icon: RATIO_ICONS['14:10'] },
     { id: '3:2',   label: '3:2',   icon: RATIO_ICONS['3:2']   },
     { id: '16:9',  label: '16:9',  icon: RATIO_ICONS['16:9']  },
     { id: '2:1',   label: '2:1',   icon: RATIO_ICONS['2:1']   },
+    { id: 'auto',  label: 'Auto',  icon: RATIO_ICONS['auto']  },
 ];
 
 const COUNT_OPTIONS = [
@@ -61,6 +61,10 @@ const BOARD_IMAGE_REARRANGE_MS = 520;
 const BOARD_IMAGE_PENDING_ENTER_FACTOR = 1.6;
 // Каскад между блоками одного батча (мс): пользователь видит, что они приезжают друг за другом.
 const BOARD_IMAGE_PENDING_STAGGER_MS = 90;
+// Референсная высота ряда AI-картинок: центры выравниваются по одной оси независимо от формата.
+const BOARD_IMAGE_LANE_REFERENCE_RATIO = [2, 3];
+const BOARD_IMAGE_LANE_CENTER_OFFSET = 250;
+const BOARD_IMAGE_LANE_UI_GAP = 16;
 
 const MODEL_OPTIONS = [
     {
@@ -135,6 +139,7 @@ export class ChatWindow {
         this._modelMenu = null;
         this._formatId = 'auto';
         this._formatMenu = null;
+        this._providers = [];
         this._countId = 'auto';
         this._countMenu = null;
         this._unsubscribe = null;
@@ -219,6 +224,7 @@ export class ChatWindow {
                 onSelect: (id) => {
                     this._modelId = id;
                     this._modelMenu.refresh();
+                    this._clampFormatToModel();
                 }
             }
         );
@@ -227,7 +233,7 @@ export class ChatWindow {
         this._formatMenu = new ChatPillMenu(
             { trigger: this._refs.formatPill, menu: this._refs.formatMenu, label: this._refs.formatLabel },
             {
-                getOptions: () => FORMAT_OPTIONS,
+                getOptions: () => this._getSupportedFormatOptions(),
                 getActiveId: () => this._formatId,
                 onSelect: (id) => {
                     this._formatId = id;
@@ -332,10 +338,62 @@ export class ChatWindow {
     async _loadProviders() {
         try {
             const list = await this._aiClient.listProviders();
+            this._providers = Array.isArray(list) ? list : [];
             this._session.setAvailableProviders(list);
+            this._clampFormatToModel();
         } catch (err) {
             console.warn('[ChatWindow] cannot load providers:', err.message);
+            this._providers = [];
             this._session.setAvailableProviders([]);
+        }
+    }
+
+    /**
+     * Возвращает id провайдера изображений для текущей модели.
+     * Дублирует логику из _getImageRequestOptions, чтобы не привязываться к payload-контексту.
+     *
+     * @param {string} modelId
+     * @returns {string}
+     */
+    _imageProviderForModel(modelId) {
+        return modelId === 'gpt' ? 'openai-image' : 'yandex-art';
+    }
+
+    /**
+     * Возвращает подмножество FORMAT_OPTIONS, поддерживаемое текущим провайдером.
+     * Если провайдер не ограничивает форматы (supportedRatios === null) — возвращает все.
+     * Формат 'auto' присутствует всегда.
+     *
+     * @returns {Array}
+     */
+    _getSupportedFormatOptions() {
+        const providerId = this._imageProviderForModel(this._modelId);
+        const provider = this._providers.find((p) => p.id === providerId);
+        const ratios = provider?.supportedRatios;
+
+        if (!Array.isArray(ratios) || ratios.length === 0) {
+            return FORMAT_OPTIONS;
+        }
+
+        return FORMAT_OPTIONS.filter((opt) => opt.id === 'auto' || ratios.includes(opt.id));
+    }
+
+    /**
+     * При смене модели проверяет, что текущий формат входит в список поддерживаемых.
+     * Если нет — сбрасывает на 'auto'.
+     */
+    _clampFormatToModel() {
+        const supported = this._getSupportedFormatOptions();
+        const stillValid = supported.some((opt) => opt.id === this._formatId);
+        if (!stillValid) {
+            this._formatId = 'auto';
+        }
+        // refresh обновляет лейбл из option.label ('Auto'), поэтому _updateFormatPillLabel
+        // вызывается после — она выставляет человекочитаемый текст 'Соотношение сторон'.
+        this._formatMenu?.refresh();
+        if (!stillValid) {
+            this._updateFormatPillIcon();
+            this._updateFormatPillLabel();
         }
     }
 
@@ -894,23 +952,74 @@ export class ChatWindow {
         };
     }
 
-    _getImageGroupAnchor() {
-        const composerRect = this._refs?.composer?.getBoundingClientRect?.();
-        if (composerRect) {
-            let y = composerRect.top - 250;
-            
-            const errorBlock = this._refs?.errorBlock;
-            if (errorBlock && errorBlock.classList.contains('is-visible')) {
-                const errorRect = errorBlock.getBoundingClientRect();
-                // Низ картинок примерно y + 150.
-                // Хотим чтобы errorRect.top был хотя бы y + 150 + 16 (gap)
-                // То есть y + 166 <= errorRect.top
-                const minY = errorRect.top - 166;
+    _getAiImageLaneCenterScreenY(scale = 1) {
+        const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
+        const s = scale || world?.scale?.x || 1;
+        const worldOffsetY = world?.y || 0;
+
+        for (const record of this._pendingOverlays.values()) {
+            if (Number.isFinite(record.worldY)) {
+                return Math.round(record.worldY * s + worldOffsetY);
+            }
+        }
+
+        for (const object of this._getBoardAiImageObjects()) {
+            if (!object?.position) continue;
+
+            const height = getBoardObjectHeight(object);
+            return Math.round((object.position.y + height / 2) * s + worldOffsetY);
+        }
+
+        for (const slot of this._aiImageLaneSlots.values()) {
+            if (slot && Number.isFinite(slot.y) && Number.isFinite(slot.height)) {
+                return Math.round((slot.y + slot.height / 2) * s + worldOffsetY);
+            }
+        }
+
+        return null;
+    }
+
+    _clampImageGroupAnchorY(y, referenceHeight) {
+        const clearance = Math.round(referenceHeight / 2) + BOARD_IMAGE_LANE_UI_GAP;
+
+        const errorBlock = this._refs?.errorBlock;
+        if (errorBlock && errorBlock.classList.contains('is-visible')) {
+            const errorRect = errorBlock.getBoundingClientRect();
+            if (errorRect.height > 0) {
+                const minY = errorRect.top - clearance;
                 if (y > minY) {
                     y = minY;
                 }
             }
-            
+        }
+
+        const statusBar = this._refs?.statusBar;
+        if (statusBar && statusBar.classList.contains('is-visible')) {
+            const statusRect = statusBar.getBoundingClientRect();
+            // jsdom отдаёт нулевой rect — без реальной геометрии не сдвигаем ряд.
+            if (statusRect.height > 0 && statusRect.top > 0) {
+                const minY = statusRect.top - clearance;
+                if (y > minY) {
+                    y = minY;
+                }
+            }
+        }
+
+        return y;
+    }
+
+    _getImageGroupAnchor() {
+        const composerRect = this._refs?.composer?.getBoundingClientRect?.();
+        if (composerRect) {
+            const existingCenterY = this._getAiImageLaneCenterScreenY();
+            const [wr, hr] = parseFormatRatio(this._formatId);
+            const actualHeight = Math.round(BOARD_IMAGE_WIDTH / (wr / hr));
+            let y = existingCenterY ?? (composerRect.top - Math.round(actualHeight / 2) - BOARD_IMAGE_LANE_UI_GAP);
+
+            if (existingCenterY == null) {
+                y = this._clampImageGroupAnchorY(y, actualHeight);
+            }
+
             return {
                 x: Math.round(composerRect.left + composerRect.width / 2),
                 y: Math.round(y)
@@ -1384,6 +1493,11 @@ export class ChatWindow {
             this._addImageToBoard(msg);
         }
     }
+}
+
+function getBoardImageReferenceHeight() {
+    const [widthRatio, heightRatio] = BOARD_IMAGE_LANE_REFERENCE_RATIO;
+    return Math.round(BOARD_IMAGE_WIDTH / (widthRatio / heightRatio));
 }
 
 function parseFormatRatio(formatId) {

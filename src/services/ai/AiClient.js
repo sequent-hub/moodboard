@@ -28,7 +28,10 @@ export class AiClient {
 
     /**
      * Список доступных провайдеров.
-     * @returns {Promise<Array<{id: string, label: string, enabled: boolean}>>}
+     *
+     * @returns {Promise<Array<{id: string, label: string, enabled: boolean, supportedRatios: string[]|null}>>}
+     *   supportedRatios — массив id форматов из FORMAT_OPTIONS (например ['1:1','3:2','2:3']),
+     *   либо null, если провайдер не ограничивает доступные соотношения сторон.
      */
     async listProviders() {
         const res = await this._fetch(`${this._baseUrl}/providers`, {
