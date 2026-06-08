@@ -889,6 +889,9 @@
     inset: 0;
     overflow: hidden;
     touch-action: none;
+    /* Цвет совпадает с дефолтным фоном PIXI (0xF5F5F5),
+       чтобы при очистке WebGL-буфера во время resize не мелькал чёрный. */
+    background-color: #f5f5f5;
 }
 
 /* Toolbar Styles */

@@ -205,6 +205,11 @@ export class PixiEngine {
             renderer.resolution = dpr;
         }
         renderer.resize(w, h);
+        // Немедленный перерендер — иначе до следующего тика PIXI буфер
+        // отображается очищенным (чёрный кадр) на время resize.
+        if (this.app?.stage) {
+            renderer.render(this.app.stage);
+        }
     }
 
     // Добавление/обновление сетки в gridLayer
