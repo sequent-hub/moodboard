@@ -156,6 +156,7 @@ export class ChatWindow {
         this._aiImageLaneHandlers = null;
         this._selectionHandlers = null;
         this._viewportHandlers = null;
+        this._boardObjectHandlers = null;
         // Окно от BoxSelectStart до BoxSelectCommit: в это время SelectionAdd
         // приходит на каждый mousemove и не должен пушить превью в чат —
         // финальный набор картинок мы получим из BoxSelectCommit по strict-contains.
@@ -190,6 +191,7 @@ export class ChatWindow {
         this._attachSelectionEvents();
         this._attachViewportSync();
         this._attachAiImageLaneEvents();
+        this._attachBoardObjectEvents();
 
         this._extendedPromptModal = new ChatExtendedPromptModal(
             this._container,
@@ -278,6 +280,7 @@ export class ChatWindow {
         this._detachSelectionEvents();
         this._detachViewportSync();
         this._detachAiImageLaneEvents();
+        this._detachBoardObjectEvents();
         this._shiftedForImageBatchKeys.clear();
         this._boardImageShiftHistory.clear();
         this._pendingBatchOffsets.clear();
@@ -552,6 +555,68 @@ export class ChatWindow {
                 this._scheduleAnimationFrame(trigger);
             }
         });
+
+        // Детерминированная гарантия отсутствия наложения: считается в чистом world-space,
+        // поэтому не зависит ни от зума, ни от порядка/тайминга батчей. Срабатывает только
+        // когда после всех остальных сдвигов изображение всё ещё заходит на слот заглушки
+        // (idempotent: при overflow <= 0 — no-op, не трогает «подтягивание вправо» и drag).
+        this._ensureExistingImagesClearOfPending();
+    }
+
+    _ensureExistingImagesClearOfPending() {
+        if (this._pendingOverlays.size === 0) {
+            return;
+        }
+
+        let minPlaceholderLeft = Infinity;
+        for (const record of this._pendingOverlays.values()) {
+            if (Number.isFinite(record.worldX)) {
+                minPlaceholderLeft = Math.min(minPlaceholderLeft, record.worldX - BOARD_IMAGE_WIDTH / 2);
+            }
+        }
+        if (!Number.isFinite(minPlaceholderLeft)) {
+            return;
+        }
+
+        const boundary = minPlaceholderLeft - BOARD_IMAGE_GAP;
+        const objects = this._getBoardAiImageObjects()
+            .filter((obj) => obj?.position && !this._draggingAiImageIds.has(obj.id));
+        if (objects.length === 0) {
+            return;
+        }
+
+        let maxRight = -Infinity;
+        for (const obj of objects) {
+            const slot = this._getAiImageLaneSlotForObject(obj);
+            const left = slot?.x ?? obj.position.x;
+            const width = slot?.width ?? getBoardObjectWidth(obj);
+            maxRight = Math.max(maxRight, left + width);
+        }
+
+        const overflow = Math.ceil(maxRight - boundary);
+        if (overflow <= 0) {
+            return;
+        }
+
+        for (const obj of objects) {
+            const key = getAiImageLaneKeyForObject(obj);
+            const slot = this._getAiImageLaneSlotForObject(obj);
+            const targetX = Math.round((slot?.x ?? obj.position.x) - overflow);
+            const targetY = slot?.y ?? obj.position.y;
+            if (key) {
+                this._aiImageLaneSlots.set(key, {
+                    x: targetX,
+                    y: targetY,
+                    width: slot?.width ?? getBoardObjectWidth(obj),
+                    height: slot?.height ?? getBoardObjectHeight(obj)
+                });
+            }
+            this._animateBoardImageToPosition(
+                obj.id,
+                { x: obj.position.x, y: obj.position.y },
+                { x: targetX, y: targetY }
+            );
+        }
     }
 
     _cancelPendingOverlayTimer(id) {
@@ -611,8 +676,11 @@ export class ChatWindow {
     _shiftPendingOverlaysForNewBatch(batchId, count, scale) {
         if (!batchId || this._pendingBatchOffsets.has(batchId)) return;
 
-        const step = Math.round(BOARD_IMAGE_STEP * scale);
-        const shiftAmount = count * step;
+        // Offset храним в world-units, чтобы расстояние между батчами оставалось
+        // стабильным при изменении zoom между промптами. Если хранить в screen-px,
+        // накопленные смещения «протухают» при следующем масштабе и батчи едут друг
+        // на друга.
+        const shiftAmount = count * BOARD_IMAGE_STEP;
 
         for (const [existingId, offset] of this._pendingBatchOffsets) {
             this._pendingBatchOffsets.set(existingId, offset - shiftAmount);
@@ -636,7 +704,8 @@ export class ChatWindow {
         // правее заглушек и перекроются ими.
         if (!existingOverlaysShifted) return;
 
-        const worldShift = shiftAmount / scale;
+        // shiftAmount уже в world-units (см. инициализацию выше).
+        const worldShift = shiftAmount;
         for (const obj of this._getBoardAiImageObjects()) {
             if (obj?.position) {
                 const key = getAiImageLaneKeyForObject(obj);
@@ -768,6 +837,9 @@ export class ChatWindow {
         };
         const onViewportChange = () => {
             this._syncPendingOverlaysToViewport({ disableTransition: true, recomputeWorld: false });
+            // Зум меняет проекцию композера в мир: после него существующее изображение может
+            // оказаться под заглушкой. Перепроверяем инвариант сразу, не дожидаясь рендера сессии.
+            this._ensureExistingImagesClearOfPending();
         };
 
         this._viewportHandlers = { onPanUpdate, onViewportChange };
@@ -785,6 +857,59 @@ export class ChatWindow {
         eventBus.off(Events.UI.ZoomPercent, handlers.onViewportChange);
         eventBus.off(Events.Viewport.Changed, handlers.onViewportChange);
         this._viewportHandlers = null;
+    }
+
+    _attachBoardObjectEvents() {
+        const eventBus = this._boardCore?.eventBus;
+        if (!eventBus || typeof eventBus.on !== 'function' || this._boardObjectHandlers) return;
+
+        // Если в момент рендера активных pending-заглушек state.objects ещё пустой
+        // (быстрый промпт сразу после refresh страницы, асинхронная загрузка доски с сервера),
+        // `_shiftExistingImagesForBatch` выходит без выставления флага в расчёте на повтор
+        // на следующем рендере. Но повтор не гарантирован: session-стейт может больше не меняться,
+        // пока генерация не завершится, и `_render` не вызовется. Поэтому материализацию объектов
+        // ловим напрямую и сами повторяем shift + safety-net.
+        const onBoardObjectChange = () => {
+            this._recheckPendingShifts();
+        };
+
+        this._boardObjectHandlers = { onBoardObjectChange };
+        eventBus.on(Events.Object.Created, onBoardObjectChange);
+        eventBus.on(Events.Board.Loaded, onBoardObjectChange);
+    }
+
+    _detachBoardObjectEvents() {
+        const eventBus = this._boardCore?.eventBus;
+        const handlers = this._boardObjectHandlers;
+        if (!eventBus || typeof eventBus.off !== 'function' || !handlers) return;
+
+        eventBus.off(Events.Object.Created, handlers.onBoardObjectChange);
+        eventBus.off(Events.Board.Loaded, handlers.onBoardObjectChange);
+        this._boardObjectHandlers = null;
+    }
+
+    _recheckPendingShifts() {
+        if (this._pendingOverlays.size === 0) return;
+
+        const messages = this._session?.getState?.()?.messages || [];
+        const pending = messages.filter((m) => m?.pending && m?.kind === 'image');
+        if (pending.length === 0) {
+            this._ensureExistingImagesClearOfPending();
+            return;
+        }
+
+        const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
+        const s = world?.scale?.x || 1;
+
+        const shiftedBids = new Set();
+        for (const m of pending) {
+            const bid = m.batchId || m.id;
+            if (shiftedBids.has(bid)) continue;
+            shiftedBids.add(bid);
+            this._shiftExistingImagesForBatch(messages, m.id, s);
+        }
+
+        this._ensureExistingImagesClearOfPending();
     }
 
     _attachAiImageLaneEvents() {
@@ -943,8 +1068,12 @@ export class ChatWindow {
         const step = Math.round(BOARD_IMAGE_STEP * scale);
         const count = Math.max(batch.count, 1);
         const index = Math.min(Math.max(batch.index, 0), count - 1);
-        const batchOffset = batch.batchId ? (this._pendingBatchOffsets.get(batch.batchId) ?? 0) : 0;
-        const leftmostCenter = anchor.x - ((count - 1) * step) / 2 + batchOffset;
+        // _pendingBatchOffsets хранятся в world-units и переводятся в screen
+        // под текущий scale: устаревшие при изменении zoom между батчами screen-смещения
+        // больше не «протухают».
+        const batchOffsetWorld = batch.batchId ? (this._pendingBatchOffsets.get(batch.batchId) ?? 0) : 0;
+        const batchOffsetScreen = Math.round(batchOffsetWorld * scale);
+        const leftmostCenter = anchor.x - ((count - 1) * step) / 2 + batchOffsetScreen;
 
         return {
             x: Math.round(leftmostCenter + index * step),
@@ -952,8 +1081,11 @@ export class ChatWindow {
         };
     }
 
-    _getAiImageLaneCenterScreenY(scale = 1) {
+    _getAiImageLaneCenterScreenY(scale = null) {
         const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
+        // scale по умолчанию null, иначе truthy-единица перекрывала бы реальный
+        // world.scale.x: экранная Y считалась бы при масштабе 1, и на зуме (0.1)
+        // обратная конвертация в мир завышала Y в 10 раз — ряд уезжал вниз.
         const s = scale || world?.scale?.x || 1;
         const worldOffsetY = world?.y || 0;
 
@@ -1042,6 +1174,11 @@ export class ChatWindow {
         const batchKey = getImageGenerationBatchKey(batch);
         if (this._shiftedForImageBatchKeys.has(batchKey)) return;
 
+        // Объект готового изображения создаётся асинхронно (img.onload в ClipboardFlow).
+        // Пока его нет в state.objects — не фиксируем флаг: следующий рендер повторит попытку,
+        // когда объект уже появится, и сдвиг отработает корректно.
+        if (this._getBoardAiImageObjects().length === 0) return;
+
         this._shiftedForImageBatchKeys.add(batchKey);
         this._shiftBoardAiImagesLeft(this._getImageBatchWorldBounds(messages, messageId, scale), batchKey);
     }
@@ -1069,8 +1206,12 @@ export class ChatWindow {
 
         const existingRight = this._getAiImageLaneRightBoundary(aiObjects);
         if (!Number.isFinite(existingRight)) return;
+        // shift > 0 — ряд истории уезжает влево, освобождая место под новый батч.
+        // shift < 0 — новый батч приземлился правее ряда (после зума «к точке»
+        // мировая проекция композера уехала далеко от уже стоящих картинок),
+        // поэтому ряд нужно подтянуть вправо к батчу, иначе картинки расползаются.
         const shift = Math.ceil(existingRight + BOARD_IMAGE_GAP - nextBatchBounds.left);
-        if (shift <= 0) return;
+        if (shift === 0) return;
 
         const ids = new Set(aiObjects.map((object) => object.id));
         const objects = this._boardCore?.state?.state?.objects;
@@ -1420,12 +1561,11 @@ export class ChatWindow {
             const key = getAiImageLaneKeyForObject(object);
             if (key === excludeKey) continue;
 
-            const slot = {
-                x: Math.round(object.position.x),
-                y: Math.round(object.position.y),
-                width: getBoardObjectWidth(object),
-                height: getBoardObjectHeight(object)
-            };
+            // Используем слот из кэша — он отражает целевую позицию после анимации сдвига.
+            // object.position содержит текущую (промежуточную) позицию, которая ещё не достигла цели,
+            // что приводит к ложным «нет пересечения» и последующему наезду.
+            const slot = this._getAiImageLaneSlotForObject(object);
+            if (!slot) continue;
 
             if (rectsOverlap(candidate, slot)) {
                 return true;
