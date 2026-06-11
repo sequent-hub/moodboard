@@ -734,13 +734,15 @@
 
 .moodboard-chat__pending-image-label {
     position: absolute;
-    bottom: 10px;
-    left: 12px;
+    bottom: var(--moodboard-chat-pending-label-bottom, 10px);
+    left: var(--moodboard-chat-pending-label-left, 12px);
     font-family: 'GeistSans', 'GeistSans Fallback', 'Roboto', Arial, sans-serif;
-    font-size: 20px;
+    font-size: var(--moodboard-chat-pending-label-font-size, 20px);
     font-weight: 400;
     color: #ffffff;
     pointer-events: none;
+    white-space: nowrap;
+    text-align: left;
 }
 
 /* Блок ошибки сервера */

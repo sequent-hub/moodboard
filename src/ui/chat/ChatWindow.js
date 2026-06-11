@@ -504,7 +504,7 @@ export class ChatWindow {
                     worldY: existing.worldY
                 };
                 this._reserveAiImageLaneSlotForMessage(message.id, existing.worldX, existing.worldY);
-                this._applyPendingOverlayScreenLayout(existing.el, screenLayout, { animate: true, enterDistance });
+                this._applyPendingOverlayScreenLayout(existing.el, screenLayout, { animate: true, enterDistance, scale: s });
                 return;
             }
 
@@ -514,6 +514,16 @@ export class ChatWindow {
             const overlay = document.createElement('div');
             overlay.className = 'moodboard-chat__pending-overlay moodboard-chat__pending-overlay--enter';
             overlay.style.cssText = `left:${layout.left}px;top:${layout.top}px;width:${layout.width}px;height:${layout.height}px`;
+
+            overlay.style.borderRadius = `${Math.max(2, Math.round(12 * s))}px`;
+
+            const fontSize = Math.round(20 * s);
+            const labelLeft = 12 * Math.min(1, s);
+            const labelBottom = 10 * Math.min(1, s);
+            overlay.style.setProperty('--moodboard-chat-pending-label-font-size', `${fontSize}px`);
+            overlay.style.setProperty('--moodboard-chat-pending-label-left', `${labelLeft}px`);
+            overlay.style.setProperty('--moodboard-chat-pending-label-bottom', `${labelBottom}px`);
+
             overlay.style.setProperty('--moodboard-chat-board-animation-ms', `${BOARD_IMAGE_REARRANGE_MS}ms`);
             overlay.style.setProperty('--moodboard-chat-pending-enter-x', `${enterDistance}px`);
 
@@ -695,7 +705,7 @@ export class ChatWindow {
             record.worldX = layout.worldX;
             record.worldY = layout.worldY;
             this._reserveAiImageLaneSlotForMessage(messageId, layout.worldX, layout.worldY);
-            this._applyPendingOverlayScreenLayout(record.el, layout, { animate: true });
+            this._applyPendingOverlayScreenLayout(record.el, layout, { animate: true, scale });
             existingOverlaysShifted = true;
         }
 
@@ -777,11 +787,20 @@ export class ChatWindow {
         };
     }
 
-    _applyPendingOverlayScreenLayout(el, layout, { animate = false, enterDistance } = {}) {
+    _applyPendingOverlayScreenLayout(el, layout, { animate = false, enterDistance, scale = 1 } = {}) {
         el.style.left = `${layout.left}px`;
         el.style.top = `${layout.top}px`;
         el.style.width = `${layout.width}px`;
         el.style.height = `${layout.height}px`;
+        el.style.borderRadius = `${Math.max(2, Math.round(12 * scale))}px`;
+
+        const fontSize = Math.round(20 * scale);
+        const labelLeft = 12 * Math.min(1, scale);
+        const labelBottom = 10 * Math.min(1, scale);
+        el.style.setProperty('--moodboard-chat-pending-label-font-size', `${fontSize}px`);
+        el.style.setProperty('--moodboard-chat-pending-label-left', `${labelLeft}px`);
+        el.style.setProperty('--moodboard-chat-pending-label-bottom', `${labelBottom}px`);
+
         if (!animate) return;
 
         el.style.setProperty('--moodboard-chat-board-animation-ms', `${BOARD_IMAGE_REARRANGE_MS}ms`);
@@ -821,6 +840,15 @@ export class ChatWindow {
             el.style.top = `${Math.round(screenY - hScreen / 2)}px`;
             el.style.width = `${wScreen}px`;
             el.style.height = `${hScreen}px`;
+            el.style.borderRadius = `${Math.max(2, Math.round(12 * s))}px`;
+
+            const fontSize = Math.round(20 * s);
+            const labelLeft = 12 * Math.min(1, s);
+            const labelBottom = 10 * Math.min(1, s);
+            el.style.setProperty('--moodboard-chat-pending-label-font-size', `${fontSize}px`);
+            el.style.setProperty('--moodboard-chat-pending-label-left', `${labelLeft}px`);
+            el.style.setProperty('--moodboard-chat-pending-label-bottom', `${labelBottom}px`);
+
             if (disableTransition) {
                 void el.offsetWidth;
                 el.style.removeProperty('transition');
