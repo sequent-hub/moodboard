@@ -1139,8 +1139,8 @@ export class ChatWindow {
         return null;
     }
 
-    _clampImageGroupAnchorY(y, referenceHeight) {
-        const clearance = Math.round(referenceHeight / 2) + BOARD_IMAGE_LANE_UI_GAP;
+    _clampImageGroupAnchorY(y, referenceHeight, reserveY = 0) {
+        const clearance = Math.round(referenceHeight / 2) + BOARD_IMAGE_LANE_UI_GAP + reserveY;
 
         const errorBlock = this._refs?.errorBlock;
         if (errorBlock && errorBlock.classList.contains('is-visible')) {
@@ -1174,10 +1174,16 @@ export class ChatWindow {
             const existingCenterY = this._getAiImageLaneCenterScreenY();
             const [wr, hr] = parseFormatRatio(this._formatId);
             const actualHeight = Math.round(BOARD_IMAGE_WIDTH / (wr / hr));
-            let y = existingCenterY ?? (composerRect.top - Math.round(actualHeight / 2) - BOARD_IMAGE_LANE_UI_GAP);
+            
+            let reserveY = 0;
+            if (this._refs?.attachmentsPreview && !this._refs.attachmentsPreview.classList.contains('is-visible')) {
+                reserveY = 74; // Резервируем место под ряд вложений (60px + padding)
+            }
+
+            let y = existingCenterY ?? (composerRect.top - reserveY - Math.round(actualHeight / 2) - BOARD_IMAGE_LANE_UI_GAP);
 
             if (existingCenterY == null) {
-                y = this._clampImageGroupAnchorY(y, actualHeight);
+                y = this._clampImageGroupAnchorY(y, actualHeight, reserveY);
             }
 
             return {

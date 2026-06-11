@@ -18,6 +18,7 @@ import { TextPropertiesPanel } from '../../ui/TextPropertiesPanel.js';
 import { FramePropertiesPanel } from '../../ui/FramePropertiesPanel.js';
 import { NotePropertiesPanel } from '../../ui/NotePropertiesPanel.js';
 import { FilePropertiesPanel } from '../../ui/FilePropertiesPanel.js';
+import { ImagePropertiesPanel } from '../../ui/ImagePropertiesPanel.js';
 import { ConnectorPropertiesPanel } from '../../ui/ConnectorPropertiesPanel.js';
 import { ShapePropertiesPanel } from '../../ui/ShapePropertiesPanel.js';
 import { DrawingPropertiesPanel } from '../../ui/DrawingPropertiesPanel.js';
@@ -151,6 +152,7 @@ function initHtmlLayersAndPanels(board) {
     board.framePropertiesPanel = new FramePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.notePropertiesPanel = new NotePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.filePropertiesPanel = new FilePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
+    board.imagePropertiesPanel = new ImagePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.connectorPropertiesPanel = new ConnectorPropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.shapePropertiesPanel = new ShapePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.drawingPropertiesPanel = new DrawingPropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);

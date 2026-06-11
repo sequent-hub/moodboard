@@ -340,3 +340,267 @@
     flex-shrink: 0;
 }
 
+/* Image properties toolbar */
+.image-properties-panel {
+    position: absolute;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 8px;
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    z-index: 1000;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.ipp-filename {
+    padding: 0 6px;
+    font-size: 13px;
+    color: #374151;
+    font-weight: 400;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: text;
+    border-radius: 4px;
+    outline: none;
+    transition: background 0.15s;
+}
+
+.ipp-filename:hover,
+.ipp-filename:focus {
+    background: #F3F4F6;
+}
+
+.ipp-filename:focus {
+    text-overflow: clip;
+}
+
+.ipp-divider {
+    width: 1px;
+    height: 18px;
+    background: #E5E7EB;
+    margin: 0 4px;
+    flex-shrink: 0;
+}
+
+.ipp-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: #6B7280;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+}
+
+.ipp-btn:hover {
+    background: #F3F4F6;
+    color: #111827;
+}
+
+.ipp-btn:active,
+.ipp-btn.is-active {
+    background: #E5E7EB;
+    color: #111827;
+}
+
+.ipp-icon-frame-wrap {
+    position: relative;
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    overflow: hidden;
+    transition: transform 100ms ease-in-out;
+    background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAySURBVHgB3Y2xDQAwDMJIr+D/5+CLtAewVMoUjyDLJakRIJlmHHyyQah+pMM2RgobhAuV0grHtNJqlwAAAABJRU5ErkJggg==);
+}
+
+.ipp-icon-frame {
+    position: relative;
+    display: inline-block;
+    width: inherit;
+    height: inherit;
+    border-radius: 50%;
+    box-shadow: rgba(0, 0, 0, 0.25) 0 0 0 1px inset;
+}
+
+.ipp-icon-frame::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 50%;
+    height: 50%;
+    background-color: rgb(250, 250, 250);
+    box-shadow: rgba(0, 0, 0, 0.25) 0 0 0 1px;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+/* Split Button (Crop) */
+.ipp-btn-split-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 6px;
+    background: transparent;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+
+.ipp-btn-split-wrapper:hover {
+    background: #F3F4F6;
+}
+
+.ipp-btn-split-main {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 6px 0 0 6px;
+    background: transparent;
+    color: #6B7280;
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.ipp-btn-split-expand {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 0 6px 6px 0;
+    background: transparent;
+    color: #6B7280;
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.ipp-btn-split-main:hover,
+.ipp-btn-split-expand:hover {
+    color: #111827;
+}
+
+.ipp-btn-split-wrapper:active {
+    background: #E5E7EB;
+}
+
+.ipp-btn-split-expand svg {
+    transition: transform 0.2s ease;
+}
+
+.ipp-btn-split-expand.is-expanded svg {
+    transform: rotate(180deg);
+}
+
+/* Crop Dropdown */
+.ipp-crop-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), 0 4px 10px rgba(0, 0, 0, 0.05);
+    padding: 6px;
+    display: none;
+    flex-direction: column;
+    min-width: 170px;
+    z-index: 1001;
+}
+
+.ipp-crop-dropdown.is-open {
+    display: flex;
+}
+
+/* More Dropdown */
+.ipp-more-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), 0 4px 10px rgba(0, 0, 0, 0.05);
+    padding: 6px;
+    display: none;
+    flex-direction: column;
+    min-width: 220px;
+    z-index: 1001;
+}
+
+.ipp-more-dropdown.is-open {
+    display: flex;
+}
+
+.ipp-dropdown-item {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #374151;
+    gap: 10px;
+    font-size: 13px;
+    font-family: inherit;
+    text-align: left;
+    transition: background 0.15s;
+    width: 100%;
+}
+
+.ipp-dropdown-item:hover {
+    background: #F3F4F6;
+}
+
+.ipp-dropdown-item-ratio {
+    margin-left: auto;
+    color: #9CA3AF;
+    font-size: 12px;
+}
+
+.ipp-dropdown-item-shortcut {
+    margin-left: auto;
+    color: #9CA3AF;
+    font-size: 12px;
+}
+
+.ipp-dropdown-divider {
+    height: 1px;
+    background: #E5E7EB;
+    margin: 4px 2px;
+}
+
+.ipp-dropdown-icon {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #6B7280;
+}
+
