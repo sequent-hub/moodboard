@@ -5,6 +5,7 @@ import { TextObject } from './TextObject.js';
 import { EmojiObject } from './EmojiObject.js';
 import { ImageObject } from './ImageObject.js';
 import { RevitScreenshotImageObject } from './RevitScreenshotImageObject.js';
+import { Model3dScreenshotImageObject } from './Model3dScreenshotImageObject.js';
 import { CommentObject } from './CommentObject.js';
 import { NoteObject } from './NoteObject.js';
 import { FileObject } from './FileObject.js';
@@ -25,6 +26,7 @@ export class ObjectFactory {
         ['emoji', EmojiObject],
         ['image', ImageObject],
         ['revit-screenshot-img', RevitScreenshotImageObject],
+        ['model3d-screenshot-img', Model3dScreenshotImageObject],
         ['comment', CommentObject],
         ['note', NoteObject],
         ['file', FileObject],

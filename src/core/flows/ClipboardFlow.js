@@ -286,8 +286,36 @@ export function setupClipboardFlow(core) {
         }
     });
 
-    core.eventBus.on(Events.UI.PasteImageAt, async ({ x, y, src, name, skipUpload, aiMessageId }) => {
+    core.eventBus.on(Events.UI.PasteImageAt, async ({ x, y, src, name, skipUpload, aiMessageId, objectType, modelUrl, format }) => {
         if (!src) return;
+
+        // Отдельный путь для 3D-скрина: без resolveRevitImagePayload и без загрузки на сервер
+        if (objectType === 'model3d-screenshot-img') {
+            const world = core.pixi.worldLayer || core.pixi.app.stage;
+            const s = world?.scale?.x || 1;
+            const worldX = (x - (world?.x || 0)) / s;
+            const worldY = (y - (world?.y || 0)) / s;
+            const placeModel3d = (natW, natH) => {
+                const ar = (natW > 0 && natH > 0) ? natW / natH : 1;
+                const w = 300;
+                const h = Math.max(1, Math.round(w / ar));
+                const created = core.createObject(
+                    'model3d-screenshot-img',
+                    { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) },
+                    { src, name: name || 'ai-3d-model', width: w, height: h, modelUrl, format }
+                );
+                if (skipUpload && created?.id) {
+                    core._pendingPersistAckVisibilityIds?.delete(created.id);
+                    core._setObjectVisibility?.(created.id, true);
+                }
+            };
+            const img = new Image();
+            img.onload = () => placeModel3d(img.naturalWidth, img.naturalHeight);
+            img.onerror = () => placeModel3d(0, 0);
+            img.src = src;
+            return;
+        }
+
         const uploaded = await ensureServerImage({ src, name, skipUpload });
         if (!uploaded?.src) return;
         const world = core.pixi.worldLayer || core.pixi.app.stage;

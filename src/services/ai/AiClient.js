@@ -141,6 +141,124 @@ export class AiClient {
         }
         return res.json();
     }
+
+    /**
+     * Отправляет джоб генерации 3D-модели.
+     * @param {object} args
+     * @param {string} [args.provider='hunyuan-3d']
+     * @param {string} [args.mode='image'] 'text'|'image'|'multi'
+     * @param {string} [args.prompt]
+     * @param {File} [args.image]
+     * @param {Array<{file: File, viewType: string}>} [args.multiViewImages]
+     * @param {string} [args.model='3.1']
+     * @param {string} [args.generateType]
+     * @param {number} [args.faceCount]
+     * @param {boolean} [args.pbr]
+     * @param {string} [args.downloadFormat]
+     * @param {AbortSignal} [args.signal]
+     * @returns {Promise<{jobId: string}>}
+     */
+    async submit3dModel({ provider = 'hunyuan-3d', mode = 'image', prompt, image, multiViewImages, model = '3.1', generateType, faceCount, pbr, downloadFormat, signal }) {
+        const body = { mode, model, downloadFormat };
+        if (generateType !== undefined) body.generateType = generateType;
+        if (faceCount !== undefined) body.faceCount = faceCount;
+        if (pbr !== undefined) body.pbr = pbr;
+
+        if (mode === 'text') {
+            body.prompt = prompt;
+        } else if (mode === 'multi') {
+            if (Array.isArray(multiViewImages) && multiViewImages.length) {
+                body.multiViewImages = await Promise.all(
+                    multiViewImages.map(async ({ file, viewType }) => {
+                        const [encoded] = await filesToBase64([file]);
+                        return { ...encoded, viewType };
+                    })
+                );
+            }
+        } else {
+            if (image) {
+                const [encoded] = await filesToBase64([image]);
+                body.image = encoded;
+            }
+        }
+
+        const res = await this._fetch(`${this._baseUrl}/${provider}/model3d`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(body),
+            signal
+        });
+        if (!res.ok) {
+            const detail = await safeReadError(res);
+            throw new Error(`AiClient.submit3dModel (${res.status}): ${detail}`);
+        }
+        return res.json();
+    }
+
+    /**
+     * Опрашивает статус джоба 3D-модели.
+     * @param {string} jobId
+     * @param {AbortSignal} [signal]
+     * @param {string} [provider='hunyuan-3d']
+     * @param {string} [format]
+     * @returns {Promise<object>}
+     */
+    async poll3dModel(jobId, signal, provider = 'hunyuan-3d', format) {
+        const url = `${this._baseUrl}/${provider}/model3d/${jobId}${format ? `?format=${format}` : ''}`;
+        const res = await this._fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            signal
+        });
+        if (!res.ok) {
+            const detail = await safeReadError(res);
+            throw new Error(`AiClient.poll3dModel (${res.status}): ${detail}`);
+        }
+        return res.json();
+    }
+
+    /**
+     * Отправляет джоб конвертации GLB -> FBX/STL.
+     * @param {object} args
+     * @param {string} args.glbUrl
+     * @param {string} args.format 'fbx'|'stl'
+     * @param {AbortSignal} [args.signal]
+     * @returns {Promise<{jobId: string}>}
+     */
+    async submitConvert3d({ glbUrl, format, signal }) {
+        const res = await this._fetch(`${this._baseUrl}/convert3d`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ glbUrl, format }),
+            signal
+        });
+        if (!res.ok) {
+            const detail = await safeReadError(res);
+            throw new Error(`AiClient.submitConvert3d (${res.status}): ${detail}`);
+        }
+        return res.json();
+    }
+
+    /**
+     * Опрашивает статус джоба конвертации.
+     * @param {string} jobId
+     * @param {AbortSignal} [signal]
+     * @param {string} [format]
+     * @returns {Promise<object>}
+     */
+    async pollConvert3d(jobId, signal, format) {
+        const url = `${this._baseUrl}/convert3d/${jobId}${format ? `?format=${format}` : ''}`;
+        const res = await this._fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            signal
+        });
+        if (!res.ok) {
+            const detail = await safeReadError(res);
+            throw new Error(`AiClient.pollConvert3d (${res.status}): ${detail}`);
+        }
+        return res.json();
+    }
 }
 
 /**
@@ -221,12 +339,22 @@ function safeJson(text) {
 }
 
 async function safeReadError(res) {
+    const fallback = res.statusText || `HTTP ${res.status}`;
     try {
         const text = await res.text();
         const json = safeJson(text);
-        return json?.error ? json.error : (text || res.statusText);
+        if (json?.error) {
+            return typeof json.error === 'string' ? json.error : fallback;
+        }
+        // Не отдаём в UI сырой HTML/стектрейс (Laravel debug-страница) или
+        // слишком длинное тело — показываем лаконичный статус вместо «простыни».
+        const trimmed = (text || '').trim();
+        if (!trimmed || trimmed.startsWith('<') || trimmed.length > 200) {
+            return fallback;
+        }
+        return trimmed;
     } catch {
-        return res.statusText;
+        return fallback;
     }
 }
 

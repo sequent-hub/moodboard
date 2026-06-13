@@ -14,6 +14,7 @@ export default defineConfig({
     // Dev-прокси на локальный AI-прокси-сервер (server/).
     // В прод-сборке этого роута нет — клиент будет ходить на реальный бэкенд.
     server: {
+        port: 5174,
         proxy: {
             '/api': {
                 target: 'http://localhost:3001',
@@ -22,6 +23,15 @@ export default defineConfig({
                 // YandexART generation can take up to 120s — proxy must not cut it off
                 proxyTimeout: 180000,
                 timeout: 180000
+            },
+            // URL после upload с Play — относительные /uploads/* и /storage/*
+            '/uploads': {
+                target: 'http://127.0.0.1:8765',
+                changeOrigin: true
+            },
+            '/storage': {
+                target: 'http://127.0.0.1:8765',
+                changeOrigin: true
             }
         }
     },

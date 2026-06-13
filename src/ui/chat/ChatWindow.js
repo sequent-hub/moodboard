@@ -1,6 +1,7 @@
 import { AiClient } from '../../services/ai/AiClient.js';
 import { ChatHistoryStore } from '../../services/ai/ChatHistoryStore.js';
 import { ChatSessionController } from '../../services/ai/ChatSessionController.js';
+import { Model3dSessionController } from '../../services/ai/Model3dSessionController.js';
 import { Events } from '../../core/events/Events.js';
 
 import { buildChatDom } from './ChatWindowRenderer.js';
@@ -9,6 +10,8 @@ import { ChatMessageList } from './ChatMessageList.js';
 import { ChatComposer } from './ChatComposer.js';
 import { ChatPillMenu } from './ChatPillMenu.js';
 import { ChatExtendedPromptModal } from './ChatExtendedPromptModal.js';
+import { Model3dProgressOverlay } from './Model3dProgressOverlay.js';
+import { Model3dBoardSkeleton } from './Model3dBoardSkeleton.js';
 import { ICONS, RATIO_ICONS, COUNT_ICONS } from './icons.js';
 
 const CONTENT_TYPE_OPTIONS = [
@@ -23,8 +26,63 @@ const CONTENT_TYPE_OPTIONS = [
         label: 'Видео',
         icon: ICONS.video,
         description: 'Создать по тексту или руководствуясь первым и последним кадром'
+    },
+    {
+        id: '3d',
+        label: '3D-модель',
+        icon: ICONS.cube,
+        description: 'Создать 3D-модель по выбранному изображению'
     }
 ];
+
+const FACE_COUNT_OPTIONS_3D = [
+    { id: '1.5m', label: '1.5M' },
+    { id: '1m',   label: '1M'   },
+    { id: '500k', label: '500k' },
+    { id: '50k',  label: '50k'  },
+];
+
+const FACE_COUNT_MAP_3D = { '1.5m': 1500000, '1m': 1000000, '500k': 500000, '50k': 50000 };
+
+const TYPE_3D_OPTIONS = [
+    { id: 'geo_tex', label: 'Геометрия + Текстура' },
+    { id: 'geo',     label: 'Только геометрия'     },
+];
+
+const MODE_3D_OPTIONS = [
+    { id: 'image', label: 'Изображение'           },
+    { id: 'multi', label: 'Несколько изображений' },
+    { id: 'text',  label: 'Текст'                 },
+];
+
+const TEXTURE_STYLE_OPTIONS_3D = [
+    { id: 'general',              label: 'Общий'             },
+    { id: 'stone_carving',        label: 'Резьба по камню'   },
+    { id: 'blue_white_porcelain', label: 'Сине-белый фарфор' },
+    { id: 'chinese_style',        label: 'Китайский стиль'   },
+    { id: 'cartoon',              label: 'Мультфильм'        },
+    { id: 'cyberpunk',            label: 'Киберпанк'         },
+];
+
+const TEXTURE_STYLE_SUFFIX_3D = {
+    general:              '',
+    stone_carving:        ', stone carving style',
+    blue_white_porcelain: ', blue and white porcelain style',
+    chinese_style:        ', Chinese style',
+    cartoon:              ', cartoon style',
+    cyberpunk:            ', cyberpunk style',
+};
+
+const RESULT_FORMAT_OPTIONS_3D = [
+    { id: 'glb', label: 'GLB' },
+    { id: 'obj', label: 'OBJ' },
+    { id: 'fbx', label: 'FBX' },
+    { id: 'stl', label: 'STL' },
+];
+
+// ViewType для мультивью: 2-е..8-е вложение (1-е = фронт, без ViewType)
+const VIEW_ORDER_3D  = ['left', 'right', 'back', 'top', 'bottom', 'left_front', 'right_front'];
+const VIEW_LABELS_3D = ['Лево', 'Право', 'Зад', 'Верх', 'Низ', 'Лево-перед', 'Право-перед'];
 
 /** Порядок: портрет (строка 1), альбом (строка 2), авто — крайнее правое */
 const FORMAT_OPTIONS = [
@@ -144,6 +202,28 @@ export class ChatWindow {
         this._countMenu = null;
         this._unsubscribe = null;
         this._attached = false;
+        this._3dFaceCountId = '1m';
+        this._3dTypeId = 'geo_tex';
+        this._3dFaceCountMenu = null;
+        this._3dTypeMenu = null;
+        this._3dFaceCountWrapper = null;
+        this._3dTypeWrapper = null;
+        this._3dMode = 'image';
+        this._3dTextureStyleId = 'general';
+        this._3dResultFormatId = 'glb';
+        this._3dModeMenu = null;
+        this._3dModeWrapper = null;
+        this._3dTextureStyleMenu = null;
+        this._3dTextureStyleWrapper = null;
+        this._3dResultFormatMenu = null;
+        this._3dResultFormatWrapper = null;
+        this._model3dSession = null;
+        this._model3dUnsubscribe = null;
+        this._model3dProgressOverlay = null;
+        this._model3dSkeleton = null;
+        // Мировые координаты центра скелетона — модель приземлится ровно сюда,
+        // независимо от пана/зума во время генерации.
+        this._model3dSkeletonWorld = null;
         this._boardImageMessageIds = new Set();
         this._shiftedForImageBatchKeys = new Set();
         this._boardImageShiftHistory = new Map();
@@ -181,6 +261,9 @@ export class ChatWindow {
             },
             {
                 onSubmit: (text, attachments) => {
+                    if (this._contentTypeId === '3d') {
+                        return this._submit3d(text, attachments);
+                    }
                     this._clearBoardSelection();
                     return this._session.send(text, { ...this._getImageRequestOptions(), referenceImages: attachments });
                 },
@@ -213,6 +296,8 @@ export class ChatWindow {
                 onSelect: (id) => {
                     this._contentTypeId = id;
                     this._contentTypeMenu.refresh();
+                    this._update3dPillVisibility();
+                    this._update3dSendGate();
                 }
             }
         );
@@ -261,6 +346,9 @@ export class ChatWindow {
         );
         this._countMenu.attach();
 
+        this._attach3dPills();
+        this._update3dPillVisibility();
+
         const initialState = this._session.getState();
         this._markExistingBoardImages(initialState.messages);
         this._reserveCurrentAiImageLaneSlots();
@@ -286,6 +374,32 @@ export class ChatWindow {
         this._pendingBatchOffsets.clear();
         this._aiImageLaneSlots.clear();
         this._draggingAiImageIds.clear();
+        this._model3dUnsubscribe?.();
+        this._model3dUnsubscribe = null;
+        this._model3dSession?.abort?.();
+        this._model3dProgressOverlay?.destroy();
+        this._model3dProgressOverlay = null;
+        this._clear3dSkeleton();
+        this._3dFaceCountMenu?.destroy();
+        this._3dFaceCountMenu = null;
+        this._3dTypeMenu?.destroy();
+        this._3dTypeMenu = null;
+        this._3dFaceCountWrapper?.remove();
+        this._3dFaceCountWrapper = null;
+        this._3dTypeWrapper?.remove();
+        this._3dTypeWrapper = null;
+        this._3dModeMenu?.destroy();
+        this._3dModeMenu = null;
+        this._3dModeWrapper?.remove();
+        this._3dModeWrapper = null;
+        this._3dTextureStyleMenu?.destroy();
+        this._3dTextureStyleMenu = null;
+        this._3dTextureStyleWrapper?.remove();
+        this._3dTextureStyleWrapper = null;
+        this._3dResultFormatMenu?.destroy();
+        this._3dResultFormatMenu = null;
+        this._3dResultFormatWrapper?.remove();
+        this._3dResultFormatWrapper = null;
         this._composer?.destroy();
         this._extendedPromptModal?.destroy();
         this._contentTypeMenu?.destroy();
@@ -308,6 +422,329 @@ export class ChatWindow {
 
     destroy() {
         this.detach();
+    }
+
+    _attach3dPills() {
+        const pillsContainer = this._refs.formatPill?.closest('.moodboard-chat__pills');
+        if (!pillsContainer) return;
+
+        const mk3dPill = (label, icon) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'moodboard-chat__pill-wrapper';
+            const pill = document.createElement('button');
+            pill.type = 'button';
+            pill.className = 'moodboard-chat__pill';
+            pill.setAttribute('aria-haspopup', 'menu');
+            pill.setAttribute('aria-expanded', 'false');
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'moodboard-chat__pill-icon-wrap';
+            iconSpan.innerHTML = icon;
+            const labelEl = document.createElement('span');
+            labelEl.className = 'moodboard-chat__pill-label';
+            labelEl.textContent = label;
+            pill.appendChild(iconSpan);
+            pill.appendChild(labelEl);
+            const menu = document.createElement('div');
+            menu.className = 'moodboard-chat__menu';
+            menu.setAttribute('role', 'menu');
+            wrapper.appendChild(pill);
+            wrapper.appendChild(menu);
+            return { wrapper, pill, menu, labelEl, iconEl: iconSpan };
+        };
+
+        const fc = mk3dPill('1M', ICONS.sliders);
+        pillsContainer.appendChild(fc.wrapper);
+        this._3dFaceCountWrapper = fc.wrapper;
+        this._3dFaceCountMenu = new ChatPillMenu(
+            { trigger: fc.pill, menu: fc.menu, label: fc.labelEl, icon: fc.iconEl },
+            {
+                getOptions: () => FACE_COUNT_OPTIONS_3D,
+                getActiveId: () => this._3dFaceCountId,
+                onSelect: (id) => { this._3dFaceCountId = id; this._3dFaceCountMenu.refresh(); }
+            }
+        );
+        this._3dFaceCountMenu.attach();
+
+        const tp = mk3dPill('Геометрия + Текстура', ICONS.cube);
+        pillsContainer.appendChild(tp.wrapper);
+        this._3dTypeWrapper = tp.wrapper;
+        this._3dTypeMenu = new ChatPillMenu(
+            { trigger: tp.pill, menu: tp.menu, label: tp.labelEl, icon: tp.iconEl },
+            {
+                getOptions: () => TYPE_3D_OPTIONS,
+                getActiveId: () => this._3dTypeId,
+                onSelect: (id) => { this._3dTypeId = id; this._3dTypeMenu.refresh(); }
+            }
+        );
+        this._3dTypeMenu.attach();
+
+        const md = mk3dPill('Изображение', ICONS.image);
+        pillsContainer.appendChild(md.wrapper);
+        this._3dModeWrapper = md.wrapper;
+        this._3dModeMenu = new ChatPillMenu(
+            { trigger: md.pill, menu: md.menu, label: md.labelEl, icon: md.iconEl },
+            {
+                getOptions: () => MODE_3D_OPTIONS,
+                getActiveId: () => this._3dMode,
+                onSelect: (id) => { this._3dModeMenu.refresh(); this._update3dMode(id); }
+            }
+        );
+        this._3dModeMenu.attach();
+
+        const ts = mk3dPill('Общий', ICONS.palette);
+        pillsContainer.appendChild(ts.wrapper);
+        this._3dTextureStyleWrapper = ts.wrapper;
+        this._3dTextureStyleMenu = new ChatPillMenu(
+            { trigger: ts.pill, menu: ts.menu, label: ts.labelEl, icon: ts.iconEl },
+            {
+                getOptions: () => TEXTURE_STYLE_OPTIONS_3D,
+                getActiveId: () => this._3dTextureStyleId,
+                onSelect: (id) => { this._3dTextureStyleId = id; this._3dTextureStyleMenu.refresh(); }
+            }
+        );
+        this._3dTextureStyleMenu.attach();
+
+        const rf = mk3dPill('GLB', ICONS.sliders);
+        pillsContainer.appendChild(rf.wrapper);
+        this._3dResultFormatWrapper = rf.wrapper;
+        this._3dResultFormatMenu = new ChatPillMenu(
+            { trigger: rf.pill, menu: rf.menu, label: rf.labelEl, icon: rf.iconEl },
+            {
+                getOptions: () => RESULT_FORMAT_OPTIONS_3D,
+                getActiveId: () => this._3dResultFormatId,
+                onSelect: (id) => { this._3dResultFormatId = id; this._3dResultFormatMenu.refresh(); }
+            }
+        );
+        this._3dResultFormatMenu.attach();
+    }
+
+    _update3dPillVisibility() {
+        const is3d = this._contentTypeId === '3d';
+        const formatWrapper = this._refs.formatPill?.closest('.moodboard-chat__pill-wrapper');
+        const countWrapper = this._refs.countPill?.closest('.moodboard-chat__pill-wrapper');
+        const modelWrapper = this._refs.modelPill?.closest('.moodboard-chat__pill-wrapper');
+        if (formatWrapper) formatWrapper.style.display = is3d ? 'none' : '';
+        if (countWrapper) countWrapper.style.display = is3d ? 'none' : '';
+        if (modelWrapper) modelWrapper.style.display = is3d ? 'none' : '';
+        if (this._3dFaceCountWrapper) this._3dFaceCountWrapper.style.display = is3d ? '' : 'none';
+        if (this._3dTypeWrapper) this._3dTypeWrapper.style.display = is3d ? '' : 'none';
+        if (this._3dModeWrapper) this._3dModeWrapper.style.display = is3d ? '' : 'none';
+        if (this._3dResultFormatWrapper) this._3dResultFormatWrapper.style.display = is3d ? '' : 'none';
+        // Стиль текстуры — только в text-режиме
+        if (this._3dTextureStyleWrapper) {
+            this._3dTextureStyleWrapper.style.display = (is3d && this._3dMode === 'text') ? '' : 'none';
+        }
+    }
+
+    _update3dSendGate() {
+        if (this._contentTypeId !== '3d') {
+            this._composer?.setInputEnabled(true);
+            this._composer?.setPlaceholderOverride(null);
+            if (this._refs?.textarea) {
+                this._refs.textarea.placeholder = 'Опишите то, что хотите сгенерировать';
+            }
+            return;
+        }
+        const inputEnabled = this._3dMode === 'text';
+        this._composer?.setInputEnabled(inputEnabled);
+        if (this._3dMode === 'image') {
+            this._composer?.setPlaceholderOverride('Описание не нужно — нажмите «Отправить»');
+            return;
+        }
+        this._composer?.setPlaceholderOverride(null);
+        if (this._refs?.textarea) {
+            if (this._3dMode === 'text') {
+                this._refs.textarea.placeholder = 'Опишите то, что хотите создать';
+            } else {
+                this._refs.textarea.placeholder = 'Выберите 2–8 изображений на доске';
+            }
+        }
+    }
+
+    _update3dMode(id) {
+        this._3dMode = id;
+        this._update3dPillVisibility();
+        this._update3dSendGate();
+        if (id === 'multi') {
+            this._composer?.setAttachmentLabelProvider((i) =>
+                i === 0 ? 'Фронт' : (VIEW_LABELS_3D[i - 1] ?? String(i + 1))
+            );
+        } else {
+            this._composer?.setAttachmentLabelProvider(null);
+        }
+        if (id === 'text') {
+            // В text-режиме вложения с доски недоступны — очищаем
+            this._composer?.removeAllBoardAttachments?.();
+        }
+    }
+
+    async _submit3d(text, attachments) {
+        const mode = this._3dMode;
+
+        if (mode === 'text') {
+            if (!text) return;
+        } else if (mode === 'image') {
+            if (!Array.isArray(attachments) || attachments.length !== 1) return;
+        } else if (mode === 'multi') {
+            if (!Array.isArray(attachments) || attachments.length < 2 || attachments.length > 8) return;
+        }
+
+        if (!this._model3dSession) {
+            this._model3dSession = new Model3dSessionController({ aiClient: this._aiClient });
+        }
+        this._model3dUnsubscribe?.();
+
+        if (!this._model3dProgressOverlay) {
+            this._model3dProgressOverlay = new Model3dProgressOverlay();
+        }
+        this._model3dProgressOverlay.attach(this._refs.composer);
+
+        this._model3dUnsubscribe = this._model3dSession.subscribe((state) => {
+            this._onModel3dState(state);
+        });
+
+        try {
+            this._show3dSkeleton();
+        } catch (e) {
+            console.warn('[ChatWindow] _show3dSkeleton failed:', e);
+        }
+
+        const suffix = TEXTURE_STYLE_SUFFIX_3D[this._3dTextureStyleId] ?? '';
+        const prompt = mode === 'text' ? (text + suffix) : undefined;
+
+        void this._model3dSession.start({
+            mode,
+            prompt,
+            image: mode !== 'text' ? attachments[0] : undefined,
+            multiViewImages: mode === 'multi'
+                ? attachments.slice(1).map((file, i) => ({ file, viewType: VIEW_ORDER_3D[i] }))
+                : undefined,
+            model: '3.1',
+            generateType: this._3dTypeId === 'geo' ? 'Geometry' : 'Normal',
+            faceCount: FACE_COUNT_MAP_3D[this._3dFaceCountId] ?? 1000000,
+            pbr: false,
+            downloadFormat: this._3dResultFormatId,
+        });
+    }
+
+    _onModel3dState(state) {
+        this._model3dProgressOverlay?.update(state);
+
+        if (state.status === 'done' && state.result) {
+            this._place3dModelOnBoard(state.result);
+            this._clear3dSkeleton();
+            // Оверлей убираем чуть позже скелетона, чтобы прогресс не «прыгал» —
+            // достаточно синхронного detach после размещения.
+            this._model3dProgressOverlay?.detach();
+        } else if (state.status === 'error') {
+            this._model3dProgressOverlay?.detach();
+            this._clear3dSkeleton();
+            if (this._refs?.errorBlock) {
+                const raw = state.error || 'Ошибка генерации 3D-модели';
+                // Убираем технический префикс вида "AiClient.submit3dModel (503): ".
+                const clean = raw.replace(/^AiClient\.\w+\s*\(\d+\):\s*/, '');
+                this._refs.errorBlock.textContent = clean || 'Ошибка генерации 3D-модели';
+                this._refs.errorBlock.classList.add('is-visible');
+            }
+        }
+    }
+
+    /**
+     * Экранный прямоугольник скелетона/модели в текущем вьюпорте из мировых координат центра.
+     * Размер фиксирован шириной BOARD_IMAGE_WIDTH в world-единицах (квадрат), как у заглушки.
+     * @param {{x:number,y:number}} worldCenter
+     */
+    _compute3dSkeletonRect(worldCenter) {
+        const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
+        const s = world?.scale?.x || 1;
+        const size = Math.round(BOARD_IMAGE_WIDTH * s);
+        const screenX = Math.round(worldCenter.x * s + (world?.x || 0));
+        const screenY = Math.round(worldCenter.y * s + (world?.y || 0));
+        return {
+            left: Math.round(screenX - size / 2),
+            top: Math.round(screenY - size / 2),
+            width: size,
+            height: size,
+            radius: Math.max(2, Math.round(12 * s))
+        };
+    }
+
+    _show3dSkeleton() {
+        const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
+        if (!world) return;
+        const s = world?.scale?.x || 1;
+
+        // Центр будущей модели в экранных координатах: над композером (как при размещении).
+        const composerRect = this._refs?.composer?.getBoundingClientRect?.();
+        const screenCenterX = composerRect
+            ? Math.round(composerRect.left + composerRect.width / 2)
+            : 400;
+        const screenCenterY = composerRect
+            ? Math.round(composerRect.top - 200)
+            : 200;
+
+        // _clear3dSkeleton() обнуляет _model3dSkeletonWorld — присваиваем ПОСЛЕ него.
+        this._clear3dSkeleton();
+
+        this._model3dSkeletonWorld = {
+            x: (screenCenterX - (world?.x || 0)) / s,
+            y: (screenCenterY - (world?.y || 0)) / s
+        };
+
+        this._model3dSkeleton = new Model3dBoardSkeleton({ iconSvg: ICONS.cube });
+        this._model3dSkeleton.attach(this._container ?? document.body);
+        this._model3dSkeleton.setRect(this._compute3dSkeletonRect(this._model3dSkeletonWorld), { animate: false });
+        this._scheduleAnimationFrame(() => this._model3dSkeleton?.enter());
+    }
+
+    _sync3dSkeletonToViewport({ disableTransition = false } = {}) {
+        if (!this._model3dSkeleton?.isAttached() || !this._model3dSkeletonWorld) return;
+        this._model3dSkeleton.setRect(
+            this._compute3dSkeletonRect(this._model3dSkeletonWorld),
+            { animate: !disableTransition }
+        );
+    }
+
+    _clear3dSkeleton() {
+        this._model3dSkeleton?.destroy();
+        this._model3dSkeleton = null;
+        this._model3dSkeletonWorld = null;
+    }
+
+    _place3dModelOnBoard(result) {
+        if (!this._boardCore?.eventBus) return;
+        const { previewBase64, mimeType, modelUrl, format } = result;
+        const src = previewBase64
+            ? `data:${mimeType || 'image/jpeg'};base64,${previewBase64}`
+            : modelUrl;
+        if (!src) return;
+
+        const world = this._boardCore.pixi?.worldLayer || this._boardCore.pixi?.app?.stage;
+        const s = world?.scale?.x || 1;
+
+        // Приоритет — мировая точка скелетона: модель приземляется ровно туда,
+        // где пользователь видел заглушку, даже если он панорамировал/зумил во время генерации.
+        let x;
+        let y;
+        if (this._model3dSkeletonWorld) {
+            x = Math.round(this._model3dSkeletonWorld.x * s + (world?.x || 0));
+            y = Math.round(this._model3dSkeletonWorld.y * s + (world?.y || 0));
+        } else {
+            const composerRect = this._refs?.composer?.getBoundingClientRect?.();
+            x = composerRect ? Math.round(composerRect.left + composerRect.width / 2) : 400;
+            y = composerRect ? Math.round(composerRect.top - 200) : 200;
+        }
+
+        this._boardCore.eventBus.emit(Events.UI.PasteImageAt, {
+            x,
+            y,
+            src,
+            name: 'ai-3d-model',
+            skipUpload: true,
+            objectType: 'model3d-screenshot-img',
+            modelUrl,
+            format
+        });
     }
 
     _clearBoardSelection() {
@@ -862,9 +1299,11 @@ export class ChatWindow {
 
         const onPanUpdate = () => {
             this._syncPendingOverlaysToViewport({ disableTransition: true });
+            this._sync3dSkeletonToViewport({ disableTransition: true });
         };
         const onViewportChange = () => {
             this._syncPendingOverlaysToViewport({ disableTransition: true, recomputeWorld: false });
+            this._sync3dSkeletonToViewport({ disableTransition: true });
             // Зум меняет проекцию композера в мир: после него существующее изображение может
             // оказаться под заглушкой. Перепроверяем инвариант сразу, не дожидаясь рендера сессии.
             this._ensureExistingImagesClearOfPending();
@@ -1006,9 +1445,11 @@ export class ChatWindow {
         const onSelectionRemove = (data) => {
             const objectId = data?.object;
             if (objectId) this._composer?.removeAttachmentForObject?.(objectId);
+            this._update3dSendGate();
         };
         const onSelectionClear = () => {
             this._composer?.removeAllBoardAttachments?.();
+            this._update3dSendGate();
         };
         const onBoxSelectStart = () => {
             this._boxSelectActive = true;
@@ -1768,7 +2209,7 @@ function rectsOverlap(a, b) {
 
 function isReferenceImageObject(object) {
     return Boolean(object?.id)
-        && (object.type === 'image' || object.type === 'revit-screenshot-img')
+        && (object.type === 'image' || object.type === 'revit-screenshot-img' || object.type === 'model3d-screenshot-img')
         && typeof getImageObjectSource(object) === 'string';
 }
 

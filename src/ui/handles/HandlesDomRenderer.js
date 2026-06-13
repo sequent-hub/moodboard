@@ -10,6 +10,7 @@ import { MindmapStatePatchCommand } from '../../core/commands/MindmapStatePatchC
 
 const HANDLES_ACCENT_COLOR = '#80D8FF';
 const REVIT_SHOW_IN_MODEL_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" aria-hidden="true" focusable="false"><path d="M384 64C366.3 64 352 78.3 352 96C352 113.7 366.3 128 384 128L466.7 128L265.3 329.4C252.8 341.9 252.8 362.2 265.3 374.7C277.8 387.2 298.1 387.2 310.6 374.7L512 173.3L512 256C512 273.7 526.3 288 544 288C561.7 288 576 273.7 576 256L576 96C576 78.3 561.7 64 544 64L384 64zM144 160C99.8 160 64 195.8 64 240L64 496C64 540.2 99.8 576 144 576L400 576C444.2 576 480 540.2 480 496L480 416C480 398.3 465.7 384 448 384C430.3 384 416 398.3 416 416L416 496C416 504.8 408.8 512 400 512L144 512C135.2 512 128 504.8 128 496L128 240C128 231.2 135.2 224 144 224L224 224C241.7 224 256 209.7 256 192C256 174.3 241.7 160 224 160L144 160z"/></svg>';
+const MODEL3D_SHOW_IN_VIEWER_ICON_SVG = REVIT_SHOW_IN_MODEL_ICON_SVG;
 const MINDMAP_CHILD_WIDTH_FACTOR = 0.9;
 const MINDMAP_CHILD_HEIGHT_FACTOR = 0.8;
 const MINDMAP_CHILD_PADDING_FACTOR = 0.5;
@@ -1158,6 +1159,9 @@ export class HandlesDomRenderer {
         let isMindmapOnlyGroupTarget = false;
         let isRevitScreenshotTarget = false;
         let revitViewPayload = null;
+        let isModel3dScreenshotTarget = false;
+        let model3dModelUrl = null;
+        let model3dFormat = null;
         let sourceMindmapProperties = null;
         const occupiedOutgoingSides = new Set();
         const hiddenIncomingSide = { value: null };
@@ -1170,6 +1174,9 @@ export class HandlesDomRenderer {
             isMindmapTarget = mbType === 'mindmap';
             isRevitScreenshotTarget = mbType === 'revit-screenshot-img';
             revitViewPayload = req.pixiObject?._mb?.properties?.view || null;
+            isModel3dScreenshotTarget = mbType === 'model3d-screenshot-img';
+            model3dModelUrl = req.pixiObject?._mb?.properties?.modelUrl || null;
+            model3dFormat = req.pixiObject?._mb?.properties?.format || null;
             if (isMindmapTarget) {
                 sourceMindmapProperties = req.pixiObject?._mb?.properties || null;
                 const allObjects = this.host.core?.state?.state?.objects || [];
@@ -1665,6 +1672,29 @@ export class HandlesDomRenderer {
             if (role === 'child' && canShowBottom) {
                 this.host.layer.appendChild(createMindmapBottomButton());
             }
+        }
+
+        if (isModel3dScreenshotTarget && typeof model3dModelUrl === 'string' && model3dModelUrl.length > 0) {
+            const showInViewerButton = document.createElement('button');
+            showInViewerButton.type = 'button';
+            showInViewerButton.className = 'mb-revit-show-in-model';
+            showInViewerButton.innerHTML = `${MODEL3D_SHOW_IN_VIEWER_ICON_SVG}<span>Показать в модели</span>`;
+            showInViewerButton.style.left = `${Math.round(left + width / 2)}px`;
+            showInViewerButton.style.top = `${Math.round(top - 34)}px`;
+            showInViewerButton.addEventListener('pointerdown', (evt) => {
+                evt.preventDefault();
+                evt.stopPropagation();
+            });
+            showInViewerButton.addEventListener('click', (evt) => {
+                evt.preventDefault();
+                evt.stopPropagation();
+                this.host.eventBus.emit(Events.UI.Model3dShowInViewer, {
+                    objectId: id,
+                    modelUrl: model3dModelUrl,
+                    format: model3dFormat,
+                });
+            });
+            this.host.layer.appendChild(showInViewerButton);
         }
 
         if (isRevitScreenshotTarget && typeof revitViewPayload === 'string' && revitViewPayload.length > 0) {

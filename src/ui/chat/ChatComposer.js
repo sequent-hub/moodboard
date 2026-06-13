@@ -32,6 +32,14 @@ export class ChatComposer {
          * @type {{ file: File, sourceObjectId: string|null }[]}
          */
         this._attachments = [];
+        this._attachmentLabelProvider = null;
+        /**
+         * Жёстко зафиксированный placeholder. Когда задан, логика вложений
+         * (`_renderAttachmentsPreview`) не перетирает текст. Нужно для 3D-режима
+         * «Изображение», где описание не требуется.
+         * @type {string|null}
+         */
+        this._placeholderOverride = null;
     }
 
     attach() {
@@ -135,6 +143,39 @@ export class ChatComposer {
         this._attachments = [];
     }
 
+    /**
+     * Включает/выключает поле ввода текста.
+     * В 3D-режимах image/multi textarea должна быть заблокирована.
+     * @param {boolean} enabled
+     */
+    setInputEnabled(enabled) {
+        this._textarea.disabled = !enabled;
+        this._textarea.style.opacity = enabled ? '' : '0.4';
+        this._textarea.style.cursor = enabled ? '' : 'not-allowed';
+    }
+
+    /**
+     * Фиксирует placeholder, который не перетирается логикой вложений.
+     * `null` — вернуть обычное поведение (текст зависит от наличия вложений).
+     * @param {string|null} text
+     */
+    setPlaceholderOverride(text) {
+        this._placeholderOverride = text ?? null;
+        if (this._placeholderOverride != null) {
+            this._textarea.placeholder = this._placeholderOverride;
+        }
+    }
+
+    /**
+     * Устанавливает провайдер пользовательских лейблов для превью вложений.
+     * Используется в мультивью: i===0 → 'Фронт', i>0 → ракурс по порядку.
+     * @param {((index: number) => string) | null} fn
+     */
+    setAttachmentLabelProvider(fn) {
+        this._attachmentLabelProvider = fn ?? null;
+        this._renderAttachmentsPreview();
+    }
+
     _submit() {
         const text = this._textarea.value;
         const trimmed = text.trim();
@@ -180,13 +221,17 @@ export class ChatComposer {
         if (this._attachments.length === 0) {
             container.classList.remove('is-visible');
             inputRow?.classList.remove('has-attachments');
-            this._textarea.placeholder = 'Опишите то, что хотите сгенерировать';
+            if (this._placeholderOverride == null) {
+                this._textarea.placeholder = 'Опишите то, что хотите сгенерировать';
+            }
             return;
         }
 
         container.classList.add('is-visible');
         inputRow?.classList.add('has-attachments');
-        this._textarea.placeholder = 'Опишите правку, изменение или стилевое направление эталонного изображения';
+        if (this._placeholderOverride == null) {
+            this._textarea.placeholder = 'Опишите правку, изменение или стилевое направление эталонного изображения';
+        }
         for (let i = 0; i < this._attachments.length; i++) {
             const entry = this._attachments[i];
             const item = this._buildAttachmentItem(entry.file, i);
@@ -219,7 +264,9 @@ export class ChatComposer {
 
         const badge = document.createElement('div');
         badge.className = 'moodboard-chat__attachment-badge';
-        badge.textContent = String(index + 1);
+        badge.textContent = this._attachmentLabelProvider
+            ? (this._attachmentLabelProvider(index) ?? String(index + 1))
+            : String(index + 1);
         item.appendChild(badge);
 
         const remove = document.createElement('button');

@@ -59,6 +59,7 @@ const MODEL_BOT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" heigh
 
 export const ICONS = {
     bot: svg('<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>'),
+    cube: svg('<path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>'),
     modelBot: MODEL_BOT_ICON,
     image: IMAGE_ICON,
     video: VIDEO_ICON,

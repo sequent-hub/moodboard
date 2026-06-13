@@ -70,6 +70,7 @@ export const Events = {
 		ZoomSelection: 'ui:zoom:selection',
 		ZoomPercent: 'ui:zoom:percent',
 		RevitShowInModel: 'ui:revit:show-in-model',
+		Model3dShowInViewer: 'ui:model3d:show-in-viewer',
 		MinimapGetData: 'ui:minimap:get-data',
 		MinimapCenterOn: 'ui:minimap:center-on',
 		TextEditStart: 'ui:text:edit:start',

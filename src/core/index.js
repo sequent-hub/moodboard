@@ -17,6 +17,7 @@ import { setupClipboardFlow, setupClipboardKeyboardFlow } from './flows/Clipboar
 import { setupObjectLifecycleFlow } from './flows/ObjectLifecycleFlow.js';
 import { setupLayerAndViewportFlow } from './flows/LayerAndViewportFlow.js';
 import { setupRevitFlow } from './flows/RevitFlow.js';
+import { setupModel3dFlow } from './flows/Model3dFlow.js';
 import { setupSaveFlow } from './flows/SaveFlow.js';
 import {
     logMindmapCompoundDebug,
@@ -133,6 +134,7 @@ export class CoreMoodBoard {
         setupTransformFlow(this);
         setupObjectLifecycleFlow(this);
         setupRevitFlow(this);
+        setupModel3dFlow(this);
     }
 
     /**
@@ -432,7 +434,7 @@ export class CoreMoodBoard {
             },
             ...extraData
         };
-        if (type === 'image' || type === 'revit-screenshot-img' || type === 'file') {
+        if (type === 'image' || type === 'revit-screenshot-img' || type === 'model3d-screenshot-img' || type === 'file') {
             const propSrc = typeof properties?.src === 'string' ? properties.src.trim() : '';
             const propUrl = typeof properties?.url === 'string' ? properties.url.trim() : '';
             const normalizedSrc = propSrc || propUrl;
@@ -557,7 +559,7 @@ export class CoreMoodBoard {
             properties: objectData.properties || {},
             existingObjects: this.state?.state?.objects || [],
         });
-        if (objectData.type === 'image' || objectData.type === 'revit-screenshot-img' || objectData.type === 'file') {
+        if (objectData.type === 'image' || objectData.type === 'revit-screenshot-img' || objectData.type === 'model3d-screenshot-img' || objectData.type === 'file') {
             const topSrc = typeof objectData.src === 'string' ? objectData.src.trim() : '';
             const propSrc = typeof objectData.properties?.src === 'string' ? objectData.properties.src.trim() : '';
             const topUrl = typeof objectData.url === 'string' ? objectData.url.trim() : '';
