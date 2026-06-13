@@ -218,6 +218,57 @@ export class AiClient {
     }
 
     /**
+     * Отправляет джоб генерации видео.
+     * @param {object} args
+     * @param {string} [args.provider='gemini-video']
+     * @param {string} args.prompt
+     * @param {string} [args.negativePrompt]
+     * @param {string} [args.model]
+     * @param {string} [args.ratio]
+     * @param {string} [args.resolution]
+     * @param {number} [args.duration]
+     * @param {number} [args.seed]
+     * @param {File[]} [args.referenceImages]
+     * @param {AbortSignal} [args.signal]
+     * @returns {Promise<{jobId: string}>}
+     */
+    async submitVideo({ provider = 'gemini-video', signal, referenceImages: files, ...payload }) {
+        const referenceImages = await filesToBase64(files);
+        const body = referenceImages ? { ...payload, referenceImages } : payload;
+        const res = await this._fetch(`${this._baseUrl}/${provider}/video`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(body),
+            signal
+        });
+        if (!res.ok) {
+            const detail = await safeReadError(res);
+            throw new Error(`AiClient.submitVideo (${res.status}): ${detail}`);
+        }
+        return res.json();
+    }
+
+    /**
+     * Опрашивает статус джоба генерации видео.
+     * @param {string} jobId
+     * @param {AbortSignal} [signal]
+     * @param {string} [provider='gemini-video']
+     * @returns {Promise<object>}
+     */
+    async pollVideo(jobId, signal, provider = 'gemini-video') {
+        const res = await this._fetch(`${this._baseUrl}/${provider}/video/${jobId}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            signal
+        });
+        if (!res.ok) {
+            const detail = await safeReadError(res);
+            throw new Error(`AiClient.pollVideo (${res.status}): ${detail}`);
+        }
+        return res.json();
+    }
+
+    /**
      * Отправляет джоб конвертации GLB -> FBX/STL.
      * @param {object} args
      * @param {string} args.glbUrl

@@ -978,6 +978,43 @@
 .moodboard-chat__settings-textarea:focus,
 .moodboard-chat__settings-input:focus { border-color: #6366F1; }
 
+/* Мини-поповер видео-пилюли (Seed / CFG / Негатив) */
+.moodboard-chat__pill-popover {
+    padding: 10px;
+    min-width: 220px;
+}
+.moodboard-chat__pill-popover-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.moodboard-chat__pill-popover-body .moodboard-chat__settings-input {
+    width: 100%;
+    box-sizing: border-box;
+}
+.moodboard-chat__settings-hint {
+    font-size: 11px;
+    line-height: 1.4;
+    color: #6B7280;
+}
+
+/* Тумблеры видео (Звук, Водяной знак): однозначное вкл/выкл */
+.moodboard-chat__pill--toggle {
+    border: 1px solid #E5E7EB;
+    padding: 3px 8px;
+}
+.moodboard-chat__pill--toggle[data-active="true"] {
+    background: #4F46E5;
+    border-color: #4F46E5;
+}
+.moodboard-chat__pill--toggle[data-active="true"]:hover:not(:disabled) {
+    background: #4338CA;
+}
+.moodboard-chat__pill--toggle[data-active="true"] .moodboard-chat__pill-label,
+.moodboard-chat__pill--toggle[data-active="true"] .moodboard-chat__pill-icon-wrap {
+    color: #FFFFFF;
+}
+
 .moodboard-chat__settings-popup-row {
     display: flex; align-items: center; gap: 8px; justify-content: flex-end;
 }
@@ -1016,6 +1053,31 @@
     background-repeat: no-repeat;
     background-position: center;
     background-size: 12px 12px;
+}
+
+/* Меню выбора модели — компактные строки с иконкой единого размера */
+#chat-menu-model {
+    min-width: 0;
+}
+
+#chat-menu-model .moodboard-chat__menu-item--rich {
+    align-items: center;
+    min-width: 268px;
+    padding: 6px 8px;
+    gap: 10px;
+}
+
+#chat-menu-model .moodboard-chat__menu-item-icon {
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border-radius: 0;
+}
+
+#chat-menu-model .moodboard-chat__menu-item-icon svg {
+    width: 22px;
+    height: 22px;
+    display: block;
 }
 
 /* Меню выбора количества изображений */

@@ -2,6 +2,9 @@ import { AiClient } from '../../services/ai/AiClient.js';
 import { ChatHistoryStore } from '../../services/ai/ChatHistoryStore.js';
 import { ChatSessionController } from '../../services/ai/ChatSessionController.js';
 import { Model3dSessionController } from '../../services/ai/Model3dSessionController.js';
+import { IMAGE_MODELS, getImageModelCapability } from '../../services/ai/imageModelCapabilities.js';
+import { VIDEO_MODELS, getVideoModelCapability } from '../../services/ai/videoModelCapabilities.js';
+import { VideoSessionController } from '../../services/ai/VideoSessionController.js';
 import { Events } from '../../core/events/Events.js';
 
 import { buildChatDom } from './ChatWindowRenderer.js';
@@ -9,6 +12,8 @@ import { formatChatErrorForDisplay } from './formatChatError.js';
 import { ChatMessageList } from './ChatMessageList.js';
 import { ChatComposer } from './ChatComposer.js';
 import { ChatPillMenu } from './ChatPillMenu.js';
+import { ChatSettingsPopup } from './ChatSettingsPopup.js';
+import { ChatVideoToolbarPills } from './ChatVideoToolbarPills.js';
 import { ChatExtendedPromptModal } from './ChatExtendedPromptModal.js';
 import { Model3dProgressOverlay } from './Model3dProgressOverlay.js';
 import { Model3dBoardSkeleton } from './Model3dBoardSkeleton.js';
@@ -19,19 +24,19 @@ const CONTENT_TYPE_OPTIONS = [
         id: 'image',
         label: 'Изображение',
         icon: ICONS.image,
-        description: 'Создать по тексту или приложите ссылку'
+        description: 'По описанию или ссылке на референс'
     },
     {
         id: 'video',
         label: 'Видео',
         icon: ICONS.video,
-        description: 'Создать по тексту или руководствуясь первым и последним кадром'
+        description: 'По описанию или по первому и последнему кадру'
     },
     {
         id: '3d',
         label: '3D-модель',
         icon: ICONS.cube,
-        description: 'Создать 3D-модель по выбранному изображению'
+        description: 'По выбранному изображению'
     }
 ];
 
@@ -93,21 +98,27 @@ const FORMAT_OPTIONS = [
     { id: '2:3',   label: '2:3',   icon: RATIO_ICONS['2:3']   },
     { id: '9:16',  label: '9:16',  icon: RATIO_ICONS['9:16']  },
     { id: '1:2',   label: '1:2',   icon: RATIO_ICONS['1:2']   },
+    { id: '1:4',   label: '1:4',   icon: RATIO_ICONS['1:4']   },
+    { id: '1:8',   label: '1:8',   icon: RATIO_ICONS['1:8']   },
     { id: '5:4',   label: '5:4',   icon: RATIO_ICONS['5:4']   },
     { id: '4:3',   label: '4:3',   icon: RATIO_ICONS['4:3']   },
     { id: '14:10', label: '14:10', icon: RATIO_ICONS['14:10'] },
     { id: '3:2',   label: '3:2',   icon: RATIO_ICONS['3:2']   },
     { id: '16:9',  label: '16:9',  icon: RATIO_ICONS['16:9']  },
     { id: '2:1',   label: '2:1',   icon: RATIO_ICONS['2:1']   },
+    { id: '21:9',  label: '21:9',  icon: RATIO_ICONS['21:9']  },
+    { id: '4:1',   label: '4:1',   icon: RATIO_ICONS['4:1']   },
+    { id: '8:1',   label: '8:1',   icon: RATIO_ICONS['8:1']   },
     { id: 'auto',  label: 'Auto',  icon: RATIO_ICONS['auto']  },
 ];
 
 const COUNT_OPTIONS = [
-    { id: 'auto', label: 'Авто',          icon: COUNT_ICONS.auto },
     { id: '1',    label: '1 Изображение', icon: COUNT_ICONS[1]   },
     { id: '2',    label: '2 Изображения', icon: COUNT_ICONS[2]   },
     { id: '3',    label: '3 Изображения', icon: COUNT_ICONS[3]   },
     { id: '4',    label: '4 Изображения', icon: COUNT_ICONS[4]   },
+    { id: '5',    label: '5 Изображений', icon: COUNT_ICONS[4]   },
+    { id: '6',    label: '6 Изображений', icon: COUNT_ICONS[4]   },
 ];
 
 const BOARD_IMAGE_WIDTH = 300;
@@ -124,38 +135,28 @@ const BOARD_IMAGE_LANE_REFERENCE_RATIO = [2, 3];
 const BOARD_IMAGE_LANE_CENTER_OFFSET = 250;
 const BOARD_IMAGE_LANE_UI_GAP = 16;
 
-const MODEL_OPTIONS = [
-    {
-        id: 'auto',
-        label: 'Автоматический режим',
-        icon: ICONS.modelBot,
-        description: 'Мы подберем модель для ваших задач.'
-    },
-    {
-        id: 'yandex',
-        label: 'Алиса',
-        icon: ICONS.modelAlice,
-        description: 'YandexGPT'
-    },
-    {
-        id: 'gpt',
-        label: 'GPT',
-        icon: ICONS.modelGpt,
-        description: 'OpenAI'
-    },
-    {
-        id: 'google',
-        label: 'Google',
-        icon: ICONS.modelGoogle,
-        description: 'Gemini'
-    },
-    {
-        id: 'qwen',
-        label: 'Qwen',
-        icon: '<img src="/icons/qwen.svg" alt="" aria-hidden="true">',
-        description: 'Alibaba'
+/** Маппинг провайдера видео → иконка пилла модели. */
+function _iconForVideoProvider(provider) {
+    switch (provider) {
+        case 'gemini-video': return ICONS.modelGoogle;
+        case 'veo':          return ICONS.modelGoogle;
+        case 'openai-video': return ICONS.modelGpt;
+        case 'kling':        return ICONS.modelKling;
+        case 'seedance':     return ICONS.modelSeedance;
+        default:             return ICONS.model;
     }
-];
+}
+
+/** Маппинг провайдера → иконка пилла модели. */
+function _iconForProvider(provider) {
+    switch (provider) {
+        case 'yandex-art':   return ICONS.modelAlice;
+        case 'gemini-image': return ICONS.modelGoogle;
+        case 'openai-image': return ICONS.modelGpt;
+        case 'qwen-image':   return ICONS.modelQwen;
+        default:             return ICONS.model;
+    }
+}
 
 /**
  * Корневой контейнер чата ИИ-ассистента.
@@ -193,13 +194,25 @@ export class ChatWindow {
         this._extendedPromptModal = null;
         this._contentTypeId = 'image';
         this._contentTypeMenu = null;
-        this._modelId = 'auto';
+        this._modelId = 'nano-banana-pro';
         this._modelMenu = null;
         this._formatId = 'auto';
         this._formatMenu = null;
         this._providers = [];
-        this._countId = 'auto';
+        this._countId = '1';
         this._countMenu = null;
+        // Разрешение — пилл, видим только когда модель имеет resolutions.length > 0
+        this._resolutionId = getImageModelCapability('nano-banana-pro')?.defaultResolution ?? null;
+        this._resolutionMenu = null;
+        // Попап настроек
+        this._settingsPopupCtrl = null;
+        // Доп-параметры генерации изображения (хранятся здесь, передаются в payload)
+        this._imageSeed = null;
+        this._imageNegativePrompt = '';
+        this._imageBackground = null;
+        this._imageOutputFormat = null;
+        this._imagePromptExtend = false;
+        this._imageWatermark = false;
         this._unsubscribe = null;
         this._attached = false;
         this._3dFaceCountId = '1m';
@@ -241,6 +254,23 @@ export class ChatWindow {
         // приходит на каждый mousemove и не должен пушить превью в чат —
         // финальный набор картинок мы получим из BoxSelectCommit по strict-contains.
         this._boxSelectActive = false;
+
+        // Видео-генерация
+        this._videoModelId = VIDEO_MODELS[0].id;
+        this._videoRatioId = VIDEO_MODELS[0].ratios[0] ?? '16:9';
+        this._videoResolutionId = null;
+        this._videoDurationId = VIDEO_MODELS[0].defaultDuration ?? VIDEO_MODELS[0].durations[0] ?? 5;
+        this._videoSeed = null;
+        this._videoNegativePrompt = '';
+        this._videoAudio = false;
+        this._videoWatermark = false;
+        this._videoCfgScale = null;
+        this._videoPersonGeneration = 'allow_all';
+        this._videoDurationWrapper = null;
+        this._videoDurationMenu = null;
+        this._videoToolbarPills = null;
+        this._videoSession = null;
+        this._videoUnsubscribe = null;
     }
 
     attach() {
@@ -264,10 +294,19 @@ export class ChatWindow {
                     if (this._contentTypeId === '3d') {
                         return this._submit3d(text, attachments);
                     }
+                    if (this._contentTypeId === 'video') {
+                        return this._submitVideo(text, attachments);
+                    }
                     this._clearBoardSelection();
                     return this._session.send(text, { ...this._getImageRequestOptions(), referenceImages: attachments });
                 },
-                onAbort: () => this._session.abort()
+                onAbort: () => {
+                    if (this._contentTypeId === 'video') {
+                        this._videoSession?.abort();
+                    } else {
+                        this._session.abort();
+                    }
+                }
             }
         );
         this._composer.attach();
@@ -298,6 +337,10 @@ export class ChatWindow {
                     this._contentTypeMenu.refresh();
                     this._update3dPillVisibility();
                     this._update3dSendGate();
+                    this._modelMenu?.refresh();
+                    this._formatMenu?.refresh();
+                    this._updateResolutionPillVisibility();
+                    this._settingsPopupCtrl?.refresh();
                 }
             }
         );
@@ -306,12 +349,24 @@ export class ChatWindow {
         this._modelMenu = new ChatPillMenu(
             { trigger: this._refs.modelPill, menu: this._refs.modelMenu, label: this._refs.modelLabel, icon: this._refs.modelIcon },
             {
-                getOptions: () => MODEL_OPTIONS,
-                getActiveId: () => this._modelId,
+                getOptions: () => {
+                    if (this._contentTypeId === 'video') {
+                        return VIDEO_MODELS.map((m) => ({ id: m.id, label: m.label, description: m.description, icon: _iconForVideoProvider(m.provider) }));
+                    }
+                    return IMAGE_MODELS.map((m) => ({ id: m.id, label: m.label, description: m.description, icon: _iconForProvider(m.provider) }));
+                },
+                getActiveId: () => this._contentTypeId === 'video' ? this._videoModelId : this._modelId,
                 onSelect: (id) => {
-                    this._modelId = id;
+                    if (this._contentTypeId === 'video') {
+                        this._videoModelId = id;
+                        this._clampVideoSettingsToModel();
+                    } else {
+                        this._modelId = id;
+                        this._clampSettingsToModel();
+                    }
                     this._modelMenu.refresh();
-                    this._clampFormatToModel();
+                    this._updateResolutionPillVisibility();
+                    this._settingsPopupCtrl?.refresh();
                 }
             }
         );
@@ -320,22 +375,52 @@ export class ChatWindow {
         this._formatMenu = new ChatPillMenu(
             { trigger: this._refs.formatPill, menu: this._refs.formatMenu, label: this._refs.formatLabel },
             {
-                getOptions: () => this._getSupportedFormatOptions(),
-                getActiveId: () => this._formatId,
+                getOptions: () => this._contentTypeId === 'video' ? this._getSupportedVideoFormatOptions() : this._getSupportedFormatOptions(),
+                getActiveId: () => this._contentTypeId === 'video' ? this._videoRatioId : this._formatId,
                 onSelect: (id) => {
-                    this._formatId = id;
+                    if (this._contentTypeId === 'video') {
+                        this._videoRatioId = id;
+                    } else {
+                        this._formatId = id;
+                        this._updateFormatPillIcon();
+                        this._updateFormatPillLabel();
+                    }
                     this._formatMenu.refresh();
-                    this._updateFormatPillIcon();
-                    this._updateFormatPillLabel();
                 }
             }
         );
         this._formatMenu.attach();
 
+        this._resolutionMenu = new ChatPillMenu(
+            { trigger: this._refs.resolutionPill, menu: this._refs.resolutionMenu, label: this._refs.resolutionLabel },
+            {
+                getOptions: () => {
+                    if (this._contentTypeId === 'video') {
+                        const cap = getVideoModelCapability(this._videoModelId);
+                        return (cap?.resolutions ?? []).map((r) => ({ id: r, label: r }));
+                    }
+                    const cap = getImageModelCapability(this._modelId);
+                    return (cap?.resolutions ?? []).map((r) => ({ id: r, label: r }));
+                },
+                getActiveId: () => this._contentTypeId === 'video' ? this._videoResolutionId : this._resolutionId,
+                onSelect: (id) => {
+                    if (this._contentTypeId === 'video') {
+                        this._videoResolutionId = id;
+                    } else {
+                        this._resolutionId = id;
+                        this._updateResolutionPillLabel();
+                    }
+                    this._resolutionMenu.refresh();
+                }
+            }
+        );
+        this._resolutionMenu.attach();
+        this._updateResolutionPillVisibility();
+
         this._countMenu = new ChatPillMenu(
             { trigger: this._refs.countPill, menu: this._refs.countMenu, label: this._refs.countLabel, icon: this._refs.countIcon },
             {
-                getOptions: () => COUNT_OPTIONS,
+                getOptions: () => this._getSupportedCountOptions(),
                 getActiveId: () => this._countId,
                 onSelect: (id) => {
                     this._countId = id;
@@ -346,7 +431,57 @@ export class ChatWindow {
         );
         this._countMenu.attach();
 
+        this._settingsPopupCtrl = new ChatSettingsPopup(
+            { trigger: this._refs.settingsTrigger, popup: this._refs.settingsPopup },
+            {
+                getSettings: () => ({
+                    systemPrompt: this._session.getState().settings?.systemPrompt ?? '',
+                    temperature: this._session.getState().settings?.temperature ?? 0.7,
+                    maxTokens: this._session.getState().settings?.maxTokens ?? 2000,
+                    seed: this._imageSeed,
+                    negativePrompt: this._imageNegativePrompt,
+                    background: this._imageBackground,
+                    outputFormat: this._imageOutputFormat,
+                    promptExtend: this._imagePromptExtend,
+                    watermark: this._imageWatermark,
+                    videoSeed: this._videoSeed,
+                    videoNegativePrompt: this._videoNegativePrompt,
+                    videoAudio: this._videoAudio,
+                    videoWatermark: this._videoWatermark,
+                    videoCfgScale: this._videoCfgScale,
+                    videoPersonGeneration: this._videoPersonGeneration,
+                }),
+                getCapability: () => getImageModelCapability(this._modelId),
+                getVideoCapability: () => getVideoModelCapability(this._videoModelId),
+                getContentType: () => this._contentTypeId,
+                onChange: (patch) => {
+                    const sessionPatch = {};
+                    if ('systemPrompt' in patch) sessionPatch.systemPrompt = patch.systemPrompt;
+                    if ('temperature' in patch) sessionPatch.temperature = patch.temperature;
+                    if ('maxTokens' in patch) sessionPatch.maxTokens = patch.maxTokens;
+                    if (Object.keys(sessionPatch).length > 0) this._session.updateSettings(sessionPatch);
+                    if ('seed' in patch) this._imageSeed = patch.seed;
+                    if ('negativePrompt' in patch) this._imageNegativePrompt = patch.negativePrompt;
+                    if ('background' in patch) this._imageBackground = patch.background;
+                    if ('outputFormat' in patch) this._imageOutputFormat = patch.outputFormat;
+                    if ('promptExtend' in patch) this._imagePromptExtend = patch.promptExtend;
+                    if ('watermark' in patch) this._imageWatermark = patch.watermark;
+                    if ('videoSeed' in patch) this._videoSeed = patch.videoSeed;
+                    if ('videoNegativePrompt' in patch) this._videoNegativePrompt = patch.videoNegativePrompt;
+                    if ('videoAudio' in patch) this._videoAudio = patch.videoAudio;
+                    if ('videoWatermark' in patch) this._videoWatermark = patch.videoWatermark;
+                    if ('videoCfgScale' in patch) this._videoCfgScale = patch.videoCfgScale;
+                    if ('videoPersonGeneration' in patch) this._videoPersonGeneration = patch.videoPersonGeneration;
+                },
+                onClearHistory: () => this._session.clearHistory()
+            }
+        );
+        this._settingsPopupCtrl.attach();
+        this._settingsPopupCtrl.refresh();
+
         this._attach3dPills();
+        this._attachVideoPills();
+        this._attachVideoToolbarPills();
         this._update3dPillVisibility();
 
         const initialState = this._session.getState();
@@ -400,12 +535,25 @@ export class ChatWindow {
         this._3dResultFormatMenu = null;
         this._3dResultFormatWrapper?.remove();
         this._3dResultFormatWrapper = null;
+        if (this._videoUnsubscribe) { this._videoUnsubscribe(); this._videoUnsubscribe = null; }
+        this._videoSession?.abort?.();
+        this._videoSession = null;
+        this._videoDurationMenu?.destroy();
+        this._videoDurationMenu = null;
+        this._videoDurationWrapper?.remove();
+        this._videoDurationWrapper = null;
+        this._videoToolbarPills?.destroy();
+        this._videoToolbarPills = null;
         this._composer?.destroy();
         this._extendedPromptModal?.destroy();
         this._contentTypeMenu?.destroy();
         this._modelMenu?.destroy();
         this._formatMenu?.destroy();
+        this._resolutionMenu?.destroy();
+        this._resolutionMenu = null;
         this._countMenu?.destroy();
+        this._settingsPopupCtrl?.destroy();
+        this._settingsPopupCtrl = null;
         if (this._refs?.root && this._refs.root.parentNode === this._container) {
             this._container.removeChild(this._refs.root);
         }
@@ -520,12 +668,20 @@ export class ChatWindow {
 
     _update3dPillVisibility() {
         const is3d = this._contentTypeId === '3d';
+        const isVideo = this._contentTypeId === 'video';
         const formatWrapper = this._refs.formatPill?.closest('.moodboard-chat__pill-wrapper');
         const countWrapper = this._refs.countPill?.closest('.moodboard-chat__pill-wrapper');
         const modelWrapper = this._refs.modelPill?.closest('.moodboard-chat__pill-wrapper');
         if (formatWrapper) formatWrapper.style.display = is3d ? 'none' : '';
-        if (countWrapper) countWrapper.style.display = is3d ? 'none' : '';
+        // В видео-режиме счётчик не нужен: у всех видео-моделей maxCount=1
+        if (countWrapper) countWrapper.style.display = (is3d || isVideo) ? 'none' : '';
         if (modelWrapper) modelWrapper.style.display = is3d ? 'none' : '';
+        // Разрешение — скрываем в 3D-режиме; при возврате — восстанавливаем по capability
+        if (is3d) {
+            if (this._refs?.resolutionWrapper) this._refs.resolutionWrapper.style.display = 'none';
+        } else {
+            this._updateResolutionPillVisibility();
+        }
         if (this._3dFaceCountWrapper) this._3dFaceCountWrapper.style.display = is3d ? '' : 'none';
         if (this._3dTypeWrapper) this._3dTypeWrapper.style.display = is3d ? '' : 'none';
         if (this._3dModeWrapper) this._3dModeWrapper.style.display = is3d ? '' : 'none';
@@ -534,6 +690,10 @@ export class ChatWindow {
         if (this._3dTextureStyleWrapper) {
             this._3dTextureStyleWrapper.style.display = (is3d && this._3dMode === 'text') ? '' : 'none';
         }
+        // Длительность — только в видео-режиме
+        if (this._videoDurationWrapper) this._videoDurationWrapper.style.display = isVideo ? '' : 'none';
+        // Видео-настройки (Звук/Водяной знак/Люди/Seed/CFG/Негатив) — пилюли тулбара
+        this._videoToolbarPills?.refresh();
     }
 
     _update3dSendGate() {
@@ -780,7 +940,9 @@ export class ChatWindow {
             const list = await this._aiClient.listProviders();
             this._providers = Array.isArray(list) ? list : [];
             this._session.setAvailableProviders(list);
-            this._clampFormatToModel();
+            // Серверные supportedRatios могут дополнительно сузить список —
+            // после загрузки ещё раз клампим настройки на случай несоответствия.
+            this._clampSettingsToModel();
         } catch (err) {
             console.warn('[ChatWindow] cannot load providers:', err.message);
             this._providers = [];
@@ -789,52 +951,251 @@ export class ChatWindow {
     }
 
     /**
-     * Возвращает id провайдера изображений для текущей модели.
-     * Дублирует логику из _getImageRequestOptions, чтобы не привязываться к payload-контексту.
-     *
-     * @param {string} modelId
-     * @returns {string}
-     */
-    _imageProviderForModel(modelId) {
-        return modelId === 'gpt' ? 'openai-image' : 'yandex-art';
-    }
-
-    /**
-     * Возвращает подмножество FORMAT_OPTIONS, поддерживаемое текущим провайдером.
-     * Если провайдер не ограничивает форматы (supportedRatios === null) — возвращает все.
+     * Возвращает подмножество FORMAT_OPTIONS, поддерживаемое текущей моделью.
+     * Источник истины — capability.ratios из imageModelCapabilities.
      * Формат 'auto' присутствует всегда.
      *
      * @returns {Array}
      */
     _getSupportedFormatOptions() {
-        const providerId = this._imageProviderForModel(this._modelId);
-        const provider = this._providers.find((p) => p.id === providerId);
-        const ratios = provider?.supportedRatios;
-
-        if (!Array.isArray(ratios) || ratios.length === 0) {
+        const cap = getImageModelCapability(this._modelId);
+        if (!cap || !Array.isArray(cap.ratios) || cap.ratios.length === 0) {
             return FORMAT_OPTIONS;
         }
-
-        return FORMAT_OPTIONS.filter((opt) => opt.id === 'auto' || ratios.includes(opt.id));
+        return FORMAT_OPTIONS.filter((opt) => opt.id === 'auto' || cap.ratios.includes(opt.id));
     }
 
     /**
-     * При смене модели проверяет, что текущий формат входит в список поддерживаемых.
-     * Если нет — сбрасывает на 'auto'.
+     * Возвращает подмножество COUNT_OPTIONS, поддерживаемое текущей моделью.
+     * Опции выше capability.maxCount скрываются.
+     *
+     * @returns {Array}
      */
-    _clampFormatToModel() {
-        const supported = this._getSupportedFormatOptions();
-        const stillValid = supported.some((opt) => opt.id === this._formatId);
-        if (!stillValid) {
+    _getSupportedCountOptions() {
+        const cap = getImageModelCapability(this._modelId);
+        const maxCount = cap?.maxCount ?? 4;
+        return COUNT_OPTIONS.filter((opt) => {
+            const n = Number.parseInt(opt.id, 10);
+            return !Number.isFinite(n) || n <= maxCount;
+        });
+    }
+
+    /**
+     * При смене модели приводит текущий формат, разрешение и количество
+     * к допустимым значениям. Невалидное значение — на дефолт.
+     */
+    _clampSettingsToModel() {
+        const cap = getImageModelCapability(this._modelId);
+
+        // Формат
+        const supportedFormats = this._getSupportedFormatOptions();
+        if (!supportedFormats.some((opt) => opt.id === this._formatId)) {
             this._formatId = 'auto';
         }
-        // refresh обновляет лейбл из option.label ('Auto'), поэтому _updateFormatPillLabel
-        // вызывается после — она выставляет человекочитаемый текст 'Соотношение сторон'.
         this._formatMenu?.refresh();
-        if (!stillValid) {
-            this._updateFormatPillIcon();
-            this._updateFormatPillLabel();
+        this._updateFormatPillIcon();
+        this._updateFormatPillLabel();
+
+        // Разрешение
+        const resolutions = cap?.resolutions ?? [];
+        if (resolutions.length === 0) {
+            this._resolutionId = null;
+        } else if (!resolutions.includes(this._resolutionId)) {
+            this._resolutionId = cap.defaultResolution ?? resolutions[0] ?? null;
         }
+        this._resolutionMenu?.refresh();
+        this._updateResolutionPillLabel();
+
+        // Количество
+        const maxCount = cap?.maxCount ?? 4;
+        const n = Number.parseInt(this._countId, 10);
+        if (Number.isFinite(n) && n > maxCount) {
+            this._countId = '1';
+        }
+        this._countMenu?.refresh();
+        this._updateCountPillIcon();
+    }
+
+    _updateResolutionPillVisibility() {
+        const isVideo = this._contentTypeId === 'video';
+        const cap = isVideo ? getVideoModelCapability(this._videoModelId) : getImageModelCapability(this._modelId);
+        const hasResolutions = Array.isArray(cap?.resolutions) && cap.resolutions.length > 0;
+        const wrapper = this._refs?.resolutionWrapper;
+        if (wrapper) wrapper.style.display = hasResolutions ? '' : 'none';
+    }
+
+    _updateResolutionPillLabel() {
+        const labelEl = this._refs?.resolutionLabel;
+        if (!labelEl) return;
+        labelEl.textContent = this._resolutionId ?? 'Разрешение';
+    }
+
+    _getSupportedVideoFormatOptions() {
+        const cap = getVideoModelCapability(this._videoModelId);
+        return (cap?.ratios ?? ['16:9']).map((r) => ({ id: r, label: r }));
+    }
+
+    _clampVideoSettingsToModel() {
+        const cap = getVideoModelCapability(this._videoModelId);
+
+        const ratios = cap?.ratios ?? [];
+        if (ratios.length > 0 && !ratios.includes(this._videoRatioId)) {
+            this._videoRatioId = ratios[0];
+        }
+        this._formatMenu?.refresh();
+
+        const resolutions = cap?.resolutions ?? [];
+        if (resolutions.length === 0) {
+            this._videoResolutionId = null;
+        } else if (!resolutions.includes(this._videoResolutionId)) {
+            this._videoResolutionId = resolutions[0];
+        }
+        this._resolutionMenu?.refresh();
+        this._updateResolutionPillVisibility();
+
+        const durations = cap?.durations ?? [];
+        if (!durations.includes(this._videoDurationId)) {
+            this._videoDurationId = cap?.defaultDuration ?? durations[0] ?? 5;
+        }
+        this._videoDurationMenu?.refresh();
+        this._settingsPopupCtrl?.refresh();
+        this._videoToolbarPills?.refresh();
+    }
+
+    _attachVideoPills() {
+        const pillsContainer = this._refs.formatPill?.closest('.moodboard-chat__pills');
+        if (!pillsContainer) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'moodboard-chat__pill-wrapper';
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'moodboard-chat__pill';
+        pill.setAttribute('aria-haspopup', 'menu');
+        pill.setAttribute('aria-expanded', 'false');
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'moodboard-chat__pill-icon-wrap';
+        iconSpan.innerHTML = ICONS.video;
+        const labelEl = document.createElement('span');
+        labelEl.className = 'moodboard-chat__pill-label';
+        labelEl.textContent = `${this._videoDurationId} сек`;
+        pill.appendChild(iconSpan);
+        pill.appendChild(labelEl);
+        const menu = document.createElement('div');
+        menu.className = 'moodboard-chat__menu';
+        menu.setAttribute('role', 'menu');
+        wrapper.appendChild(pill);
+        wrapper.appendChild(menu);
+
+        pillsContainer.appendChild(wrapper);
+        this._videoDurationWrapper = wrapper;
+        this._videoDurationMenu = new ChatPillMenu(
+            { trigger: pill, menu, label: labelEl, icon: iconSpan },
+            {
+                getOptions: () => {
+                    const cap = getVideoModelCapability(this._videoModelId);
+                    return (cap?.durations ?? []).map((d) => ({ id: String(d), label: `${d} сек` }));
+                },
+                getActiveId: () => String(this._videoDurationId),
+                onSelect: (id) => {
+                    this._videoDurationId = Number(id);
+                    this._videoDurationMenu.refresh();
+                }
+            }
+        );
+        this._videoDurationMenu.attach();
+        this._videoDurationMenu.refresh();
+    }
+
+    _attachVideoToolbarPills() {
+        const pillsContainer = this._refs.formatPill?.closest('.moodboard-chat__pills');
+        if (!pillsContainer) return;
+        this._videoToolbarPills = new ChatVideoToolbarPills(pillsContainer, {
+            getActive: () => this._contentTypeId === 'video',
+            getModelId: () => this._videoModelId,
+            getState: () => ({
+                seed: this._videoSeed,
+                negativePrompt: this._videoNegativePrompt,
+                audio: this._videoAudio,
+                watermark: this._videoWatermark,
+                cfgScale: this._videoCfgScale,
+                personGeneration: this._videoPersonGeneration,
+            }),
+            onChange: (patch) => {
+                if ('seed' in patch) this._videoSeed = patch.seed;
+                if ('negativePrompt' in patch) this._videoNegativePrompt = patch.negativePrompt;
+                if ('audio' in patch) this._videoAudio = patch.audio;
+                if ('watermark' in patch) this._videoWatermark = patch.watermark;
+                if ('cfgScale' in patch) this._videoCfgScale = patch.cfgScale;
+                if ('personGeneration' in patch) this._videoPersonGeneration = patch.personGeneration;
+                this._videoToolbarPills?.refresh();
+            },
+        });
+        this._videoToolbarPills.attach();
+        this._videoToolbarPills.refresh();
+    }
+
+    async _submitVideo(text, attachments) {
+        if (!text) return;
+        if (!this._videoSession) {
+            this._videoSession = new VideoSessionController({ aiClient: this._aiClient });
+        }
+        if (this._videoUnsubscribe) {
+            this._videoUnsubscribe();
+            this._videoUnsubscribe = null;
+        }
+        this._videoUnsubscribe = this._videoSession.subscribe((state) => this._onVideoState(state));
+        const opts = this._getVideoRequestOptions();
+        void this._videoSession.start({ ...opts, prompt: text, referenceImages: attachments?.length ? attachments : undefined });
+    }
+
+    _onVideoState(state) {
+        if (state.status === 'submitting' || state.status === 'polling') {
+            this._composer?.setStreaming(true);
+        }
+        if (state.status === 'done') {
+            this._composer?.setStreaming(false);
+            // Тип объекта «видео» на доске не существует. Событие Events.UI.PasteImageAt
+            // ожидает data URL картинки — видео-URL несовместим. Размещение на доске
+            // выходит за рамки текущей фазы (нет объекта типа video).
+            console.info('[ChatWindow] Видео готово. Размещение на доске не поддерживается: нет объекта типа video.', state.result?.videoUrl);
+            if (this._refs?.errorBlock) {
+                this._refs.errorBlock.textContent = 'Видео сгенерировано. Размещение на доске появится в следующей фазе.';
+                this._refs.errorBlock.classList.add('is-visible');
+            }
+        }
+        if (state.status === 'error') {
+            this._composer?.setStreaming(false);
+            if (this._refs?.errorBlock) {
+                const clean = (state.error || 'Ошибка генерации видео').replace(/^AiClient\.\w+\s*\(\d+\):\s*/, '');
+                this._refs.errorBlock.textContent = clean;
+                this._refs.errorBlock.classList.add('is-visible');
+            }
+        }
+        if (state.status === 'idle') {
+            this._composer?.setStreaming(false);
+        }
+    }
+
+    _getVideoRequestOptions() {
+        const cap = getVideoModelCapability(this._videoModelId);
+        const opts = {
+            provider: cap?.provider ?? 'gemini-video',
+            model:    cap?.model,
+            ratio:    this._videoRatioId,
+            duration: this._videoDurationId,
+        };
+        if (cap?.resolutions?.length > 0 && this._videoResolutionId) {
+            opts.resolution = this._videoResolutionId;
+        }
+        const sup = cap?.supports ?? {};
+        if (sup.seed && this._videoSeed != null) opts.seed = this._videoSeed;
+        if (sup.negativePrompt && this._videoNegativePrompt) opts.negativePrompt = this._videoNegativePrompt;
+        if (sup.audio) opts.audio = this._videoAudio;
+        if (sup.watermark) opts.watermark = this._videoWatermark;
+        if (sup.cfgScale && this._videoCfgScale != null) opts.cfgScale = this._videoCfgScale;
+        if (sup.personGeneration) opts.personGeneration = this._videoPersonGeneration;
+        return opts;
     }
 
     _render(state) {
@@ -850,6 +1211,8 @@ export class ChatWindow {
         this._formatMenu.refresh();
         this._updateFormatPillIcon();
         this._updateFormatPillLabel();
+        this._resolutionMenu?.refresh();
+        this._updateResolutionPillLabel();
         this._countMenu.refresh();
         this._updateCountPillIcon();
         this._composer.setStreaming(state.status === 'streaming');
@@ -1191,14 +1554,31 @@ export class ChatWindow {
 
     _getImageRequestOptions() {
         const [widthRatio, heightRatio] = parseFormatRatio(this._formatId);
-        const provider = this._modelId === 'gpt' ? 'openai-image' : 'yandex-art';
-        return {
-            provider,
-            widthRatio,
-            heightRatio,
-            model: this._modelId === 'yandex' ? 'yandex-art' : undefined,
-            imageCount: parseImageCount(this._countId)
-        };
+        const cap = getImageModelCapability(this._modelId);
+        const provider = cap?.provider ?? 'yandex-art';
+        const model = cap?.model;
+        const imageCount = parseImageCount(this._countId);
+
+        const opts = { provider, widthRatio, heightRatio, model, imageCount };
+
+        // Качество (фиксировано для gpt-image-2-*)
+        if (cap?.quality != null) opts.quality = cap.quality;
+
+        // Разрешение (только если модель поддерживает выбор)
+        if (cap?.resolutions?.length > 0 && this._resolutionId) {
+            opts.resolution = this._resolutionId;
+        }
+
+        // Доп-параметры — только поддерживаемые моделью
+        const sup = cap?.supports ?? {};
+        if (sup.seed && this._imageSeed != null) opts.seed = this._imageSeed;
+        if (sup.negativePrompt && this._imageNegativePrompt) opts.negativePrompt = this._imageNegativePrompt;
+        if (sup.background && this._imageBackground) opts.background = this._imageBackground;
+        if (sup.outputFormat && this._imageOutputFormat) opts.outputFormat = this._imageOutputFormat;
+        if (sup.promptExtend) opts.promptExtend = this._imagePromptExtend;
+        if (sup.watermark) opts.watermark = this._imageWatermark;
+
+        return opts;
     }
 
     _computePendingOverlayScreenLayout(messages, messageId, scale = 1) {
@@ -2138,7 +2518,7 @@ function parseImageCount(countId) {
         return 1;
     }
 
-    return Math.min(Math.max(count, 1), 4);
+    return Math.min(Math.max(count, 1), 6);
 }
 
 function findImageGenerationBatch(messages, messageId) {

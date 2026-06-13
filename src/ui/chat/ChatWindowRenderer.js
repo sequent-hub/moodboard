@@ -97,7 +97,7 @@ function buildActionsRow(collect) {
     contentTypeWrapper.pill.title = 'Тип генерируемого контента';
     contentTypeWrapper.pill.setAttribute('aria-label', 'Тип генерируемого контента');
 
-    const modelWrapper = pillWithMenu('Алиса', ICONS.model, 'chat-menu-model');
+    const modelWrapper = pillWithMenu('Nano Banana Pro', ICONS.model, 'chat-menu-model');
     modelWrapper.pill.title = 'Модель ИИ';
     modelWrapper.pill.setAttribute('aria-label', 'Модель ИИ');
 
@@ -106,6 +106,10 @@ function buildActionsRow(collect) {
     formatWrapper.pill.setAttribute('aria-label', 'Формат изображения');
     formatWrapper.menu.classList.add('moodboard-chat__menu--grid');
 
+    const resolutionWrapper = pillWithMenu('Разрешение', ICONS.ratio, 'chat-menu-resolution');
+    resolutionWrapper.pill.title = 'Разрешение изображения';
+    resolutionWrapper.pill.setAttribute('aria-label', 'Разрешение изображения');
+
     const countWrapper = pillWithMenu('Авто', ICONS.count, 'chat-menu-count');
     countWrapper.pill.title = 'Количество изображений';
     countWrapper.pill.setAttribute('aria-label', 'Количество изображений');
@@ -113,6 +117,7 @@ function buildActionsRow(collect) {
     pills.appendChild(contentTypeWrapper.wrapper);
     pills.appendChild(modelWrapper.wrapper);
     pills.appendChild(formatWrapper.wrapper);
+    pills.appendChild(resolutionWrapper.wrapper);
     pills.appendChild(countWrapper.wrapper);
 
     const sendRow = createDiv('moodboard-chat__send-row');
@@ -132,6 +137,22 @@ function buildActionsRow(collect) {
     fileInput.setAttribute('aria-hidden', 'true');
     fileInput.setAttribute('tabindex', '-1');
 
+    // Обёртка настроек — позиционированный контейнер для попапа
+    const settingsWrapper = createDiv('moodboard-chat__settings-wrapper');
+    settingsWrapper.style.cssText = 'position:relative;display:inline-flex;align-items:center;';
+
+    const settingsTrigger = document.createElement('button');
+    settingsTrigger.type = 'button';
+    settingsTrigger.className = 'moodboard-chat__attach';
+    settingsTrigger.title = 'Настройки';
+    settingsTrigger.setAttribute('aria-label', 'Настройки генерации');
+    settingsTrigger.innerHTML = ICONS.sliders;
+
+    const settingsPopup = createDiv('moodboard-chat__settings-popup');
+
+    settingsWrapper.appendChild(settingsTrigger);
+    settingsWrapper.appendChild(settingsPopup);
+
     const send = document.createElement('button');
     send.type = 'button';
     send.className = 'moodboard-chat__send';
@@ -141,6 +162,7 @@ function buildActionsRow(collect) {
 
     sendRow.appendChild(attach);
     sendRow.appendChild(fileInput);
+    sendRow.appendChild(settingsWrapper);
     sendRow.appendChild(send);
 
     row.appendChild(pills);
@@ -158,12 +180,18 @@ function buildActionsRow(collect) {
         formatPill: formatWrapper.pill,
         formatMenu: formatWrapper.menu,
         formatLabel: formatWrapper.labelEl,
+        resolutionPill: resolutionWrapper.pill,
+        resolutionMenu: resolutionWrapper.menu,
+        resolutionLabel: resolutionWrapper.labelEl,
+        resolutionWrapper: resolutionWrapper.wrapper,
         countPill: countWrapper.pill,
         countMenu: countWrapper.menu,
         countLabel: countWrapper.labelEl,
         countIcon: countWrapper.iconEl,
         attach,
         fileInput,
+        settingsTrigger,
+        settingsPopup,
         send
     });
     return row;

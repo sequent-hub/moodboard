@@ -1,5 +1,13 @@
 /**
- * Попап настроек чата (системный промпт, temperature, maxTokens, очистить историю).
+ * Попап доп-настроек генерации изображения + «Очистить историю».
+ *
+ * Секция изображения (seed, негативный промпт, фон, формат файла,
+ * авто-расширение, водяной знак) — поля отображаются только когда текущая
+ * модель изображения поддерживает соответствующую настройку.
+ *
+ * Видео-настройки в этой панели НЕ живут — они вынесены в тулбар
+ * (см. ChatVideoToolbarPills). Поэтому кнопка-триггер скрывается целиком,
+ * когда у текущей модели изображения нет ни одной поддерживаемой настройки.
  *
  * Одна ответственность: построить контент попапа, прокинуть значения
  * наружу при изменении, открывать/закрывать по триггеру.
@@ -9,7 +17,13 @@ export class ChatSettingsPopup {
     /**
      * @param {{ trigger: HTMLElement, popup: HTMLElement }} refs
      * @param {{
-     *   getSettings: () => { systemPrompt: string, temperature: number, maxTokens: number },
+     *   getSettings: () => {
+     *     systemPrompt: string, temperature: number, maxTokens: number,
+     *     seed: number|null, negativePrompt: string,
+     *     background: string|null, outputFormat: string|null,
+     *     promptExtend: boolean, watermark: boolean
+     *   },
+     *   getCapability?: () => import('../../services/ai/imageModelCapabilities.js').ImageModelCapability|null,
      *   onChange: (patch: object) => void,
      *   onClearHistory: () => void
      * }} handlers
@@ -22,6 +36,8 @@ export class ChatSettingsPopup {
         this._docClickHandler = null;
         this._isOpen = false;
         this._fields = null;
+        // Обёртка секции доп-настроек — скрывается целиком, когда модель ничего не поддерживает
+        this._imageGenSection = null;
     }
 
     attach() {
@@ -35,15 +51,19 @@ export class ChatSettingsPopup {
     refresh() {
         if (!this._fields) return;
         const s = this._handlers.getSettings?.() || {};
-        if (document.activeElement !== this._fields.system) {
-            this._fields.system.value = s.systemPrompt || '';
-        }
-        if (document.activeElement !== this._fields.temperature) {
-            this._fields.temperature.value = formatNumber(s.temperature);
-        }
-        if (document.activeElement !== this._fields.maxTokens) {
-            this._fields.maxTokens.value = String(s.maxTokens ?? '');
-        }
+
+        const imageVisible = this._refreshImageGenSection(s);
+
+        // Кнопка-триггер видна только когда для текущей модели есть хотя бы
+        // одна поддерживаемая настройка генерации изображения. Видео-настройки
+        // живут в тулбаре (ChatVideoToolbarPills), не в этой панели.
+        this._setTriggerVisible(imageVisible);
+    }
+
+    _setTriggerVisible(visible) {
+        const host = this._trigger?.parentNode || this._trigger;
+        if (host) host.style.display = visible ? 'inline-flex' : 'none';
+        if (!visible && this._isOpen) this.close();
     }
 
     toggle() {
@@ -78,58 +98,144 @@ export class ChatSettingsPopup {
         for (const off of this._listeners) off();
         this._listeners = [];
         this._fields = null;
+        this._imageGenSection = null;
     }
 
     _buildContent() {
         const fields = {};
         const fragment = document.createDocumentFragment();
 
-        fragment.appendChild(this._buildField({
-            label: 'Системный промпт',
-            input: () => {
-                const ta = document.createElement('textarea');
-                ta.className = 'moodboard-chat__settings-textarea';
-                ta.rows = 3;
-                fields.system = ta;
-                this._on(ta, 'change', () => this._handlers.onChange?.({ systemPrompt: ta.value }));
-                return ta;
-            }
-        }));
+        // Секция доп-настроек генерации изображения
+        const imageGenSection = document.createElement('div');
+        imageGenSection.className = 'moodboard-chat__settings-image-section';
+        imageGenSection.style.display = 'none';
 
-        fragment.appendChild(this._buildField({
-            label: 'Temperature (0–1)',
+        const sectionDivider = document.createElement('div');
+        sectionDivider.className = 'moodboard-chat__settings-divider';
+        sectionDivider.style.cssText = 'border-top:1px solid #E5E7EB;margin:2px 0;';
+        imageGenSection.appendChild(sectionDivider);
+
+        const sectionTitle = document.createElement('div');
+        sectionTitle.className = 'moodboard-chat__settings-label';
+        sectionTitle.textContent = 'Параметры генерации';
+        sectionTitle.style.marginTop = '4px';
+        imageGenSection.appendChild(sectionTitle);
+
+        // Seed
+        const seedField = this._buildField({
+            label: 'Seed (число)',
             input: () => {
                 const inp = document.createElement('input');
                 inp.type = 'number';
-                inp.step = '0.1';
                 inp.min = '0';
-                inp.max = '2';
+                inp.step = '1';
+                inp.placeholder = 'Случайный';
                 inp.className = 'moodboard-chat__settings-input';
-                fields.temperature = inp;
+                fields.seed = inp;
                 this._on(inp, 'change', () => {
-                    const v = Number(inp.value);
-                    if (!Number.isNaN(v)) this._handlers.onChange?.({ temperature: v });
+                    const raw = inp.value.trim();
+                    const v = raw === '' ? null : Number.parseInt(raw, 10);
+                    this._handlers.onChange?.({ seed: (v !== null && !Number.isNaN(v)) ? v : null });
                 });
                 return inp;
             }
-        }));
+        });
+        seedField.dataset.imageGenField = 'seed';
+        imageGenSection.appendChild(seedField);
 
-        fragment.appendChild(this._buildField({
-            label: 'Max tokens',
+        // Негативный промпт
+        const negField = this._buildField({
+            label: 'Негативный промпт',
             input: () => {
                 const inp = document.createElement('input');
-                inp.type = 'number';
-                inp.step = '100';
-                inp.min = '1';
+                inp.type = 'text';
+                inp.placeholder = 'Что исключить из изображения';
                 inp.className = 'moodboard-chat__settings-input';
-                fields.maxTokens = inp;
+                fields.negativePrompt = inp;
                 this._on(inp, 'change', () => {
-                    const v = Number.parseInt(inp.value, 10);
-                    if (!Number.isNaN(v) && v > 0) this._handlers.onChange?.({ maxTokens: v });
+                    this._handlers.onChange?.({ negativePrompt: inp.value });
                 });
                 return inp;
             }
-        }));
+        });
+        negField.dataset.imageGenField = 'negativePrompt';
+        imageGenSection.appendChild(negField);
+
+        // Фон (background)
+        const bgField = this._buildField({
+            label: 'Фон',
+            input: () => {
+                const sel = document.createElement('select');
+                sel.className = 'moodboard-chat__settings-input';
+                [
+                    { value: '', label: 'По умолчанию' },
+                    { value: 'opaque', label: 'Непрозрачный' },
+                    { value: 'auto', label: 'Авто' }
+                ].forEach(({ value, label }) => {
+                    const opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = label;
+                    sel.appendChild(opt);
+                });
+                fields.background = sel;
+                this._on(sel, 'change', () => {
+                    this._handlers.onChange?.({ background: sel.value || null });
+                });
+                return sel;
+            }
+        });
+        bgField.dataset.imageGenField = 'background';
+        imageGenSection.appendChild(bgField);
+
+        // Формат файла (outputFormat)
+        const fmtField = this._buildField({
+            label: 'Формат файла',
+            input: () => {
+                const sel = document.createElement('select');
+                sel.className = 'moodboard-chat__settings-input';
+                [
+                    { value: '', label: 'По умолчанию' },
+                    { value: 'png', label: 'PNG' },
+                    { value: 'jpeg', label: 'JPEG' },
+                    { value: 'webp', label: 'WebP' }
+                ].forEach(({ value, label }) => {
+                    const opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = label;
+                    sel.appendChild(opt);
+                });
+                fields.outputFormat = sel;
+                this._on(sel, 'change', () => {
+                    this._handlers.onChange?.({ outputFormat: sel.value || null });
+                });
+                return sel;
+            }
+        });
+        fmtField.dataset.imageGenField = 'outputFormat';
+        imageGenSection.appendChild(fmtField);
+
+        // Авто-расширение промпта
+        const extField = this._buildCheckboxField({
+            label: 'Авто-расширение промпта',
+            key: 'promptExtend',
+            fields,
+            onChange: (v) => this._handlers.onChange?.({ promptExtend: v })
+        });
+        extField.dataset.imageGenField = 'promptExtend';
+        imageGenSection.appendChild(extField);
+
+        // Водяной знак
+        const wmField = this._buildCheckboxField({
+            label: 'Водяной знак',
+            key: 'watermark',
+            fields,
+            onChange: (v) => this._handlers.onChange?.({ watermark: v })
+        });
+        wmField.dataset.imageGenField = 'watermark';
+        imageGenSection.appendChild(wmField);
+
+        fragment.appendChild(imageGenSection);
+        this._imageGenSection = imageGenSection;
 
         const row = document.createElement('div');
         row.className = 'moodboard-chat__settings-popup-row';
@@ -148,6 +254,47 @@ export class ChatSettingsPopup {
         this._fields = fields;
     }
 
+    /**
+     * Показывает/скрывает поля секции генерации и синхронизирует значения
+     * в зависимости от текущих возможностей модели.
+     */
+    _refreshImageGenSection(s) {
+        if (!this._imageGenSection || !this._fields) return false;
+        const isImage = this._handlers.getContentType?.() === 'image';
+        const cap = isImage ? (this._handlers.getCapability?.() ?? null) : null;
+        const sup = cap?.supports ?? {};
+
+        const anyVisible = !!(sup.seed || sup.negativePrompt || sup.background || sup.outputFormat || sup.promptExtend || sup.watermark);
+        this._imageGenSection.style.display = anyVisible ? '' : 'none';
+
+        // Показываем/скрываем отдельные поля по флагам
+        for (const el of this._imageGenSection.querySelectorAll('[data-image-gen-field]')) {
+            const flag = el.dataset.imageGenField;
+            el.style.display = sup[flag] ? '' : 'none';
+        }
+
+        // Синхронизируем значения только если поле не активно
+        if (sup.seed && document.activeElement !== this._fields.seed) {
+            this._fields.seed.value = s.seed != null ? String(s.seed) : '';
+        }
+        if (sup.negativePrompt && document.activeElement !== this._fields.negativePrompt) {
+            this._fields.negativePrompt.value = s.negativePrompt || '';
+        }
+        if (sup.background) {
+            this._fields.background.value = s.background || '';
+        }
+        if (sup.outputFormat) {
+            this._fields.outputFormat.value = s.outputFormat || '';
+        }
+        if (sup.promptExtend && this._fields.promptExtend) {
+            this._fields.promptExtend.checked = Boolean(s.promptExtend);
+        }
+        if (sup.watermark && this._fields.watermark) {
+            this._fields.watermark.checked = Boolean(s.watermark);
+        }
+        return anyVisible;
+    }
+
     _buildField({ label, input }) {
         const wrap = document.createElement('div');
         wrap.className = 'moodboard-chat__settings-field';
@@ -159,13 +306,32 @@ export class ChatSettingsPopup {
         return wrap;
     }
 
+    _buildCheckboxField({ label, key, fields, onChange }) {
+        const wrap = document.createElement('div');
+        wrap.className = 'moodboard-chat__settings-field';
+        wrap.style.flexDirection = 'row';
+        wrap.style.alignItems = 'center';
+        wrap.style.gap = '8px';
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'moodboard-chat__settings-checkbox';
+        fields[key] = cb;
+        this._on(cb, 'change', () => onChange(cb.checked));
+
+        const labelEl = document.createElement('label');
+        labelEl.className = 'moodboard-chat__settings-label';
+        labelEl.style.textTransform = 'none';
+        labelEl.style.cursor = 'pointer';
+        labelEl.textContent = label;
+
+        wrap.appendChild(cb);
+        wrap.appendChild(labelEl);
+        return wrap;
+    }
+
     _on(el, type, handler) {
         el.addEventListener(type, handler);
         this._listeners.push(() => el.removeEventListener(type, handler));
     }
-}
-
-function formatNumber(n) {
-    if (typeof n !== 'number' || Number.isNaN(n)) return '';
-    return String(Math.round(n * 100) / 100);
 }

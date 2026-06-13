@@ -488,6 +488,25 @@ const server = http.createServer(async (req, res) => {
         return res.end(data);
     }
 
+    // ── POST /api/v2/ai/:provider/video ──────────────────────────────────────
+    //   Dev-мок: реальный бэкенд видео не существует; provider-id предварительные.
+    //   Возвращает jobId для последующего поллинга.
+    const videoSubmitMatch = url.match(/^\/api\/v2\/ai\/([^/]+)\/video$/);
+    if (method === 'POST' && videoSubmitMatch) {
+        return json(res, 200, { jobId: `mock-video-${Date.now()}` });
+    }
+
+    // ── GET /api/v2/ai/:provider/video/:jobId ─────────────────────────────────
+    //   Dev-мок: сразу возвращает completed с публичным sample-видео.
+    const videoPollMatch = url.match(/^\/api\/v2\/ai\/([^/]+)\/video\/([^/]+)$/);
+    if (method === 'GET' && videoPollMatch) {
+        return json(res, 200, {
+            status: 'done',
+            videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+            mimeType: 'video/mp4',
+        });
+    }
+
     // ── Мок для прочих AI эндпоинтов (image/chat/etc.) ────────────────────────
     if (url.startsWith('/api/v2/ai')) {
         return json(res, 200, {

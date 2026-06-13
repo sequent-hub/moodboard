@@ -45,14 +45,20 @@ const EXTEND_PROMPT_FIELD_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width=
 /** public/icons/google.svg — цветной логотип Google 36×36 */
 const MODEL_GOOGLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" fill="none" viewBox="0 0 36 36"><path fill="#4285F4" d="M29.251 18.49c0-.813-.073-1.596-.209-2.347H18.23v4.445h6.179c-.272 1.43-1.086 2.64-2.307 3.455v2.89h3.726c2.17-2.003 3.423-4.946 3.423-8.442"/><path fill="#34A853" d="M18.229 29.71c3.1 0 5.698-1.023 7.597-2.776l-3.725-2.89c-1.023.688-2.328 1.105-3.872 1.105-2.985 0-5.52-2.014-6.429-4.727H7.98v2.964c1.89 3.746 5.761 6.324 10.249 6.324"/><path fill="#FBBC05" d="M11.801 20.412a6.9 6.9 0 0 1-.365-2.181c0-.762.136-1.492.365-2.181v-2.964h-3.82A11.34 11.34 0 0 0 6.75 18.23c0 1.858.449 3.6 1.231 5.145l2.975-2.317z"/><path fill="#EA4335" d="M18.229 11.321c1.69 0 3.193.585 4.393 1.712l3.288-3.288c-1.994-1.857-4.582-2.995-7.681-2.995-4.488 0-8.36 2.578-10.249 6.335l3.82 2.964c.908-2.714 3.444-4.728 6.429-4.728"/></svg>`;
 
-/** public/icons/gpt.svg — логотип GPT 36×36 */
-const MODEL_GPT_ICON = `<img src="/icons/gpt.svg" width="36" height="36" alt="" aria-hidden="true">`;
+/** public/icons/gpt.svg — логотип OpenAI 36×36 (currentColor) */
+const MODEL_GPT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" fill="currentColor" fill-rule="evenodd" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.205 8.658v-2.26c0-.19.072-.333.238-.428l4.543-2.616c.619-.357 1.356-.523 2.117-.523 2.854 0 4.662 2.212 4.662 4.566 0 .167 0 .357-.024.547l-4.71-2.759a.797.797 0 00-.856 0l-5.97 3.473zm10.609 8.8V12.06c0-.333-.143-.57-.429-.737l-5.97-3.473 1.95-1.118a.433.433 0 01.476 0l4.543 2.617c1.309.76 2.189 2.378 2.189 3.948 0 1.808-1.07 3.473-2.76 4.163zM7.802 12.703l-1.95-1.142c-.167-.095-.239-.238-.239-.428V5.899c0-2.545 1.95-4.472 4.591-4.472 1 0 1.927.333 2.712.928L8.23 5.067c-.285.166-.428.404-.428.737v6.898zM12 15.128l-2.795-1.57v-3.33L12 8.658l2.795 1.57v3.33L12 15.128zm1.796 7.23c-1 0-1.927-.332-2.712-.927l4.686-2.712c.285-.166.428-.404.428-.737v-6.898l1.974 1.142c.167.095.238.238.238.428v5.233c0 2.545-1.974 4.472-4.614 4.472zm-5.637-5.303l-4.544-2.617c-1.308-.761-2.188-2.378-2.188-3.948A4.482 4.482 0 014.21 6.327v5.423c0 .333.143.571.428.738l5.947 3.449-1.95 1.118a.432.432 0 01-.476 0zm-.262 3.9c-2.688 0-4.662-2.021-4.662-4.519 0-.19.024-.38.047-.57l4.686 2.71c.286.167.571.167.856 0l5.97-3.448v2.26c0 .19-.07.333-.237.428l-4.543 2.616c-.619.357-1.356.523-2.117.523zm5.899 2.83a5.947 5.947 0 005.827-4.756C22.287 18.339 24 15.84 24 13.296c0-1.665-.713-3.282-1.998-4.448.119-.5.19-.999.19-1.498 0-3.401-2.759-5.947-5.946-5.947-.642 0-1.26.095-1.88.31A5.962 5.962 0 0010.205 0a5.947 5.947 0 00-5.827 4.757C1.713 5.447 0 7.945 0 10.49c0 1.666.713 3.283 1.998 4.448-.119.5-.19 1-.19 1.499 0 3.401 2.759 5.946 5.946 5.946.642 0 1.26-.095 1.88-.309a5.96 5.96 0 004.162 1.713z"/></svg>`;
 
-/** Placeholder Alibaba Qwen — буква Q в круге, 36×36 */
-const MODEL_QWEN_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#6e42ca"/><text x="18" y="23" text-anchor="middle" font-size="16" font-family="Arial,sans-serif" fill="#fff" font-weight="bold">Q</text></svg>`;
+/** public/icons/qwen.svg — логотип Alibaba Qwen 36×36 (фирменный градиент) */
+const MODEL_QWEN_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.604 1.34c.393.69.784 1.382 1.174 2.075a.18.18 0 00.157.091h5.552c.174 0 .322.11.446.327l1.454 2.57c.19.337.24.478.024.837-.26.43-.513.864-.76 1.3l-.367.658c-.106.196-.223.28-.04.512l2.652 4.637c.172.301.111.494-.043.77-.437.785-.882 1.564-1.335 2.34-.159.272-.352.375-.68.37-.777-.016-1.552-.01-2.327.016a.099.099 0 00-.081.05 575.097 575.097 0 01-2.705 4.74c-.169.293-.38.363-.725.364-.997.003-2.002.004-3.017.002a.537.537 0 01-.465-.271l-1.335-2.323a.09.09 0 00-.083-.049H4.982c-.285.03-.553-.001-.805-.092l-1.603-2.77a.543.543 0 01-.002-.54l1.207-2.12a.198.198 0 000-.197 550.951 550.951 0 01-1.875-3.272l-.79-1.395c-.16-.31-.173-.496.095-.965.465-.813.927-1.625 1.387-2.436.132-.234.304-.334.584-.335a338.3 338.3 0 012.589-.001.124.124 0 00.107-.063l2.806-4.895a.488.488 0 01.422-.246c.524-.001 1.053 0 1.583-.006L11.704 1c.341-.003.724.032.9.34zm-3.432.403a.06.06 0 00-.052.03L6.254 6.788a.157.157 0 01-.135.078H3.253c-.056 0-.07.025-.041.074l5.81 10.156c.025.042.013.062-.034.063l-2.795.015a.218.218 0 00-.2.116l-1.32 2.31c-.044.078-.021.118.068.118l5.716.008c.046 0 .08.02.104.061l1.403 2.454c.046.081.092.082.139 0l5.006-8.76.783-1.382a.055.055 0 01.096 0l1.424 2.53a.122.122 0 00.107.062l2.763-.02a.04.04 0 00.035-.02.041.041 0 000-.04l-2.9-5.086a.108.108 0 010-.113l.293-.507 1.12-1.977c.024-.041.012-.062-.035-.062H9.2c-.059 0-.073-.026-.043-.077l1.434-2.505a.107.107 0 000-.114L9.225 1.774a.06.06 0 00-.053-.031zm6.29 8.02c.046 0 .058.02.034.06l-.832 1.465-2.613 4.585a.056.056 0 01-.05.029.058.058 0 01-.05-.029L8.498 9.841c-.02-.034-.01-.052.028-.054l.216-.012 6.722-.012z" fill="url(#mb-icon-qwen-fill)" fill-rule="nonzero"/><defs><linearGradient id="mb-icon-qwen-fill" x1="0%" x2="100%" y1="0%" y2="0%"><stop offset="0%" stop-color="#6336E7" stop-opacity=".84"/><stop offset="100%" stop-color="#6F69F7" stop-opacity=".84"/></linearGradient></defs></svg>`;
 
-/** Placeholder Yandex Alice — буква А в круге, 36×36 */
-const MODEL_ALICE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true"><circle cx="18" cy="18" r="16" fill="#fc3f1d"/><text x="18" y="23" text-anchor="middle" font-size="16" font-family="Arial,sans-serif" fill="#fff" font-weight="bold">А</text></svg>`;
+/** public/icons/yandex.svg — логотип Yandex 36×36 (фирменный красный) */
+const MODEL_ALICE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" fill="#FC3F1D" fill-rule="evenodd" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.376 12.644L21 2h-3.842l-4.624 10.644h3.842zM13.915 24v-3.733c0-2.822-.352-3.64-1.407-5.988L6.933 2H3l7.124 15.709V24h3.79z"/></svg>`;
+
+/** public/icons/kling.svg — логотип Kling (Kuaishou) 36×36 (фирменный градиент) */
+const MODEL_KLING_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.412 13.775A23.193 23.193 0 017.41 9.32c3.17-5.492 7.795-8.757 10.33-7.294C12.038-1.266 4.598.944 1.122 6.964A13.378 13.378 0 00.085 9.22c-.259.739.092 1.534.77 1.926l4.557 2.63z" fill="url(#mb-icon-kling-0)"/><path d="M18.588 10.164a23.188 23.188 0 01-1.999 4.455c-3.17 5.492-7.795 8.758-10.33 7.294 5.703 3.293 13.143 1.082 16.619-4.938a13.392 13.392 0 001.037-2.255c.259-.738-.092-1.534-.77-1.925l-4.557-2.63z" fill="url(#mb-icon-kling-1)"/><path d="M16.59 14.62c3.17-5.492 3.686-11.13 1.15-12.594C15.207.563 10.582 3.83 7.41 9.32c2.074-3.59 5.809-5.315 8.344-3.852 2.534 1.464 2.908 5.56.835 9.151z" fill="url(#mb-icon-kling-2)"/><path d="M7.41 9.32c-3.17 5.492-3.686 11.13-1.15 12.593 2.534 1.464 7.159-1.802 10.33-7.294-2.074 3.591-5.809 5.316-8.344 3.852-2.534-1.463-2.908-5.56-.835-9.15z" fill="url(#mb-icon-kling-3)"/><defs><radialGradient cx="0" cy="0" gradientTransform="matrix(7.47772 -12.51022 17.14368 10.24728 5.173 13.637)" gradientUnits="userSpaceOnUse" id="mb-icon-kling-0" r="1"><stop offset=".095" stop-color="#FFF959"/><stop offset=".326" stop-color="#0DF35E"/><stop offset=".64" stop-color="#0BF2F9"/><stop offset="1" stop-color="#04A6F0"/></radialGradient><radialGradient cx="0" cy="0" gradientTransform="rotate(120.868 6.491 10.491) scale(14.5747 19.9728)" gradientUnits="userSpaceOnUse" id="mb-icon-kling-1" r="1"><stop offset=".095" stop-color="#FFF959"/><stop offset=".326" stop-color="#0DF35E"/><stop offset=".64" stop-color="#0BF2F9"/><stop offset="1" stop-color="#04A6F0"/></radialGradient><linearGradient gradientUnits="userSpaceOnUse" id="mb-icon-kling-2" x1="15.578" x2="18.062" y1="1.798" y2="9.861"><stop stop-color="#003EFF"/><stop offset="1" stop-color="#0BFFE7"/></linearGradient><linearGradient gradientUnits="userSpaceOnUse" id="mb-icon-kling-3" x1="8.422" x2="5.938" y1="22.142" y2="14.079"><stop stop-color="#003EFF"/><stop offset="1" stop-color="#0BFFE7"/></linearGradient></defs></svg>`;
+
+/** public/icons/seedance.svg — логотип ByteDance (Seedance) 36×36 (фирменные цвета) */
+const MODEL_SEEDANCE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.944 18.587l-1.704-.445V10.01l1.824-.462c1-.254 1.84-.461 1.88-.453.032 0 .056 2.235.056 4.972v4.973l-.176-.008c-.104 0-.952-.207-1.88-.446z" fill="#00C8D2" fill-rule="nonzero"/><path d="M7 16.542c0-2.736.024-4.98.064-4.98.032-.008.872.2 1.88.454l1.816.461-.016 4.05-.024 4.049-1.632.422c-.896.23-1.736.445-1.856.469L7 21.523v-4.98z" fill="#3C8CFF" fill-rule="nonzero"/><path d="M19.24 12.477c0-9.03.008-9.515.144-9.475.072.024.784.207 1.576.406.792.207 1.576.405 1.744.445l.296.08-.016 8.56-.024 8.568-1.624.414c-.888.23-1.728.437-1.856.47l-.24.055v-9.523z" fill="#78E6DC" fill-rule="nonzero"/><path d="M1 12.509c0-4.678.024-8.505.064-8.505.032 0 .872.207 1.872.454l1.824.461v7.582c0 4.16-.016 7.574-.032 7.574-.024 0-.872.215-1.88.47L1 21.013v-8.505z" fill="#325AB4"/></svg>`;
 
 /** Иконка «Автоматический режим» — робот, 36×36, outline */
 const MODEL_BOT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>`;
@@ -74,6 +80,13 @@ export const ICONS = {
     send: SEND_ICON,
     extendPromptField: EXTEND_PROMPT_FIELD_ICON,
     sliders: svg('<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>'),
+    audio: svg('<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/>'),
+    audioOff: svg('<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M22 9l-6 6M16 9l6 6"/>'),
+    watermark: svg('<path d="M12 2.7 6.7 9.2a6.5 6.5 0 1 0 10.6 0z"/>'),
+    users: svg('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 5.4a3.2 3.2 0 0 1 0 6"/><path d="M21 20c0-2.6-1.6-4.3-4-4.8"/>'),
+    seed: svg('<path d="M9 4 7 20M17 4l-2 16M4 9h16M3 15h16"/>'),
+    gauge: svg('<path d="M5 18a8 8 0 1 1 14 0"/><path d="M12 14l4-3"/>'),
+    negative: svg('<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>'),
     chevronDown: svg('<path d="M6 9l6 6 6-6"/>'),
     trash: svg('<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/>'),
     close: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 16 16"><path fill="currentColor" d="M13.575 12.726a.6.6 0 0 1-.849.849zm-.849-10.3a.6.6 0 0 1 .849.848L8.848 7.999l4.727 4.727-.425.424-.424.425-4.727-4.727-4.725 4.727a.6.6 0 0 1-.848-.849l4.726-4.727-4.726-4.725a.599.599 0 1 1 .848-.848l4.725 4.726z"></path></svg>`,
@@ -82,6 +95,8 @@ export const ICONS = {
     modelGpt: MODEL_GPT_ICON,
     modelQwen: MODEL_QWEN_ICON,
     modelAlice: MODEL_ALICE_ICON,
+    modelKling: MODEL_KLING_ICON,
+    modelSeedance: MODEL_SEEDANCE_ICON,
 };
 
 /**
@@ -120,6 +135,8 @@ export const RATIO_ICONS = {
     '2:3':   ratioSvgIcon(6.437, false, false, 11.983),
     '9:16':  ratioSvgIcon(7.907, false, false, 9.9),
     '1:2':   ratioSvgIcon(7.961, false, false, 8.65),
+    '1:4':   ratioSvgIcon(10.17, false, false, 4.66),
+    '1:8':   ratioSvgIcon(11.34, false, false, 2.33),
     /* авто + альбомные (повёрнутые портреты) */
     'auto':  ratioSvgIcon(3.389, false, true, 18.65),
     '5:4':   ratioSvgIcon(4.818, true),
@@ -128,4 +145,7 @@ export const RATIO_ICONS = {
     '3:2':   ratioSvgIcon(6.437, true, false, 11.983),
     '16:9':  ratioSvgIcon(7.907, true, false, 9.9),
     '2:1':   ratioSvgIcon(7.961, true, false, 8.65),
+    '21:9':  ratioSvgIcon(8.5, true, false, 8.0),
+    '4:1':   ratioSvgIcon(10.17, true, false, 4.66),
+    '8:1':   ratioSvgIcon(11.34, true, false, 2.33),
 };
