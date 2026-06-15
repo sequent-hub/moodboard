@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import { applyRoundedMask } from '../utils/applyRoundedMask.js';
 
 /**
  * ImageObject — отображение загруженного изображения как спрайт
@@ -42,6 +43,10 @@ export class ImageObject {
                     baseH: texH
                 }
             };
+            const borderRadius = objectData.properties?.borderRadius;
+            if (borderRadius > 0) {
+                applyRoundedMask(this.sprite, borderRadius);
+            }
         };
 
         const onError = () => {

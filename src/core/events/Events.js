@@ -173,8 +173,10 @@ export const Events = {
 		ThreadDeleted: 'comment:thread:deleted',
 		DraftOpened: 'comment:draft:opened',
 		DraftClosed: 'comment:draft:closed',
+		PopoverClosed: 'comment:popover:closed',
 		ResolvedFilterChanged: 'comment:resolved:filter:changed',
 		ListOpened: 'comment:list:opened',
+		OpenImageDraft: 'comment:open:image:draft',
 	},
 };
 

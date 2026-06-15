@@ -125,6 +125,7 @@ export class CommentThreadPopover {
         this._onThreadOpened = this._onThreadOpened.bind(this);
         this._onRemote = () => this._refreshIfOpen();
         this._onOpenDraftAt = this._onOpenDraftAt.bind(this);
+        this._onOpenImageDraft = this._onOpenImageDraft.bind(this);
         this._onThreadDeleted = this._onThreadDeleted.bind(this);
     }
 
@@ -143,6 +144,7 @@ export class CommentThreadPopover {
         this.eventBus.on(Events.Comment.RemoteUpdated, this._onRemote);
         this.eventBus.on(Events.Comment.MessageAdded, this._onRemote);
         this.eventBus.on(Events.Comment.OpenDraftAt, this._onOpenDraftAt);
+        this.eventBus.on(Events.Comment.OpenImageDraft, this._onOpenImageDraft);
         this.eventBus.on(Events.Comment.ThreadDeleted, this._onThreadDeleted);
         this.eventBus.on(Events.Viewport.Changed, () => this.reposition());
         this.eventBus.on(Events.Tool.PanUpdate, () => this.reposition());
@@ -155,6 +157,7 @@ export class CommentThreadPopover {
         this.eventBus.off(Events.Comment.RemoteUpdated, this._onRemote);
         this.eventBus.off(Events.Comment.MessageAdded, this._onRemote);
         this.eventBus.off(Events.Comment.OpenDraftAt, this._onOpenDraftAt);
+        this.eventBus.off(Events.Comment.OpenImageDraft, this._onOpenImageDraft);
         this.eventBus.off(Events.Comment.ThreadDeleted, this._onThreadDeleted);
         if (this.layer) this.layer.remove();
         this.layer = null;
@@ -176,6 +179,70 @@ export class CommentThreadPopover {
         if (!worldLayer) return;
         const local = worldLayer.toLocal(new PIXI.Point(screenX, screenY));
         this.openDraftAt({ x: local.x, y: local.y });
+    }
+
+    /**
+     * Открывает черновик комментария, привязанный к центру объекта.
+     * Если на объекте уже есть комментарии, смещает точку от занятых позиций.
+     */
+    _onOpenImageDraft({ objectId }) {
+        if (!objectId) return;
+
+        const posData = { objectId, position: null };
+        const sizeData = { objectId, size: null };
+        this.eventBus.emit(Events.Tool.GetObjectPosition, posData);
+        this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+
+        if (!posData.position || !sizeData.size) return;
+
+        const { x: left, y: top } = posData.position;
+        const { width, height } = sizeData.size;
+
+        const anchored = this.commentService.getAllThreads().filter(
+            (t) => t.anchor_object_id === objectId
+        );
+
+        // anchor_dx/anchor_dy хранятся как смещение от top-left объекта,
+        // поэтому центр = (width/2, height/2) в этом пространстве
+        const { dx, dy } = this._findFreeCommentOffset(anchored, width / 2, height / 2);
+
+        this.openDraftAt(
+            { x: left + dx, y: top + dy },
+            { anchor_object_id: objectId, anchor_dx: dx, anchor_dy: dy }
+        );
+    }
+
+    /**
+     * Ищет свободный anchor-offset от top-left объекта.
+     * Начинает с центра (centerDx, centerDy), затем пробует 8 направлений шагами по 10px.
+     * «Свободным» считается offset, удалённый от всех занятых не менее чем на 12px.
+     */
+    _findFreeCommentOffset(anchoredThreads, centerDx, centerDy) {
+        const STEP = 10;
+        const MIN_DIST = 12;
+
+        const isFree = (dx, dy) => anchoredThreads.every((t) => {
+            const ex = t.anchor_dx || 0;
+            const ey = t.anchor_dy || 0;
+            return Math.sqrt((dx - ex) ** 2 + (dy - ey) ** 2) >= MIN_DIST;
+        });
+
+        if (isFree(centerDx, centerDy)) return { dx: centerDx, dy: centerDy };
+
+        const directions = [
+            [1, 0], [0, 1], [-1, 0], [0, -1],
+            [1, 1], [-1, 1], [1, -1], [-1, -1],
+        ];
+
+        for (let radius = 1; radius <= 20; radius++) {
+            for (const [dirX, dirY] of directions) {
+                const dx = centerDx + dirX * STEP * radius;
+                const dy = centerDy + dirY * STEP * radius;
+                if (isFree(dx, dy)) return { dx, dy };
+            }
+        }
+
+        return { dx: centerDx + STEP, dy: centerDy };
     }
 
     _onThreadOpened({ threadId, pinEl }) {
@@ -203,6 +270,7 @@ export class CommentThreadPopover {
         this._closePalette();
         this._disarmOutsideClose();
         if (wasDraft) this.eventBus.emit(Events.Comment.DraftClosed, {});
+        this.eventBus.emit(Events.Comment.PopoverClosed, {});
     }
 
     reposition() {

@@ -18,6 +18,7 @@ export class ConnectionAnchorsLayer {
         this.hoveredObjectId = null;
         this._dragController = null;
         this._onAnchorPointerDown = null;
+        this._commentPopoverOpen = false;
     }
 
     attach() {
@@ -94,7 +95,12 @@ export class ConnectionAnchorsLayer {
             [Events.Viewport.Changed, () => this.update()],
             [Events.UI.ZoomPercent, () => this.update()],
             [Events.History.Changed, () => this.update()],
-            [Events.Board.Loaded, () => this.update()]
+            [Events.Board.Loaded, () => this.update()],
+            [Events.Comment.ThreadOpened, () => { this._commentPopoverOpen = true; this.layer.innerHTML = ''; }],
+            [Events.Comment.DraftOpened,  () => { this._commentPopoverOpen = true; this.layer.innerHTML = ''; }],
+            [Events.Comment.DraftClosed,  () => { this._commentPopoverOpen = false; this.update(); }],
+            [Events.Comment.ThreadDeleted, () => { this._commentPopoverOpen = false; this.update(); }],
+            [Events.Comment.PopoverClosed, () => { this._commentPopoverOpen = false; this.update(); }],
         ];
         
         bindings.forEach(([event, handler]) => {
@@ -137,6 +143,7 @@ export class ConnectionAnchorsLayer {
 
     update() {
         if (!this.layer) return;
+        if (this._commentPopoverOpen) return;
         this.layer.innerHTML = '';
         
         const selection = Array.from(this.core?.selectTool?.selectedObjects || []);

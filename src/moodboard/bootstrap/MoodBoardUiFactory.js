@@ -152,7 +152,7 @@ function initHtmlLayersAndPanels(board) {
     board.framePropertiesPanel = new FramePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.notePropertiesPanel = new NotePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.filePropertiesPanel = new FilePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
-    board.imagePropertiesPanel = new ImagePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
+    board.imagePropertiesPanel = new ImagePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard, board.options.currentUser || null);
     board.connectorPropertiesPanel = new ConnectorPropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.shapePropertiesPanel = new ShapePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.drawingPropertiesPanel = new DrawingPropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);

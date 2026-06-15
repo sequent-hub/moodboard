@@ -2,6 +2,16 @@ import { Events } from '../events/Events.js';
 import { PasteObjectCommand } from '../commands/index.js';
 import { RevitScreenshotMetadataService } from '../../services/RevitScreenshotMetadataService.js';
 
+// Дубликат AI-изображения — полноправный член ряда генераций, но ему нужен
+// собственный слот. Слот привязан к properties.aiMessageId, поэтому копия должна
+// получить уникальный aiMessageId, иначе все копии делят один слот и ряд
+// «расползается» при следующей генерации.
+function reassignClonedAiMessageId(clonedData) {
+    if (clonedData?.properties?.aiMessageId) {
+        clonedData.properties.aiMessageId = `dup_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+}
+
 export function setupClipboardFlow(core) {
     const revitMetadataService = new RevitScreenshotMetadataService(console);
 
@@ -391,6 +401,7 @@ export function setupClipboardFlow(core) {
                     const clonedChild = JSON.parse(JSON.stringify(child));
                     clonedChild.properties = clonedChild.properties || {};
                     clonedChild.properties.frameId = newFrameId;
+                    reassignClonedAiMessageId(clonedChild);
                     const targetPos = {
                         x: (child.position?.x || 0) + dx,
                         y: (child.position?.y || 0) + dy
@@ -431,6 +442,7 @@ export function setupClipboardFlow(core) {
             type: 'object',
             data: JSON.parse(JSON.stringify(original))
         };
+        reassignClonedAiMessageId(core.clipboard.data);
         try {
             if (original.type === 'frame') {
                 core._dupTitleMap = core._dupTitleMap || new Map();
@@ -487,6 +499,7 @@ export function setupClipboardFlow(core) {
             tempHandlers.set(originalId, handler);
             core.eventBus.on(Events.Object.Pasted, handler);
             core.clipboard = { type: 'object', data: JSON.parse(JSON.stringify(obj)) };
+            reassignClonedAiMessageId(core.clipboard.data);
             try {
                 if (obj.type === 'frame') {
                     core._dupTitleMap = core._dupTitleMap || new Map();
