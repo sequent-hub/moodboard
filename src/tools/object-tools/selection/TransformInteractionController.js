@@ -25,6 +25,12 @@ export function handleObjectSelect(objectId, event) {
 }
 
 export function startDrag(objectId, event) {
+    const req = { objectId, pixiObject: null };
+    this.emit('tool:get:object:pixi', req);
+    if (req.pixiObject?._mb?.properties?.locked) {
+        return;
+    }
+
     this.isDragging = true;
     this.dragTarget = objectId;
     // Сообщаем HtmlHandlesLayer о начале перетаскивания одиночного объекта
@@ -91,6 +97,23 @@ export function endDrag() {
 }
 
 export function startResize(handle, objectId) {
+    const isLocked = (() => {
+        if (objectId === this.groupId) {
+            return this.selection.toArray().some(id => {
+                const req = { objectId: id, pixiObject: null };
+                this.emit('tool:get:object:pixi', req);
+                return !!req.pixiObject?._mb?.properties?.locked;
+            });
+        }
+        const req = { objectId, pixiObject: null };
+        this.emit('tool:get:object:pixi', req);
+        return !!req.pixiObject?._mb?.properties?.locked;
+    })();
+
+    if (isLocked) {
+        return;
+    }
+
     // Групповой resize
     if (objectId === this.groupId && this.selection.size() > 1) {
         this.isGroupResizing = true;
@@ -169,6 +192,23 @@ export function endResize() {
 }
 
 export function startRotate(objectId) {
+    const isLocked = (() => {
+        if (objectId === this.groupId) {
+            return this.selection.toArray().some(id => {
+                const req = { objectId: id, pixiObject: null };
+                this.emit('tool:get:object:pixi', req);
+                return !!req.pixiObject?._mb?.properties?.locked;
+            });
+        }
+        const req = { objectId, pixiObject: null };
+        this.emit('tool:get:object:pixi', req);
+        return !!req.pixiObject?._mb?.properties?.locked;
+    })();
+
+    if (isLocked) {
+        return;
+    }
+
     // Групповой поворот
     if (objectId === this.groupId && this.selection.size() > 1) {
         this.isGroupRotating = true;
@@ -276,6 +316,16 @@ export function endBoxSelect() {
 }
 
 export function startGroupDrag(event) {
+    const isLocked = this.selection.toArray().some(id => {
+        const req = { objectId: id, pixiObject: null };
+        this.emit('tool:get:object:pixi', req);
+        return !!req.pixiObject?._mb?.properties?.locked;
+    });
+
+    if (isLocked) {
+        return;
+    }
+
     const gb = this.computeGroupBounds();
     this.groupStartBounds = gb;
     this.isGroupDragging = true;

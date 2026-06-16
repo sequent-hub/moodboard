@@ -1157,6 +1157,7 @@ export class HandlesDomRenderer {
         let isFrameTarget = false;
         let isMindmapTarget = false;
         let isMindmapOnlyGroupTarget = false;
+        let isLockedTarget = false;
         let isRevitScreenshotTarget = false;
         let revitViewPayload = null;
         let isModel3dScreenshotTarget = false;
@@ -1167,11 +1168,12 @@ export class HandlesDomRenderer {
         const hiddenIncomingSide = { value: null };
         if (id !== '__group__') {
             const req = { objectId: id, pixiObject: null };
-            this.host.eventBus.emit(Events.Tool.GetObjectPixi, req);
+            this.host.eventBus.emit('tool:get:object:pixi', req);
             const mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
             isFileTarget = mbType === 'file';
             isFrameTarget = mbType === 'frame';
             isMindmapTarget = mbType === 'mindmap';
+            isLockedTarget = !!req.pixiObject?._mb?.properties?.locked;
             isRevitScreenshotTarget = mbType === 'revit-screenshot-img';
             revitViewPayload = req.pixiObject?._mb?.properties?.view || null;
             isModel3dScreenshotTarget = mbType === 'model3d-screenshot-img';
@@ -1199,9 +1201,14 @@ export class HandlesDomRenderer {
             if (selectionIds.length > 0) {
                 const byId = new Map((this.host.core?.state?.state?.objects || []).map((obj) => [obj?.id, obj]));
                 isMindmapOnlyGroupTarget = selectionIds.every((selectedId) => byId.get(selectedId)?.type === 'mindmap');
+                isLockedTarget = selectionIds.some(selId => {
+                    const req = { objectId: selId, pixiObject: null };
+                    this.host.eventBus.emit('tool:get:object:pixi', req);
+                    return !!req.pixiObject?._mb?.properties?.locked;
+                });
             }
         }
-        const isNonResizableTarget = isFileTarget || isMindmapTarget || isMindmapOnlyGroupTarget;
+        const isNonResizableTarget = isFileTarget || isMindmapTarget || isMindmapOnlyGroupTarget || isLockedTarget;
 
         const left = Math.round(cssRect.left);
         const top = Math.round(cssRect.top);

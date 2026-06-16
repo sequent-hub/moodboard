@@ -929,7 +929,7 @@
 .moodboard-root, :root {
     /* CSS variables for frame style */
     --frame-border-color: #C7CDD6;
-    --frame-border-width: 1; /* px */
+    --frame-border-width: 5; /* px */
     --frame-corner-radius: 6; /* px */
 }
 .frame-popup {

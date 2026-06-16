@@ -1,6 +1,6 @@
 /**
- * Команда изменения свойств фрейма (название, фон, тип, lockedAspect) для системы Undo/Redo.
- * Поддерживает: title, backgroundColor, type, lockedAspect.
+ * Команда изменения свойств фрейма (название, фон, тип, lockedAspect, bgMode) для системы Undo/Redo.
+ * Поддерживает: title, backgroundColor, type, lockedAspect, bgMode, hidden.
  */
 import { BaseCommand } from './BaseCommand.js';
 import { Events } from '../events/Events.js';
@@ -10,6 +10,7 @@ const FRAME_PROP_LABELS = {
     backgroundColor: 'фон',
     type: 'тип',
     lockedAspect: 'фиксация пропорций',
+    bgMode: 'режим заливки',
 };
 
 export class UpdateFramePropertiesCommand extends BaseCommand {
@@ -77,6 +78,12 @@ export class UpdateFramePropertiesCommand extends BaseCommand {
             }
             if (property === 'backgroundColor' && instance.setBackgroundColor) {
                 instance.setBackgroundColor(value);
+            }
+            if (property === 'hidden' && instance.setHidden) {
+                instance.setHidden(value);
+            }
+            if (property === 'bgMode' && instance.setBgMode) {
+                instance.setBgMode(value);
             }
         }
 

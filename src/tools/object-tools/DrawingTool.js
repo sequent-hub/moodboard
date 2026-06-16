@@ -98,6 +98,7 @@ export class DrawingTool extends BaseTool {
     }
 
     onMouseDown(event) {
+        if (event.button === 2) return;
         super.onMouseDown(event);
         if (!this.world) this.world = this._getWorldLayer();
         if (!this.world) return;

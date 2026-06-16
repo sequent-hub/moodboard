@@ -71,6 +71,24 @@ export class FrameService {
 		};
 		this.eventBus.on(Events.Object.Created, this._onObjectCreated);
 
+		this._onStateChanged = (data) => {
+			if (!data || !data.updates || !data.updates.properties) return;
+			if (data.updates.properties.hidden !== undefined) {
+				const obj = this.state.state.objects.find(o => o.id === data.objectId);
+				if (obj && obj.type === 'frame') {
+					const isHidden = data.updates.properties.hidden;
+					const children = this._getFrameChildren(obj.id);
+					for (const childId of children) {
+						const pixi = this.pixi.objects.get(childId);
+						if (pixi) {
+							pixi.visible = !isHidden;
+						}
+					}
+				}
+			}
+		};
+		this.eventBus.on(Events.Object.StateChanged, this._onStateChanged);
+
 		this._onDragStart = (data) => {
 			const moved = this.state.state.objects.find(o => o.id === data.object);
 			if (moved && moved.type === 'frame') {
@@ -255,6 +273,20 @@ export class FrameService {
 			this.state.markDirty();
 			this._forceFramesBelow();
 			this.eventBus.emit(Events.Object.Reordered, { reason: 'recompute_frame_attachment' });
+		}
+		
+		// Обновляем видимость в зависимости от скрытости фрейма
+		const pixi = this.pixi.objects.get(objectId);
+		if (pixi) {
+			let isHidden = false;
+			const targetFrameId = obj.properties?.frameId;
+			if (targetFrameId) {
+				const frameObj = this.state.state.objects.find(o => o.id === targetFrameId);
+				if (frameObj && frameObj.properties?.hidden) {
+					isHidden = true;
+				}
+			}
+			pixi.visible = !isHidden;
 		}
 	}
 }

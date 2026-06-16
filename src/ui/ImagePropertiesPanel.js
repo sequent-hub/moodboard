@@ -155,13 +155,12 @@ export class ImagePropertiesPanel {
     }
 
     _toggleLocked() {
-        const obj = this._getCurrentObject();
-        if (!obj) return;
-        if (!obj.properties) obj.properties = {};
-        obj.properties.locked = !obj.properties.locked;
-        if (typeof this.core?.state?.markDirty === 'function') {
-            this.core.state.markDirty();
-        }
+        if (!this.currentId) return;
+        const newLocked = !this._isLocked();
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: { properties: { locked: newLocked } },
+        });
         this._updateLockUI();
         this.reposition();
     }
@@ -170,7 +169,7 @@ export class ImagePropertiesPanel {
         if (!this._btn_lock) return;
         const locked = this._isLocked();
 
-        this._btn_lock.innerHTML = locked ? ICONS.unlock : ICONS.lock;
+        this._btn_lock.innerHTML = locked ? ICONS.lock : ICONS.unlock;
         this._btn_lock.title = locked ? 'Разблокировать' : 'Заблокировать';
 
         if (Array.isArray(this._lockableEls)) {

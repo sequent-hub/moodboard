@@ -114,6 +114,7 @@ export class HandlesEventBridge {
             [Events.UI.ZoomPercent, () => this.host.update()],
             [Events.Tool.PanUpdate, () => this.host.update()],
             [Events.Viewport.Changed, () => this.host.update()],
+            [Events.Object.TransformUpdated, () => this.host.update()],
             [Events.History.Changed, (data) => {
                 if (data?.lastUndone || data?.lastRedone) {
                     this.host._endGroupRotationPreview();

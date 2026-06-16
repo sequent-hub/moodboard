@@ -29,6 +29,10 @@ export class ToolManagerLifecycle {
         manager._onContextMenu = (e) => {
             e.preventDefault();
             if (!manager.activeTool) return;
+            if (manager.activeTool.name === 'draw') {
+                manager.activateDefaultTool();
+                return;
+            }
             const rect = manager.container.getBoundingClientRect();
             const toolEvent = {
                 x: e.clientX - rect.left,

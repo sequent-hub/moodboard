@@ -198,11 +198,11 @@ function tryCreateConnectorStyleCommand(core, object, objectId, updates) {
     return true;
 }
 
-const FRAME_PROP_KEYS = ['title'];
+const FRAME_PROP_KEYS = ['title', 'hidden', 'bgMode'];
 
 /**
  * Если updates содержит одно свойство фрейма — создаёт UpdateFramePropertiesCommand.
- * Поддерживает: title, backgroundColor, type, lockedAspect.
+ * Поддерживает: title, backgroundColor, type, lockedAspect, hidden.
  * @returns {boolean} true, если команда создана и применена
  */
 function tryCreateFramePropertiesCommand(core, object, objectId, updates) {
@@ -218,10 +218,16 @@ function tryCreateFramePropertiesCommand(core, object, objectId, updates) {
         oldValue = object.backgroundColor ?? 0xFFFFFF;
     } else if (updates.properties) {
         const propKeys = Object.keys(updates.properties);
-        if (propKeys.length === 1 && propKeys[0] === 'title') {
-            property = 'title';
-            newValue = updates.properties.title;
-            oldValue = object.properties?.title ?? '';
+        if (propKeys.length === 1 && FRAME_PROP_KEYS.includes(propKeys[0])) {
+            property = propKeys[0];
+            newValue = updates.properties[property];
+            if (property === 'hidden') {
+                oldValue = object.properties?.[property] ?? false;
+            } else if (property === 'bgMode') {
+                oldValue = object.properties?.[property] ?? 'solid';
+            } else {
+                oldValue = object.properties?.[property] ?? '';
+            }
         }
         // type и lockedAspect — только через UpdateFrameTypeCommand в панели (один шаг в истории)
     }
@@ -375,6 +381,13 @@ export function setupObjectLifecycleFlow(core) {
         Object.assign(object, topLevelUpdates);
 
         const pixiObject = core.pixi.objects.get(objectId);
+        if (pixiObject && pixiObject._mb) {
+            if (updates.properties) {
+                if (!pixiObject._mb.properties) pixiObject._mb.properties = {};
+                Object.assign(pixiObject._mb.properties, updates.properties);
+            }
+        }
+
         if (pixiObject && pixiObject._mb && pixiObject._mb.instance) {
             const instance = pixiObject._mb.instance;
 
@@ -387,6 +400,12 @@ export function setupObjectLifecycleFlow(core) {
             if (object.type === 'frame' && updates.backgroundColor !== undefined) {
                 if (instance.setBackgroundColor) {
                     instance.setBackgroundColor(updates.backgroundColor);
+                }
+            }
+
+            if (object.type === 'frame' && updates.properties?.bgMode !== undefined) {
+                if (instance.setBgMode) {
+                    instance.setBgMode(updates.properties.bgMode);
                 }
             }
 

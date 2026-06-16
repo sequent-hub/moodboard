@@ -23,6 +23,8 @@ export class FrameObject {
         this.borderWidth = Number.isFinite(cssBorderWidth) ? cssBorderWidth : 4;
         // Используем backgroundColor из данных объекта, если есть, иначе белый
         this.fillColor = this.objectData.backgroundColor || this.objectData.properties?.backgroundColor || 0xFFFFFF;
+        // Режим заливки: solid | solid-bordered | outline
+        this.bgMode = this.objectData.properties?.bgMode || this.objectData.bgMode || 'solid';
         // Парсим цвет из CSS переменной, если задан
         if (cssBorderColor && cssBorderColor.startsWith('#')) {
             this.strokeColor = parseInt(cssBorderColor.slice(1), 16);
@@ -119,6 +121,17 @@ export class FrameObject {
         this._redrawPreserveTransform(this.width, this.height, this.fillColor);
     }
 
+    /**
+     * Установить скрытость фрейма
+     * @param {boolean} hidden 
+     */
+    setHidden(hidden) {
+        if (!this.objectData) this.objectData = {};
+        if (!this.objectData.properties) this.objectData.properties = {};
+        this.objectData.properties.hidden = hidden;
+        this._redrawPreserveTransform(this.width, this.height, this.fillColor);
+    }
+
     /** Скрыть/показать серую рамку (при выделении скрываем, чтобы не накладывалась на синюю) */
     setBorderVisible(visible) {
         if (this._borderVisible === visible) return;
@@ -183,6 +196,17 @@ export class FrameObject {
     }
 
     /**
+     * Установить режим заливки фрейма
+     * @param {'solid'|'solid-bordered'|'outline'} mode
+     */
+    setBgMode(mode) {
+        this.bgMode = mode || 'solid';
+        if (!this.objectData.properties) { this.objectData.properties = {}; }
+        this.objectData.properties.bgMode = this.bgMode;
+        this._redrawPreserveTransform(this.width, this.height, this.fillColor);
+    }
+
+    /**
      * Обновить размер фрейма
      * @param {{width:number,height:number}} size
      */
@@ -224,16 +248,74 @@ export class FrameObject {
     _draw(width, height, color, showStroke = true) {
         const g = this.graphics;
         g.clear();
-        if (showStroke) {
-            try {
-                g.lineStyle({ width: this.borderWidth, color: this.strokeColor, alpha: 1, alignment: 1 });
-            } catch (e) {
-                g.lineStyle(this.borderWidth, this.strokeColor, 1);
+        const isHidden = !!(this.objectData?.properties?.hidden);
+
+        if (isHidden) {
+            // Закрашиваем фон фрейма в #f0f6fc при скрытии
+            g.beginFill(0xF0F6FC, 1);
+            g.drawRoundedRect(0, 0, Math.max(0, width), Math.max(0, height), this.cornerRadius);
+            g.endFill();
+
+            // Создаём иконку глаза, если её ещё нет
+            if (!this.eyeSprite) {
+                const eyeSvg = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#666666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M3 3l18 18"/><path d="M10.6 10.7a2 2 0 0 0 2.7 2.8"/><path d="M9.4 5.2A9.6 9.6 0 0 1 12 5c6.5 0 10 7 10 7a13 13 0 0 1-2.2 2.9M6.2 6.2A13 13 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 3.5-.6"/></svg>`;
+                const eyeTexture = PIXI.Texture.from(`data:image/svg+xml;utf8,${encodeURIComponent(eyeSvg)}`);
+                this.eyeSprite = new PIXI.Sprite(eyeTexture);
+                this.eyeSprite.anchor.set(0.5);
+                this.container.addChild(this.eyeSprite);
             }
+            this.eyeSprite.visible = true;
+            this.eyeSprite.x = Math.max(0, width) / 2;
+            this.eyeSprite.y = Math.max(0, height) / 2;
+            
+            if (this.titleLayer) this.titleLayer.visible = false;
+        } else {
+            if (this.eyeSprite) this.eyeSprite.visible = false;
+
+            const bgMode = this.bgMode || 'solid';
+            const fillColor = typeof color === 'number' ? color : 0xFFFFFF;
+
+            if (bgMode === 'solid') {
+                // Сплошная заливка выбранным цветом, стандартная тонкая серая рамка
+                if (showStroke) {
+                    try {
+                        g.lineStyle({ width: this.borderWidth, color: this.strokeColor, alpha: 1, alignment: 1 });
+                    } catch (e) {
+                        g.lineStyle(this.borderWidth, this.strokeColor, 1);
+                    }
+                }
+                g.beginFill(fillColor, 1);
+                g.drawRoundedRect(0, 0, Math.max(0, width), Math.max(0, height), this.cornerRadius);
+                g.endFill();
+            } else if (bgMode === 'solid-bordered') {
+                // Контрастный белый/светлый фон + толстая цветная рамка
+                if (showStroke) {
+                    try {
+                        g.lineStyle({ width: this.borderWidth * 2, color: fillColor, alpha: 1, alignment: 1 });
+                    } catch (e) {
+                        g.lineStyle(this.borderWidth * 2, fillColor, 1);
+                    }
+                }
+                g.beginFill(0xFFFFFF, 0.92);
+                g.drawRoundedRect(0, 0, Math.max(0, width), Math.max(0, height), this.cornerRadius);
+                g.endFill();
+            } else {
+                // outline: прозрачный фон, рамка цвета выбранного цвета
+                if (showStroke) {
+                    try {
+                        g.lineStyle({ width: this.borderWidth, color: fillColor, alpha: 1, alignment: 1 });
+                    } catch (e) {
+                        g.lineStyle(this.borderWidth, fillColor, 1);
+                    }
+                }
+                g.beginFill(0x000000, 0);
+                g.drawRoundedRect(0, 0, Math.max(0, width), Math.max(0, height), this.cornerRadius);
+                g.endFill();
+            }
+
+            if (this.titleLayer) this.titleLayer.visible = true;
         }
-        g.beginFill(typeof color === 'number' ? color : 0xFFFFFF, 1);
-        g.drawRoundedRect(0, 0, Math.max(0, width), Math.max(0, height), this.cornerRadius);
-        g.endFill();
+
         // Обновляем hitArea и корректный hit testing
         this.container.hitArea = new PIXI.Rectangle(0, 0, width, height);
         this.container.containsPoint = (point) => {
