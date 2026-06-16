@@ -27,6 +27,7 @@ export class HtmlHandlesLayer {
         this.handles = {};
         this._drag = null;
       this._handlesSuppressed = false; // скрывать ручки во время перетаскивания/трансформаций
+      this._cropMode = false; // полное подавление во время crop (ни рамка, ни ручки)
         this._groupRotationPreview = null;
 
       // Ссылки на обработчики, чтобы корректно отписаться при destroy()
@@ -96,6 +97,7 @@ export class HtmlHandlesLayer {
     }
 
     update() {
+      if (this._cropMode) return;
       // Дополнительная защита: если слой или core уже уничтожены,
       // выходим, чтобы не получить ошибок при resize/смене DPR
       if (!this.core || !this.core.pixi || !this.core.pixi.app || !this.layer) return;

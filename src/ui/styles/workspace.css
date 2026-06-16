@@ -1622,3 +1622,23 @@
     }
 }
 
+/* ── Crop Overlay ─────────────────────────────────────────────────────────── */
+
+.mb-crop-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2000;
+    user-select: none;
+}
+
+.mb-crop-img-area {
+    position: absolute;
+}
+
+/* Стили ручек задаются инлайн в CropOverlay.js (уголки и засечки) */
+.mb-crop-handle {
+    position: absolute;
+    box-sizing: border-box;
+    z-index: 1;
+}
+

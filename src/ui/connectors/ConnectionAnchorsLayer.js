@@ -144,6 +144,10 @@ export class ConnectionAnchorsLayer {
     update() {
         if (!this.layer) return;
         if (this._commentPopoverOpen) return;
+        if (typeof window !== 'undefined' && window.moodboardHtmlHandlesLayer?._cropMode) {
+            this.layer.innerHTML = '';
+            return;
+        }
         this.layer.innerHTML = '';
         
         const selection = Array.from(this.core?.selectTool?.selectedObjects || []);

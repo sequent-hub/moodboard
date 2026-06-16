@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js';
 import { Events } from '../core/events/Events.js';
 import { EditFileNameCommand } from '../core/commands/EditFileNameCommand.js';
 import { applyRoundedMask } from '../utils/applyRoundedMask.js';
+import { CropController } from '../services/CropController.js';
 
 const ICONS = {
     download: `<svg width="24" height="24" fill="none" viewBox="0 0 24 24" type="download"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.75 14.75V16.25C4.75 17.9069 6.09315 19.25 7.75 19.25H16.25C17.9069 19.25 19.25 17.9069 19.25 16.25V14.75"></path><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14.25L12 4.75"></path><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.75 10.75L12 14.25L15.25 10.75"></path></svg>`,
@@ -37,6 +38,9 @@ export class ImagePropertiesPanel {
         this.panel = null;
         this.currentId = null;
         this._handlers = null;
+
+        this._cropController = new CropController({ core, eventBus, container });
+        this._cropController._onActivate = (active) => this._onCropActivate(active);
 
         this._attachEvents();
         this._createPanel();
@@ -125,6 +129,9 @@ export class ImagePropertiesPanel {
     }
 
     showFor(objectId) {
+        if (this.currentId !== objectId) {
+            this._cropController?.cancel();
+        }
         this.currentId = objectId;
         if (this.panel) {
             this.panel.style.display = 'flex';
@@ -178,11 +185,42 @@ export class ImagePropertiesPanel {
     }
 
     hide() {
+        this._cropController?.cancel();
         this.currentId = null;
         if (this.panel) {
             this.panel.style.display = 'none';
         }
         this._closeBorderRadiusPopover();
+    }
+
+    /**
+     * Вызывается CropController при входе/выходе из режима crop.
+     * Прячет тулбар и ручки выделения на время crop; восстанавливает по завершении.
+     */
+    _onCropActivate(active) {
+        if (!this.panel) return;
+
+        const handlesLayer = typeof window !== 'undefined' ? window.moodboardHtmlHandlesLayer : null;
+        const anchorsLayer = typeof window !== 'undefined' ? window.moodboardConnectionAnchorsLayer : null;
+
+        if (active) {
+            this.panel.style.display = 'none';
+            if (handlesLayer) {
+                handlesLayer._cropMode = true;
+                handlesLayer.hide();
+            }
+            anchorsLayer?.update();
+        } else {
+            // Восстанавливаем тулбар только если объект ещё выделен
+            if (this.currentId) {
+                this.panel.style.display = 'flex';
+            }
+            if (handlesLayer) {
+                handlesLayer._cropMode = false;
+                handlesLayer.update();
+            }
+            anchorsLayer?.update();
+        }
     }
 
     _closeBorderRadiusPopover() {
@@ -316,12 +354,6 @@ export class ImagePropertiesPanel {
         mainBtn.className = 'ipp-btn-split-main';
         mainBtn.title = 'Обрезать';
         mainBtn.innerHTML = ICONS.crop;
-        mainBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // Логика применения текущего кропа
-        });
-
         const expandBtn = document.createElement('button');
         expandBtn.className = 'ipp-btn-split-expand';
         expandBtn.title = 'Выбрать пропорции';
@@ -330,15 +362,36 @@ export class ImagePropertiesPanel {
         const dropdown = document.createElement('div');
         dropdown.className = 'ipp-crop-dropdown';
 
+        const toggleCropDropdown = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const isOpen = dropdown.classList.contains('is-open');
+            
+            document.querySelectorAll('.ipp-crop-dropdown.is-open, .ipp-more-dropdown.is-open, .ipp-border-radius-popover.is-open, .ipp-border-style-popover.is-open').forEach(el => {
+                el.classList.remove('is-open');
+            });
+            document.querySelectorAll('.ipp-btn-split-expand.is-expanded, .ipp-btn.is-active').forEach(el => {
+                el.classList.remove('is-expanded', 'is-active');
+            });
+
+            if (!isOpen) {
+                dropdown.classList.add('is-open');
+                expandBtn.classList.add('is-expanded');
+            }
+        };
+
+        mainBtn.addEventListener('click', toggleCropDropdown);
+        expandBtn.addEventListener('click', toggleCropDropdown);
+
         const items = [
-            { id: 'custom', label: 'Custom', icon: ICONS.ddCustom },
-            { id: 'original', label: 'Original', icon: ICONS.ddOriginal },
+            { id: 'custom', label: 'Произвольный', icon: ICONS.ddCustom },
+            { id: 'original', label: 'Оригинал', icon: ICONS.ddOriginal },
             { divider: true },
-            { id: 'circle', label: 'Circle', icon: ICONS.ddCircle },
-            { id: 'square', label: 'Square', icon: ICONS.ddSquare },
-            { id: 'portrait', label: 'Portrait', icon: ICONS.ddPortrait, ratio: '3:4' },
-            { id: 'landscape', label: 'Landscape', icon: ICONS.ddLandscape, ratio: '4:3' },
-            { id: 'wide', label: 'Wide', icon: ICONS.ddWide, ratio: '16:9' },
+            { id: 'circle', label: 'Круг', icon: ICONS.ddCircle },
+            { id: 'square', label: 'Квадрат', icon: ICONS.ddSquare },
+            { id: 'portrait', label: 'Портрет', icon: ICONS.ddPortrait, ratio: '3:4' },
+            { id: 'landscape', label: 'Пейзаж', icon: ICONS.ddLandscape, ratio: '4:3' },
+            { id: 'wide', label: 'Широкий', icon: ICONS.ddWide, ratio: '16:9' },
         ];
 
         items.forEach(item => {
@@ -372,31 +425,14 @@ export class ImagePropertiesPanel {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                // Логика выбора пропорции
                 dropdown.classList.remove('is-open');
                 expandBtn.classList.remove('is-expanded');
+                if (this.currentId) {
+                    this._cropController.start(this.currentId, item.id);
+                }
             });
 
             dropdown.appendChild(btn);
-        });
-
-        expandBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const isOpen = dropdown.classList.contains('is-open');
-            
-            // Закрываем все другие дропдауны, если есть (на будущее)
-            document.querySelectorAll('.ipp-crop-dropdown.is-open, .ipp-more-dropdown.is-open').forEach(el => {
-                el.classList.remove('is-open');
-            });
-            document.querySelectorAll('.ipp-btn-split-expand.is-expanded, .ipp-btn.is-active').forEach(el => {
-                el.classList.remove('is-expanded', 'is-active');
-            });
-
-            if (!isOpen) {
-                dropdown.classList.add('is-open');
-                expandBtn.classList.add('is-expanded');
-            }
         });
 
         wrapper.appendChild(mainBtn);
@@ -1442,6 +1478,7 @@ export class ImagePropertiesPanel {
     }
 
     destroy() {
+        this._cropController?.destroy();
         if (!this.eventBus || !this._handlers) return;
 
         this.eventBus.off(Events.Tool.SelectionAdd, this._handlers.onSelectionAdd);

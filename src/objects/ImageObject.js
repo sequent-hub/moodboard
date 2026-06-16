@@ -1,5 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { applyRoundedMask } from '../utils/applyRoundedMask.js';
+import { applyCropToSprite } from '../utils/applyCrop.js';
 
 /**
  * ImageObject — отображение загруженного изображения как спрайт
@@ -28,10 +29,7 @@ export class ImageObject {
         const fitToSize = () => {
             const texW = this.sprite.texture.width || 1;
             const texH = this.sprite.texture.height || 1;
-            const sx = this.width / texW;
-            const sy = this.height / texH;
-            this.sprite.scale.set(sx, sy);
-            // Обновим метаданные базовых размеров
+            // Обновим метаданные базовых размеров (до кропа)
             const prevMb = this.sprite._mb || {};
             this.sprite._mb = {
                 ...prevMb,
@@ -43,9 +41,27 @@ export class ImageObject {
                     baseH: texH
                 }
             };
-            const borderRadius = objectData.properties?.borderRadius;
-            if (borderRadius > 0) {
-                applyRoundedMask(this.sprite, borderRadius);
+
+            const cropRect    = objectData.properties?.cropRect;
+            const cropShape   = objectData.properties?.cropShape || null;
+            const borderRadius = objectData.properties?.borderRadius || 0;
+
+            if (cropRect) {
+                // Восстановить кроп: позиция и размер уже в objectData (post-crop)
+                const pos = objectData.position || { x: 0, y: 0 };
+                applyCropToSprite(
+                    this.sprite,
+                    cropRect,
+                    cropShape,
+                    { width: this.width, height: this.height },
+                    pos,
+                    borderRadius
+                );
+            } else {
+                this.sprite.scale.set(this.width / texW, this.height / texH);
+                if (borderRadius > 0) {
+                    applyRoundedMask(this.sprite, borderRadius);
+                }
             }
         };
 
