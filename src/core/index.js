@@ -39,7 +39,7 @@ export class CoreMoodBoard {
             autoSave: false,
             width: this.container.clientWidth || 800,
             height: this.container.clientHeight || 600,
-            backgroundColor: 0xF5F5F5,
+            backgroundColor: 0xFFFFFF,
             ...options
         };
 
@@ -624,7 +624,7 @@ export class CoreMoodBoard {
         const app = this.pixi?.app;
         const rendererBg = app?.renderer?.background?.color ?? app?.renderer?.backgroundColor;
         const toHex = (num) => {
-            try { return '#' + Number(num >>> 0).toString(16).padStart(6, '0'); } catch (_) { return '#F5F5F5'; }
+            try { return '#' + Number(num >>> 0).toString(16).padStart(6, '0'); } catch (_) { return '#FFFFFF'; }
         };
         const world = this.pixi?.worldLayer || app?.stage;
         const currentZoom = Math.max(0.02, Math.min(5, world?.scale?.x || 1));
@@ -653,7 +653,7 @@ export class CoreMoodBoard {
         })();
 
         const settings = {
-            backgroundColor: toHex(rendererBg ?? 0xF5F5F5),
+            backgroundColor: toHex(rendererBg ?? 0xFFFFFF),
             grid: gridSettings || undefined,
             zoom: { min: 0.1, max: 5.0, default: 1.0, current: currentZoom },
             pan: currentPan,

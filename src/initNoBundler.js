@@ -59,7 +59,7 @@ export function injectCriticalStyles() {
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background: #f0f6fc;
+            background: #ffffff;
         }
         
         .moodboard-workspace__toolbar {

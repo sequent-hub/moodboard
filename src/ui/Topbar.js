@@ -176,10 +176,18 @@ export class Topbar {
     _getCurrentBoardBackgroundHex() {
         try {
             const app = window?.moodboard?.coreMoodboard?.pixi?.app || window?.moodboard?.core?.pixi?.app;
-            const colorInt = app?.renderer?.background?.color ?? app?.renderer?.backgroundColor;
+            const renderer = app?.renderer;
+            if (!renderer) return null;
+            const bg = renderer.background;
+            // PIXI v7+: bg.color — экземпляр Color с методом toHex()
+            if (bg?.color && typeof bg.color.toHex === 'function') {
+                return String(bg.color.toHex()).toLowerCase();
+            }
+            const colorInt = (typeof bg?.color === 'number')
+                ? bg.color
+                : (typeof renderer.backgroundColor === 'number' ? renderer.backgroundColor : null);
             if (typeof colorInt !== 'number') return null;
-            const hex = `#${colorInt.toString(16).padStart(6, '0')}`;
-            return hex.toLowerCase();
+            return `#${colorInt.toString(16).padStart(6, '0')}`.toLowerCase();
         } catch (_) { return null; }
     }
 
@@ -288,14 +296,20 @@ export class Topbar {
         // Выделяем активный цвет галочкой по фактическому boardHex
         try {
             const ap = window?.moodboard?.coreMoodboard?.settingsApplier;
-            const boardHex = (
-                (ap && ap.get && ap.get().backgroundColor) ||
-                this._currentBoardHex ||
-                this._getCurrentBoardBackgroundHex() ||
-                ''
-            ).toLowerCase();
+            const raw = (ap && ap.get && ap.get().backgroundColor)
+                || this._currentBoardHex
+                || this._getCurrentBoardBackgroundHex()
+                || '';
+            let boardHex = '';
+            if (typeof raw === 'number') {
+                boardHex = `#${raw.toString(16).padStart(6, '0')}`;
+            } else if (typeof raw === 'string') {
+                boardHex = raw;
+            }
+            boardHex = boardHex.toLowerCase();
             const match = boardHex ? grid.querySelector(`[data-board="${boardHex}"]`) : null;
-            if (match) match.classList.add('is-active');
+            const toActivate = match || grid.querySelector('[data-board="#ffffff"]');
+            if (toActivate) toActivate.classList.add('is-active');
         } catch (_) {}
 
         // позиционируем поповер

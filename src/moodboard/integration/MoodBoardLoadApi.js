@@ -1,7 +1,7 @@
 import { Events } from '../../core/events/Events.js';
 
 const BOARD_DEFAULTS = {
-    backgroundColor: '#daeefb',
+    backgroundColor: '#ffffff',
     grid: { type: 'cross' },
 };
 
