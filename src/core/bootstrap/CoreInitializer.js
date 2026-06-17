@@ -4,6 +4,7 @@ import { BoardService } from '../../services/BoardService.js';
 import { ZoomPanController } from '../../services/ZoomPanController.js';
 import { ZOrderManager } from '../../services/ZOrderManager.js';
 import { FrameService } from '../../services/FrameService.js';
+import { ImageAttachmentService } from '../../services/ImageAttachmentService.js';
 import { Events } from '../events/Events.js';
 
 export async function initializeCore(core) {
@@ -20,6 +21,8 @@ export async function initializeCore(core) {
         core.zOrder.attach();
         core.frameService = new FrameService(core.eventBus, core.pixi, core.state);
         core.frameService.attach();
+        core.imageAttachmentService = new ImageAttachmentService(core.eventBus, core.pixi, core.state);
+        core.imageAttachmentService.attach();
 
         setupViewportResize(core);
 
