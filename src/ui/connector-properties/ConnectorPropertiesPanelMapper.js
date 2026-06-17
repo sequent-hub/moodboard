@@ -120,6 +120,45 @@ export function getConnectorMidpointScreen(core, connectorId) {
 }
 
 /**
+ * Возвращает наивысшую экранную точку коннектора (минимальный y) и горизонтальный центр.
+ * Координаты — целые числа (screen-space integer contract).
+ * @returns {{ x: number, topY: number } | null}
+ */
+export function getConnectorTopScreen(core, connectorId) {
+    const segments = core?.connectorLayer?._lastSegments;
+    if (!segments) return null;
+    const seg = segments.find(s => s.id === connectorId);
+    if (!seg) return null;
+
+    const worldLayer = core?.pixi?.worldLayer;
+    const scale  = worldLayer?.scale?.x ?? 1;
+    const worldX = worldLayer?.x ?? 0;
+    const worldY = worldLayer?.y ?? 0;
+
+    let pts;
+    if (seg.points && seg.points.length >= 2) {
+        pts = seg.points;
+    } else if (seg.start && seg.end) {
+        pts = [seg.start, seg.end];
+    } else {
+        return null;
+    }
+
+    let minWorldY = Infinity;
+    let sumWorldX = 0;
+    for (const p of pts) {
+        if (p.y < minWorldY) minWorldY = p.y;
+        sumWorldX += p.x;
+    }
+    const avgWorldX = sumWorldX / pts.length;
+
+    return {
+        x:    Math.round(avgWorldX * scale + worldX),
+        topY: Math.round(minWorldY * scale + worldY),
+    };
+}
+
+/**
  * Формирует updates.properties.style для StateChanged-эмита.
  */
 export function buildStyleUpdate(partialStyle) {

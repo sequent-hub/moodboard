@@ -10,6 +10,7 @@ import {
     getSelectedConnectorId,
     getConnectorData,
     getConnectorMidpointScreen,
+    getConnectorTopScreen,
     getConnectorStyle,
     buildStyleUpdate,
 } from './connector-properties/ConnectorPropertiesPanelMapper.js';
@@ -62,18 +63,21 @@ export class ConnectorPropertiesPanel {
         const stillSelected = getSelectedConnectorId(this.core) === this.currentId;
         if (!stillSelected) { this.hide(); return; }
 
-        const mid = getConnectorMidpointScreen(this.core, this.currentId);
-        if (!mid) return;
+        const top = getConnectorTopScreen(this.core, this.currentId);
+        if (!top) return;
 
         const panelW = this.panel.offsetWidth || 480;
         const panelH = this.panel.offsetHeight || 40;
-        const GAP    = 18;
+        const GAP    = 20;
 
-        let px = mid.x - Math.round(panelW / 2);
-        let py = mid.y - panelH - GAP;
+        let px = top.x - Math.round(panelW / 2);
+        let py = top.topY - panelH - GAP;
 
-        // Если уходит вверх за контейнер — переносим ниже середины
-        if (py < 0) py = mid.y + GAP;
+        // Если уходит вверх за контейнер — переносим ниже наивысшей точки
+        if (py < 0) {
+            const mid = getConnectorMidpointScreen(this.core, this.currentId);
+            py = (mid?.y ?? top.topY) + GAP;
+        }
 
         // Clamp по ширине контейнера
         const cw = this.container.offsetWidth || window.innerWidth;
