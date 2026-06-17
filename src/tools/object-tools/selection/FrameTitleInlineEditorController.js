@@ -50,16 +50,25 @@ export function openFrameTitleEditor(object, _create = false) {
         ? toScreenWithContainerOffset(titleLayer, view, 0, 0)
         : { x: 0, y: 0 };
 
-    // Ширина редактора = ширина titleBg в экранных пикселях (с учётом зум-компенсации)
+    // Габариты редактора = titleBg в экранных пикселях (с учётом зум-компенсации)
     let inputWidth = 150;
+    let inputHeight = 22;
     if (titleLayer && frameInstance.titleBg) {
         const bgRight = toScreenWithContainerOffset(titleLayer, view, frameInstance.titleBg.width || 150, 0);
-        inputWidth = Math.max(100, Math.round(bgRight.x - screenPos.x));
+        const bgBottom = toScreenWithContainerOffset(titleLayer, view, 0, frameInstance.titleBg.height || 22);
+        inputWidth = Math.max(1, Math.round(bgRight.x - screenPos.x));
+        inputHeight = Math.max(1, Math.round(bgBottom.y - screenPos.y));
     }
 
-    const wrapper = createFrameTitleEditorWrapper();
-    const input = createFrameTitleEditorInput(currentTitle);
+    const titleColors = typeof frameInstance.getTitleColors === 'function'
+        ? frameInstance.getTitleColors()
+        : { bgCss: '#ffffff', textCss: '#333333' };
+
+    const wrapper = createFrameTitleEditorWrapper(titleColors.bgCss);
+    wrapper.id = `mb-frame-title-editor-${objectId}`;
+    const input = createFrameTitleEditorInput(currentTitle, titleColors.textCss);
     wrapper.style.width = `${inputWidth}px`;
+    wrapper.style.height = `${inputHeight}px`;
 
     wrapper.appendChild(input);
     view.parentElement.appendChild(wrapper);

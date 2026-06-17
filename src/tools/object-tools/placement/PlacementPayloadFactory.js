@@ -43,7 +43,15 @@ export class PlacementPayloadFactory {
             type: 'frame',
             id: 'frame',
             position: { x, y },
-            properties: { width: Math.round(w), height: Math.round(h), title: 'Произвольный', lockedAspect: false, isArbitrary: true }
+            properties: {
+                width: Math.round(w),
+                height: Math.round(h),
+                title: 'Произвольный',
+                lockedAspect: false,
+                isArbitrary: true,
+                bgMode: 'solid',
+                backgroundColor: 0xFFFFFF,
+            }
         });
     }
 

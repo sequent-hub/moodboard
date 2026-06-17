@@ -378,10 +378,10 @@ export class GhostController {
         const title = host.pending.properties?.title || 'Новый';
 
         const rootStyles = (typeof window !== 'undefined') ? getComputedStyle(document.documentElement) : null;
-        const cssBorderWidth = rootStyles ? parseFloat(rootStyles.getPropertyValue('--frame-border-width') || '4') : 4;
+        const cssBorderWidth = rootStyles ? parseFloat(rootStyles.getPropertyValue('--frame-border-width') || '5') : 5;
         const cssCornerRadius = rootStyles ? parseFloat(rootStyles.getPropertyValue('--frame-corner-radius') || '6') : 6;
         const cssBorderColor = rootStyles ? rootStyles.getPropertyValue('--frame-border-color').trim() : '';
-        const borderWidth = Number.isFinite(cssBorderWidth) ? cssBorderWidth : 4;
+        const borderWidth = Number.isFinite(cssBorderWidth) ? cssBorderWidth : 5;
         const cornerRadius = Number.isFinite(cssCornerRadius) ? cssCornerRadius : 6;
         let strokeColor;
         if (cssBorderColor && cssBorderColor.startsWith('#')) {

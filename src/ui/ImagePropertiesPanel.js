@@ -1050,6 +1050,14 @@ export class ImagePropertiesPanel {
                 
                 if (item.id === 'copy') {
                     this.eventBus.emit(Events.Keyboard.Copy);
+                } else if (item.id === 'bring-front') {
+                    if (this.currentId) this.eventBus.emit(Events.UI.LayerBringToFront, { objectId: this.currentId });
+                } else if (item.id === 'bring-forward') {
+                    if (this.currentId) this.eventBus.emit(Events.UI.LayerBringForward, { objectId: this.currentId });
+                } else if (item.id === 'send-backward') {
+                    if (this.currentId) this.eventBus.emit(Events.UI.LayerSendBackward, { objectId: this.currentId });
+                } else if (item.id === 'send-back') {
+                    if (this.currentId) this.eventBus.emit(Events.UI.LayerSendToBack, { objectId: this.currentId });
                 } else if (item.id === 'duplicate') {
                     this._duplicateImage();
                 } else if (item.id === 'lock') {

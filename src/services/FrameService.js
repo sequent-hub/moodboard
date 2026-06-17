@@ -86,14 +86,40 @@ export class FrameService {
 					}
 				}
 			}
+			const lockedChanged = data.updates.properties.locked !== undefined;
+			const lockModeChanged = data.updates.properties.lockMode !== undefined;
+			if (lockedChanged || lockModeChanged) {
+				const obj = this.state.state.objects.find(o => o.id === data.objectId);
+				if (obj && obj.type === 'frame') {
+					const newLocked = lockedChanged
+						? !!data.updates.properties.locked
+						: !!(obj.properties && obj.properties.locked);
+					const newLockMode = lockModeChanged
+						? data.updates.properties.lockMode
+						: (obj.properties && obj.properties.lockMode) || 'frame';
+					const children = this._getFrameChildren(obj.id);
+					for (const childId of children) {
+						const childObj = this.state.state.objects.find(o => o.id === childId);
+						if (!childObj) continue;
+						childObj.properties = childObj.properties || {};
+						if (newLocked && newLockMode === 'frame-and-content') {
+							childObj.properties.locked = true;
+							childObj.properties.lockedByFrame = true;
+						} else if (childObj.properties.lockedByFrame) {
+							childObj.properties.locked = false;
+							delete childObj.properties.lockedByFrame;
+						}
+					}
+					this.state.markDirty();
+				}
+			}
 		};
 		this.eventBus.on(Events.Object.StateChanged, this._onStateChanged);
 
-		this._onDragStart = (data) => {
+		this.	_onDragStart = (data) => {
 			const moved = this.state.state.objects.find(o => o.id === data.object);
 			if (moved && moved.type === 'frame') {
-				// Серый фон
-				this.pixi.setFrameFill(moved.id, moved.width, moved.height, 0xFAFAFA);
+				this._frameDragOriginalFill = moved.backgroundColor ?? moved.properties?.backgroundColor ?? 0xFFFFFF;
 				// Cнимок стартовых позиций по центру PIXI
 				const fp = this.pixi.objects.get(moved.id);
 				this._frameDragFrameStart = { x: fp?.x || 0, y: fp?.y || 0 };
@@ -157,18 +183,25 @@ export class FrameService {
 			const movedObj = this.state.state.objects.find(o => o.id === data.object);
 			if (!movedObj) return;
 			if (movedObj.type === 'frame') {
-				this.pixi.setFrameFill(movedObj.id, movedObj.width, movedObj.height, 0xFFFFFF);
+				const restoreFill = this._frameDragOriginalFill ?? movedObj.backgroundColor ?? movedObj.properties?.backgroundColor ?? 0xFFFFFF;
+				this.pixi.setFrameFill(movedObj.id, movedObj.width, movedObj.height, restoreFill);
 			}
 			this._recomputeFrameAttachment(movedObj.id);
 			this._forceFramesBelow();
 			this._frameDragFrameStart = null;
 			this._frameDragChildStart = null;
+			this._frameDragOriginalFill = null;
 			if (this._frameHoverId) {
 				const frames = (this.state.state.objects || []).filter(o => o.type === 'frame');
 				const prev = frames.find(fr => fr.id === this._frameHoverId);
-				if (prev) this.pixi.setFrameFill(prev.id, prev.width, prev.height, 0xFFFFFF);
-			this._frameHoverId = null;
-		}
+				if (prev) {
+					const hoverOriginal = this._frameHoverOriginalFill?.get(this._frameHoverId)
+						?? prev.backgroundColor ?? prev.properties?.backgroundColor ?? 0xFFFFFF;
+					this.pixi.setFrameFill(prev.id, prev.width, prev.height, hoverOriginal);
+				}
+				this._frameHoverId = null;
+				this._frameHoverOriginalFill = null;
+			}
 		};
 		this.eventBus.on(Events.Tool.DragEnd, this._onDragEnd);
 	}
@@ -192,7 +225,9 @@ export class FrameService {
 		this._onDragEnd = null;
 		this._frameDragFrameStart = null;
 		this._frameDragChildStart = null;
+		this._frameDragOriginalFill = null;
 		this._frameHoverId = null;
+		this._frameHoverOriginalFill = null;
 	}
 
 	_getFrameChildren(frameId) {
@@ -234,11 +269,22 @@ export class FrameService {
 			if (hoverId !== this._frameHoverId) {
 				if (this._frameHoverId) {
 					const prev = frames.find(fr => fr.id === this._frameHoverId);
-					if (prev) this.pixi.setFrameFill(prev.id, prev.width, prev.height, 0xFFFFFF);
+					if (prev) {
+						const origFill = this._frameHoverOriginalFill?.get(this._frameHoverId)
+							?? prev.backgroundColor ?? prev.properties?.backgroundColor ?? 0xFFFFFF;
+						this.pixi.setFrameFill(prev.id, prev.width, prev.height, origFill);
+					}
+					this._frameHoverOriginalFill?.delete(this._frameHoverId);
 				}
 				if (hoverId) {
 					const cur = frames.find(fr => fr.id === hoverId);
-					if (cur) this.pixi.setFrameFill(cur.id, cur.width, cur.height, 0xFAFAFA);
+					if (cur) {
+						if (!this._frameHoverOriginalFill) this._frameHoverOriginalFill = new Map();
+						if (!this._frameHoverOriginalFill.has(hoverId)) {
+							this._frameHoverOriginalFill.set(hoverId, cur.backgroundColor ?? cur.properties?.backgroundColor ?? 0xFFFFFF);
+						}
+						this.pixi.setFrameFill(cur.id, cur.width, cur.height, 0xFAFAFA);
+					}
 				}
 				this._frameHoverId = hoverId || null;
 			}

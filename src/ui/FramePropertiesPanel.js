@@ -42,19 +42,19 @@ function hexToHsv(hex) {
 const FRAME_COLORS = [
     { name: 'Белый',            hex: '#FFFFFF' },
     { name: 'Светло-серый',     hex: '#EBEBEB' },
-    { name: 'Серый',            hex: '#ABABAB' },
-    { name: 'Светло-розовый',   hex: '#FFDDE0' },
-    { name: 'Розовый',          hex: '#FFB3BB' },
-    { name: 'Персиковый',       hex: '#FFE5CC' },
-    { name: 'Оранжевый',        hex: '#FFB066' },
-    { name: 'Светло-жёлтый',   hex: '#FFFACC' },
-    { name: 'Жёлтый',           hex: '#FFE566' },
-    { name: 'Светло-зелёный',   hex: '#D4F5D4' },
-    { name: 'Зелёный',          hex: '#88D888' },
-    { name: 'Небесный',         hex: '#D4EEFF' },
-    { name: 'Голубой',          hex: '#80BFFF' },
-    { name: 'Лавандовый',       hex: '#E8D4FF' },
-    { name: 'Фиолетовый',       hex: '#C499FF' },
+    { name: 'Серый',            hex: '#E4E4E4' },
+    { name: 'Светло-розовый',   hex: '#FFEFEF' },
+    { name: 'Розовый',          hex: '#FDD8D8' },
+    { name: 'Персиковый',       hex: '#FFEDD5' },
+    { name: 'Оранжевый',        hex: '#FFD3A4' },
+    { name: 'Светло-жёлтый',    hex: '#FFFBE0' },
+    { name: 'Жёлтый',           hex: '#FCF3AF' },
+    { name: 'Светло-зелёный',   hex: '#E9F9EE' },
+    { name: 'Зелёный',          hex: '#CCEBD7' },
+    { name: 'Небесный',         hex: '#EDF6FF' },
+    { name: 'Голубой',          hex: '#CEE7FE' },
+    { name: 'Лавандовый',       hex: '#F5F2FF' },
+    { name: 'Фиолетовый',       hex: '#E4DEFC' },
 ];
 
 const ICONS = {
@@ -75,6 +75,7 @@ const ICONS = {
     bgBordered: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="16" height="16" rx="2.5" fill="#D1D5DB"/><rect x="3" y="3" width="16" height="16" rx="2.5" stroke="#374151" stroke-width="1.5"/></svg>',
     bgOutline: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="16" height="16" rx="2.5" stroke="#374151" stroke-width="1.5"/></svg>',
     eyedropper: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 20.5l4-4"/><path d="M6.5 17.5L17 7a2.5 2.5 0 0 0 0-3.5l-2-2a2.5 2.5 0 0 0-3.5 0L3 10l4 4z"/></svg>',
+    check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
 };
 
 const RATIO_LABELS = {
@@ -241,8 +242,7 @@ export class FramePropertiesPanel {
 
         const divider = this._makeDivider();
 
-        this._btn_lock = this._makeButton(ICONS.unlock, 'Заблокировать', 'lock');
-        this._btn_lock.addEventListener('click', (e) => { e.stopPropagation(); this._toggleLocked(); });
+        const lockControl = this._makeLockControl();
 
         const more = this._makeMoreButton();
 
@@ -251,7 +251,7 @@ export class FramePropertiesPanel {
         panel.appendChild(rename);
         panel.appendChild(eye);
         panel.appendChild(divider);
-        panel.appendChild(this._btn_lock);
+        panel.appendChild(lockControl);
         panel.appendChild(more);
 
         this._lockableEls = [ratio, color, rename, eye, divider];
@@ -271,9 +271,79 @@ export class FramePropertiesPanel {
         const btn = document.createElement('button');
         btn.className = 'ipp-btn';
         btn.title = title;
-        if (key) { btn.dataset.id = 'fpp-btn-' + key; }
+        if (key) {
+            btn.id = 'fpp-btn-' + key;
+            btn.dataset.id = 'fpp-btn-' + key;
+        }
         btn.innerHTML = iconHtml;
         return btn;
+    }
+
+    _makeLockControl() {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'ipp-btn-split-wrapper fpp-lock-wrap';
+
+        const mainBtn = document.createElement('button');
+        mainBtn.className = 'ipp-btn-split-main';
+        mainBtn.id = 'fpp-btn-lock';
+        mainBtn.dataset.id = 'fpp-btn-lock';
+        mainBtn.title = 'Заблокировать';
+        mainBtn.innerHTML = ICONS.unlock;
+        mainBtn.addEventListener('click', (e) => { e.stopPropagation(); this._toggleLocked(); });
+        this._lockSplitMain = mainBtn;
+
+        const expandBtn = document.createElement('button');
+        expandBtn.className = 'ipp-btn-split-expand fpp-lock-chevron';
+        expandBtn.title = 'Режим блокировки';
+        expandBtn.innerHTML = ICONS.expand;
+        expandBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = this._lockDropdown.classList.contains('is-open');
+            this._closeMenus();
+            if (!isOpen) {
+                this._lockDropdown.classList.add('is-open');
+                expandBtn.classList.add('is-expanded');
+                this._attachOutside();
+            }
+        });
+        this._lockExpandBtn = expandBtn;
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'fpp-lock-dropdown';
+        this._lockDropdown = dropdown;
+
+        const lockModeItems = [
+            { id: 'frame', label: 'Только фрейм' },
+            { id: 'frame-and-content', label: 'Фрейм и содержимое' },
+        ];
+
+        lockModeItems.forEach((item) => {
+            const btn = document.createElement('button');
+            btn.className = 'ipp-dropdown-item';
+            btn.id = 'fpp-lock-mode-' + item.id;
+            btn.dataset.lockMode = item.id;
+
+            const checkSpan = document.createElement('span');
+            checkSpan.className = 'fpp-lock-mode-check';
+            checkSpan.innerHTML = ICONS.check;
+            btn.appendChild(checkSpan);
+
+            const labelSpan = document.createElement('span');
+            labelSpan.textContent = item.label;
+            btn.appendChild(labelSpan);
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._closeMenus();
+                this._applyLockMode(item.id);
+            });
+            dropdown.appendChild(btn);
+        });
+
+        wrapper.appendChild(mainBtn);
+        wrapper.appendChild(expandBtn);
+        wrapper.appendChild(dropdown);
+        return wrapper;
     }
 
     _makeDivider() {
@@ -288,6 +358,7 @@ export class FramePropertiesPanel {
 
         const btn = document.createElement('button');
         btn.className = 'fpp-ratio-btn';
+        btn.id = 'fpp-ratio-btn';
         btn.dataset.id = 'fpp-ratio-btn';
 
         const textBox = document.createElement('span');
@@ -324,6 +395,7 @@ export class FramePropertiesPanel {
         items.forEach((item) => {
             const el = document.createElement('button');
             el.className = 'ipp-dropdown-item';
+            el.id = 'fpp-ratio-item-' + item.id;
             const ic = document.createElement('span');
             ic.className = 'ipp-dropdown-icon';
             ic.innerHTML = item.icon;
@@ -362,6 +434,7 @@ export class FramePropertiesPanel {
 
         const colorButton = document.createElement('button');
         colorButton.className = 'fpp-color-button';
+        colorButton.id = 'fpp-color-btn';
         colorButton.addEventListener('click', (e) => {
             e.stopPropagation();
             this._toggleColorPopup(colorButton);
@@ -394,6 +467,7 @@ export class FramePropertiesPanel {
         BG_TYPES.forEach(({ id, title, icon }) => {
             const btn = document.createElement('button');
             btn.className = 'fpp-bg-type-btn';
+            btn.id = 'fpp-bg-type-btn-' + id;
             btn.title = title;
             btn.dataset.bgMode = id;
             btn.innerHTML = ICONS[icon];
@@ -425,6 +499,7 @@ export class FramePropertiesPanel {
         // "None" swatch — transparent
         const noneSwatch = document.createElement('button');
         noneSwatch.className = 'fpp-color-swatch fpp-color-swatch--none';
+        noneSwatch.id = 'fpp-swatch-none';
         noneSwatch.title = 'Прозрачный';
         noneSwatch.dataset.colorHex = 'none';
         noneSwatch.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><line x1="3" y1="17" x2="17" y2="3" stroke="#EF4444" stroke-width="1.5" stroke-linecap="round"/></svg>';
@@ -440,6 +515,7 @@ export class FramePropertiesPanel {
         FRAME_COLORS.forEach((color) => {
             const btn = document.createElement('button');
             btn.className = 'fpp-color-swatch';
+            btn.id = 'fpp-swatch-' + color.hex.replace('#', '').toLowerCase();
             btn.title = color.name;
             btn.dataset.colorHex = color.hex.toUpperCase();
             btn.style.setProperty('--swatch-color', color.hex);
@@ -470,6 +546,7 @@ export class FramePropertiesPanel {
 
         const addBtn = document.createElement('button');
         addBtn.className = 'fpp-add-color-btn';
+        addBtn.id = 'fpp-add-color-btn';
         addBtn.title = 'Добавить цвет';
         addBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="7" y1="1" x2="7" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
         addBtn.addEventListener('click', (e) => {
@@ -562,9 +639,18 @@ export class FramePropertiesPanel {
             this.colorButton.classList.remove('fpp-color-button--none');
         }
 
+        const targetBgMode = this._getCurrentBgMode();
+
+        this._bgTypeBtns.forEach((btn) => {
+            btn.classList.toggle('is-active', btn.dataset.bgMode === targetBgMode);
+        });
+
         this.eventBus.emit(Events.Object.StateChanged, {
             objectId: this.currentId,
-            updates: { backgroundColor: pixi },
+            updates: { 
+                backgroundColor: pixi,
+                properties: { bgMode: targetBgMode }
+            },
         });
     }
 
@@ -574,9 +660,10 @@ export class FramePropertiesPanel {
     }
 
     _setColorSectionDisabled(disabled) {
-        if (this._colorSection) {
-            this._colorSection.classList.toggle('is-disabled', disabled);
-        }
+        // Disabled logic removed as per requirements (all colour buttons remain active)
+        // if (this._colorSection) {
+        //     this._colorSection.classList.toggle('is-disabled', disabled);
+        // }
     }
 
     _markNoneSelected() {
@@ -633,6 +720,7 @@ export class FramePropertiesPanel {
         canvas.width = 212;
         canvas.height = 148;
         canvas.className = 'fpp-color-picker__canvas';
+        canvas.id = 'fpp-hsv-canvas';
         this._hsvCanvas = canvas;
 
         const cursor = document.createElement('div');
@@ -661,6 +749,7 @@ export class FramePropertiesPanel {
         hueSlider.max = '360';
         hueSlider.value = '0';
         hueSlider.className = 'fpp-color-picker__hue-slider';
+        hueSlider.id = 'fpp-hue-slider';
         this._hueSlider = hueSlider;
 
         hueSlider.addEventListener('input', (e) => {
@@ -679,6 +768,7 @@ export class FramePropertiesPanel {
 
         const eyedropper = document.createElement('button');
         eyedropper.className = 'fpp-color-picker__eyedropper';
+        eyedropper.id = 'fpp-eyedropper-btn';
         eyedropper.title = 'Пипетка';
         eyedropper.innerHTML = ICONS.eyedropper;
         eyedropper.addEventListener('click', (e) => {
@@ -694,6 +784,7 @@ export class FramePropertiesPanel {
         const hexInput = document.createElement('input');
         hexInput.type = 'text';
         hexInput.className = 'fpp-color-picker__hex-input';
+        hexInput.id = 'fpp-hex-input';
         hexInput.value = '#ffffff';
         hexInput.maxLength = 7;
         hexInput.spellcheck = false;
@@ -724,6 +815,7 @@ export class FramePropertiesPanel {
         // Apply button
         const applyBtn = document.createElement('button');
         applyBtn.className = 'fpp-color-picker__apply';
+        applyBtn.id = 'fpp-picker-apply-btn';
         applyBtn.textContent = 'Добавить';
         applyBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -867,6 +959,7 @@ export class FramePropertiesPanel {
         const mainBtn = document.createElement('button');
         mainBtn.className = 'ipp-btn';
         mainBtn.title = 'Ещё';
+        mainBtn.id = 'fpp-btn-more';
         mainBtn.dataset.id = 'fpp-btn-more';
         mainBtn.innerHTML = ICONS.more;
 
@@ -911,6 +1004,7 @@ export class FramePropertiesPanel {
 
             const btn = document.createElement('button');
             btn.className = 'ipp-dropdown-item';
+            btn.id = 'fpp-more-' + item.id;
             btn.dataset.id = 'fpp-more-' + item.id;
 
             if (item.icon) {
@@ -1052,6 +1146,8 @@ export class FramePropertiesPanel {
         if (this._moreDropdown) { this._moreDropdown.classList.remove('is-open'); }
         if (this._moreMainBtn) { this._moreMainBtn.classList.remove('is-active'); }
         if (this._infoPopover) { this._infoPopover.classList.remove('is-open'); }
+        if (this._lockDropdown) { this._lockDropdown.classList.remove('is-open'); }
+        if (this._lockExpandBtn) { this._lockExpandBtn.classList.remove('is-expanded'); }
         this._detachOutside();
     }
 
@@ -1098,23 +1194,52 @@ export class FramePropertiesPanel {
     _toggleLocked() {
         if (!this.currentId) { return; }
         const newLocked = !this._isLocked();
+        const updates = { locked: newLocked };
+        if (newLocked) {
+            const data = this._getObjectData();
+            updates.lockMode = (data && data.properties && data.properties.lockMode) || 'frame';
+        }
         this.eventBus.emit(Events.Object.StateChanged, {
             objectId: this.currentId,
-            updates: { properties: { locked: newLocked } },
+            updates: { properties: updates },
+        });
+        this._updateLockUI();
+        this.reposition();
+    }
+
+    _applyLockMode(mode) {
+        if (!this.currentId) { return; }
+        const locked = this._isLocked();
+        const updates = { lockMode: mode };
+        if (!locked) { updates.locked = true; }
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: { properties: updates },
         });
         this._updateLockUI();
         this.reposition();
     }
 
     _updateLockUI() {
-        if (!this._btn_lock) { return; }
+        if (!this._lockSplitMain) { return; }
         const locked = this._isLocked();
 
         const data = this._getObjectData();
         const hidden = !!(data && data.properties && data.properties.hidden);
+        const lockMode = (data && data.properties && data.properties.lockMode) || 'frame';
 
-        this._btn_lock.innerHTML = locked ? ICONS.lock : ICONS.unlock;
-        this._btn_lock.title = locked ? 'Разблокировать' : 'Заблокировать';
+        this._lockSplitMain.innerHTML = locked ? ICONS.lock : ICONS.unlock;
+        this._lockSplitMain.title = locked ? 'Разблокировать' : 'Заблокировать';
+
+        if (this._lockExpandBtn) {
+            this._lockExpandBtn.style.display = locked ? 'none' : '';
+        }
+        if (this._lockDropdown) {
+            if (locked) { this._lockDropdown.classList.remove('is-open'); }
+            this._lockDropdown.querySelectorAll('[data-lock-mode]').forEach((btn) => {
+                btn.classList.toggle('is-active', btn.dataset.lockMode === lockMode);
+            });
+        }
 
         if (this._eyeBtn) {
             this._eyeBtn.dataset.hidden = hidden ? '1' : '0';

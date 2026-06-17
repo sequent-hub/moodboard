@@ -17,10 +17,10 @@ export class FrameObject {
         this.height = this.objectData.height || 100;
         // Берем стили рамки из CSS-переменных, с дефолтом
         const rootStyles = (typeof window !== 'undefined') ? getComputedStyle(document.documentElement) : null;
-        const cssBorderWidth = rootStyles ? parseFloat(rootStyles.getPropertyValue('--frame-border-width') || '4') : 4;
+        const cssBorderWidth = rootStyles ? parseFloat(rootStyles.getPropertyValue('--frame-border-width') || '5') : 5;
         const cssCornerRadius = rootStyles ? parseFloat(rootStyles.getPropertyValue('--frame-corner-radius') || '6') : 6;
         const cssBorderColor = rootStyles ? rootStyles.getPropertyValue('--frame-border-color').trim() : '';
-        this.borderWidth = Number.isFinite(cssBorderWidth) ? cssBorderWidth : 4;
+        this.borderWidth = Number.isFinite(cssBorderWidth) ? cssBorderWidth : 5;
         // Используем backgroundColor из данных объекта, если есть, иначе белый
         this.fillColor = this.objectData.backgroundColor || this.objectData.properties?.backgroundColor || 0xFFFFFF;
         // Режим заливки: solid | solid-bordered | outline
@@ -50,6 +50,10 @@ export class FrameObject {
         // Под-контейнер: масштаб компенсирует зум, поэтому заголовок всегда одного размера на экране
         this.titleLayer = new PIXI.Container();
         this.titleLayer.eventMode = 'none'; // не перехватывать указатель
+        const _frameObjectId = this.objectData.id || '';
+        if (_frameObjectId) {
+            this.titleLayer.name = `mb-frame-title-${_frameObjectId}`;
+        }
 
         this.titleBg = new PIXI.Graphics();
         this.titleLayer.addChild(this.titleBg);
@@ -60,7 +64,7 @@ export class FrameObject {
             fill: 0x333333,
             fontWeight: '500'
         });
-        this.titleText.anchor.set(0, 0);
+        this.titleText.anchor.set(0, 0.5);
         this.titleLayer.addChild(this.titleText);
 
         this.container.addChild(this.titleLayer);
@@ -141,7 +145,10 @@ export class FrameObject {
 
     _onSelectionAdd(data) {
         const myId = this.objectData?.id ?? this.container?._mb?.objectId;
-        if (data?.object === myId) this.setBorderVisible(false);
+        if (data?.object !== myId) return;
+        // В outline цветная рамка — основной визуал фрейма, не дублирует синюю рамку выделения.
+        if (this.bgMode === 'outline') return;
+        this.setBorderVisible(false);
     }
 
     _onSelectionRemove(data) {
@@ -276,37 +283,29 @@ export class FrameObject {
             const fillColor = typeof color === 'number' ? color : 0xFFFFFF;
 
             if (bgMode === 'solid') {
-                // Сплошная заливка выбранным цветом, стандартная тонкая серая рамка
+                // Сплошная заливка без собственной рамки (рамка выделения — отдельно)
+                g.beginFill(fillColor, 1);
+                g.drawRoundedRect(0, 0, Math.max(0, width), Math.max(0, height), this.cornerRadius);
+                g.endFill();
+            } else if (bgMode === 'solid-bordered') {
+                // Фон = выбранный цвет; рамка = S=100,V=50 от того же тона палитры
+                const borderColor = this._pickBorderColor(fillColor);
                 if (showStroke) {
                     try {
-                        g.lineStyle({ width: this.borderWidth, color: this.strokeColor, alpha: 1, alignment: 1 });
+                        g.lineStyle({ width: this.borderWidth, color: borderColor, alpha: 1, alignment: 0 });
                     } catch (e) {
-                        g.lineStyle(this.borderWidth, this.strokeColor, 1);
+                        g.lineStyle(this.borderWidth, borderColor, 1);
                     }
                 }
                 g.beginFill(fillColor, 1);
                 g.drawRoundedRect(0, 0, Math.max(0, width), Math.max(0, height), this.cornerRadius);
                 g.endFill();
-            } else if (bgMode === 'solid-bordered') {
-                // Контрастный белый/светлый фон + толстая цветная рамка
-                if (showStroke) {
-                    try {
-                        g.lineStyle({ width: this.borderWidth * 2, color: fillColor, alpha: 1, alignment: 1 });
-                    } catch (e) {
-                        g.lineStyle(this.borderWidth * 2, fillColor, 1);
-                    }
-                }
-                g.beginFill(0xFFFFFF, 0.92);
-                g.drawRoundedRect(0, 0, Math.max(0, width), Math.max(0, height), this.cornerRadius);
-                g.endFill();
             } else {
-                // outline: прозрачный фон, рамка цвета выбранного цвета
-                if (showStroke) {
-                    try {
-                        g.lineStyle({ width: this.borderWidth, color: fillColor, alpha: 1, alignment: 1 });
-                    } catch (e) {
-                        g.lineStyle(this.borderWidth, fillColor, 1);
-                    }
+                // outline: прозрачный фон, рамка цвета выбранного цвета (всегда видна, в т.ч. при фокусе)
+                try {
+                    g.lineStyle({ width: this.borderWidth, color: fillColor, alpha: 1, alignment: 1 });
+                } catch (e) {
+                    g.lineStyle(this.borderWidth, fillColor, 1);
                 }
                 g.beginFill(0x000000, 0);
                 g.drawRoundedRect(0, 0, Math.max(0, width), Math.max(0, height), this.cornerRadius);
@@ -352,7 +351,7 @@ export class FrameObject {
 
         // Высота подложки в базовых пикселях: baseFontSize + 4px сверху + 4px снизу
         const labelBaseH = this.baseFontSize + 8;
-        const gap = 4; // зазор между нижним краем подписи и верхней границей фрейма
+        const gap = 5; // зазор между нижним краем подписи и верхней границей фрейма
 
         // Позиционируем над фреймом (y=0 — верхний край фрейма в локальных координатах контейнера)
         this.titleLayer.x = 0;
@@ -373,6 +372,143 @@ export class FrameObject {
     }
 
     /**
+     * YIQ-контраст: возвращает 0x000000 или 0xFFFFFF — читаемый цвет на заданном фоне
+     * @param {number} hexInt Цвет фона (PIXI hex)
+     * @returns {number}
+     */
+    _pickContrastColor(hexInt) {
+        const r = (hexInt >> 16) & 0xFF;
+        const g = (hexInt >> 8) & 0xFF;
+        const b = hexInt & 0xFF;
+        const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+        const darkness = (1 - yiq / 255) * 100;
+        return darkness >= 35 ? 0xFFFFFF : 0x000000;
+    }
+
+    /**
+     * Цвет рамки в режиме solid-bordered.
+     * Крайне правый по горизонтали (S=100) и по середине вертикали (V=50)
+     * в палитре того же тона, что и фон.
+     * Белый фон: крайне левый по горизонтали (S=0), середина по вертикали (V=50) → нейтральный серый.
+     * Прочие ахроматические цвета (серый, чёрный — s=0): чёрный.
+     * @param {number} hexInt Цвет фона (PIXI hex)
+     * @returns {number}
+     */
+    _pickBorderColor(hexInt) {
+        const r = (hexInt >> 16) & 0xFF;
+        const g = (hexInt >> 8) & 0xFF;
+        const b = hexInt & 0xFF;
+        if (r === 255 && g === 255 && b === 255) {
+            return 0x808080;
+        }
+        const { h, s } = this._rgbToHsv(r, g, b);
+        if (s === 0) {
+            return 0x000000;
+        }
+        return this._hsvToHex(h, 100, 50);
+    }
+
+    /**
+     * Цвет текста заголовка фрейма.
+     * Для почти-белых тонированных фонов (яркость < 5 по шкале 0=белый…100=чёрный,
+     * но не чистый белый) берёт тон из той же палитры с макс. насыщенностью (S=100, V=50).
+     * Иначе — обычный YIQ-контраст (чёрный/белый).
+     * @param {number} hexInt Цвет фона (PIXI hex)
+     * @returns {number}
+     */
+    _pickTitleTextColor(hexInt) {
+        const r = (hexInt >> 16) & 0xFF;
+        const g = (hexInt >> 8) & 0xFF;
+        const b = hexInt & 0xFF;
+
+        // Чистый белый фон — исключение: чёрный текст
+        if (r === 255 && g === 255 && b === 255) {
+            return 0x000000;
+        }
+
+        // Яркость по шкале 0 (белый) → 100 (чёрный) через HSL-lightness
+        const darkness = 100 - ((Math.max(r, g, b) + Math.min(r, g, b)) / 2 / 255) * 100;
+        if (darkness >= 5) {
+            return this._pickContrastColor(hexInt);
+        }
+
+        // Почти-белый тонированный фон: та же палитра, правый край по центру (S=100, V=50)
+        const { h } = this._rgbToHsv(r, g, b);
+        return this._hsvToHex(h, 100, 50);
+    }
+
+    /**
+     * @param {number} r 0..255
+     * @param {number} g 0..255
+     * @param {number} b 0..255
+     * @returns {{ h: number, s: number, v: number }} h 0..360, s/v 0..100
+     */
+    _rgbToHsv(r, g, b) {
+        const rn = r / 255, gn = g / 255, bn = b / 255;
+        const max = Math.max(rn, gn, bn);
+        const min = Math.min(rn, gn, bn);
+        const d = max - min;
+        let h = 0;
+        if (d !== 0) {
+            if (max === rn) {
+                h = ((gn - bn) / d) % 6;
+            } else if (max === gn) {
+                h = (bn - rn) / d + 2;
+            } else {
+                h = (rn - gn) / d + 4;
+            }
+            h *= 60;
+            if (h < 0) {
+                h += 360;
+            }
+        }
+        const s = max === 0 ? 0 : (d / max) * 100;
+        return { h, s, v: max * 100 };
+    }
+
+    /**
+     * @param {number} h 0..360
+     * @param {number} s 0..100
+     * @param {number} v 0..100
+     * @returns {number} PIXI hex
+     */
+    _hsvToHex(h, s, v) {
+        const sn = s / 100, vn = v / 100;
+        const c = vn * sn;
+        const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+        const m = vn - c;
+        let rp = 0, gp = 0, bp = 0;
+        if (h < 60) {
+            rp = c; gp = x;
+        } else if (h < 120) {
+            rp = x; gp = c;
+        } else if (h < 180) {
+            gp = c; bp = x;
+        } else if (h < 240) {
+            gp = x; bp = c;
+        } else if (h < 300) {
+            rp = x; bp = c;
+        } else {
+            rp = c; bp = x;
+        }
+        const r = Math.round((rp + m) * 255);
+        const g = Math.round((gp + m) * 255);
+        const b = Math.round((bp + m) * 255);
+        return (r << 16) | (g << 8) | b;
+    }
+
+    /**
+     * Возвращает цвета плашки заголовка в формате CSS-строк для HTML-инпута
+     * @returns {{ bgCss: string, textCss: string }}
+     */
+    getTitleColors() {
+        const bg = this.fillColor;
+        const text = this._pickTitleTextColor(bg);
+        const toHex = (n) => '#' + n.toString(16).padStart(6, '0');
+        return { bgCss: toHex(bg), textCss: toHex(text) };
+    }
+
+    /**
      * Нарисовать скруглённую подложку под текущую ширину текста
      */
     _redrawTitleBg() {
@@ -380,6 +516,13 @@ export class FrameObject {
 
         const padH = 8; // горизонтальный отступ с каждой стороны
         const padV = 4; // вертикальный отступ с каждой стороны
+
+        // Фон плашки = цвет фрейма (fill или border в зависимости от bgMode — всегда this.fillColor)
+        const bgColor = typeof this.fillColor === 'number' ? this.fillColor : 0xFFFFFF;
+        const textColor = this._pickTitleTextColor(bgColor);
+
+        // Обновляем цвет текста под контраст фона
+        this.titleText.style.fill = textColor;
 
         // Измеряем текст в базовых единицах
         const style = new PIXI.TextStyle({
@@ -394,18 +537,14 @@ export class FrameObject {
 
         const g = this.titleBg;
         g.clear();
-        try {
-            g.lineStyle({ width: 1, color: this.strokeColor, alpha: 1 });
-        } catch (_) {
-            g.lineStyle(1, this.strokeColor, 1);
-        }
-        g.beginFill(0xFFFFFF, 1);
+        g.lineStyle(0);
+        g.beginFill(bgColor, 1);
         g.drawRoundedRect(0, 0, bgW, bgH, 6);
         g.endFill();
 
-        // Текст внутри подложки
+        // Текст внутри подложки — по вертикали по центру (anchor.y = 0.5)
         this.titleText.x = padH;
-        this.titleText.y = padV;
+        this.titleText.y = Math.round(bgH / 2);
     }
 
     /**

@@ -30,38 +30,43 @@ export function createFileNameEditorWrapper() {
     return wrapper;
 }
 
-export function createFrameTitleEditorWrapper() {
+export function createFrameTitleEditorWrapper(bgColor = '#ffffff') {
     const wrapper = document.createElement('div');
     wrapper.className = 'moodboard-frame-title-editor';
     wrapper.style.cssText = `
             position: absolute;
             z-index: 1000;
-            background: white;
-            border: 2px solid #2563eb;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            background: ${bgColor};
+            border: none;
             border-radius: 6px;
-            padding: 3px 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            min-width: 100px;
-            max-width: 320px;
+            padding: 4px 8px;
+            overflow: hidden;
             font-family: Inter, system-ui, -apple-system, Arial, sans-serif;
         `;
     return wrapper;
 }
 
-export function createFrameTitleEditorInput(title) {
+export function createFrameTitleEditorInput(title, textColor = '#333333') {
     const input = document.createElement('input');
     input.type = 'text';
     input.value = title;
     input.style.cssText = `
+            box-sizing: border-box;
             border: none;
             outline: none;
             background: transparent;
             font-family: Inter, system-ui, -apple-system, Arial, sans-serif;
             font-size: 14px;
             font-weight: 500;
+            line-height: 14px;
+            height: 14px;
             width: 100%;
-            padding: 1px 2px;
-            color: #1f2937;
+            margin: 0;
+            padding: 0;
+            color: ${textColor};
         `;
     return input;
 }

@@ -169,12 +169,14 @@ function tryCreateConnectorStyleCommand(core, object, objectId, updates) {
     const { style, start, end } = updates.properties;
 
     // Проверяем, что в updates.properties только style/start/end (и нет посторонних ключей)
-    const allowedKeys = new Set(['style', 'start', 'end', 'locked']);
+    const allowedKeys = new Set(['style', 'start', 'end', 'locked', 'lockMode', 'lockedByFrame']);
     const hasOtherKeys = Object.keys(updates.properties).some(k => !allowedKeys.has(k));
     if (hasOtherKeys) return false;
     // Должно быть хотя бы одно из: style, start, end
     if (!style && start === undefined && end === undefined
-        && updates.properties.locked === undefined) return false;
+        && updates.properties.locked === undefined
+        && updates.properties.lockMode === undefined
+        && updates.properties.lockedByFrame === undefined) return false;
 
     const commandUpdates = {};
     if (style !== undefined) commandUpdates.style = style;
