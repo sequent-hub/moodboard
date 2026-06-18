@@ -20,6 +20,9 @@ export class BaseGrid {
         this.color = options.color;
         this.opacity = options.opacity;
         this.lineWidth = options.lineWidth;
+        // Эфемерный override цвета сетки (производный от фона доски, не сериализуется).
+        // null — используется штатный цвет/бэнды типа сетки.
+        this.colorOverride = null;
         
         // Размеры области отрисовки
         this.width = options.width || 1920;
@@ -167,6 +170,15 @@ export class BaseGrid {
      */
     setColor(color) {
         this.color = color;
+        this.updateVisual();
+    }
+
+    /**
+     * Устанавливает override-цвет сетки (производный от фона доски).
+     * @param {number|null} color — int-цвет либо null для сброса к штатному.
+     */
+    setColorOverride(color) {
+        this.colorOverride = (typeof color === 'number' && Number.isFinite(color)) ? color : null;
         this.updateVisual();
     }
     

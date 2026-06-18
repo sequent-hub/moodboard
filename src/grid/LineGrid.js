@@ -44,15 +44,21 @@ export class LineGrid extends BaseGrid {
             this.graphics.alpha = this.opacity;
         }
         const state = this.getScreenGridState();
+        // Miro-профиль: по умолчанию нативная пара цветов. Если из палитры пришёл colorOverride
+        // (например светлый фон #f0f6fc с gridColor #d4d4d4), используем его — иначе мелкая сетка
+        // сливается с фоном.
+        const mainColor = (typeof this.colorOverride === 'number' && Number.isFinite(this.colorOverride))
+            ? this._deriveMinorColor(this.colorOverride)
+            : this.color;
         try {
             this.graphics.lineStyle({
                 width: Math.max(1, Math.round(this.lineWidth || 1)),
-                color: this.color,
+                color: mainColor,
                 alpha: 1,
                 alignment: 0
             });
         } catch (_) {
-            this.graphics.lineStyle(Math.max(1, Math.round(this.lineWidth || 1)), this.color, 1);
+            this.graphics.lineStyle(Math.max(1, Math.round(this.lineWidth || 1)), mainColor, 1);
         }
         
         // Основные линии сетки
@@ -160,15 +166,18 @@ export class LineGrid extends BaseGrid {
         const { secondGridStep } = this.getScreenGridState();
         const step = Math.max(1, Math.round(secondGridStep || 0));
         if (step <= 0) return;
+        const bigColor = (typeof this.colorOverride === 'number' && Number.isFinite(this.colorOverride))
+            ? this.colorOverride
+            : this.bigGridColor;
         try {
             this.graphics.lineStyle({
                 width: 1,
-                color: this.bigGridColor,
+                color: bigColor,
                 alpha: this.bigGridOpacity,
                 alignment: 0
             });
         } catch (_) {
-            this.graphics.lineStyle(1, this.bigGridColor, this.bigGridOpacity);
+            this.graphics.lineStyle(1, bigColor, this.bigGridOpacity);
         }
         const b = this.getDrawBounds();
         const worldX = this.viewportTransform?.worldX || 0;
@@ -196,6 +205,18 @@ export class LineGrid extends BaseGrid {
             this.graphics.moveTo(b.left, py);
             this.graphics.lineTo(b.right, py);
         }
+    }
+
+    /**
+     * Цвет мелкой сетки из цвета крупной: на 20 светлее на канал, чтобы крупная (override)
+     * читалась как заметный якорь, а мелкая была тоньше/бледнее. Для #d4d4d4 даёт #e8e8e8.
+     */
+    _deriveMinorColor(bigColor) {
+        const delta = 0x14;
+        const r = Math.min(0xFF, ((bigColor >> 16) & 0xFF) + delta);
+        const g = Math.min(0xFF, ((bigColor >> 8) & 0xFF) + delta);
+        const b = Math.min(0xFF, (bigColor & 0xFF) + delta);
+        return (r << 16) | (g << 8) | b;
     }
 
     _normalizeAnchor(anchor, stepPx) {

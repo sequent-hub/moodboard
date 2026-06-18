@@ -1,4 +1,5 @@
 import { Events } from '../core/events/Events.js';
+import { BOARD_PALETTE } from '../ui/boardPalette.js';
 
 export class SettingsApplier {
     constructor(eventBus, pixi, boardService = null, uiRefs = {}) {
@@ -43,6 +44,12 @@ export class SettingsApplier {
                     this.ui.topbar.setPaintButtonHex(this.ui.topbar.mapBoardToBtnHex(boardHex));
                 } catch (_) {}
             }
+            // Цвет сетки производный от фона: для палитры с заданным gridColor — override, иначе сброс.
+            try {
+                if (this.boardService && typeof this.boardService.setGridColorOverride === 'function') {
+                    this.boardService.setGridColorOverride(this._resolveGridColorOverride(bgInt));
+                }
+            } catch (_) {}
         }
 
         // 2) Сетка — применяем только если grid пришёл в partial
@@ -113,6 +120,21 @@ export class SettingsApplier {
 
     _toHex(intColor) {
         try { return `#${(intColor >>> 0).toString(16).padStart(6, '0')}`.toLowerCase(); } catch (_) { return '#f5f5f5'; }
+    }
+
+    /**
+     * Возвращает int-цвет сетки для фона из палитры (если задан gridColor), иначе null.
+     * @param {number|null} bgInt
+     * @returns {number|null}
+     */
+    _resolveGridColorOverride(bgInt) {
+        if (bgInt == null) return null;
+        const hex = this._toHex(bgInt);
+        const entry = BOARD_PALETTE.find((p) => String(p.board).toLowerCase() === hex);
+        if (entry && entry.gridColor) {
+            return this._toIntColor(entry.gridColor);
+        }
+        return null;
     }
 }
 

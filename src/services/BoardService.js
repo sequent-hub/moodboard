@@ -16,6 +16,20 @@ export class BoardService {
 		this._destroyed = false;
 		this._lastZoomCursor = null;
 		this._consumeZoomCursorAnchor = false;
+		// Override цвета сетки, производный от фона доски (null — штатный цвет типа сетки).
+		this._gridColorOverride = null;
+	}
+
+	/**
+	 * Устанавливает override цвета сетки от фона доски и применяет к текущей сетке.
+	 * Сохраняется, чтобы переехать на новую сетку при смене её типа.
+	 * @param {number|null} color
+	 */
+	setGridColorOverride(color) {
+		this._gridColorOverride = (typeof color === 'number' && Number.isFinite(color)) ? color : null;
+		if (this.grid && typeof this.grid.setColorOverride === 'function') {
+			this.grid.setColorOverride(this._gridColorOverride);
+		}
 	}
 
 	async init(getCanvasSize) {
@@ -57,6 +71,9 @@ export class BoardService {
 			};
 			try {
 				this.grid = GridFactory.createGrid(type, gridOptions);
+				if (this._gridColorOverride != null && typeof this.grid.setColorOverride === 'function') {
+					this.grid.setColorOverride(this._gridColorOverride);
+				}
 				this.pixi.setGrid(this.grid);
 				this.refreshGridViewport();
 				this.eventBus.emit(Events.UI.GridCurrent, { type });

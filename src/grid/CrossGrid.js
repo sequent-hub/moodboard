@@ -38,7 +38,7 @@ export class CrossGrid extends BaseGrid {
         const g = this.graphics;
         // Строго без прозрачности.
         g.alpha = 1;
-        const lineColor = getCrossColor(this._zoom, this.color);
+        const lineColor = this.colorOverride != null ? this.colorOverride : getCrossColor(this._zoom, this.color);
         g.beginFill(lineColor, 1);
 
         const checkpoint = getCrossCheckpointForZoom(this._zoom);

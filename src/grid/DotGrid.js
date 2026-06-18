@@ -105,7 +105,7 @@ export class DotGrid extends BaseGrid {
         const zoomPct = checkpoint?.zoomPercent ?? 100;
         const use1px = DOT_1PX_CHECKPOINTS.has(zoomPct);
         const dotSize = use1px ? 0.4 : rawDotSize;
-        const dotColor = getDotColor(this._zoom, this.color);
+        const dotColor = this.colorOverride != null ? this.colorOverride : getDotColor(this._zoom, this.color);
 
         this.graphics.beginFill(dotColor, alpha);
         for (let x = startX; x <= endX; x += stepPx) {
