@@ -16,7 +16,7 @@ import { ChatSettingsPopup } from './ChatSettingsPopup.js';
 import { ChatVideoToolbarPills } from './ChatVideoToolbarPills.js';
 import { ChatExtendedPromptModal } from './ChatExtendedPromptModal.js';
 import { Model3dProgressOverlay } from './Model3dProgressOverlay.js';
-import { Model3dBoardSkeleton } from './Model3dBoardSkeleton.js';
+import { BoardSkeleton } from './BoardSkeleton.js';
 import { ICONS, RATIO_ICONS, COUNT_ICONS } from './icons.js';
 
 const CONTENT_TYPE_OPTIONS = [
@@ -237,6 +237,8 @@ export class ChatWindow {
         // Мировые координаты центра скелетона — модель приземлится ровно сюда,
         // независимо от пана/зума во время генерации.
         this._model3dSkeletonWorld = null;
+        this._videoSkeleton = null;
+        this._videoSkeletonWorld = null;
         this._boardImageMessageIds = new Set();
         this._shiftedForImageBatchKeys = new Set();
         this._boardImageShiftHistory = new Map();
@@ -538,6 +540,7 @@ export class ChatWindow {
         if (this._videoUnsubscribe) { this._videoUnsubscribe(); this._videoUnsubscribe = null; }
         this._videoSession?.abort?.();
         this._videoSession = null;
+        this._clearVideoSkeleton();
         this._videoDurationMenu?.destroy();
         this._videoDurationMenu = null;
         this._videoDurationWrapper?.remove();
@@ -851,7 +854,7 @@ export class ChatWindow {
             y: (screenCenterY - (world?.y || 0)) / s
         };
 
-        this._model3dSkeleton = new Model3dBoardSkeleton({ iconSvg: ICONS.cube });
+        this._model3dSkeleton = new BoardSkeleton({ iconSvg: ICONS.cube, variant: '3d' });
         this._model3dSkeleton.attach(this._container ?? document.body);
         this._model3dSkeleton.setRect(this._compute3dSkeletonRect(this._model3dSkeletonWorld), { animate: false });
         this._scheduleAnimationFrame(() => this._model3dSkeleton?.enter());
@@ -869,6 +872,68 @@ export class ChatWindow {
         this._model3dSkeleton?.destroy();
         this._model3dSkeleton = null;
         this._model3dSkeletonWorld = null;
+    }
+
+    /**
+     * Экранный прямоугольник скелетона видео из мировых координат центра.
+     * Ширина фиксирована BOARD_IMAGE_WIDTH в world-единицах, высота — по соотношению сторон видео.
+     * @param {{x:number,y:number}} worldCenter
+     */
+    _computeVideoSkeletonRect(worldCenter) {
+        const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
+        const s = world?.scale?.x || 1;
+        const [wr, hr] = parseFormatRatio(this._videoRatioId);
+        const width = Math.round(BOARD_IMAGE_WIDTH * s);
+        const height = Math.round(width / (wr / hr));
+        const screenX = Math.round(worldCenter.x * s + (world?.x || 0));
+        const screenY = Math.round(worldCenter.y * s + (world?.y || 0));
+        return {
+            left: Math.round(screenX - width / 2),
+            top: Math.round(screenY - height / 2),
+            width,
+            height,
+            radius: Math.max(2, Math.round(12 * s))
+        };
+    }
+
+    _showVideoSkeleton() {
+        const world = this._boardCore?.pixi?.worldLayer || this._boardCore?.pixi?.app?.stage;
+        if (!world) return;
+        const s = world?.scale?.x || 1;
+
+        const composerRect = this._refs?.composer?.getBoundingClientRect?.();
+        const screenCenterX = composerRect
+            ? Math.round(composerRect.left + composerRect.width / 2)
+            : 400;
+        const screenCenterY = composerRect
+            ? Math.round(composerRect.top - 200)
+            : 200;
+
+        this._clearVideoSkeleton();
+
+        this._videoSkeletonWorld = {
+            x: (screenCenterX - (world?.x || 0)) / s,
+            y: (screenCenterY - (world?.y || 0)) / s
+        };
+
+        this._videoSkeleton = new BoardSkeleton({ iconSvg: ICONS.video, variant: 'video' });
+        this._videoSkeleton.attach(this._container ?? document.body);
+        this._videoSkeleton.setRect(this._computeVideoSkeletonRect(this._videoSkeletonWorld), { animate: false });
+        this._scheduleAnimationFrame(() => this._videoSkeleton?.enter());
+    }
+
+    _syncVideoSkeletonToViewport({ disableTransition = false } = {}) {
+        if (!this._videoSkeleton?.isAttached() || !this._videoSkeletonWorld) return;
+        this._videoSkeleton.setRect(
+            this._computeVideoSkeletonRect(this._videoSkeletonWorld),
+            { animate: !disableTransition }
+        );
+    }
+
+    _clearVideoSkeleton() {
+        this._videoSkeleton?.destroy();
+        this._videoSkeleton = null;
+        this._videoSkeletonWorld = null;
     }
 
     _place3dModelOnBoard(result) {
@@ -1145,6 +1210,13 @@ export class ChatWindow {
             this._videoUnsubscribe = null;
         }
         this._videoUnsubscribe = this._videoSession.subscribe((state) => this._onVideoState(state));
+
+        try {
+            this._showVideoSkeleton();
+        } catch (e) {
+            console.warn('[ChatWindow] _showVideoSkeleton failed:', e);
+        }
+
         const opts = this._getVideoRequestOptions();
         void this._videoSession.start({ ...opts, prompt: text, referenceImages: attachments?.length ? attachments : undefined });
     }
@@ -1155,6 +1227,7 @@ export class ChatWindow {
         }
         if (state.status === 'done') {
             this._composer?.setStreaming(false);
+            this._clearVideoSkeleton();
             // Тип объекта «видео» на доске не существует. Событие Events.UI.PasteImageAt
             // ожидает data URL картинки — видео-URL несовместим. Размещение на доске
             // выходит за рамки текущей фазы (нет объекта типа video).
@@ -1166,6 +1239,7 @@ export class ChatWindow {
         }
         if (state.status === 'error') {
             this._composer?.setStreaming(false);
+            this._clearVideoSkeleton();
             if (this._refs?.errorBlock) {
                 const clean = (state.error || 'Ошибка генерации видео').replace(/^AiClient\.\w+\s*\(\d+\):\s*/, '');
                 this._refs.errorBlock.textContent = clean;
@@ -1174,6 +1248,7 @@ export class ChatWindow {
         }
         if (state.status === 'idle') {
             this._composer?.setStreaming(false);
+            this._clearVideoSkeleton();
         }
     }
 
@@ -1317,20 +1392,13 @@ export class ChatWindow {
 
             overlay.style.borderRadius = `${Math.max(2, Math.round(12 * s))}px`;
 
-            const fontSize = Math.round(20 * s);
-            const labelLeft = 12 * Math.min(1, s);
-            const labelBottom = 10 * Math.min(1, s);
-            overlay.style.setProperty('--moodboard-chat-pending-label-font-size', `${fontSize}px`);
-            overlay.style.setProperty('--moodboard-chat-pending-label-left', `${labelLeft}px`);
-            overlay.style.setProperty('--moodboard-chat-pending-label-bottom', `${labelBottom}px`);
-
             overlay.style.setProperty('--moodboard-chat-board-animation-ms', `${BOARD_IMAGE_REARRANGE_MS}ms`);
             overlay.style.setProperty('--moodboard-chat-pending-enter-x', `${enterDistance}px`);
 
-            const label = document.createElement('span');
-            label.className = 'moodboard-chat__pending-image-label';
-            label.textContent = 'В процессе...';
-            overlay.appendChild(label);
+            const icon = document.createElement('span');
+            icon.className = 'moodboard-chat__pending-overlay-icon';
+            icon.innerHTML = ICONS.image;
+            overlay.appendChild(icon);
 
             (this._container ?? document.body).appendChild(overlay);
 
@@ -1680,10 +1748,12 @@ export class ChatWindow {
         const onPanUpdate = () => {
             this._syncPendingOverlaysToViewport({ disableTransition: true });
             this._sync3dSkeletonToViewport({ disableTransition: true });
+            this._syncVideoSkeletonToViewport({ disableTransition: true });
         };
         const onViewportChange = () => {
             this._syncPendingOverlaysToViewport({ disableTransition: true, recomputeWorld: false });
             this._sync3dSkeletonToViewport({ disableTransition: true });
+            this._syncVideoSkeletonToViewport({ disableTransition: true });
             // Зум меняет проекцию композера в мир: после него существующее изображение может
             // оказаться под заглушкой. Перепроверяем инвариант сразу, не дожидаясь рендера сессии.
             this._ensureExistingImagesClearOfPending();

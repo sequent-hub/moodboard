@@ -1,22 +1,27 @@
 /**
- * DOM-скелетон 3D-модели на полотне доски.
+ * DOM-скелетон генерируемого объекта на полотне доски.
  *
- * Одна ответственность: показывать анимированную заглушку в том месте,
- * где появится сгенерированная 3D-модель. Не знает про сессию и вьюпорт —
- * экранный прямоугольник ему задаёт ChatWindow (он же держит мировые координаты
- * и пересчитывает позицию при pan/zoom).
+ * Одна ответственность: показывать анимированную заглушку (белая карточка,
+ * бегущий блик, пульсирующая иконка) в том месте, где появится результат
+ * генерации. Не знает про сессию и вьюпорт — экранный прямоугольник ему задаёт
+ * ChatWindow (он же держит мировые координаты и пересчитывает позицию при pan/zoom).
+ *
+ * Используется для 3D-моделей, изображений и видео — иконка и вариант задаются
+ * через конструктор.
  *
  * Lifecycle: attach(container) → setRect(rect)* → enter() → detach() → destroy()
  * attach/detach идемпотентны.
  */
-export class Model3dBoardSkeleton {
+export class BoardSkeleton {
     /**
      * @param {object} [opts]
      * @param {string} [opts.iconSvg] HTML-строка иконки (например ICONS.cube)
+     * @param {string} [opts.variant] Модификатор вида ('3d' | 'image' | 'video')
      */
-    constructor({ iconSvg = '' } = {}) {
+    constructor({ iconSvg = '', variant = '' } = {}) {
         this._el = null;
         this._iconSvg = iconSvg;
+        this._variant = variant;
     }
 
     /**
@@ -26,11 +31,14 @@ export class Model3dBoardSkeleton {
         if (this._el) return;
 
         const el = document.createElement('div');
-        el.className = 'moodboard-chat__3d-skeleton moodboard-chat__3d-skeleton--enter';
+        el.className = 'moodboard-chat__board-skeleton moodboard-chat__board-skeleton--enter';
+        if (this._variant) {
+            el.classList.add(`moodboard-chat__board-skeleton--${this._variant}`);
+        }
 
         if (this._iconSvg) {
             const icon = document.createElement('span');
-            icon.className = 'moodboard-chat__3d-skeleton-icon';
+            icon.className = 'moodboard-chat__board-skeleton-icon';
             icon.innerHTML = this._iconSvg;
             el.appendChild(icon);
         }
@@ -71,8 +79,8 @@ export class Model3dBoardSkeleton {
     /** Запускает анимацию появления. */
     enter() {
         if (!this._el) return;
-        this._el.classList.remove('moodboard-chat__3d-skeleton--enter');
-        this._el.classList.add('moodboard-chat__3d-skeleton--entered');
+        this._el.classList.remove('moodboard-chat__board-skeleton--enter');
+        this._el.classList.add('moodboard-chat__board-skeleton--entered');
     }
 
     /** @returns {boolean} */
