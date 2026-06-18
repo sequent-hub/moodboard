@@ -28,6 +28,10 @@ export class SaveManager {
         
         // Состояния сохранения
         this.saveStatus = 'idle'; // idle, saving, saved, error
+
+        // Коллбеки для получения актуальной версии и перезагрузки доски при конфликте версий
+        this._versionGetter = null;
+        this._reloadHandler = null;
         
         this.setupEventListeners();
     }
@@ -37,6 +41,25 @@ export class SaveManager {
      */
     setApiClient(apiClient) {
         this.apiClient = apiClient;
+    }
+
+    /**
+     * Регистрирует функцию, возвращающую актуальный номер версии доски (board.historyHeadVersion).
+     * Вызывается перед каждым сохранением и передаётся в payload как baseVersion.
+     * Если функция вернёт null/undefined/NaN — baseVersion не отправляется (новая доска).
+     * @param {() => number|null} fn
+     */
+    setVersionGetter(fn) {
+        this._versionGetter = fn;
+    }
+
+    /**
+     * Регистрирует async-функцию, перезагружающую доску с сервера (loadExistingBoard).
+     * Вызывается при 409 stale_base_version — перечитывает latest, не перезаписывает сервер.
+     * @param {() => Promise<void>} fn
+     */
+    setReloadHandler(fn) {
+        this._reloadHandler = fn;
     }
     
     /**
@@ -156,6 +179,38 @@ export class SaveManager {
                 console.warn('SaveManager: объект с data:/blob: URL пропущен при сохранении:', error.message);
                 return;
             }
+
+            // 409 stale_base_version: экземпляр устарел — нельзя перезаписывать сервер.
+            // Перечитываем latest. Retry исключён — это не transient-ошибка.
+            if (error?.code === 'stale_base_version') {
+                console.warn(
+                    'SaveManager: 409 stale_base_version — версия доски устарела. Перечитываю latest с сервера...',
+                    error.message
+                );
+                if (typeof this._reloadHandler === 'function') {
+                    try {
+                        await this._reloadHandler();
+                        // После перезагрузки сбрасываем кеш: следующее изменение
+                        // сохранится с актуальной версией без ложного дедупа.
+                        this.lastSavedData = null;
+                        this.hasUnsavedChanges = false;
+                        this.updateSaveStatus('saved');
+                        console.warn(
+                            'SaveManager: состояние доски перечитано с сервера. ' +
+                            'Локальное pending-изменение отменено во избежание затирания чужих данных. ' +
+                            'TODO: переприменить pending-изменение поверх свежего состояния.'
+                        );
+                    } catch (reloadErr) {
+                        console.error('SaveManager: ошибка перечитывания после 409:', reloadErr);
+                        this.updateSaveStatus('error', reloadErr.message);
+                    }
+                } else {
+                    console.warn('SaveManager: _reloadHandler не задан — состояние не синхронизировано.');
+                    this.updateSaveStatus('error', error.message);
+                }
+                return; // НЕ вызываем handleSaveError — retry не нужен
+            }
+
             console.error('Ошибка автосохранения:', error);
             this.handleSaveError(error, data);
         } finally {
@@ -179,10 +234,19 @@ export class SaveManager {
      */
     async sendSaveRequest(data) {
         const boardId = data.id || 'default';
+
+        // Актуальная версия — baseVersion для обнаружения конфликтов на сервере.
+        // null означает «новая доска», бэкенд игнорирует поле.
+        const baseVersion = typeof this._versionGetter === 'function'
+            ? this._versionGetter()
+            : null;
+        const validBaseVersion = (baseVersion !== null && Number.isFinite(Number(baseVersion)) && Number(baseVersion) > 0)
+            ? Number(baseVersion)
+            : null;
         
         // Если есть ApiClient, используем его (он автоматически очистит данные изображений)
         if (this.apiClient) {
-            return await this.apiClient.saveBoard(boardId, data);
+            return await this.apiClient.saveBoard(boardId, data, { baseVersion: validBaseVersion });
         }
         
         // Fallback к прямому запросу (без очистки изображений)
@@ -197,7 +261,8 @@ export class SaveManager {
         const requestBody = {
             moodboardId: boardId,
             state: data,
-            actionType: 'command_execute'
+            actionType: 'command_execute',
+            ...(validBaseVersion !== null ? { baseVersion: validBaseVersion } : {})
         };
 
         const response = await fetch(this.options.saveEndpoint, {
@@ -213,6 +278,18 @@ export class SaveManager {
         });
         
         if (!response.ok) {
+            // Конфликт версий: бэкенд отверг сохранение, т.к. экземпляр устарел
+            if (response.status === 409) {
+                let body = {};
+                try { body = await response.json(); } catch (_) {}
+                if (body?.code === 'stale_base_version') {
+                    const err = new Error(body.message || 'Версия доски устарела');
+                    err.code = 'stale_base_version';
+                    err.currentVersion = body.currentVersion ?? null;
+                    throw err;
+                }
+            }
+
             let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
             
             try {
@@ -289,12 +366,13 @@ export class SaveManager {
         }
     }
 
-    _buildSavePayload(boardId, data, csrfToken = undefined) {
+    _buildSavePayload(boardId, data, csrfToken = undefined, baseVersion = null) {
         return {
             moodboardId: boardId,
             state: data,
             actionType: 'command_execute',
-            _token: csrfToken || undefined
+            _token: csrfToken || undefined,
+            ...(baseVersion !== null ? { baseVersion } : {})
         };
     }
     

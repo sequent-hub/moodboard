@@ -58,6 +58,10 @@ export class ApiClient {
     async saveBoard(boardId, boardData, options = {}) {
         try {
             const actionType = options?.actionType || 'command_execute';
+            const baseVersion = options?.baseVersion ?? null;
+            const validBaseVersion = (baseVersion !== null && Number.isFinite(Number(baseVersion)) && Number(baseVersion) > 0)
+                ? Number(baseVersion)
+                : null;
             // Поддержка формата core.getBoardData(): { id, boardData, settings }
             const payloadBoardData = boardData && boardData.boardData ? boardData.boardData : boardData;
             const payloadSettings = boardData && boardData.settings ? boardData.settings : {};
@@ -130,11 +134,23 @@ export class ApiClient {
                 body: JSON.stringify({
                     moodboardId: boardId,
                     state: cleanedData,
-                    actionType
+                    actionType,
+                    ...(validBaseVersion !== null ? { baseVersion: validBaseVersion } : {})
                 })
             });
 
             if (!response.ok) {
+                // Конфликт версий: бэкенд отверг сохранение, т.к. экземпляр устарел
+                if (response.status === 409) {
+                    let body = {};
+                    try { body = await response.json(); } catch (_) {}
+                    if (body?.code === 'stale_base_version') {
+                        const err = new Error(body.message || 'Версия доски устарела');
+                        err.code = 'stale_base_version';
+                        err.currentVersion = body.currentVersion ?? null;
+                        throw err;
+                    }
+                }
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             

@@ -1,5 +1,6 @@
 import { Events } from '../../core/events/Events.js';
 import { logMindmapCompoundDebug } from '../../mindmap/MindmapCompoundContract.js';
+import { loadExistingBoard } from './MoodBoardLoadApi.js';
 
 function getSelectTool(board) {
     const toolManager = board?.coreMoodboard?.toolManager;
@@ -113,6 +114,21 @@ export function bindTopbarEvents(board) {
 export function bindSaveCallbacks(board) {
     if (!board.coreMoodboard || !board.coreMoodboard.eventBus) {
         return;
+    }
+
+    // Прокидываем актуальную версию экземпляра в SaveManager, чтобы payload
+    // содержал baseVersion и бэкенд мог отклонить сохранение устаревшего состояния (409).
+    const saveManager = board.coreMoodboard.saveManager;
+    if (saveManager) {
+        saveManager.setVersionGetter(() => {
+            const v = board.historyHeadVersion ?? board.currentLoadedVersion ?? null;
+            return (v !== null && Number.isFinite(Number(v)) && Number(v) > 0) ? Number(v) : null;
+        });
+
+        // На 409 stale_base_version — перечитываем latest с сервера, не затираем чужие данные.
+        saveManager.setReloadHandler(async () => {
+            await loadExistingBoard(board, null, { fallbackToSeedOnError: false });
+        });
     }
 
     board.coreMoodboard.eventBus.on('save:success', (data) => {
