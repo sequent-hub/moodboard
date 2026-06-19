@@ -195,7 +195,7 @@
     flex-direction: row;
     align-items: center;
     gap: 8px;
-    padding: 12px 22px;
+    padding: 0 22px;
     background-color: #ffffff;
     border: 1px solid #e0e0e0;
     border-radius: 9999px;
@@ -204,6 +204,10 @@
     font-family: 'Roboto', Arial, sans-serif;
     min-width: 320px;
     height: 36px;
+}
+
+.text-properties-panel * {
+    max-height: 36px;
 }
 
 /* Frame properties toolbar — mirror image toolbar look */
@@ -604,18 +608,151 @@
 
 .text-properties-panel .tpp-label--spaced { margin-left: 6px; }
 
-.text-properties-panel .font-select,
-.text-properties-panel .font-size-select {
-    border: 1px solid #ddd;
-    border-radius: 4px;
+.text-properties-panel .font-select-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.text-properties-panel .font-select {
+    box-sizing: border-box;
+    min-width: 90px;
+    width: 90px;
+    height: 38px;
     padding: 4px 8px;
     font-size: 13px;
     background-color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    user-select: none;
+}
+
+.text-properties-panel .font-select:focus { outline: none; box-shadow: none; }
+
+.text-properties-panel .font-select__label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.text-properties-panel .font-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 180px;
+    max-height: 280px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), 0 4px 10px rgba(0, 0, 0, 0.05);
+    padding: 4px;
+    display: none;
+    z-index: 10000;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+
+.text-properties-panel .font-dropdown.is-open { display: block; }
+
+.text-properties-panel .font-dropdown:hover {
+    scrollbar-color: rgba(170, 170, 170, 0.7) transparent;
+}
+
+.text-properties-panel .font-dropdown::-webkit-scrollbar { width: 9px; }
+.text-properties-panel .font-dropdown::-webkit-scrollbar-button {
+    display: none;
+    height: 0;
+    width: 0;
+}
+.text-properties-panel .font-dropdown::-webkit-scrollbar-track { background: transparent; }
+.text-properties-panel .font-dropdown::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 4px;
+}
+.text-properties-panel .font-dropdown:hover::-webkit-scrollbar-thumb {
+    background: rgba(170, 170, 170, 0.7);
+}
+
+.text-properties-panel .font-dropdown__item {
+    display: block;
+    width: 100%;
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    font-size: 14px;
+    color: #111;
+    cursor: pointer;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.text-properties-panel .font-dropdown__item:hover {
+    background: #f3f4f6;
+}
+
+.text-properties-panel .font-dropdown__item.is-active {
+    background: #2563eb;
+    color: #fff;
+}
+.text-properties-panel .font-size-wrapper {
+    display: flex;
+    align-items: center;
+    position: relative;
+    border: none;
+    border-radius: 4px;
+    background-color: #fff;
+    height: 38px;
+    box-sizing: border-box;
+}
+
+.text-properties-panel .font-size-select {
+    outline: none;
+    height: 100%;
+    width: 32px;
+    border: none;
+    background: transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding: 0 4px 0 8px;
+    font-size: 13px;
     cursor: pointer;
 }
 
-.text-properties-panel .font-select { min-width: 110px; }
-.text-properties-panel .font-size-select { min-width: 56px; }
+.text-properties-panel .font-size-steppers {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 20px;
+    border-left: none;
+}
+
+.text-properties-panel .font-size-stepper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: #666;
+}
+
+.text-properties-panel .font-size-stepper:hover {
+    background: #f5f5f5;
+    color: #333;
+}
+
+.text-properties-panel .font-size-stepper--down {
+    border-bottom-right-radius: 4px;
+    margin-top: -2px;
+}
 
 .text-properties-panel .current-color-button,
 .text-properties-panel .current-bgcolor-button {
@@ -654,19 +791,101 @@
     color: #6155F5;
 }
 
-.text-properties-panel .tpp-align-select,
-.text-properties-panel .tpp-list-select {
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 4px 6px;
-    font-size: 12px;
-    background-color: #fff;
-    height: 28px;
-    cursor: pointer;
-    font-family: 'Roboto', Arial, sans-serif;
+.text-properties-panel .tpp-list-btns {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    position: relative;
 }
-.text-properties-panel .tpp-align-select { min-width: 86px; }
-.text-properties-panel .tpp-list-select { min-width: 110px; }
+.text-properties-panel .tpp-list-btns svg {
+    width: 22px;
+    height: 22px;
+}
+
+.text-properties-panel .tpp-list-modal {
+    max-height: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    flex-direction: column;
+    gap: 2px;
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06);
+    padding: 4px;
+    z-index: 4000;
+}
+
+.text-properties-panel .tpp-list-modal-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #374151;
+    transition: background 0.1s;
+    flex-shrink: 0;
+}
+
+.text-properties-panel .tpp-list-modal-option:hover {
+    background: #f3f4f6;
+}
+
+.text-properties-panel .tpp-align-btns {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    position: relative;
+}
+
+.text-properties-panel .tpp-align-btns img,
+.text-properties-panel .tpp-align-btns svg,
+.text-properties-panel .tpp-align-modal img,
+.text-properties-panel .tpp-align-modal svg {
+    width: 24px;
+    height: 24px;
+}
+
+.text-properties-panel .tpp-align-modal {
+    max-height: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    flex-direction: column;
+    gap: 2px;
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06);
+    padding: 4px;
+    z-index: 4000;
+}
+
+.text-properties-panel .tpp-align-modal-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #374151;
+    transition: background 0.1s;
+    flex-shrink: 0;
+}
+
+.text-properties-panel .tpp-align-modal-option:hover {
+    background: #f3f4f6;
+}
 
 .text-properties-panel .tpp-lh-slider {
     width: 68px;

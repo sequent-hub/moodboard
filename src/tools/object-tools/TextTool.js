@@ -108,7 +108,6 @@ export class TextTool extends BaseTool {
     startEditingNew(textData, x, y) {
         this.isEditing = true;
         this.editingObject = textData;
-        
         this.createTextInput(x, y, '');
         this.emit('text:edit:start', { object: textData });
     }
@@ -166,7 +165,7 @@ export class TextTool extends BaseTool {
         });
         
         // Обработчики событий input
-        this.textInput.addEventListener('blur', () => this.finishEditing());
+        this.textInput.addEventListener('blur', (e) => this.handleBlur(e));
         this.textInput.addEventListener('keydown', (e) => this.handleInputKeys(e));
         this.textInput.addEventListener('input', (e) => this.handleTextChange(e));
         
@@ -181,6 +180,13 @@ export class TextTool extends BaseTool {
         
         // Автоматически подгоняем размер
         this.adjustInputSize();
+    }
+    
+    /**
+     * Обработка blur
+     */
+    handleBlur(event) {
+        this.finishEditing();
     }
     
     /**
@@ -328,7 +334,7 @@ export class TextTool extends BaseTool {
         // TODO: Реализовать поиск текстового объекта по координатам
         return null; // Временная заглушка
     }
-    
+
     /**
      * Обработка клавиш во время редактирования (глобальные)
      */

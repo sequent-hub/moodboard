@@ -99,54 +99,109 @@ export function updateCurrentBgColorButton(panelInstance, color) {
 }
 
 function createFontControls(panelInstance, panel) {
-    const fontLabel = document.createElement('span');
-    fontLabel.textContent = 'Шрифт:';
-    fontLabel.className = 'tpp-label';
-    panel.appendChild(fontLabel);
+    const fontWrapper = document.createElement('div');
+    fontWrapper.className = 'font-select-wrapper';
 
-    panelInstance.fontSelect = document.createElement('select');
-    panelInstance.fontSelect.className = 'font-select';
-    panelInstance.fontSelect.className = 'font-select';
+    const trigger = document.createElement('div');
+    trigger.className = 'font-select';
+    trigger.setAttribute('role', 'combobox');
+    trigger.setAttribute('tabindex', '0');
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
 
-    FONT_OPTIONS.forEach((font) => {
-        const option = document.createElement('option');
-        option.value = font.value;
-        option.textContent = font.name;
-        option.style.fontFamily = font.value;
-        panelInstance.fontSelect.appendChild(option);
+    const triggerLabel = document.createElement('span');
+    triggerLabel.className = 'font-select__label';
+    trigger.appendChild(triggerLabel);
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'font-dropdown';
+    dropdown.setAttribute('role', 'listbox');
+
+    const optionElements = [];
+    const optionRefs = FONT_OPTIONS.map((font) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'font-dropdown__item';
+        item.setAttribute('role', 'option');
+        item.dataset.value = font.value;
+        item.textContent = font.name;
+        item.style.fontFamily = font.value;
+        dropdown.appendChild(item);
+        optionElements.push(item);
+        return { value: font.value, textContent: font.name, element: item };
     });
 
-    panel.appendChild(panelInstance.fontSelect);
+    fontWrapper.appendChild(trigger);
+    fontWrapper.appendChild(dropdown);
+    panel.appendChild(fontWrapper);
 
-    const sizeLabel = document.createElement('span');
-    sizeLabel.textContent = 'Размер:';
-    sizeLabel.className = 'tpp-label tpp-label--spaced';
-    panel.appendChild(sizeLabel);
+    let currentValue = FONT_OPTIONS[0].value;
+    const applyValue = (newValue) => {
+        currentValue = newValue;
+        const match = optionRefs.find((opt) => opt.value === newValue);
+        triggerLabel.textContent = match ? match.textContent : newValue;
+        triggerLabel.style.fontFamily = newValue;
+        optionRefs.forEach((opt) => {
+            opt.element.classList.toggle('is-active', opt.value === newValue);
+        });
+    };
+    applyValue(currentValue);
+
+    Object.defineProperty(trigger, 'value', {
+        configurable: true,
+        get() {
+            return currentValue;
+        },
+        set(newValue) {
+            applyValue(newValue);
+        },
+    });
+    Object.defineProperty(trigger, 'options', {
+        configurable: true,
+        get() {
+            return optionElements;
+        },
+    });
+
+    panelInstance.fontSelect = trigger;
+    panelInstance.fontDropdown = dropdown;
+    panelInstance._fontSelectWrapper = fontWrapper;
+
+    const fontSizeWrapper = document.createElement('div');
+    fontSizeWrapper.className = 'font-size-wrapper';
 
     panelInstance.fontSizeSelect = document.createElement('select');
-    panelInstance.fontSizeSelect.className = 'font-size-select';
     panelInstance.fontSizeSelect.className = 'font-size-select';
 
     FONT_SIZE_OPTIONS.forEach((size) => {
         const option = document.createElement('option');
         option.value = size;
-        option.textContent = `${size}px`;
+        option.textContent = String(size);
         panelInstance.fontSizeSelect.appendChild(option);
     });
 
-    panel.appendChild(panelInstance.fontSizeSelect);
+    const stepperContainer = document.createElement('div');
+    stepperContainer.className = 'font-size-steppers';
 
-    const colorLabel = document.createElement('span');
-    colorLabel.textContent = 'Цвет:';
-    colorLabel.className = 'tpp-label tpp-label--spaced';
-    panel.appendChild(colorLabel);
+    panelInstance.fontSizeUpBtn = document.createElement('button');
+    panelInstance.fontSizeUpBtn.type = 'button';
+    panelInstance.fontSizeUpBtn.className = 'font-size-stepper font-size-stepper--up';
+    panelInstance.fontSizeUpBtn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg" style="top: 1px;"><path d="M8.25 6.75L5 3.25L1.75 6.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+
+    panelInstance.fontSizeDownBtn = document.createElement('button');
+    panelInstance.fontSizeDownBtn.type = 'button';
+    panelInstance.fontSizeDownBtn.className = 'font-size-stepper font-size-stepper--down';
+    panelInstance.fontSizeDownBtn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="bottom: 1px;"><path d="M8.25 3.25L5 6.75L1.75 3.25"></path></svg>';
+
+    stepperContainer.appendChild(panelInstance.fontSizeUpBtn);
+    stepperContainer.appendChild(panelInstance.fontSizeDownBtn);
+
+    fontSizeWrapper.appendChild(panelInstance.fontSizeSelect);
+    fontSizeWrapper.appendChild(stepperContainer);
+
+    panel.appendChild(fontSizeWrapper);
 
     createCompactColorSelector(panelInstance, panel);
-
-    const bgColorLabel = document.createElement('span');
-    bgColorLabel.textContent = 'Фон:';
-    bgColorLabel.className = 'tpp-label tpp-label--spaced';
-    panel.appendChild(bgColorLabel);
 
     createCompactBackgroundSelector(panelInstance, panel);
 

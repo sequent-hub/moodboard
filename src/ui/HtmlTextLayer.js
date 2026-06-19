@@ -173,6 +173,12 @@ export class HtmlTextLayer {
                     el.style.overflowWrap = isMarkdown ? 'break-word' : '';
                     if (!isMarkdown) el.style.padding = '0';
                 }
+                // После коммита текста высота .mb-text осталась от пустого редактора (схлопнута),
+                // а ResizeUpdate при завершении редактирования отрабатывает раньше синхронизации
+                // контента. Без пере-подгонки DOM-бокс не оборачивает глифы, и рамка выделения,
+                // строящаяся по getBoundingClientRect этого блока, оказывается выше текста.
+                this._autoFitTextHeight(objectId);
+                this.updateOne(objectId);
                 console.log(`🔍 HtmlTextLayer: содержимое обновлено для ${objectId}:`, content);
             } else {
                 console.warn(`❌ HtmlTextLayer: не удалось обновить содержимое для ${objectId}:`, { el: !!el, content });

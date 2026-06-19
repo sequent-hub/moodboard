@@ -164,6 +164,22 @@ export function createTextEditorFinalize(controller, {
     };
 }
 
+// Классы DOM-элементов, клики по которым не должны закрывать пустой текстовый редактор.
+const UI_BLOCK_SELECTOR = [
+    '.moodboard-toolbar',
+    '.text-properties-layer',
+    '.moodboard-topbar',
+    '.moodboard-zoom-panel',
+    '.moodboard-ui-layer',
+].join(', ');
+
+/**
+ * Возвращает true, если элемент находится внутри UI-панелей (тулбар, панель свойств текста и т.п.).
+ */
+function _isInsideToolbarUI(target) {
+    return !!(target && typeof target.closest === 'function' && target.closest(UI_BLOCK_SELECTOR));
+}
+
 export function bindTextEditorInteractions(controller, {
     textarea,
     isNewCreation,
@@ -191,6 +207,46 @@ export function bindTextEditorInteractions(controller, {
             finalize(true);
         }, 0);
     };
+
+    // Перехватываем mousedown на тулбаре/панелях в capture-фазе, чтобы:
+    // 1. Предотвратить потерю фокуса textarea (e.preventDefault()).
+    // 2. Заблокировать последующий click до ToolbarActionRouter (одноразовый capture-обработчик).
+    // Работает только пока поле ввода пусто и объект только что создан — если текст уже есть,
+    // клик по другому инструменту отрабатывает штатно (commit + переключение).
+    let _pendingClickBlocker = null;
+    const mousedownCaptureHandler = (e) => {
+        if (!controller?.textEditor?.active) return;
+        if (e.target === textarea) return;
+        if (!_isInsideToolbarUI(e.target)) return;
+
+        const value = (textarea.value || '').trim();
+        if (!isNewCreation || value.length > 0) return;
+
+        // Пустое новое поле + клик по UI: не даём сместить фокус с textarea.
+        e.preventDefault();
+
+        // Блокируем следующий click-события, чтобы ToolbarActionRouter не переключил инструмент.
+        if (_pendingClickBlocker) {
+            document.removeEventListener('click', _pendingClickBlocker, true);
+        }
+        _pendingClickBlocker = (ce) => {
+            if (_isInsideToolbarUI(ce.target)) {
+                ce.stopPropagation();
+                ce.preventDefault();
+            }
+            document.removeEventListener('click', _pendingClickBlocker, true);
+            _pendingClickBlocker = null;
+        };
+        document.addEventListener('click', _pendingClickBlocker, true);
+
+        // Страховочный возврат фокуса на случай, если браузер всё-таки убрал фокус.
+        setTimeout(() => {
+            if (controller?.textEditor?.active && textarea) {
+                try { textarea.focus(); } catch (_) {}
+            }
+        }, 0);
+    };
+    document.addEventListener('mousedown', mousedownCaptureHandler, true);
 
     const keydownHandler = (e) => {
         const isList = listType && listType !== 'none';
@@ -244,6 +300,11 @@ export function bindTextEditorInteractions(controller, {
         textarea.removeEventListener('blur', blurHandler);
         textarea.removeEventListener('keydown', keydownHandler);
         textarea.removeEventListener('input', inputHandler);
+        document.removeEventListener('mousedown', mousedownCaptureHandler, true);
+        if (_pendingClickBlocker) {
+            document.removeEventListener('click', _pendingClickBlocker, true);
+            _pendingClickBlocker = null;
+        }
     };
 
     if (controller.textEditor) {

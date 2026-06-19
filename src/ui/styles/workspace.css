@@ -684,7 +684,7 @@
 }
 
 .text-properties-panel .font-select { min-width: 110px; }
-.text-properties-panel .font-size-select { min-width: 56px; }
+.text-properties-panel .font-size-select { min-width: 32px; }
 
 .text-properties-panel .current-color-button,
 .text-properties-panel .current-bgcolor-button {

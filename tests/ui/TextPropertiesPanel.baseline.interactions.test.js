@@ -40,8 +40,9 @@ describe('TextPropertiesPanel baseline: interactions contracts', () => {
     });
 
     it('emits stable payload for font family change and syncs UI/model state', () => {
-        panel.fontSelect.value = '"Playfair Display", Georgia, serif';
-        panel.fontSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        const targetValue = '"Playfair Display", Georgia, serif';
+        const item = panel.fontDropdown.querySelector(`.font-dropdown__item[data-value='${targetValue}']`);
+        item.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
         expect(getLastStateChangedCall(ctx.eventBus)).toEqual([
             Events.Object.StateChanged,

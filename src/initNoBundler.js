@@ -356,7 +356,7 @@ export function forceInjectPanelStyles() {
         }
         
         .font-select { min-width: 110px !important; }
-        .font-size-select { min-width: 56px !important; }
+        .font-size-select { min-width: 32px !important; }
         
         .current-color-button, .current-bgcolor-button, .fpp-color-button {
             width: 28px !important;

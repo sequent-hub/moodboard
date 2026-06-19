@@ -49,7 +49,7 @@ export class StyleLoader {
             }
             
             .font-select { min-width: 110px; }
-            .font-size-select { min-width: 56px; }
+            .font-size-select { min-width: 32px; }
             
             .text-properties-panel .tpp-label--spaced { margin-left: 6px; }
             

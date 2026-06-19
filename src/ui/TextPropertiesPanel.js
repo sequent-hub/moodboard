@@ -349,7 +349,11 @@ export class TextPropertiesPanel {
         const panelY = screenY - this.panel.offsetHeight - 20;
 
         const containerRect = this.container.getBoundingClientRect();
-        const finalX = Math.max(10, Math.min(panelX, containerRect.width - this.panel.offsetWidth - 10));
+        const toolbarEl = document.querySelector('.moodboard-toolbar');
+        const toolbarRight = toolbarEl
+            ? toolbarEl.getBoundingClientRect().right - containerRect.left + 10
+            : 10;
+        const finalX = Math.max(toolbarRight, Math.min(panelX, containerRect.width - this.panel.offsetWidth - 10));
         const finalY = Math.max(10, panelY);
 
         this.panel.style.left = `${Math.round(finalX)}px`;
