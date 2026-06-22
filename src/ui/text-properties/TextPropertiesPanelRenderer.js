@@ -5,6 +5,7 @@ import {
     TEXT_COLOR_PRESETS,
 } from './TextPropertiesPanelMapper.js';
 import { createTextFormatControls } from './TextFormatControls.js';
+import { createTextLockMoreControls } from './TextLockMoreControls.js';
 
 export function createTextPropertiesPanelRenderer(panelInstance) {
     const panel = document.createElement('div');
@@ -36,11 +37,43 @@ export function hideColorDropdown(panelInstance) {
 
 export function updateCurrentColorButton(panelInstance, color) {
     if (panelInstance.currentColorButton) {
-        panelInstance.currentColorButton.style.backgroundColor = color;
+        if (panelInstance.colorIndicator) {
+            panelInstance.colorIndicator.style.backgroundColor = color;
+        }
         panelInstance.currentColorButton.title = `Текущий цвет: ${color}`;
     }
     if (panelInstance.colorInput) {
         panelInstance.colorInput.value = color;
+    }
+}
+
+export function toggleHighlightDropdown(panelInstance) {
+    if (!panelInstance.highlightDropdown) {
+        return;
+    }
+
+    if (panelInstance.highlightDropdown.style.display === 'none') {
+        panelInstance.highlightDropdown.style.display = 'block';
+    } else {
+        panelInstance.highlightDropdown.style.display = 'none';
+    }
+}
+
+export function hideHighlightDropdown(panelInstance) {
+    if (panelInstance.highlightDropdown) {
+        panelInstance.highlightDropdown.style.display = 'none';
+    }
+}
+
+export function updateCurrentHighlightButton(panelInstance, color) {
+    if (panelInstance.currentHighlightButton) {
+        if (panelInstance.highlightIndicator) {
+            panelInstance.highlightIndicator.style.backgroundColor = color === 'transparent' ? 'transparent' : color;
+        }
+        panelInstance.currentHighlightButton.title = color === 'transparent' ? 'Без фона текста' : `Цвет фона текста: ${color}`;
+    }
+    if (panelInstance.highlightInput) {
+        panelInstance.highlightInput.value = color === 'transparent' ? '#ffff99' : color;
     }
 }
 
@@ -68,24 +101,27 @@ export function updateCurrentBgColorButton(panelInstance, color) {
             panelInstance.currentBgColorButton.style.backgroundColor = 'white';
             panelInstance.currentBgColorButton.title = 'Без выделения';
 
-            if (!panelInstance.currentBgColorButton.querySelector('div')) {
-                const line = document.createElement('div');
-                line.style.cssText = `
-                    width: 20px;
-                    height: 1px;
-                    background: #ff0000;
-                    transform: rotate(45deg);
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform-origin: center;
-                    transform: translate(-50%, -50%) rotate(45deg);
-                `;
-                panelInstance.currentBgColorButton.appendChild(line);
+            const line = panelInstance.currentBgColorButton.querySelector('div');
+            if (line) {
+                line.remove();
+            }
+
+            if (!panelInstance.currentBgColorButton.querySelector('img.no-color-icon')) {
+                const img = document.createElement('img');
+                img.src = '/icons/no-color.svg';
+                img.className = 'no-color-icon';
+                img.style.cssText = 'width: 20px; height: 20px; pointer-events: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);';
+                panelInstance.currentBgColorButton.appendChild(img);
             }
         } else {
             panelInstance.currentBgColorButton.style.backgroundColor = color;
             panelInstance.currentBgColorButton.title = `Цвет выделения: ${color}`;
+            
+            const img = panelInstance.currentBgColorButton.querySelector('img.no-color-icon');
+            if (img) {
+                img.remove();
+            }
+            
             const line = panelInstance.currentBgColorButton.querySelector('div');
             if (line) {
                 line.remove();
@@ -114,6 +150,7 @@ function createFontControls(panelInstance, panel) {
     trigger.appendChild(triggerLabel);
 
     const dropdown = document.createElement('div');
+    dropdown.id = `tpp-font-dropdown-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     dropdown.className = 'font-dropdown';
     dropdown.setAttribute('role', 'listbox');
 
@@ -167,6 +204,10 @@ function createFontControls(panelInstance, panel) {
     panelInstance.fontDropdown = dropdown;
     panelInstance._fontSelectWrapper = fontWrapper;
 
+    const fontSeparator = document.createElement('div');
+    fontSeparator.style.cssText = 'width:1px;height:18px;background:#e0e0e0;margin:0 6px;flex-shrink:0;';
+    panel.appendChild(fontSeparator);
+
     const fontSizeWrapper = document.createElement('div');
     fontSizeWrapper.className = 'font-size-wrapper';
 
@@ -201,7 +242,13 @@ function createFontControls(panelInstance, panel) {
 
     panel.appendChild(fontSizeWrapper);
 
+    const colorSeparator = document.createElement('div');
+    colorSeparator.style.cssText = 'width:1px;height:18px;background:#e0e0e0;margin:0 6px;flex-shrink:0;';
+    panel.appendChild(colorSeparator);
+
     createCompactColorSelector(panelInstance, panel);
+
+    createCompactHighlightSelector(panelInstance, panel);
 
     createCompactBackgroundSelector(panelInstance, panel);
 
@@ -227,6 +274,8 @@ function createFontControls(panelInstance, panel) {
     panel.appendChild(mdLabel);
 
     createTextFormatControls(panelInstance, panel);
+
+    createTextLockMoreControls(panelInstance, panel);
 }
 
 function createCompactColorSelector(panelInstance, panel) {
@@ -234,7 +283,6 @@ function createCompactColorSelector(panelInstance, panel) {
     colorSelectorContainer.style.cssText = `
         position: relative;
         display: inline-block;
-        margin-left: 4px;
     `;
     panelInstance._colorSelectorContainer = colorSelectorContainer;
 
@@ -243,7 +291,26 @@ function createCompactColorSelector(panelInstance, panel) {
     panelInstance.currentColorButton.title = 'Выбрать цвет';
     panelInstance.currentColorButton.className = 'current-color-button';
 
+    const colorIcon = document.createElement('span');
+    colorIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5636 13.9875L12 5L15.4364 13.9875"></path><path d="M9.88525 10.8155H14.1147"></path></svg>';
+    colorIcon.style.cssText = 'width: 24px; height: 24px; pointer-events: none; display: flex; align-items: center; justify-content: center;';
+
+    panelInstance.colorIndicator = document.createElement('div');
+    panelInstance.colorIndicator.style.cssText = `
+        width: 18px;
+        height: 5px;
+        position: absolute;
+        bottom: 2px;
+        background: rgb(255, 235, 164);
+        box-shadow: rgba(0, 0, 0, 0.1) 0px 0px 0px 1px inset;
+        border-radius: 2px;
+    `;
+
+    panelInstance.currentColorButton.appendChild(colorIcon);
+    panelInstance.currentColorButton.appendChild(panelInstance.colorIndicator);
+
     panelInstance.colorDropdown = document.createElement('div');
+    panelInstance.colorDropdown.id = `tpp-color-dropdown-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     panelInstance.colorDropdown.style.cssText = `
         position: absolute;
         top: 100%;
@@ -255,7 +322,7 @@ function createCompactColorSelector(panelInstance, panel) {
         padding: 8px;
         display: none;
         z-index: 10000;
-        min-width: 200px;
+        width: max-content;
     `;
 
     createColorGrid(panelInstance, panelInstance.colorDropdown);
@@ -356,6 +423,178 @@ function createColorGrid(panelInstance, container) {
     container.appendChild(customContainer);
 }
 
+function createCompactHighlightSelector(panelInstance, panel) {
+    const highlightSelectorContainer = document.createElement('div');
+    highlightSelectorContainer.style.cssText = `
+        position: relative;
+        display: inline-block;
+        margin-left: 4px;
+    `;
+    panelInstance._highlightSelectorContainer = highlightSelectorContainer;
+
+    panelInstance.currentHighlightButton = document.createElement('button');
+    panelInstance.currentHighlightButton.type = 'button';
+    panelInstance.currentHighlightButton.title = 'Выбрать цвет фона текста';
+    panelInstance.currentHighlightButton.className = 'current-highlight-button';
+
+    const highlightIcon = document.createElement('span');
+    highlightIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.431 13.4828L17.5 6.27586L15.2241 4L8.01724 10.069M11.431 13.4828L6.5 15L8.01724 10.069M11.431 13.4828L8.01724 10.069" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+    highlightIcon.style.cssText = 'width: 24px; height: 24px; pointer-events: none; display: flex; align-items: center; justify-content: center;';
+
+    panelInstance.highlightIndicator = document.createElement('div');
+    panelInstance.highlightIndicator.style.cssText = `
+        width: 18px;
+        height: 5px;
+        position: absolute;
+        bottom: 2px;
+        background: transparent;
+        box-shadow: rgba(0, 0, 0, 0.1) 0px 0px 0px 1px inset;
+        border-radius: 2px;
+    `;
+
+    panelInstance.currentHighlightButton.appendChild(highlightIcon);
+    panelInstance.currentHighlightButton.appendChild(panelInstance.highlightIndicator);
+
+    panelInstance.highlightDropdown = document.createElement('div');
+    panelInstance.highlightDropdown.id = `tpp-highlight-dropdown-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    panelInstance.highlightDropdown.style.cssText = `
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        padding: 8px;
+        display: none;
+        z-index: 10000;
+        width: max-content;
+    `;
+
+    createHighlightColorGrid(panelInstance, panelInstance.highlightDropdown);
+
+    highlightSelectorContainer.appendChild(panelInstance.currentHighlightButton);
+    highlightSelectorContainer.appendChild(panelInstance.highlightDropdown);
+    panel.appendChild(highlightSelectorContainer);
+}
+
+function createHighlightColorGrid(panelInstance, container) {
+    const presetsGrid = document.createElement('div');
+    presetsGrid.style.cssText = `
+        display: grid;
+        grid-template-columns: repeat(6, 28px);
+        gap: 6px;
+        margin-bottom: 8px;
+        align-items: center;
+        justify-items: center;
+    `;
+
+    panelInstance._highlightPresetButtons = [];
+
+    BACKGROUND_COLOR_PRESETS.forEach((preset) => {
+        const colorButton = document.createElement('button');
+        colorButton.type = 'button';
+        colorButton.title = preset.name;
+        colorButton.dataset.colorValue = preset.color;
+
+        if (preset.color === 'transparent') {
+            colorButton.style.cssText = `
+                width: 28px;
+                height: 28px;
+                border: 1px solid #ddd;
+                border-radius: 50%;
+                background: white;
+                cursor: pointer;
+                margin: 0;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-sizing: border-box;
+                position: relative;
+            `;
+
+            const img = document.createElement('img');
+            img.src = '/icons/no-color.svg';
+            img.className = 'no-color-icon';
+            img.style.cssText = 'width: 20px; height: 20px; pointer-events: none;';
+            colorButton.appendChild(img);
+        } else {
+            colorButton.style.cssText = `
+                width: 28px;
+                height: 28px;
+                border: 1px solid #ddd;
+                border-radius: 50%;
+                background-color: ${preset.color};
+                cursor: pointer;
+                margin: 0;
+                padding: 0;
+                display: block;
+                box-sizing: border-box;
+                ${preset.color === '#ffffff' ? 'border-color: #ccc;' : ''}
+                position: relative;
+            `;
+
+            const tick = document.createElement('i');
+            tick.style.cssText = `
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                width: 8px;
+                height: 5px;
+                transform: translate(-50%, -50%) rotate(315deg) scaleX(-1);
+                border-right: 2px solid #111;
+                border-bottom: 2px solid #111;
+                display: none;
+                pointer-events: none;
+            `;
+            colorButton.appendChild(tick);
+        }
+
+        presetsGrid.appendChild(colorButton);
+        panelInstance._highlightPresetButtons.push(colorButton);
+    });
+
+    container.appendChild(presetsGrid);
+
+    const separator = document.createElement('div');
+    separator.style.cssText = `
+        height: 1px;
+        background: #eee;
+        margin: 8px 0;
+    `;
+    container.appendChild(separator);
+
+    const customContainer = document.createElement('div');
+    customContainer.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    `;
+
+    const customLabel = document.createElement('span');
+    customLabel.textContent = 'Свой цвет:';
+    customLabel.style.cssText = `
+        font-size: 12px;
+        color: #666;
+    `;
+
+    panelInstance.highlightInput = document.createElement('input');
+    panelInstance.highlightInput.type = 'color';
+    panelInstance.highlightInput.style.cssText = `
+        width: 32px;
+        height: 24px;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+        cursor: pointer;
+        padding: 0;
+    `;
+
+    customContainer.appendChild(customLabel);
+    customContainer.appendChild(panelInstance.highlightInput);
+    container.appendChild(customContainer);
+}
+
 function createCompactBackgroundSelector(panelInstance, panel) {
     const bgSelectorContainer = document.createElement('div');
     bgSelectorContainer.style.cssText = `
@@ -371,6 +610,7 @@ function createCompactBackgroundSelector(panelInstance, panel) {
     panelInstance.currentBgColorButton.className = 'current-bgcolor-button';
 
     panelInstance.bgColorDropdown = document.createElement('div');
+    panelInstance.bgColorDropdown.id = `tpp-bgcolor-dropdown-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     panelInstance.bgColorDropdown.style.cssText = `
         position: absolute;
         top: 100%;
@@ -382,7 +622,7 @@ function createCompactBackgroundSelector(panelInstance, panel) {
         padding: 8px;
         display: none;
         z-index: 10000;
-        min-width: 200px;
+        width: max-content;
     `;
 
     createBackgroundColorGrid(panelInstance, panelInstance.bgColorDropdown);
@@ -428,14 +668,11 @@ function createBackgroundColorGrid(panelInstance, container) {
                 position: relative;
             `;
 
-            const line = document.createElement('div');
-            line.style.cssText = `
-                width: 20px;
-                height: 1px;
-                background: #ff0000;
-                transform: rotate(45deg);
-            `;
-            colorButton.appendChild(line);
+            const img = document.createElement('img');
+            img.src = '/icons/no-color.svg';
+            img.className = 'no-color-icon';
+            img.style.cssText = 'width: 20px; height: 20px; pointer-events: none;';
+            colorButton.appendChild(img);
         } else {
             colorButton.style.cssText = `
                 width: 28px;

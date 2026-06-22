@@ -68,6 +68,44 @@ function resolveLineHeightRatio(baseFontSizePx, properties) {
 }
 
 /**
+ * Строит безопасный HTML-фрагмент с кликабельными ссылками по массиву диапазонов.
+ * Символы вне ссылок экранируются через textContent. Диапазоны не должны пересекаться.
+ * @param {string} content
+ * @param {Array<{start:number, end:number, url:string}>} links
+ * @returns {string} готовый innerHTML
+ */
+function _buildHtmlWithLinks(content, links) {
+    if (!links || links.length === 0) return _escapeHtml(content);
+
+    const sorted = [...links]
+        .filter(l => typeof l.start === 'number' && typeof l.end === 'number' && l.end > l.start && l.url)
+        .sort((a, b) => a.start - b.start);
+
+    let result = '';
+    let pos = 0;
+    for (const link of sorted) {
+        const s = Math.max(0, link.start);
+        const e = Math.min(content.length, link.end);
+        if (s < pos) continue; // пропускаем пересечения
+        if (s > pos) result += _escapeHtml(content.slice(pos, s));
+        const linkText = _escapeHtml(content.slice(s, e));
+        const href = _escapeAttr(link.url);
+        result += `<a href="${href}" target="_blank" rel="noopener noreferrer" class="mb-text-link">${linkText}</a>`;
+        pos = e;
+    }
+    if (pos < content.length) result += _escapeHtml(content.slice(pos));
+    return result;
+}
+
+function _escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function _escapeAttr(str) {
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+/**
  * HtmlTextLayer — рисует текст как HTML-элементы поверх PIXI для максимальной чёткости
  * Синхронизирует позицию/размер/масштаб с миром (worldLayer) и состоянием объектов
  */
@@ -108,6 +146,10 @@ export class HtmlTextLayer {
             if (objectData.type === 'text' || objectData.type === 'simple-text' || objectData.type === 'shape') {
                 this._ensureTextEl(objectId, objectData);
                 this.updateOne(objectId);
+                // Нормализуем высоту по реальному scrollHeight .mb-text,
+                // чтобы начальная рамка совпадала с той, что получается после
+                // любого изменения свойства (там тоже вызывается _autoFitTextHeight).
+                this._autoFitTextHeight(objectId);
             }
         });
         this.eventBus.on(Events.Object.Deleted, ({ objectId }) => {
@@ -166,7 +208,8 @@ export class HtmlTextLayer {
             if (el && typeof content === 'string') {
                 const _obj = this.core?.state?.state?.objects?.find(o => o.id === objectId);
                 const isMarkdown = resolveMarkdown(_obj?.properties, content);
-                this._syncElementContent(el, content, isMarkdown);
+                const _links = !isMarkdown ? (_obj?.properties?.links || null) : null;
+                this._syncElementContent(el, content, isMarkdown, _links);
                 if (el.classList.contains('mb-text--md') !== isMarkdown) {
                     el.classList.toggle('mb-text--md', isMarkdown);
                     el.style.whiteSpace = isMarkdown ? 'normal' : 'pre';
@@ -210,6 +253,20 @@ export class HtmlTextLayer {
                 if (updates.backgroundColor !== undefined) {
                     el.style.backgroundColor = updates.backgroundColor === 'transparent' ? '' : updates.backgroundColor;
                     console.log(`🔍 HtmlTextLayer: обновлен фон для ${objectId}:`, updates.backgroundColor);
+                }
+                if (updates.highlightColor !== undefined) {
+                    if (updates.highlightColor === 'transparent') {
+                        el.style.removeProperty('--highlight-color');
+                        // Не сбрасываем backgroundColor, так как он может быть установлен отдельно
+                    } else {
+                        el.style.setProperty('--highlight-color', updates.highlightColor);
+                        // Для обычного текста без Quill мы можем просто установить backgroundColor
+                        // если нет выделения
+                        if (!el.querySelector('span[style*="background-color"]')) {
+                            el.style.backgroundColor = updates.highlightColor;
+                        }
+                    }
+                    console.log(`🔍 HtmlTextLayer: обновлен цвет фона текста для ${objectId}:`, updates.highlightColor);
                 }
                 // После изменения свойств текста — автоподгон высоты рамки под контент и принудительное обновление
                 this._autoFitTextHeight(objectId);
@@ -422,7 +479,8 @@ export class HtmlTextLayer {
         const initDec = [props.underline && 'underline', props.strikethrough && 'line-through'].filter(Boolean).join(' ');
         el.style.textDecoration = initDec || '';
         el.style.textAlign = props.textAlign || '';
-        this._syncElementContent(el, content, isMarkdown);
+        const initLinks = !isMarkdown ? (props.links || null) : null;
+        this._syncElementContent(el, content, isMarkdown, initLinks);
         // Базовые размеры сохраняем в dataset
         const fs = objectData.fontSize || objectData.properties?.fontSize || 32;
         const bw = Math.max(1, objectData.width || objectData.properties?.baseW || 160);
@@ -629,7 +687,8 @@ export class HtmlTextLayer {
                 el.style.padding = '';
             } else {
                 el.dataset.renderedList = '';
-                const contentChanged = this._syncElementContent(el, content, isMarkdown);
+                const plainLinks = !isMarkdown ? (props.links || null) : null;
+                const contentChanged = this._syncElementContent(el, content, isMarkdown, plainLinks);
                 if (contentChanged) {
                     console.log(`🔍 HtmlTextLayer: содержимое обновлено в updateOne для ${objectId}:`, content);
                 }
@@ -686,18 +745,26 @@ export class HtmlTextLayer {
         });
     }
 
-    /** Обновляет innerHTML/textContent только при реальной смене content или флага markdown */
-    _syncElementContent(el, content, isMarkdown) {
+    /** Обновляет innerHTML/textContent только при реальной смене content, флага markdown или ссылок */
+    _syncElementContent(el, content, isMarkdown, links) {
         if (typeof content !== 'string') return false;
         const mdFlag = isMarkdown ? '1' : '0';
-        if (el.dataset.renderedContent === content && el.dataset.renderedMd === mdFlag) return false;
+        const linksKey = (Array.isArray(links) && links.length > 0) ? JSON.stringify(links) : '';
+        if (
+            el.dataset.renderedContent === content &&
+            el.dataset.renderedMd === mdFlag &&
+            (el.dataset.renderedLinks || '') === linksKey
+        ) return false;
         if (isMarkdown) {
             el.innerHTML = renderRichText(content);
+        } else if (linksKey) {
+            el.innerHTML = _buildHtmlWithLinks(content, links);
         } else {
             el.textContent = content;
         }
         el.dataset.renderedContent = content;
         el.dataset.renderedMd = mdFlag;
+        el.dataset.renderedLinks = linksKey;
         return true;
     }
 

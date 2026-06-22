@@ -97,6 +97,7 @@ export function getControlValuesFromProperties(properties) {
         fontFamily: properties.fontFamily || 'Roboto, Arial, sans-serif',
         fontSize: String(properties.fontSize || 18),
         color: properties.color || '#000000',
+        highlightColor: properties.highlightColor !== undefined ? properties.highlightColor : 'transparent',
         backgroundColor: properties.backgroundColor !== undefined ? properties.backgroundColor : 'transparent',
         markdown: properties.markdown === true,
         bold: properties.bold === true,
@@ -114,6 +115,7 @@ export function getFallbackControlValues() {
         fontFamily: 'Arial, sans-serif',
         fontSize: '18',
         color: '#000000',
+        highlightColor: 'transparent',
         backgroundColor: 'transparent',
         markdown: false,
         bold: false,
@@ -150,6 +152,12 @@ export function buildBackgroundColorUpdate(backgroundColor) {
     };
 }
 
+export function buildHighlightColorUpdate(highlightColor) {
+    return {
+        properties: { highlightColor },
+    };
+}
+
 export function buildMarkdownUpdate(markdown) {
     return {
         properties: { markdown },
@@ -180,6 +188,21 @@ export function applyTextAppearanceToDom(objectId, properties) {
             htmlElement.style.backgroundColor = '';
         } else {
             htmlElement.style.backgroundColor = properties.backgroundColor;
+        }
+    }
+    if (properties.highlightColor !== undefined) {
+        // Устанавливаем CSS-переменную --highlight-color на элементе текста,
+        // чтобы она могла использоваться для подкраски выделенного фрагмента
+        if (properties.highlightColor === 'transparent') {
+            htmlElement.style.removeProperty('--highlight-color');
+            // Не сбрасываем backgroundColor, так как он может быть установлен отдельно
+        } else {
+            htmlElement.style.setProperty('--highlight-color', properties.highlightColor);
+            // Для обычного текста без Quill мы можем просто установить backgroundColor
+            // если нет выделения
+            if (!htmlElement.querySelector('span[style*="background-color"]')) {
+                htmlElement.style.backgroundColor = properties.highlightColor;
+            }
         }
     }
     if (properties.bold !== undefined) {

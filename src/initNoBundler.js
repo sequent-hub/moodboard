@@ -203,10 +203,22 @@ export function injectCriticalStyles() {
             min-height: 20px;
         }
         
-        .current-color-button, .current-bgcolor-button, .fpp-color-button {
-            width: 28px !important;
-            height: 28px !important;
+        .current-color-button, .fpp-color-button {
+            width: 24px !important;
+            height: 24px !important;
             border: 1px solid #ddd;
+            border-radius: 50%;
+            cursor: pointer;
+            margin: 0;
+            padding: 0;
+            display: block;
+            box-sizing: border-box;
+        }
+
+        .current-bgcolor-button {
+            width: 20px !important;
+            height: 20px !important;
+            border: none;
             border-radius: 50%;
             cursor: pointer;
             margin: 0;
@@ -358,10 +370,22 @@ export function forceInjectPanelStyles() {
         .font-select { min-width: 110px !important; }
         .font-size-select { min-width: 32px !important; }
         
-        .current-color-button, .current-bgcolor-button, .fpp-color-button {
+        .current-color-button, .fpp-color-button {
             width: 28px !important;
             height: 28px !important;
             border: 1px solid #ddd !important;
+            border-radius: 50% !important;
+            cursor: pointer !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: block !important;
+            box-sizing: border-box !important;
+        }
+
+        .current-bgcolor-button {
+            width: 20px !important;
+            height: 20px !important;
+            border: none !important;
             border-radius: 50% !important;
             cursor: pointer !important;
             margin: 0 !important;

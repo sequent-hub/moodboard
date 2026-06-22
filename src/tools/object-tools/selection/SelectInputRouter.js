@@ -1,7 +1,7 @@
 import { Events } from '../../../core/events/Events.js';
 
 const DRAG_START_THRESHOLD_PX = 4;
-const TEXT_EDITOR_STYLE_KEYS = ['fontFamily', 'fontSize', 'color', 'backgroundColor', 'markdown', 'bold', 'italic', 'underline', 'strikethrough', 'textAlign', 'lineHeight', 'listType', 'listChecked'];
+const TEXT_EDITOR_STYLE_KEYS = ['fontFamily', 'fontSize', 'color', 'highlightColor', 'backgroundColor', 'markdown', 'bold', 'italic', 'underline', 'strikethrough', 'textAlign', 'lineHeight', 'listType', 'listChecked'];
 
 function pickTextEditorProperties(properties = {}) {
     const picked = {};

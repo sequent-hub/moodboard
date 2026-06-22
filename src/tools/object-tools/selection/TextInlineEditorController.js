@@ -437,7 +437,7 @@ export function openTextEditor(object, create = false) {
         // +25% — запас на Caveat vs Arial: при незагруженном Caveat span рендерится в Arial,
         // а Caveat (рукописный шрифт) заметно шире для кириллицы.
         const startWidth = Math.max(1, Math.ceil(measureTextEditorPlaceholderWidth(textarea, 'Напишите что-нибудь') * 1.25));
-        const startHeight = Math.max(1, lhInitial - BASELINE_FIX + 10); // +5px сверху и +5px снизу
+        const startHeight = Math.max(1, lhInitial - BASELINE_FIX + 2); // +1px сверху и +1px снизу (паддинги textarea)
         textarea.style.width = `${startWidth}px`;
         textarea.style.height = `${startHeight}px`;
         wrapper.style.width = `${startWidth}px`;
@@ -502,7 +502,7 @@ export function openTextEditor(object, create = false) {
         wrapper,
         world: this.textEditor.world,
         position,
-        properties: { fontSize },
+        properties: { fontSize, highlightColor: properties.highlightColor },
         objectType,
         listType: properties.listType || 'none',
         _phStyle: styleEl,

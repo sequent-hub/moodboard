@@ -3,6 +3,7 @@ import {
     bindTextPropertiesPanelControls,
     unbindTextPropertiesPanelControls,
 } from './text-properties/TextPropertiesPanelBindings.js';
+import { updateLinkButtonState } from './text-properties/TextLinkControl.js';
 import {
     attachTextPropertiesPanelEventBridge,
     detachTextPropertiesPanelEventBridge,
@@ -10,6 +11,7 @@ import {
 import {
     applyTextAppearanceToDom,
     buildBackgroundColorUpdate,
+    buildHighlightColorUpdate,
     buildFontFamilyUpdate,
     buildFontSizeUpdate,
     buildMarkdownUpdate,
@@ -26,10 +28,13 @@ import {
     createTextPropertiesPanelRenderer,
     hideBgColorDropdown,
     hideColorDropdown,
+    hideHighlightDropdown,
     toggleBgColorDropdown,
     toggleColorDropdown,
+    toggleHighlightDropdown,
     updateCurrentBgColorButton,
     updateCurrentColorButton,
+    updateCurrentHighlightButton,
 } from './text-properties/TextPropertiesPanelRenderer.js';
 import {
     clearTextPropertiesPanelState,
@@ -57,7 +62,7 @@ export class TextPropertiesPanel {
             position: 'absolute',
             inset: '0',
             pointerEvents: 'none',
-            zIndex: 20,
+            zIndex: 10000,
         });
         this.container.appendChild(this.layer);
 
@@ -107,8 +112,9 @@ export class TextPropertiesPanel {
         }
 
         this.panel.style.display = 'flex';
-        this.reposition();
         this._updateControlsFromObject();
+        this._updateLockUI();
+        this.reposition();
     }
 
     hide() {
@@ -119,6 +125,7 @@ export class TextPropertiesPanel {
         }
 
         this._hideColorDropdown();
+        this._hideHighlightDropdown();
         this._hideBgColorDropdown();
         if (this._docMouseDownAttached) {
             document.removeEventListener('mousedown', this._onDocMouseDown, true);
@@ -142,6 +149,24 @@ export class TextPropertiesPanel {
 
     _updateCurrentColorButton(color) {
         updateCurrentColorButton(this, color);
+    }
+
+    _toggleHighlightDropdown() {
+        toggleHighlightDropdown(this);
+    }
+
+    _hideHighlightDropdown() {
+        hideHighlightDropdown(this);
+    }
+
+    _selectHighlightColor(color) {
+        this._changeHighlightColor(color);
+        this._updateCurrentHighlightButton(color);
+        this._hideHighlightDropdown();
+    }
+
+    _updateCurrentHighlightButton(color) {
+        updateCurrentHighlightButton(this, color);
     }
 
     _toggleBgColorDropdown() {
@@ -212,6 +237,19 @@ export class TextPropertiesPanel {
         });
 
         this._updateTextAppearance(this.currentId, { backgroundColor });
+    }
+
+    _changeHighlightColor(highlightColor) {
+        if (!this.currentId) {
+            return;
+        }
+
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: buildHighlightColorUpdate(highlightColor),
+        });
+
+        this._updateTextAppearance(this.currentId, { highlightColor });
     }
 
     _toggleFormat(prop) {
@@ -288,6 +326,40 @@ export class TextPropertiesPanel {
         this._updateTextAppearance(this.currentId, { markdown });
     }
 
+    /**
+     * Добавляет web-ссылку к диапазону текста (plain-режим).
+     * При включённом MD-режиме ничего не делает (кнопка должна быть disabled).
+     * @param {string} url — нормализованный URL
+     * @param {number} start — индекс начала диапазона (включительно)
+     * @param {number} end — индекс конца диапазона (не включительно)
+     * @param {string} [objectId] — id объекта; если не задан, используется this.currentId.
+     *   Нужен потому, что во время ввода URL фокус уходит в input и выделение объекта
+     *   может сброситься (this.currentId → null).
+     */
+    _addLink(url, start, end, objectId) {
+        const targetId = objectId || this.currentId;
+        if (!targetId || !url) return;
+        const props = getObjectProperties(this.eventBus, targetId);
+        if (props?.markdown === true) return;
+
+        const content = props?.content ?? '';
+        const safeEnd = Math.min(end, content.length);
+        const safeStart = Math.min(start, safeEnd);
+        if (safeStart >= safeEnd) return;
+
+        const oldLinks = Array.isArray(props?.links) ? props.links : [];
+        // Удаляем ссылки, пересекающиеся с новым диапазоном
+        const filtered = oldLinks.filter(l => l.end <= safeStart || l.start >= safeEnd);
+        const newLinks = [...filtered, { start: safeStart, end: safeEnd, url }]
+            .sort((a, b) => a.start - b.start);
+
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: targetId,
+            updates: { properties: { links: newLinks } },
+        });
+        this._updateTextAppearance(targetId, { links: newLinks });
+    }
+
     _updateTextAppearance(objectId, properties) {
         applyTextAppearanceToDom(objectId, properties);
         syncPixiTextProperties(this.eventBus, objectId, properties);
@@ -310,9 +382,11 @@ export class TextPropertiesPanel {
         this.fontSelect.value = values.fontFamily;
         this.fontSizeSelect.value = values.fontSize;
         this._updateCurrentColorButton(values.color);
+        this._updateCurrentHighlightButton(values.highlightColor);
         this._updateCurrentBgColorButton(values.backgroundColor);
         if (this.markdownToggle) {
             this.markdownToggle.checked = values.markdown;
+            updateLinkButtonState(this, values.markdown);
         }
 
         if (this.boldBtn) this.boldBtn.classList.toggle('is-active', values.bold);
@@ -382,5 +456,87 @@ export class TextPropertiesPanel {
 
         this.container.getBoundingClientRect();
         this.hide();
+    }
+
+    _isLocked() {
+        if (!this.currentId) return false;
+        const objects = this.core?.state?.getObjects ? this.core.state.getObjects() : [];
+        const obj = objects.find((o) => o.id === this.currentId);
+        return !!(obj?.properties?.locked);
+    }
+
+    _toggleLocked() {
+        if (!this.currentId) return;
+        const newLocked = !this._isLocked();
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: { properties: { locked: newLocked } },
+        });
+        this._updateLockUI();
+        this.reposition();
+    }
+
+    _updateLockUI() {
+        if (!this._tppBtnLock) return;
+        const locked = this._isLocked();
+
+        this._tppBtnLock.innerHTML = locked ? this._tppLockIcon : this._tppUnlockIcon;
+        this._tppBtnLock.title = locked ? 'Разблокировать' : 'Заблокировать';
+
+        if (Array.isArray(this._lockableEls)) {
+            this._lockableEls.forEach((el) => {
+                if (el) el.style.display = locked ? 'none' : '';
+            });
+        }
+
+        if (this._moreLockLabel) {
+            this._moreLockLabel.textContent = locked ? 'Разблокировать' : 'Заблокировать';
+        }
+
+        if (this.panel) {
+            this.panel.classList.toggle('is-locked', locked);
+        }
+    }
+
+    _duplicateText() {
+        if (!this.currentId) return;
+
+        const posData = { objectId: this.currentId, position: null };
+        const sizeData = { objectId: this.currentId, size: null };
+        this.eventBus.emit(Events.Tool.GetObjectPosition, posData);
+        this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
+
+        if (!posData.position || !sizeData.size) return;
+
+        let w = sizeData.size.width;
+        if (typeof w !== 'number' || isNaN(w)) {
+            const pixiObj = this.core?.pixi?.objects?.get(this.currentId);
+            w = pixiObj ? pixiObj.width : 160;
+        }
+
+        const originalId = this.currentId;
+        const newPos = {
+            x: posData.position.x + (w || 160) + 14,
+            y: posData.position.y,
+        };
+
+        const onReady = (data) => {
+            if (!data || data.originalId !== originalId) return;
+            this.eventBus.off(Events.Tool.DuplicateReady, onReady);
+            this._selectObject(data.newId);
+        };
+        this.eventBus.on(Events.Tool.DuplicateReady, onReady);
+
+        this.eventBus.emit(Events.Tool.DuplicateRequest, { originalId, position: newPos });
+    }
+
+    _selectObject(objectId) {
+        if (!objectId) return;
+        const selectTool = this.core?.selectTool;
+        if (!selectTool || typeof selectTool.setSelection !== 'function') return;
+        selectTool.setSelection([objectId]);
+        if (typeof selectTool.updateResizeHandles === 'function') {
+            selectTool.updateResizeHandles();
+        }
     }
 }

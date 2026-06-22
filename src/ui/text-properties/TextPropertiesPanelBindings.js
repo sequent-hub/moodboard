@@ -1,3 +1,5 @@
+import { updateLinkButtonState } from './TextLinkControl.js';
+
 function hidePresetTicks(buttons) {
     buttons.forEach((button) => {
         const tick = button.querySelector('i');
@@ -108,6 +110,35 @@ export function bindTextPropertiesPanelControls(panel) {
     };
     document.addEventListener('click', panel._onColorDocumentClick);
 
+    if (panel.currentHighlightButton) {
+        panel.currentHighlightButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            panel._toggleHighlightDropdown();
+        });
+
+        panel._highlightPresetButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                hidePresetTicks(panel._highlightPresetButtons);
+                const tick = button.querySelector('i');
+                if (tick) {
+                    tick.style.display = 'block';
+                }
+                panel._selectHighlightColor(button.dataset.colorValue);
+            });
+        });
+
+        panel.highlightInput.addEventListener('change', (event) => {
+            panel._selectHighlightColor(event.target.value);
+        });
+
+        panel._onHighlightDocumentClick = (event) => {
+            if (!panel._highlightSelectorContainer || !event.target || !panel._highlightSelectorContainer.contains(event.target)) {
+                panel._hideHighlightDropdown();
+            }
+        };
+        document.addEventListener('click', panel._onHighlightDocumentClick);
+    }
+
     panel.currentBgColorButton.addEventListener('click', (event) => {
         event.stopPropagation();
         panel._toggleBgColorDropdown();
@@ -138,6 +169,7 @@ export function bindTextPropertiesPanelControls(panel) {
     if (panel.markdownToggle) {
         panel.markdownToggle.addEventListener('change', (event) => {
             panel._changeMarkdown(event.target.checked);
+            updateLinkButtonState(panel, event.target.checked);
         });
     }
 
@@ -169,6 +201,11 @@ export function unbindTextPropertiesPanelControls(panel) {
     if (panel._onColorDocumentClick) {
         document.removeEventListener('click', panel._onColorDocumentClick);
         panel._onColorDocumentClick = null;
+    }
+
+    if (panel._onHighlightDocumentClick) {
+        document.removeEventListener('click', panel._onHighlightDocumentClick);
+        panel._onHighlightDocumentClick = null;
     }
 
     if (panel._onBgDocumentClick) {

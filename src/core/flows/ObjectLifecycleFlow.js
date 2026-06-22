@@ -309,7 +309,16 @@ export function setupObjectLifecycleFlow(core) {
         const objects = core.state.getObjects();
         const object = objects.find(obj => obj.id === data.objectId);
         if (object) {
-            data.size = { width: object.width, height: object.height };
+            let w = object.width;
+            let h = object.height;
+            if (typeof w !== 'number' || typeof h !== 'number') {
+                const pixiObj = core.pixi.objects.get(data.objectId);
+                if (pixiObj) {
+                    if (typeof w !== 'number') w = pixiObj.width;
+                    if (typeof h !== 'number') h = pixiObj.height;
+                }
+            }
+            data.size = { width: w, height: h };
         }
     });
 

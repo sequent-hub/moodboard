@@ -288,7 +288,7 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
     font-size: 13px;
     font-family: 'Roboto', Arial, sans-serif;
-    min-width: 320px;
+    min-width: auto;
     height: 36px;
 }
 
@@ -319,6 +319,21 @@
     -moz-osx-font-smoothing: grayscale;
     margin: 0;
     letter-spacing: normal;
+}
+
+/* Веб-ссылка внутри текстового объекта. pointer-events: auto переопределяет
+   pointer-events: none у родительского .mb-text и .moodboard-html-layer,
+   чтобы по ссылке можно было реально перейти. */
+.mb-text-link {
+    color: #2563EB;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.mb-text-link:hover {
+    color: #1D4ED8;
 }
 
 /* Markdown-режим текстового объекта: блочный рендер, перенос по словам */
@@ -688,9 +703,6 @@
 
 .text-properties-panel .current-color-button,
 .text-properties-panel .current-bgcolor-button {
-    width: 28px;
-    height: 20px;
-    border: 1px solid #ddd;
     border-radius: 4px;
     background-color: #000;
     cursor: pointer;
@@ -699,6 +711,18 @@
     display: block;
     box-sizing: border-box;
     position: relative;
+}
+
+.text-properties-panel .current-color-button {
+    width: 20px;
+    height: 20px;
+    border: 1px solid #ddd;
+}
+
+.text-properties-panel .current-bgcolor-button {
+    width: 20px;
+    height: 20px;
+    border: none;
 }
 /* MoodBoard Workspace Styles */
 
@@ -1548,8 +1572,8 @@
     transition: all 0.2s ease;
     outline: none;
     outline-offset: 0;
-    padding-top: 5px;
-    padding-bottom: 5px;
+    padding-top: 1px;
+    padding-bottom: 1px;
 }
 
 .moodboard-text-input:focus {

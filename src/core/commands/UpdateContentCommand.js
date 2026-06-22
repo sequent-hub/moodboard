@@ -47,6 +47,14 @@ export class UpdateContentCommand extends BaseCommand {
             if (!object.properties) {
                 object.properties = {};
             }
+            // Пересчитываем диапазоны ссылок при изменении контента
+            if (Array.isArray(object.properties.links) && object.properties.links.length > 0) {
+                object.properties.links = _adjustLinks(
+                    object.properties.links,
+                    object.properties.content ?? '',
+                    content
+                );
+            }
             object.properties.content = content;
 
             const isMindmap = object.type === 'mindmap';
@@ -92,4 +100,45 @@ export class UpdateContentCommand extends BaseCommand {
             content,
         });
     }
+}
+
+/**
+ * Пересчитывает диапазоны ссылок после изменения контента.
+ * Алгоритм: находим наибольший общий префикс и суффикс, определяем
+ * изменённый диапазон; ссылки внутри него удаляем, за ним — сдвигаем.
+ * @param {Array<{start:number,end:number,url:string}>} links
+ * @param {string} oldText
+ * @param {string} newText
+ * @returns {Array<{start:number,end:number,url:string}>}
+ */
+function _adjustLinks(links, oldText, newText) {
+    if (!links || links.length === 0) return links;
+
+    let prefixLen = 0;
+    const minLen = Math.min(oldText.length, newText.length);
+    while (prefixLen < minLen && oldText[prefixLen] === newText[prefixLen]) prefixLen++;
+
+    let oldSuffix = 0;
+    while (
+        oldSuffix < oldText.length - prefixLen &&
+        oldSuffix < newText.length - prefixLen &&
+        oldText[oldText.length - 1 - oldSuffix] === newText[newText.length - 1 - oldSuffix]
+    ) oldSuffix++;
+
+    const oldChangeEnd = oldText.length - oldSuffix; // конец изменённого диапазона в старом тексте
+    const newChangeEnd = newText.length - oldSuffix;  // конец изменённого диапазона в новом тексте
+    const delta = newChangeEnd - oldChangeEnd;         // сдвиг для символов после изменения
+
+    return links.reduce((acc, link) => {
+        const { start, end, url } = link;
+        if (end <= prefixLen) {
+            // Ссылка полностью в неизменённом префиксе — оставляем
+            acc.push({ start, end, url });
+        } else if (start >= oldChangeEnd) {
+            // Ссылка полностью после изменения — сдвигаем
+            acc.push({ start: start + delta, end: end + delta, url });
+        }
+        // Ссылка перекрывает изменённый диапазон — удаляем (стала некорректной)
+        return acc;
+    }, []);
 }

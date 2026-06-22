@@ -1105,7 +1105,14 @@ export class ImagePropertiesPanel {
             });
 
             if (!isOpen) {
+                const rect = mainBtn.getBoundingClientRect();
+                dropdown.style.top = (rect.bottom + 6) + 'px';
+                dropdown.style.left = (rect.right - 220) + 'px';
                 dropdown.classList.add('is-open');
+                requestAnimationFrame(() => {
+                    const left = Math.max(4, rect.right - dropdown.offsetWidth);
+                    dropdown.style.left = left + 'px';
+                });
                 mainBtn.classList.add('is-active');
             } else {
                 infoPopover.classList.remove('is-open');

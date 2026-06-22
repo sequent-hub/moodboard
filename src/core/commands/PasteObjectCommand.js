@@ -87,7 +87,13 @@ export class PasteObjectCommand extends BaseCommand {
         
         // Создаем PIXI объект
         this.coreMoodboard.pixi.createObject(this.newObjectData);
-        
+
+        // Уведомляем слои (HtmlTextLayer и др.), которые ждут { objectId, objectData }
+        this.coreMoodboard.eventBus.emit(Events.Object.Created, {
+            objectId: this.newObjectId,
+            objectData: this.newObjectData,
+        });
+
         this.emit(Events.Object.Pasted, {
             originalId: originalData.id,
             newId: this.newObjectId,

@@ -206,8 +206,25 @@
     height: 36px;
 }
 
+.text-properties-panel.is-locked {
+    min-width: 0;
+    padding: 0 6px;
+    gap: 4px;
+}
+
 .text-properties-panel * {
     max-height: 36px;
+}
+
+.text-properties-panel [id^="tpp-color-dropdown"],
+.text-properties-panel [id^="tpp-color-dropdown"] *,
+.text-properties-panel [id^="tpp-bgcolor-dropdown"],
+.text-properties-panel [id^="tpp-bgcolor-dropdown"] *,
+.text-properties-panel [id^="tpp-highlight-dropdown"],
+.text-properties-panel [id^="tpp-highlight-dropdown"] *,
+.text-properties-panel .tpp-more-dropdown,
+.text-properties-panel .tpp-more-dropdown * {
+    max-height: none;
 }
 
 /* Frame properties toolbar — mirror image toolbar look */
@@ -615,10 +632,10 @@
 
 .text-properties-panel .font-select {
     box-sizing: border-box;
-    min-width: 90px;
-    width: 90px;
+    min-width: 70px;
+    width: 70px;
     height: 38px;
-    padding: 4px 8px;
+    padding: 4px 0px;
     font-size: 13px;
     background-color: #fff;
     border: none;
@@ -741,12 +758,12 @@
     border: none;
     padding: 0;
     cursor: pointer;
-    color: #666;
+    color: #6B7280;
 }
 
 .text-properties-panel .font-size-stepper:hover {
     background: #f5f5f5;
-    color: #333;
+    color: #111827;
 }
 
 .text-properties-panel .font-size-stepper--down {
@@ -754,11 +771,10 @@
     margin-top: -2px;
 }
 
-.text-properties-panel .current-color-button,
 .text-properties-panel .current-bgcolor-button {
-    width: 28px;
-    height: 28px;
-    border: 1px solid #ddd;
+    width: 20px;
+    height: 20px;
+    border: none;
     border-radius: 50%;
     background-color: #000;
     cursor: pointer;
@@ -767,6 +783,54 @@
     display: block;
     box-sizing: border-box;
     position: relative;
+}
+
+.text-properties-panel .current-color-button {
+    width: 28px;
+    height: 28px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background-color: transparent;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    position: relative;
+    transition: background 0.15s;
+    color: #6B7280;
+}
+
+.text-properties-panel .current-color-button:hover {
+    background: #f0f0f0;
+    color: #111827;
+}
+
+.text-properties-panel .current-highlight-button {
+    width: 28px;
+    height: 28px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background-color: transparent;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    position: relative;
+    transition: background 0.15s;
+    color: #6B7280;
+}
+
+.text-properties-panel .current-highlight-button:hover {
+    background: #f0f0f0;
+    color: #111827;
 }
 
 .text-properties-panel .tpp-format-btn {
@@ -780,15 +844,27 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #444;
+    color: #6B7280;
     flex-shrink: 0;
-    transition: background 0.15s;
+    transition: background 0.15s, color 0.15s;
 }
-.text-properties-panel .tpp-format-btn:hover { background: #f0f0f0; }
+.text-properties-panel .tpp-format-btn:hover { background: #f0f0f0; color: #111827; }
 .text-properties-panel .tpp-format-btn.is-active {
     background: #e8eaff;
     border-color: #6155F5;
     color: #6155F5;
+}
+
+.text-properties-panel .tpp-format-btns-wrapper {
+    width: 24px;
+    height: 24px;
+}
+
+.text-properties-panel .tpp-format-btn.tpp-format-trigger {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    padding: 0;
 }
 
 .text-properties-panel .tpp-list-btns {
@@ -817,6 +893,21 @@
     z-index: 4000;
 }
 
+.text-properties-panel .tpp-format-modal {
+    max-height: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    flex-direction: row;
+    gap: 2px;
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06);
+    padding: 4px;
+    z-index: 4000;
+}
+
 .text-properties-panel .tpp-list-modal-option {
     display: flex;
     align-items: center;
@@ -831,6 +922,26 @@
     color: #374151;
     transition: background 0.1s;
     flex-shrink: 0;
+}
+
+.text-properties-panel .tpp-format-modal-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #374151;
+    transition: background 0.1s;
+    flex-shrink: 0;
+}
+
+.text-properties-panel .tpp-format-modal-option:hover {
+    background: #f3f4f6;
 }
 
 .text-properties-panel .tpp-list-modal-option:hover {
@@ -885,6 +996,34 @@
 
 .text-properties-panel .tpp-align-modal-option:hover {
     background: #f3f4f6;
+}
+
+.text-properties-panel .tpp-lh-control {
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.text-properties-panel .tpp-lh-control svg {
+    width: 22px;
+    height: 22px;
+}
+
+.text-properties-panel .tpp-lh-modal {
+    max-height: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06);
+    padding: 8px 12px;
+    z-index: 4000;
 }
 
 .text-properties-panel .tpp-lh-slider {
@@ -1091,7 +1230,7 @@
 }
 
 /* More Dropdown */
-.ipp-more-dropdown {
+.ipp-more-dropdown, .tpp-more-dropdown {
     position: absolute;
     top: calc(100% + 6px);
     right: 0;
@@ -1106,11 +1245,15 @@
     z-index: 1001;
 }
 
-.ipp-more-dropdown.is-open {
+.ipp-more-dropdown.is-open, .tpp-more-dropdown.is-open {
     display: flex;
+    position: fixed;
+    min-width: 0;
+    max-width: 214px;
+    width: 214px;
 }
 
-.ipp-dropdown-item {
+.ipp-dropdown-item, .tpp-dropdown-item {
     display: flex;
     align-items: center;
     padding: 6px 8px;
@@ -1127,7 +1270,7 @@
     width: 100%;
 }
 
-.ipp-dropdown-item:hover {
+.ipp-dropdown-item:hover, .tpp-dropdown-item:hover {
     background: #F3F4F6;
 }
 
@@ -1137,19 +1280,19 @@
     font-size: 12px;
 }
 
-.ipp-dropdown-item-shortcut {
+.ipp-dropdown-item-shortcut, .tpp-dropdown-item-shortcut {
     margin-left: auto;
     color: #9CA3AF;
     font-size: 12px;
 }
 
-.ipp-dropdown-divider {
+.ipp-dropdown-divider, .tpp-dropdown-divider {
     height: 1px;
     background: #E5E7EB;
     margin: 4px 2px;
 }
 
-.ipp-dropdown-icon {
+.ipp-dropdown-icon, .tpp-dropdown-icon {
     width: 16px;
     height: 16px;
     display: inline-flex;
@@ -1583,5 +1726,83 @@
 
 .ipp-dropdown-item.is-active .fpp-lock-mode-check {
     opacity: 1;
+}
+
+/* ── Кнопка «Ссылка» в панели свойств текста ────────────────── */
+.tpp-link-btn:disabled,
+.tpp-link-btn--disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* ── Форма ввода URL ─────────────────────────────────────────── */
+.tpp-link-form {
+    position: fixed;
+    z-index: 10010;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.07);
+    padding: 10px 12px;
+    min-width: 260px;
+    max-width: 340px;
+}
+
+.tpp-link-form-label {
+    font-size: 11px;
+    color: #6B7280;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.tpp-link-form-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.tpp-link-input {
+    flex: 1;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid #D1D5DB;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    color: #111827;
+    transition: border-color 0.15s;
+}
+
+.tpp-link-input:focus {
+    border-color: #6366F1;
+}
+
+.tpp-link-input--error {
+    border-color: #EF4444;
+}
+
+.tpp-link-form-ok {
+    height: 30px;
+    padding: 0 12px;
+    background: #6366F1;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+
+.tpp-link-form-ok:hover {
+    background: #4F46E5;
 }
 

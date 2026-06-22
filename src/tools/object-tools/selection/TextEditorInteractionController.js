@@ -92,7 +92,9 @@ export function createTextEditorFinalize(controller, {
                 const scaleX = worldLayerRef?.scale?.x || 1;
                 const viewResLocal = (controller.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
                 const wPx = Math.max(1, wrapper.offsetWidth);
-                const hPx = Math.max(1, wrapper.offsetHeight);
+                const _taStyle = typeof window !== 'undefined' ? window.getComputedStyle(textarea) : null;
+                const _taPaddingV = _taStyle ? (parseFloat(_taStyle.paddingTop) || 0) + (parseFloat(_taStyle.paddingBottom) || 0) : 0;
+                const hPx = Math.max(1, wrapper.offsetHeight - _taPaddingV);
                 const newW = Math.max(1, Math.round(wPx * viewResLocal / scaleX));
                 const newH = Math.max(1, Math.round(hPx * viewResLocal / scaleX));
                 const sizeReq = { objectId, size: null };
@@ -135,14 +137,22 @@ export function createTextEditorFinalize(controller, {
             const worldLayerRef = controller.textEditor.world || (controller.app?.stage);
             const scaleX = worldLayerRef?.scale?.x || 1;
             const wPx = Math.max(1, wrapper.offsetWidth);
-            const hPx = Math.max(1, wrapper.offsetHeight);
+            const _taStyle2 = typeof window !== 'undefined' ? window.getComputedStyle(textarea) : null;
+            const _taPaddingV2 = _taStyle2 ? (parseFloat(_taStyle2.paddingTop) || 0) + (parseFloat(_taStyle2.paddingBottom) || 0) : 0;
+            const hPx = Math.max(1, wrapper.offsetHeight - _taPaddingV2);
             const wWorld = Math.max(1, Math.round(wPx * viewRes / scaleX));
             const hWorld = Math.max(1, Math.round(hPx * viewRes / scaleX));
             controller.eventBus.emit(Events.UI.ToolbarAction, {
                 type: objectType,
                 id: objectType,
                 position: { x: position.x, y: position.y },
-                properties: { content: value, fontSize, width: wWorld, height: hWorld },
+                properties: { 
+                    content: value, 
+                    fontSize, 
+                    width: wWorld, 
+                    height: hWorld,
+                    highlightColor: properties.highlightColor
+                },
             });
         } else {
             if (isNewCreation) {
@@ -377,14 +387,18 @@ export function closeTextEditorFromState(controller, commit) {
         }
         return;
     }
-    if (objectId == null) {
-        controller.eventBus.emit(Events.UI.ToolbarAction, {
-            type: objectType,
-            id: objectType,
-            position: { x: position.x, y: position.y },
-            properties: { content: value, fontSize: properties.fontSize },
-        });
-    } else {
+        if (objectId == null) {
+            controller.eventBus.emit(Events.UI.ToolbarAction, {
+                type: objectType,
+                id: objectType,
+                position: { x: position.x, y: position.y },
+                properties: { 
+                    content: value, 
+                    fontSize: properties.fontSize,
+                    highlightColor: properties.highlightColor
+                },
+            });
+        } else {
         if (isNewCreation) {
             const oldContent = typeof initialContent === 'string' ? initialContent : '';
             controller.eventBus.emit(Events.Object.ContentChange, {
