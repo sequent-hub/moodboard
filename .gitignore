@@ -11,3 +11,8 @@ test-results/
 playwright-report/
 node_modules/.vite/
 vite.config.js.timestamp-*.mjs
+.cursor/
+.dev-data/
+.playwright-mcp/
+error checking/
+/*.png
