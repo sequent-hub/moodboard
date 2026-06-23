@@ -1,5 +1,6 @@
 import { Events } from '../../../core/events/Events.js';
 import { registerEditorListeners } from './InlineEditorListenersRegistry.js';
+import { computeTextRightPadPx } from '../../../services/text/TextBoxMetrics.js';
 
 export function createRegularTextAutoSize({
     textarea,
@@ -13,7 +14,7 @@ export function createRegularTextAutoSize({
         textarea.style.height = 'auto';
 
         const fontPx = parseFloat(textarea.style.fontSize) || 16;
-        const rightPad = Math.ceil(fontPx * 0.7) + 6;
+        const rightPad = computeTextRightPadPx(fontPx);
         const naturalW = Math.max(1, Math.ceil(textarea.scrollWidth + rightPad));
         const targetW = Math.round(Math.max(minWBound, naturalW));
         textarea.style.width = `${targetW}px`;

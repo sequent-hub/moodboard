@@ -1,5 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { Events } from '../../../core/events/Events.js';
+import { updateCustomCaret } from './TextEditorCaretService.js';
+import { buildHtmlWithRanges } from '../../../ui/HtmlTextLayer.js';
 import {
     createTextEditorTextarea,
     createTextEditorWrapper,
@@ -196,10 +198,14 @@ export function openMindmapEditor(object, create = false) {
         }
     }
 
-    const wrapper = createTextEditorWrapper();
+    const { wrapper, caret, backdrop } = createTextEditorWrapper();
     const textarea = createTextEditorTextarea(properties.content || '');
     wrapper.classList.add('moodboard-text-editor--mindmap-debug');
     textarea.classList.add('moodboard-text-input--mindmap-debug');
+    
+    if (backdrop) {
+        backdrop.classList.add('moodboard-text-backdrop--mindmap-debug');
+    }
     textarea.placeholder = 'Напишите что-нибудь';
     textarea.style.fontFamily = properties.fontFamily || 'Roboto, Arial, sans-serif';
     textarea.style.fontWeight = '400';
@@ -261,15 +267,33 @@ export function openMindmapEditor(object, create = false) {
 
         if (typeof window.getComputedStyle === 'function') {
             const staticStyle = window.getComputedStyle(staticTextEl);
-            if (staticStyle?.fontFamily) textarea.style.fontFamily = staticStyle.fontFamily;
-            if (staticStyle?.fontSize) textarea.style.fontSize = staticStyle.fontSize;
-            if (staticStyle?.lineHeight) textarea.style.lineHeight = staticStyle.lineHeight;
-            if (staticStyle?.color) textarea.style.color = staticStyle.color;
-            if (staticStyle?.paddingLeft) textarea.style.paddingLeft = staticStyle.paddingLeft;
-            if (staticStyle?.paddingRight) textarea.style.paddingRight = staticStyle.paddingRight;
+            if (staticStyle?.fontFamily) {
+                textarea.style.fontFamily = staticStyle.fontFamily;
+                if (backdrop) backdrop.style.fontFamily = staticStyle.fontFamily;
+            }
+            if (staticStyle?.fontSize) {
+                textarea.style.fontSize = staticStyle.fontSize;
+                if (backdrop) backdrop.style.fontSize = staticStyle.fontSize;
+            }
+            if (staticStyle?.lineHeight) {
+                textarea.style.lineHeight = staticStyle.lineHeight;
+                if (backdrop) backdrop.style.lineHeight = staticStyle.lineHeight;
+            }
+            if (staticStyle?.color) {
+                if (backdrop) backdrop.style.color = staticStyle.color;
+            }
+            if (staticStyle?.paddingLeft) {
+                textarea.style.paddingLeft = staticStyle.paddingLeft;
+                if (backdrop) backdrop.style.paddingLeft = staticStyle.paddingLeft;
+            }
+            if (staticStyle?.paddingRight) {
+                textarea.style.paddingRight = staticStyle.paddingRight;
+                if (backdrop) backdrop.style.paddingRight = staticStyle.paddingRight;
+            }
         }
     } else if (properties.fontSize) {
         textarea.style.fontSize = `${properties.fontSize}px`;
+        if (backdrop) backdrop.style.fontSize = `${properties.fontSize}px`;
     }
 
     wrapper.style.left = `${targetLeft}px`;
@@ -285,6 +309,14 @@ export function openMindmapEditor(object, create = false) {
     textarea.style.width = '100%';
     textarea.style.height = 'auto';
     textarea.style.minHeight = '0';
+    
+    if (backdrop) {
+        backdrop.style.width = '100%';
+        backdrop.style.height = '100%';
+        backdrop.style.display = 'flex';
+        backdrop.style.alignItems = 'center';
+        backdrop.style.justifyContent = 'center';
+    }
 
     const initialCssWidth = targetWidth;
     const initialCssHeight = targetHeight;
@@ -734,14 +766,67 @@ export function openMindmapEditor(object, create = false) {
         }
     };
 
+    const caretUpdateHandler = () => {
+        if (this.textEditor && this.textEditor.caret) {
+            updateCustomCaret(textarea, this.textEditor.caret);
+        }
+    };
+
+    const syncBackdrop = () => {
+        if (!backdrop) return;
+        let currentHighlights = properties.highlights || null;
+        let currentLinks = properties.links || null;
+        if (objectId) {
+            try {
+                const pixiReq = { objectId, pixiObject: null };
+                this.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
+                const props = pixiReq.pixiObject && pixiReq.pixiObject._mb
+                    ? pixiReq.pixiObject._mb.properties
+                    : null;
+                if (props) {
+                    if (Array.isArray(props.highlights)) currentHighlights = props.highlights;
+                    if (Array.isArray(props.links)) currentLinks = props.links;
+                }
+            } catch (_) {}
+        }
+        const content = textarea.value;
+        backdrop.innerHTML = buildHtmlWithRanges(content, currentLinks, currentHighlights);
+    };
+
     textarea.addEventListener('blur', onBlur);
     textarea.addEventListener('keydown', onKeyDown);
+    
+    textarea.addEventListener('input', (e) => {
+        caretUpdateHandler(e);
+        syncBackdrop();
+    });
+    textarea.addEventListener('keydown', () => setTimeout(caretUpdateHandler, 0));
+    textarea.addEventListener('keyup', caretUpdateHandler);
+    textarea.addEventListener('click', caretUpdateHandler);
+    textarea.addEventListener('focus', caretUpdateHandler);
+    document.addEventListener('selectionchange', caretUpdateHandler);
+
+    setTimeout(() => {
+        caretUpdateHandler();
+        syncBackdrop();
+    }, 0);
+
+    const removeDomListeners = () => {
+        textarea.removeEventListener('blur', onBlur);
+        textarea.removeEventListener('keydown', onKeyDown);
+        textarea.removeEventListener('input', caretUpdateHandler);
+        textarea.removeEventListener('keyup', caretUpdateHandler);
+        textarea.removeEventListener('click', caretUpdateHandler);
+        textarea.removeEventListener('focus', caretUpdateHandler);
+        document.removeEventListener('selectionchange', caretUpdateHandler);
+    };
 
     this.textEditor = {
         active: true,
         objectId,
         textarea,
         wrapper,
+        caret,
         world,
         position,
         properties: { ...properties },
@@ -749,6 +834,7 @@ export function openMindmapEditor(object, create = false) {
         isResizing: false,
         _finalize: finalize,
         _listeners: editorListeners,
+        _removeDomListeners: removeDomListeners,
     };
 
     textarea.focus();
@@ -762,6 +848,11 @@ export function openMindmapEditor(object, create = false) {
 
 export function closeMindmapEditor(commit) {
     if (!this.textEditor?.active || this.textEditor.objectType !== 'mindmap') return;
+    
+    if (typeof this.textEditor._removeDomListeners === 'function') {
+        try { this.textEditor._removeDomListeners(); } catch (_) {}
+    }
+    
     const finalize = this.textEditor._finalize;
     if (typeof finalize === 'function') {
         finalize(commit);

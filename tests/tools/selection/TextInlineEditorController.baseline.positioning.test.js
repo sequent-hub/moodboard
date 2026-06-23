@@ -58,7 +58,7 @@ describe('TextInlineEditorController baseline: positioning', () => {
         );
 
         expect(ctx.textEditor.wrapper.style.left).toBe('500px');
-        expect(ctx.textEditor.wrapper.style.top).toBe('600px');
+        expect(ctx.textEditor.wrapper.style.top).toBe('601px');
     });
 
     it('falls back to world-to-screen transform when HtmlTextLayer is absent', () => {
@@ -74,7 +74,7 @@ describe('TextInlineEditorController baseline: positioning', () => {
         );
 
         expect(ctx.textEditor.wrapper.style.left).toBe('170px');
-        expect(ctx.textEditor.wrapper.style.top).toBe('200px');
+        expect(ctx.textEditor.wrapper.style.top).toBe('201px');
     });
 
     it('create flow emits StateChanged with synced position payload', () => {
@@ -127,7 +127,42 @@ describe('TextInlineEditorController baseline: positioning', () => {
         );
 
         expect(ctx.textEditor.wrapper.style.left).toBe('111px');
-        expect(ctx.textEditor.wrapper.style.top).toBe('222px');
+        expect(ctx.textEditor.wrapper.style.top).toBe('223px');
+    });
+
+    it('keeps the visible static text bounds when entering edit mode', () => {
+        const htmlText = document.createElement('div');
+        htmlText.style.left = '111px';
+        htmlText.style.top = '222px';
+        htmlText.getBoundingClientRect = vi.fn(() => ({
+            left: 111,
+            top: 222,
+            right: 351,
+            bottom: 254,
+            width: 240,
+            height: 32,
+        }));
+        window.moodboardHtmlTextLayer = { idToEl: new Map([['text-dom-bounds', htmlText]]) };
+        eventBus.setResponder(Events.Tool.GetObjectSize, (payload) => {
+            if (payload?.objectId === 'text-dom-bounds') {
+                payload.size = { width: 120, height: 20 };
+            }
+        });
+
+        openTextEditor.call(
+            ctx,
+            {
+                id: 'text-dom-bounds',
+                type: 'text',
+                position: { x: 0, y: 0 },
+                properties: { content: 'same bounds', fontSize: 20 },
+            },
+            false
+        );
+
+        expect(ctx.textEditor.wrapper.style.width).toBe('240px');
+        expect(ctx.textEditor.wrapper.style.height).toBe('32px');
+        expect(collectEventPayloads(eventBus, Events.Tool.ResizeUpdate)).toHaveLength(0);
     });
 
     it('positioning reacts to world transform changes as smoke contract', () => {
@@ -147,7 +182,7 @@ describe('TextInlineEditorController baseline: positioning', () => {
         );
 
         expect(ctx.textEditor.wrapper.style.left).toBe('120px');
-        expect(ctx.textEditor.wrapper.style.top).toBe('130px');
+        expect(ctx.textEditor.wrapper.style.top).toBe('131px');
         expect(dom.worldLayer.toGlobal).toHaveBeenCalled();
     });
 });

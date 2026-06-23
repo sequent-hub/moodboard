@@ -1218,6 +1218,8 @@ export class HandlesDomRenderer {
         this.host.layer.innerHTML = '';
         const box = document.createElement('div');
         box.className = 'mb-handles-box';
+        box.id = `mb-handles-box-${id}`;
+        box.dataset.objectId = id;
 
         let rotation = options.rotation ?? 0;
         if (id !== '__group__') {

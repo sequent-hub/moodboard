@@ -170,6 +170,35 @@ export function buildPropertyUpdate(key, value) {
 
 export function applyTextAppearanceToDom(objectId, properties) {
     const htmlElement = document.querySelector(`[data-id="${objectId}"]`);
+    
+    // Также обновляем активный редактор, если он открыт
+    const activeEditor = document.querySelector('.moodboard-text-editor');
+    if (activeEditor) {
+        const textarea = activeEditor.querySelector('.moodboard-text-input');
+        const backdrop = activeEditor.querySelector('.moodboard-text-backdrop');
+        
+        if (textarea) {
+            if (properties.fontFamily) {
+                textarea.style.fontFamily = properties.fontFamily;
+                if (backdrop) backdrop.style.fontFamily = properties.fontFamily;
+            }
+            if (properties.fontSize) {
+                textarea.style.fontSize = `${properties.fontSize}px`;
+                if (backdrop) backdrop.style.fontSize = `${properties.fontSize}px`;
+            }
+            if (properties.textAlign !== undefined) {
+                textarea.style.textAlign = properties.textAlign;
+                if (backdrop) backdrop.style.textAlign = properties.textAlign;
+            }
+            if (properties.color && backdrop) {
+                backdrop.style.color = properties.color;
+            }
+            
+            // Эмулируем событие input для перерисовки backdrop
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+
     if (!htmlElement) {
         return;
     }

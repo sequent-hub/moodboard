@@ -111,6 +111,14 @@ export function bindTextPropertiesPanelControls(panel) {
     document.addEventListener('click', panel._onColorDocumentClick);
 
     if (panel.currentHighlightButton) {
+        // Снимок выделения textarea до ухода фокуса (capture-фаза, до click/blur).
+        // Покрывает и кнопку, и пресеты, и нативный color-input внутри контейнера.
+        if (panel._highlightSelectorContainer) {
+            panel._highlightSelectorContainer.addEventListener('mousedown', () => {
+                panel._snapshotTextSelection();
+            }, true);
+        }
+
         panel.currentHighlightButton.addEventListener('click', (event) => {
             event.stopPropagation();
             panel._toggleHighlightDropdown();

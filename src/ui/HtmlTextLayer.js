@@ -4,6 +4,13 @@ import { Events } from '../core/events/Events.js';
 import * as PIXI from 'pixi.js';
 import { renderRichText, hasMath } from '../utils/richText.js';
 import { renderTextList } from './text-properties/TextListRenderer.js';
+import {
+    applyTextStyles,
+    resolveLineHeightRatio,
+    computeTextRightPadPx,
+    resolveStaticTextPadding,
+    TEXT_BOX_BOTTOM_PAD_PX,
+} from '../services/text/TextBoxMetrics.js';
 
 gsap.registerPlugin(CustomEase);
 const TEXT_HOVER_EASE = 'hoverLiftSpring';
@@ -46,28 +53,6 @@ function resolveMarkdown(properties, content) {
 }
 
 /**
- * Возвращает коэффициент межстрочного интервала по базовому (немасштабированному) размеру шрифта.
- * Коэффициент зависит от базового размера, а не от отрисованного, — это гарантирует,
- * что соотношение line-height/font-size остаётся постоянным при любом зуме.
- * @param {number} baseFontSizePx — базовый размер шрифта без учёта зума
- * @param {object|undefined} properties
- * @returns {number} коэффициент (не пиксели)
- */
-function resolveLineHeightRatio(baseFontSizePx, properties) {
-    if (typeof properties?.lineHeight === 'number') {
-        return properties.lineHeight;
-    }
-    const fs = baseFontSizePx;
-    if (fs <= 12) return 1.40;
-    if (fs <= 18) return 1.34;
-    if (fs <= 36) return 1.26;
-    if (fs <= 48) return 1.24;
-    if (fs <= 72) return 1.22;
-    if (fs <= 96) return 1.20;
-    return 1.18;
-}
-
-/**
  * Строит безопасный HTML-фрагмент с кликабельными ссылками по массиву диапазонов.
  * Символы вне ссылок экранируются через textContent. Диапазоны не должны пересекаться.
  * @param {string} content
@@ -94,6 +79,58 @@ function _buildHtmlWithLinks(content, links) {
         pos = e;
     }
     if (pos < content.length) result += _escapeHtml(content.slice(pos));
+    return result;
+}
+
+/**
+ * Строит HTML-фрагмент с диапазонами подсветки и/или ссылок.
+ * Пересечение highlight + link обрабатывается через набор граничных точек:
+ * внутри перекрытия порядок вложения — <a><mark>текст</mark></a>.
+ * @param {string} content
+ * @param {Array<{start:number, end:number, url:string}>|null} links
+ * @param {Array<{start:number, end:number, color:string}>|null} highlights
+ * @returns {string} готовый innerHTML
+ */
+export function buildHtmlWithRanges(content, links, highlights) {
+    const validLinks = (links || [])
+        .filter(l => typeof l.start === 'number' && typeof l.end === 'number' && l.end > l.start && l.url);
+    const validHighlights = (highlights || [])
+        .filter(h => typeof h.start === 'number' && typeof h.end === 'number' && h.end > h.start && h.color);
+
+    if (validLinks.length === 0 && validHighlights.length === 0) return _escapeHtml(content);
+    if (validHighlights.length === 0) return _buildHtmlWithLinks(content, validLinks);
+
+    // Строим набор граничных точек всех диапазонов, делим текст на сегменты
+    const boundaries = new Set([0, content.length]);
+    for (const l of validLinks) {
+        boundaries.add(Math.max(0, l.start));
+        boundaries.add(Math.min(content.length, l.end));
+    }
+    for (const h of validHighlights) {
+        boundaries.add(Math.max(0, h.start));
+        boundaries.add(Math.min(content.length, h.end));
+    }
+
+    const points = [...boundaries].sort((a, b) => a - b);
+
+    let result = '';
+    for (let i = 0; i < points.length - 1; i++) {
+        const s = points[i];
+        const e = points[i + 1];
+        let text = _escapeHtml(content.slice(s, e));
+
+        const hi = validHighlights.find(h => h.start <= s && h.end >= e);
+        const link = validLinks.find(l => l.start <= s && l.end >= e);
+
+        if (hi) {
+            text = `<mark style="background-color: ${_escapeAttr(hi.color)}">${text}</mark>`;
+        }
+        if (link) {
+            text = `<a href="${_escapeAttr(link.url)}" target="_blank" rel="noopener noreferrer" class="mb-text-link">${text}</a>`;
+        }
+        result += text;
+    }
+
     return result;
 }
 
@@ -454,33 +491,28 @@ export class HtmlTextLayer {
         const color = objectData.color || props.color || props.textColor || '#000000';
         const backgroundColor = objectData.backgroundColor || props.backgroundColor || 'transparent';
 
-        // Безразмерный множитель line-height: браузер сам считает интервал относительно
-        // font-size, поэтому соотношение строк не зависит от зума и не страдает от округления.
         const baseFs = objectData.fontSize || props.fontSize || 32;
-        const baseLineHeight = resolveLineHeightRatio(baseFs, props);
 
         const content = objectData.content || objectData.properties?.content || '';
         const isMarkdown = resolveMarkdown(objectData.properties, content);
         if (isMarkdown) el.classList.add('mb-text--md');
+        // Единый набор текстовых параметров (шрифт, line-height, начертание, выравнивание).
+        // Тот же вызов используется в редакторе — гарантирует идентичный рендер в обоих режимах.
+        applyTextStyles(el, {
+            fontSizePx: baseFs,
+            baseFontSizePx: baseFs,
+            fontFamily,
+            properties: props,
+        });
         el.style.color = color;
-        el.style.fontFamily = fontFamily;
         el.style.backgroundColor = backgroundColor === 'transparent' ? '' : backgroundColor;
-        el.style.lineHeight = `${baseLineHeight}`;
         el.style.whiteSpace = isMarkdown ? 'normal' : 'pre';
         el.style.overflow = 'visible';
         if (isMarkdown) el.style.overflowWrap = 'break-word';
-        el.style.letterSpacing = '0px';
-        el.style.fontKerning = 'normal';
-        el.style.textRendering = 'optimizeLegibility';
-        if (!isMarkdown) el.style.padding = '0';
-        // Начертания и выравнивание из properties
-        el.style.fontWeight = props.bold ? 'bold' : '';
-        el.style.fontStyle = props.italic ? 'italic' : '';
-        const initDec = [props.underline && 'underline', props.strikethrough && 'line-through'].filter(Boolean).join(' ');
-        el.style.textDecoration = initDec || '';
-        el.style.textAlign = props.textAlign || '';
+        el.style.padding = resolveStaticTextPadding({ isMarkdown, useList: false });
         const initLinks = !isMarkdown ? (props.links || null) : null;
-        this._syncElementContent(el, content, isMarkdown, initLinks);
+        const initHighlights = !isMarkdown ? (props.highlights || null) : null;
+        this._syncElementContent(el, content, isMarkdown, initLinks, initHighlights);
         // Базовые размеры сохраняем в dataset
         const fs = objectData.fontSize || objectData.properties?.fontSize || 32;
         const bw = Math.max(1, objectData.width || objectData.properties?.baseW || 160);
@@ -556,12 +588,17 @@ export class HtmlTextLayer {
             : Math.min(scaleX, scaleY);
         const sCss = s / res;
         const fontSizePx = Math.max(1, baseFS * sObj * sCss);
-        el.style.fontSize = `${fontSizePx}px`;
-        // Безразмерный множитель: интервал между строками масштабируется браузером
-        // пропорционально font-size, поэтому не зависит от зума и не страдает от округления.
-        const newLH = `${resolveLineHeightRatio(baseFS, obj.properties)}`;
-        if (el.style.lineHeight !== newLH) {
-            el.style.lineHeight = newLH;
+        // Единый набор текстовых параметров через общий модуль — тот же вызов, что в редакторе.
+        // Это гарантирует идентичный рендер глифов в статическом режиме и в режиме редактирования.
+        if (obj.type !== 'shape') {
+            const props = obj.properties || {};
+            const fontFamily = props.fontFamily || obj.fontFamily || 'Caveat, Arial, cursive';
+            applyTextStyles(el, {
+                fontSizePx,
+                baseFontSizePx: baseFS,
+                fontFamily,
+                properties: props,
+            });
         }
 
         // Позиция и габариты в CSS координатах - используем тот же подход что в HtmlHandlesLayer
@@ -588,10 +625,14 @@ export class HtmlTextLayer {
             // при вычислении CSS-позиции и размеров не нужно. Деление приводило к тому,
             // что при res < 1 (масштаб браузера ≠ 100%) HTML-текст уезжал относительно
             // собственных рамок и PIXI-объекта.
-            const left = offsetLeft + tl.x;
-            const top = offsetTop + tl.y;
-            const width = Math.max(1, (br.x - tl.x));
-            const height = Math.max(1, (br.y - tl.y));
+            // Округляем до целых px: inline-редактор позиционирует обёртку через Math.round
+            // (TextEditorPositioningService), а статический слой раньше писал дробный top —
+            // из-за этого глиф съезжал по вертикали на доли пикселя при выходе из редактора.
+            // Целочисленный screen-space обязателен по pixel-perfect integer contract.
+            const left = Math.round(offsetLeft + tl.x);
+            const top = Math.round(offsetTop + tl.y);
+            const width = Math.max(1, Math.round(br.x - tl.x));
+            const height = Math.max(1, Math.round(br.y - tl.y));
 
             // Применяем к элементу
             el.style.left = `${left}px`;
@@ -608,13 +649,13 @@ export class HtmlTextLayer {
             logHeight = height;
         } else {
             // Fallback к старому методу
-            const left = (tx + s * x) / res;
-            const top = (ty + s * y) / res;
+            const left = Math.round((tx + s * x) / res);
+            const top = Math.round((ty + s * y) / res);
             el.style.left = `${left}px`;
             el.style.top = `${top}px`;
             if (w && h) {
-                const cssW = Math.max(1, (w * s) / res);
-                const cssH = Math.max(1, (h * s) / res);
+                const cssW = Math.max(1, Math.round((w * s) / res));
+                const cssH = Math.max(1, Math.round((h * s) / res));
                 el.style.width = `${cssW}px`;
                 el.style.height = `${cssH}px`;
                 logWidth = cssW;
@@ -649,15 +690,9 @@ export class HtmlTextLayer {
             return;
         }
 
-        // Начертания и выравнивание из properties
-        const props = obj.properties || {};
-        el.style.fontWeight = props.bold ? 'bold' : '';
-        el.style.fontStyle = props.italic ? 'italic' : '';
-        const textDec = [props.underline && 'underline', props.strikethrough && 'line-through'].filter(Boolean).join(' ');
-        el.style.textDecoration = textDec || '';
-        el.style.textAlign = props.textAlign || '';
-
         // Текст: список или plain/markdown
+        // (fontWeight/fontStyle/textDecoration/textAlign/lineHeight уже выставлены applyTextStyles выше)
+        const props = obj.properties || {};
         const content = obj.content || obj.properties?.content;
         const listType = props.listType;
         const useList = listType && listType !== 'none';
@@ -684,11 +719,12 @@ export class HtmlTextLayer {
                 el.classList.remove('mb-text--md');
                 el.style.whiteSpace = 'normal';
                 el.style.overflowWrap = 'break-word';
-                el.style.padding = '';
+                el.style.padding = resolveStaticTextPadding({ isMarkdown: false, useList: true });
             } else {
                 el.dataset.renderedList = '';
                 const plainLinks = !isMarkdown ? (props.links || null) : null;
-                const contentChanged = this._syncElementContent(el, content, isMarkdown, plainLinks);
+                const plainHighlights = !isMarkdown ? (props.highlights || null) : null;
+                const contentChanged = this._syncElementContent(el, content, isMarkdown, plainLinks, plainHighlights);
                 if (contentChanged) {
                     console.log(`🔍 HtmlTextLayer: содержимое обновлено в updateOne для ${objectId}:`, content);
                 }
@@ -697,8 +733,12 @@ export class HtmlTextLayer {
                     el.classList.toggle('mb-text--md', isMarkdown);
                     el.style.whiteSpace = isMarkdown ? 'normal' : 'pre';
                     el.style.overflowWrap = isMarkdown ? 'break-word' : '';
-                    if (!isMarkdown) el.style.padding = '0';
                 }
+                // Паддинг задаём при каждом проходе, а не только при смене режима:
+                // после режима списка inline padding сброшен на CSS 0.3em, и без
+                // безусловного восстановления обычный текст сохраняет лишний отступ
+                // сверху — статическая рамка уезжает выше глифов относительно поля ввода.
+                el.style.padding = resolveStaticTextPadding({ isMarkdown, useList: false });
             }
         }
 
@@ -710,7 +750,7 @@ export class HtmlTextLayer {
         try {
             const hasContent = !!(el.textContent && el.textContent.trim());
             if (hasContent && !angle && !isMarkdown && !useList && !(props.textAlign && props.textAlign !== 'left')) {
-                const rightMargin = Math.ceil(fontSizePx * 0.7) + 6;
+                const rightMargin = computeTextRightPadPx(fontSizePx);
                 const prevWidth = el.style.width;
                 el.style.width = 'auto';
                 const contentW = Math.ceil(el.scrollWidth);
@@ -725,7 +765,7 @@ export class HtmlTextLayer {
         try {
             el.style.height = 'auto';
             // Добавим небольшой нижний отступ для хвостов букв, чтобы не отсекались (например, у «з»)
-            const hCss = Math.max(1, Math.round(el.scrollHeight + 2));
+            const hCss = Math.max(1, Math.round(el.scrollHeight + TEXT_BOX_BOTTOM_PAD_PX));
             el.style.height = `${hCss}px`;
             // Обновим высоту для лога, если её ещё не устанавливали
             if (!logHeight) {
@@ -745,26 +785,29 @@ export class HtmlTextLayer {
         });
     }
 
-    /** Обновляет innerHTML/textContent только при реальной смене content, флага markdown или ссылок */
-    _syncElementContent(el, content, isMarkdown, links) {
+    /** Обновляет innerHTML/textContent только при реальной смене content, флага markdown, ссылок или подсветки */
+    _syncElementContent(el, content, isMarkdown, links, highlights) {
         if (typeof content !== 'string') return false;
         const mdFlag = isMarkdown ? '1' : '0';
         const linksKey = (Array.isArray(links) && links.length > 0) ? JSON.stringify(links) : '';
+        const highlightsKey = (Array.isArray(highlights) && highlights.length > 0) ? JSON.stringify(highlights) : '';
         if (
             el.dataset.renderedContent === content &&
             el.dataset.renderedMd === mdFlag &&
-            (el.dataset.renderedLinks || '') === linksKey
+            (el.dataset.renderedLinks || '') === linksKey &&
+            (el.dataset.renderedHighlights || '') === highlightsKey
         ) return false;
         if (isMarkdown) {
             el.innerHTML = renderRichText(content);
-        } else if (linksKey) {
-            el.innerHTML = _buildHtmlWithLinks(content, links);
+        } else if (linksKey || highlightsKey) {
+            el.innerHTML = buildHtmlWithRanges(content, links, highlights);
         } else {
             el.textContent = content;
         }
         el.dataset.renderedContent = content;
         el.dataset.renderedMd = mdFlag;
         el.dataset.renderedLinks = linksKey;
+        el.dataset.renderedHighlights = highlightsKey;
         return true;
     }
 

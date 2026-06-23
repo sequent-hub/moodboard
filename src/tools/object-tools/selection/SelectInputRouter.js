@@ -130,8 +130,8 @@ export function onMouseDown(event) {
                         }
                     }
                 }
-                // Откладываем drag до превышения порога смещения
-                this._pendingDrag = { isGroup: false, objectId: selId, downX: event.x, downY: event.y, event };
+                // Откладываем drag до превышения порога смещения; editCandidate — уже выделен
+                this._pendingDrag = { isGroup: false, objectId: selId, downX: event.x, downY: event.y, event, editCandidate: true };
                 return;
             }
         }
@@ -194,7 +194,37 @@ export function onMouseMove(event) {
 
 export function onMouseUp(event) {
     if (this._pendingDrag) {
+        const pending = this._pendingDrag;
         this._pendingDrag = null;
+
+        // Повторный клик по уже выделенному тексту (без перехода в drag) —
+        // вход в режим редактирования, как при двойном клике.
+        if (pending.editCandidate && !pending.isGroup && pending.objectId) {
+            const req = { objectId: pending.objectId, pixiObject: null };
+            this.emit(Events.Tool.GetObjectPixi, req);
+            const pix = req.pixiObject;
+            const isText = !!(pix && pix._mb && pix._mb.type === 'text');
+            if (isText) {
+                const posData = { objectId: pending.objectId, position: null };
+                this.emit(Events.Tool.GetObjectPosition, posData);
+                const textProperties = pix._mb?.properties || {};
+                const textContent = textProperties.content || '';
+                this.emit(Events.Tool.ObjectEdit, {
+                    id: pending.objectId,
+                    type: 'text',
+                    position: posData.position,
+                    properties: {
+                        ...pickTextEditorProperties(textProperties),
+                        content: textContent,
+                    },
+                    caretClick: {
+                        clientX: event?.originalEvent?.clientX,
+                        clientY: event?.originalEvent?.clientY,
+                    },
+                    create: false,
+                });
+            }
+        }
         return;
     }
     if (this.isResizing || this.isGroupResizing) {
@@ -332,6 +362,29 @@ export function onContextMenu(event) {
     } else if (this.selection.size() > 1) {
         context = 'group';
     }
+
+    // Для одиночного текстового объекта — открываем tpp-more-dropdown вместо moodboard-contextmenu
+    if (context === 'object' && targetId) {
+        const req = { objectId: targetId, pixiObject: null };
+        this.emit(Events.Tool.GetObjectPixi, req);
+        const pix = req.pixiObject;
+        if (pix && pix._mb && pix._mb.type === 'text') {
+            // Если объект ещё не выделен — выделяем его, чтобы панель свойств текста появилась в DOM
+            if (!this.selection.has(targetId)) {
+                this.setSelection([targetId]);
+            }
+            // Открываем дропдаун «Ещё» из TextPropertiesPanel в следующем кадре
+            // (панель рендерится асинхронно после выделения)
+            requestAnimationFrame(() => {
+                const moreBtn = document.getElementById('tpp-btn-more');
+                if (moreBtn) {
+                    moreBtn.click();
+                }
+            });
+            return;
+        }
+    }
+
     // Сообщаем ядру/UI, что нужно показать контекстное меню (пока без пунктов)
     this.emit(Events.Tool.ContextMenuShow, { x: event.x, y: event.y, context, targetId });
 }

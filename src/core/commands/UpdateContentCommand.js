@@ -47,11 +47,19 @@ export class UpdateContentCommand extends BaseCommand {
             if (!object.properties) {
                 object.properties = {};
             }
-            // Пересчитываем диапазоны ссылок при изменении контента
+            // Пересчитываем диапазоны ссылок и подсветки при изменении контента
+            const oldContent = object.properties.content ?? '';
             if (Array.isArray(object.properties.links) && object.properties.links.length > 0) {
                 object.properties.links = _adjustLinks(
                     object.properties.links,
-                    object.properties.content ?? '',
+                    oldContent,
+                    content
+                );
+            }
+            if (Array.isArray(object.properties.highlights) && object.properties.highlights.length > 0) {
+                object.properties.highlights = _adjustHighlights(
+                    object.properties.highlights,
+                    oldContent,
                     content
                 );
             }
@@ -139,6 +147,44 @@ function _adjustLinks(links, oldText, newText) {
             acc.push({ start: start + delta, end: end + delta, url });
         }
         // Ссылка перекрывает изменённый диапазон — удаляем (стала некорректной)
+        return acc;
+    }, []);
+}
+
+/**
+ * Пересчитывает диапазоны подсветки после изменения контента.
+ * Алгоритм идентичен _adjustLinks: общий префикс/суффикс, сдвиг или удаление.
+ * @param {Array<{start:number,end:number,color:string}>} highlights
+ * @param {string} oldText
+ * @param {string} newText
+ * @returns {Array<{start:number,end:number,color:string}>}
+ */
+function _adjustHighlights(highlights, oldText, newText) {
+    if (!highlights || highlights.length === 0) return highlights;
+
+    let prefixLen = 0;
+    const minLen = Math.min(oldText.length, newText.length);
+    while (prefixLen < minLen && oldText[prefixLen] === newText[prefixLen]) prefixLen++;
+
+    let oldSuffix = 0;
+    while (
+        oldSuffix < oldText.length - prefixLen &&
+        oldSuffix < newText.length - prefixLen &&
+        oldText[oldText.length - 1 - oldSuffix] === newText[newText.length - 1 - oldSuffix]
+    ) oldSuffix++;
+
+    const oldChangeEnd = oldText.length - oldSuffix;
+    const newChangeEnd = newText.length - oldSuffix;
+    const delta = newChangeEnd - oldChangeEnd;
+
+    return highlights.reduce((acc, hi) => {
+        const { start, end, color } = hi;
+        if (end <= prefixLen) {
+            acc.push({ start, end, color });
+        } else if (start >= oldChangeEnd) {
+            acc.push({ start: start + delta, end: end + delta, color });
+        }
+        // Подсветка перекрывает изменённый диапазон — удаляем
         return acc;
     }, []);
 }

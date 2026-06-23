@@ -1,7 +1,18 @@
+import { applyEditorSizing, applyTextStyles, computeLineHeightPx } from '../../../services/text/TextBoxMetrics.js';
+
 export function createTextEditorWrapper() {
     const wrapper = document.createElement('div');
     wrapper.className = 'moodboard-text-editor';
-    return wrapper;
+    
+    const backdrop = document.createElement('div');
+    backdrop.className = 'moodboard-text-backdrop';
+    wrapper.appendChild(backdrop);
+    
+    const caret = document.createElement('div');
+    caret.className = 'mb-custom-caret';
+    wrapper.appendChild(caret);
+    
+    return { wrapper, caret, backdrop };
 }
 
 export function createTextEditorTextarea(content) {
@@ -13,27 +24,32 @@ export function createTextEditorTextarea(content) {
 }
 
 export function computeTextEditorLineHeightPx(fontSizePx) {
-    if (fontSizePx <= 12) return Math.round(fontSizePx * 1.40);
-    if (fontSizePx <= 18) return Math.round(fontSizePx * 1.34);
-    if (fontSizePx <= 36) return Math.round(fontSizePx * 1.26);
-    if (fontSizePx <= 48) return Math.round(fontSizePx * 1.24);
-    if (fontSizePx <= 72) return Math.round(fontSizePx * 1.22);
-    if (fontSizePx <= 96) return Math.round(fontSizePx * 1.20);
-    return Math.round(fontSizePx * 1.18);
+    return computeLineHeightPx(fontSizePx);
 }
 
-export function applyInitialTextEditorTextareaStyles(textarea, { effectiveFontPx, lineHeightPx }) {
-    textarea.style.fontSize = `${effectiveFontPx}px`;
-    textarea.style.lineHeight = `${lineHeightPx}px`;
-
-    const initialHeightPx = Math.max(1, lineHeightPx);
-    textarea.style.minHeight = `${initialHeightPx}px`;
-    textarea.style.height = `${initialHeightPx}px`;
-    textarea.setAttribute('rows', '1');
-    textarea.style.overflowY = 'hidden';
-    textarea.style.whiteSpace = 'pre';
-    textarea.style.letterSpacing = '0px';
-    textarea.style.fontKerning = 'normal';
+/**
+ * Применяет все текстовые параметры на textarea/backdrop через общий applyTextStyles,
+ * и дополнительно выставляет sizing-параметры поля ввода (height, rows, overflow, white-space).
+ *
+ * fontSizePx — отображаемый размер в px (с учётом зума);
+ * baseFontSizePx — базовый без зума (для выбора line-height ratio).
+ * Эти два значения разделены, чтобы line-height ratio вычислялся по тому же baseFontSizePx,
+ * что и в HtmlTextLayer — строки совпадают при любом уровне зума.
+ */
+export function applyInitialTextEditorTextareaStyles(textarea, {
+    effectiveFontPx,
+    baseFontSizePx,
+    fontFamily,
+    properties,
+    lineHeightPx,
+}) {
+    applyTextStyles(textarea, {
+        fontSizePx: effectiveFontPx,
+        baseFontSizePx: baseFontSizePx || effectiveFontPx,
+        fontFamily: fontFamily || textarea.style.fontFamily || '',
+        properties: properties || {},
+    });
+    applyEditorSizing(textarea, lineHeightPx);
 }
 
 export function measureTextEditorPlaceholderWidth(textarea, placeholder = 'Напишите что-нибудь') {
@@ -57,7 +73,7 @@ export function attachTextEditorPlaceholderStyle(textarea, { effectiveFontPx, is
 
     const styleEl = document.createElement('style');
     const placeholderOpacity = isNote ? '0.4' : '0.6';
-    styleEl.textContent = `.${uid}::placeholder{font-size:${effectiveFontPx}px;opacity:${placeholderOpacity};line-height:${computeTextEditorLineHeightPx(effectiveFontPx)}px;white-space:nowrap;}`;
+    styleEl.textContent = `.${uid}::placeholder{font-size:${effectiveFontPx}px;opacity:${placeholderOpacity};line-height:${computeTextEditorLineHeightPx(effectiveFontPx)}px;white-space:nowrap;color:#111;-webkit-text-fill-color:#111;}`;
     document.head.appendChild(styleEl);
 
     return styleEl;

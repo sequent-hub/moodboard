@@ -1,5 +1,7 @@
 import { Events } from '../../../core/events/Events.js';
 import { alignStaticTextToEditorCssPosition } from './TextEditorPositioningService.js';
+import { updateCustomCaret } from './TextEditorCaretService.js';
+import { buildHtmlWithRanges } from '../../../ui/HtmlTextLayer.js';
 import {
     cleanupActiveTextEditor,
     showNotePixiText,
@@ -190,6 +192,20 @@ function _isInsideToolbarUI(target) {
     return !!(target && typeof target.closest === 'function' && target.closest(UI_BLOCK_SELECTOR));
 }
 
+/**
+ * Возвращает true, если элемент находится внутри панели свойств текста (форматирование).
+ */
+function _isInsideTextPropertiesPanel(target) {
+    return !!(target && typeof target.closest === 'function' && target.closest('.text-properties-layer'));
+}
+
+/**
+ * Нативный color-input открывает системную палитру по mousedown; preventDefault его ломает.
+ */
+function _isNativeColorInput(target) {
+    return !!(target && target.tagName === 'INPUT' && target.type === 'color');
+}
+
 export function bindTextEditorInteractions(controller, {
     textarea,
     isNewCreation,
@@ -228,6 +244,15 @@ export function bindTextEditorInteractions(controller, {
         if (!controller?.textEditor?.active) return;
         if (e.target === textarea) return;
         if (!_isInsideToolbarUI(e.target)) return;
+
+        // Клик по панели свойств текста (например, выбор цвета подсветки выделенного
+        // фрагмента): сохраняем фокус и выделение в textarea, но НЕ глушим сам click —
+        // он должен дойти до кнопки/дропдауна. Иначе blur закроет редактор, и выделение
+        // пропадёт ещё до выбора цвета.
+        if (_isInsideTextPropertiesPanel(e.target) && !_isNativeColorInput(e.target)) {
+            e.preventDefault();
+            return;
+        }
 
         const value = (textarea.value || '').trim();
         if (!isNewCreation || value.length > 0) return;
@@ -302,14 +327,74 @@ export function bindTextEditorInteractions(controller, {
         inputHandler = autoSize;
     }
 
+    const syncBackdrop = () => {
+        if (!controller.textEditor) return;
+        const wrapper = controller.textEditor.wrapper;
+        const objectId = controller.textEditor.objectId;
+        const editorProps = controller.textEditor.properties || {};
+        
+        const backdrop = wrapper ? wrapper.querySelector('.moodboard-text-backdrop') : null;
+        if (!backdrop) return;
+        
+        // Актуальные highlights/links берём из _mb.properties объекта (обновляются
+        // через Events.Object.StateChanged), с fallback на свойства редактора.
+        let currentHighlights = editorProps.highlights || null;
+        let currentLinks = editorProps.links || null;
+        if (objectId) {
+            try {
+                const pixiReq = { objectId, pixiObject: null };
+                controller.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
+                const props = pixiReq.pixiObject && pixiReq.pixiObject._mb
+                    ? pixiReq.pixiObject._mb.properties
+                    : null;
+                if (props) {
+                    if (Array.isArray(props.highlights)) currentHighlights = props.highlights;
+                    if (Array.isArray(props.links)) currentLinks = props.links;
+                }
+            } catch (_) {}
+        }
+        
+        const content = textarea.value;
+        backdrop.innerHTML = buildHtmlWithRanges(content, currentLinks, currentHighlights);
+    };
+
+    const caretUpdateHandler = () => {
+        if (controller.textEditor && controller.textEditor.caret) {
+            updateCustomCaret(textarea, controller.textEditor.caret);
+        }
+    };
+
     textarea.addEventListener('blur', blurHandler);
     textarea.addEventListener('keydown', keydownHandler);
-    textarea.addEventListener('input', inputHandler);
+    textarea.addEventListener('input', (e) => {
+        inputHandler(e);
+        syncBackdrop();
+    });
+    
+    textarea.addEventListener('input', caretUpdateHandler);
+    textarea.addEventListener('keydown', () => setTimeout(caretUpdateHandler, 0));
+    textarea.addEventListener('keyup', caretUpdateHandler);
+    textarea.addEventListener('click', caretUpdateHandler);
+    textarea.addEventListener('focus', caretUpdateHandler);
+    document.addEventListener('selectionchange', caretUpdateHandler);
+
+    // Initial caret and backdrop update
+    setTimeout(() => {
+        caretUpdateHandler();
+        syncBackdrop();
+    }, 0);
 
     const removeDomListeners = () => {
         textarea.removeEventListener('blur', blurHandler);
         textarea.removeEventListener('keydown', keydownHandler);
         textarea.removeEventListener('input', inputHandler);
+        
+        textarea.removeEventListener('input', caretUpdateHandler);
+        textarea.removeEventListener('keyup', caretUpdateHandler);
+        textarea.removeEventListener('click', caretUpdateHandler);
+        textarea.removeEventListener('focus', caretUpdateHandler);
+        document.removeEventListener('selectionchange', caretUpdateHandler);
+        
         document.removeEventListener('mousedown', mousedownCaptureHandler, true);
         if (_pendingClickBlocker) {
             document.removeEventListener('click', _pendingClickBlocker, true);

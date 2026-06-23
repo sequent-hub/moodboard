@@ -2,6 +2,11 @@ import { Events } from '../../../core/events/Events.js';
 import { tryStartAltCloneDuringDrag, resetCloneStateAfterDragEnd } from './CloneFlowController.js';
 
 export function handleObjectSelect(objectId, event) {
+    // Запоминаем ДО clearSelection: объект был единственным выделенным?
+    const wasAlreadySingleSelected = !this.isMultiSelect &&
+        this.selection.size() === 1 &&
+        this.selection.has(objectId);
+
     if (!this.isMultiSelect) {
         this.clearSelection();
     }
@@ -19,7 +24,8 @@ export function handleObjectSelect(objectId, event) {
         if (this.selection.size() > 1) {
             this._pendingDrag = { isGroup: true, objectId: null, downX: event.x, downY: event.y, event };
         } else {
-            this._pendingDrag = { isGroup: false, objectId, downX: event.x, downY: event.y, event };
+            // editCandidate=true если это повторный клик по уже единственному выделенному объекту
+            this._pendingDrag = { isGroup: false, objectId, downX: event.x, downY: event.y, event, editCandidate: wasAlreadySingleSelected };
         }
     }
 }

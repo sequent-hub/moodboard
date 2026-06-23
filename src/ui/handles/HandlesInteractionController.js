@@ -500,7 +500,17 @@ export class HandlesInteractionController {
             isNoteTarget = (mbType === 'note');
         }
 
+        let _edgeHasMoved = false;
+        const EDGE_DRAG_THRESHOLD = 4;
+
         const onMove = (ev) => {
+            if (!_edgeHasMoved) {
+                const dx = ev.clientX - startMouse.x;
+                const dy = ev.clientY - startMouse.y;
+                if (Math.hypot(dx, dy) > EDGE_DRAG_THRESHOLD) {
+                    _edgeHasMoved = true;
+                }
+            }
             const maintainAspectRatio = !!ev.shiftKey;
             if (isGroup && maintainAspectRatio !== previousMaintainAspectRatio) {
                 startCSS = this._readBoxCss(box);
@@ -657,6 +667,36 @@ export class HandlesInteractionController {
         const onUp = () => {
             document.removeEventListener('pointermove', onMove);
             document.removeEventListener('pointerup', onUp);
+
+            // Клик по рамке без перетаскивания на текстовом объекте → редактирование
+            if (!_edgeHasMoved && isTextTarget && !isGroup) {
+                const posData = { objectId: id, position: null };
+                this.host.eventBus.emit(Events.Tool.GetObjectPosition, posData);
+                const _pixiReq = { objectId: id, pixiObject: null };
+                this.host.eventBus.emit(Events.Tool.GetObjectPixi, _pixiReq);
+                const _textProps = _pixiReq.pixiObject?._mb?.properties || {};
+                this.host.eventBus.emit(Events.Tool.ObjectEdit, {
+                    id,
+                    type: 'text',
+                    position: posData.position,
+                    properties: {
+                        ..._textProps,
+                        content: _textProps.content || '',
+                    },
+                    caretClick: { clientX: e.clientX, clientY: e.clientY },
+                    create: false,
+                });
+                // Сбрасываем состояние resize без создания команды в истории
+                this.host.eventBus.emit(Events.Tool.ResizeEnd, {
+                    object: id,
+                    oldSize: { width: startWorld.width, height: startWorld.height },
+                    newSize: { width: startWorld.width, height: startWorld.height },
+                    oldPosition: { x: startWorld.x, y: startWorld.y },
+                    newPosition: { x: startWorld.x, y: startWorld.y },
+                });
+                return;
+            }
+
             const endCSS = {
                 left: parseFloat(box.style.left),
                 top: parseFloat(box.style.top),

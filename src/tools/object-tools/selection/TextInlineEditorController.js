@@ -11,7 +11,7 @@ import {
     createTextEditorFinalize,
 } from './TextEditorInteractionController.js';
 import {
-    hideGlobalTextEditorHandlesLayer,
+    updateGlobalTextEditorHandlesLayer,
     hideNotePixiText,
     hideStaticTextDuringEditing,
 } from './TextEditorLifecycleRegistry.js';
@@ -25,6 +25,8 @@ import {
 } from './TextEditorDomFactory.js';
 import { setupNoteInlineEditor } from './NoteInlineEditorController.js';
 import { createRegularTextAutoSize } from './TextEditorSyncService.js';
+import { TEXT_BOX_BOTTOM_PAD_PX } from '../../../services/text/TextBoxMetrics.js';
+import { buildHtmlWithRanges } from '../../../ui/HtmlTextLayer.js';
 
 export function openTextEditor(object, create = false) {
 
@@ -100,8 +102,6 @@ export function openTextEditor(object, create = false) {
     } else {
         this.eventBus.emit(Events.UI.TextEditStart, { objectId: objectId || null });
     }
-    // Прячем глобальные HTML-ручки на время редактирования, чтобы не было второй рамки
-    hideGlobalTextEditorHandlesLayer();
     // Подавляем пересоздание ручек при паразитных ResizeUpdate (тач double-tap):
     // host.update() внутри HandlesEventBridge вызывается при каждом ResizeUpdate,
     // _handlesSuppressed=true гарантирует что showBounds не создаст ручки поверх textarea.
@@ -110,6 +110,8 @@ export function openTextEditor(object, create = false) {
             window.moodboardHtmlHandlesLayer._handlesSuppressed = true;
         }
     } catch (_) {}
+    // Обновляем глобальные HTML-ручки на время редактирования, чтобы осталась только рамка без точек
+    updateGlobalTextEditorHandlesLayer();
 
     const app = this.app;
     const world = app?.stage?.getChildByName && app.stage.getChildByName('worldLayer');
@@ -147,19 +149,19 @@ export function openTextEditor(object, create = false) {
     }
     // Используем только HTML-ручки во время редактирования текста
     // Обертка для рамки + textarea + ручек
-    const wrapper = createTextEditorWrapper();
+    const { wrapper, caret } = createTextEditorWrapper();
 
     // Базовые стили вынесены в CSS (.moodboard-text-editor)
 
     const textarea = createTextEditorTextarea(content || '');
-    // Без доступного статичного HTML-элемента (часто при create) не оставляем Caveat как fallback.
-    textarea.style.fontFamily = 'Caveat, Arial, cursive';
+    const backdrop = wrapper.querySelector('.moodboard-text-backdrop');
 
-    // Вычисляем межстрочный интервал; подгоняем к реальным значениям HTML-отображения
+    // Собираем текстовые параметры из статического .mb-text (для существующих объектов)
+    // или из properties. Единый источник гарантирует идентичный рендер в обоих режимах.
+    let resolvedFontFamily = properties.fontFamily || 'Caveat, Arial, cursive';
+    let resolvedColor = properties.color || '#111';
     let lhInitial = computeTextEditorLineHeightPx(effectiveFontPx);
-    if (typeof properties.lineHeight === 'number') {
-        lhInitial = Math.round(effectiveFontPx * properties.lineHeight);
-    }
+
     try {
         if (objectId) {
             if (objectType === 'note') {
@@ -171,54 +173,54 @@ export function openTextEditor(object, create = false) {
                     const scaleY = Math.max(0.0001, Math.hypot(wt.c || 0, wt.d || 0));
                     const baseLH = parseFloat(inst.textField.style?.lineHeight || (fontSize * 1.2)) || (fontSize * 1.2);
                     lhInitial = Math.max(1, Math.round(baseLH * (scaleY / viewResEarly)));
+                    const ff = (inst.textField.style && inst.textField.style.fontFamily)
+                        || (pixiReq.pixiObject._mb.properties && pixiReq.pixiObject._mb.properties.fontFamily)
+                        || null;
+                    if (ff) resolvedFontFamily = ff;
                 }
             } else if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
                 const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
-                if (el) {
+                if (el && typeof window.getComputedStyle === 'function') {
                     const cs = window.getComputedStyle(el);
+                    const f = parseFloat(cs.fontSize);
+                    if (isFinite(f) && f > 0) effectiveFontPx = Math.round(f);
                     const lh = parseFloat(cs.lineHeight);
                     if (isFinite(lh) && lh > 0) lhInitial = Math.round(lh);
+                    if (cs.fontFamily) resolvedFontFamily = cs.fontFamily;
+                    if (cs.color) resolvedColor = cs.color;
                 }
             }
         }
     } catch (_) {}
 
-    // Базовые стили вынесены в CSS (.moodboard-text-input); здесь — только динамика
-    // Подбираем актуальный font-family из объекта
-    try {
-        if (objectId) {
-            if (objectType === 'note') {
-                // Для записки читаем из PIXI-инстанса NoteObject
-                const pixiReq = { objectId, pixiObject: null };
-                this.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
-                const inst = pixiReq.pixiObject && pixiReq.pixiObject._mb && pixiReq.pixiObject._mb.instance;
-                const ff = (inst && inst.textField && inst.textField.style && inst.textField.style.fontFamily)
-                    || (pixiReq.pixiObject && pixiReq.pixiObject._mb && pixiReq.pixiObject._mb.properties && pixiReq.pixiObject._mb.properties.fontFamily)
-                    || null;
-                if (ff) textarea.style.fontFamily = ff;
-            } else if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
-                // Для обычного текста читаем из HTML-элемента
-                const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
-                if (el) {
-                    const cs = window.getComputedStyle(el);
-                    const ff = cs && cs.fontFamily ? cs.fontFamily : null;
-                    if (ff) textarea.style.fontFamily = ff;
-                }
-            }
-        }
-    } catch (_) {}
+    // Применяем все текстовые параметры через единый applyTextStyles.
+    // textarea рендерит текст прозрачным (backdrop отвечает за видимые глифы),
+    // поэтому после applyTextStyles явно переопределяем color.
     applyInitialTextEditorTextareaStyles(textarea, {
         effectiveFontPx,
+        baseFontSizePx: fontSize,
+        fontFamily: resolvedFontFamily,
+        properties,
         lineHeightPx: lhInitial,
     });
-    if (properties.textAlign) {
-        textarea.style.textAlign = properties.textAlign;
+    textarea.style.color = 'transparent';
+
+    if (backdrop) {
+        applyInitialTextEditorTextareaStyles(backdrop, {
+            effectiveFontPx,
+            baseFontSizePx: fontSize,
+            fontFamily: resolvedFontFamily,
+            properties,
+            lineHeightPx: lhInitial,
+        });
+        backdrop.style.color = resolvedColor;
     }
 
-    // Shape: текст по центру, textarea покрывает весь bounds фигуры
+    // Shape: текст по центру — переопределяем textAlign после applyTextStyles
     if (isShape) {
         textarea.style.textAlign = 'center';
         textarea.placeholder = '';
+        if (backdrop) backdrop.style.textAlign = 'center';
     }
 
     wrapper.appendChild(textarea);
@@ -310,6 +312,7 @@ export function openTextEditor(object, create = false) {
 
     // Для записок позиционируем редактор внутри записки
     let updateNoteEditor = null;
+    let regularEditorVisualBox = null;
     if (objectType === 'note') {
         const noteSetup = setupNoteInlineEditor(this, {
             objectId,
@@ -356,6 +359,16 @@ export function openTextEditor(object, create = false) {
         textarea.style.width = `${shapeCssW}px`;
         textarea.style.height = `${shapeCssH}px`;
         textarea.style.boxSizing = 'border-box';
+        
+        if (backdrop) {
+            backdrop.style.width = `${shapeCssW}px`;
+            backdrop.style.height = `${shapeCssH}px`;
+            backdrop.style.boxSizing = 'border-box';
+            backdrop.style.display = 'block';
+            backdrop.style.paddingTop = `${paddingTopShape}px`;
+            backdrop.style.paddingBottom = '0px';
+        }
+        
         // display:block убирает baseline-смещение inline-block textarea внутри wrapper'а
         // (wrapper наследует line-height ~24px от body, из-за чего на сильном отдалении
         // textarea съезжает вниз от фигуры на фиксированные ~11px независимо от зума).
@@ -376,6 +389,8 @@ export function openTextEditor(object, create = false) {
             lineHeightPx,
             baseLeftPx,
             baseTopPx,
+            baseWidthPx,
+            baseHeightPx,
         } = positionRegularTextEditor({
             create,
             objectId,
@@ -383,6 +398,12 @@ export function openTextEditor(object, create = false) {
             textarea,
             wrapper,
         });
+        if (!create && baseWidthPx && baseHeightPx) {
+            regularEditorVisualBox = {
+                width: Math.max(1, Math.round(baseWidthPx)),
+                height: Math.max(1, Math.round(baseHeightPx)),
+            };
+        }
         // Сохраняем CSS-позицию редактора для точной синхронизации при закрытии
         this.textEditor._cssLeftPx = leftPx;
         this.textEditor._cssTopPx = topPx;
@@ -420,14 +441,16 @@ export function openTextEditor(object, create = false) {
     // Синхронизируем стартовый размер шрифта textarea с текущим зумом (как HtmlTextLayer)
     // Используем ранее вычисленный effectiveFontPx (до вставки в DOM), если он есть в замыкании
     textarea.style.fontSize = `${effectiveFontPx}px`;
-    const initialWpx = initialSize ? Math.max(1, (initialSize.width || 0) * s / viewRes) : null;
-    const initialHpx = initialSize ? Math.max(1, (initialSize.height || 0) * s / viewRes) : null;
+    const initialWpx = regularEditorVisualBox?.width
+        || (initialSize ? Math.max(1, (initialSize.width || 0) * s / viewRes) : null);
+    const initialHpx = regularEditorVisualBox?.height
+        || (initialSize ? Math.max(1, (initialSize.height || 0) * s / viewRes) : null);
 
     // Определяем минимальные границы для всех типов объектов
     let minWBound = initialWpx || 120; // базово близко к призраку
     let minHBound = effectiveFontPx; // базовая высота
     // Уменьшаем визуальный нижний запас, который браузеры добавляют к textarea
-    const BASELINE_FIX = 2; // px
+    const BASELINE_FIX = TEXT_BOX_BOTTOM_PAD_PX; // px
     if (!isNote) {
         minHBound = Math.max(1, effectiveFontPx - BASELINE_FIX);
     }
@@ -484,8 +507,9 @@ export function openTextEditor(object, create = false) {
         onSizeChange: syncRegularTextSizeToObject,
     });
 
-    // autoSize только для обычного текста; shape имеет фиксированные bounds фигуры
-    if (!isNote && !isShape) {
+    // Для существующего текста стартовый размер уже взят из видимого DOM-бокса:
+    // пересчёт нужен только после фактического ввода, иначе рамка прыгает при входе в редактор.
+    if (!isNote && !isShape && create) {
         autoSize();
     }
     textarea.focus();
@@ -500,6 +524,7 @@ export function openTextEditor(object, create = false) {
         objectId,
         textarea,
         wrapper,
+        caret,
         world: this.textEditor.world,
         position,
         properties: { fontSize, highlightColor: properties.highlightColor },

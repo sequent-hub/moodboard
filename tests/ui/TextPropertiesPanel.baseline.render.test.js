@@ -22,6 +22,7 @@ describe('TextPropertiesPanel baseline: render and visibility contracts', () => 
         const layer = ctx.container.querySelector('.text-properties-layer');
 
         expect(layer).toBeInTheDocument();
+        expect(Number(layer.style.zIndex)).toBeGreaterThan(10000);
         expect(layer.style.pointerEvents).toBe('none');
         expect(layer.querySelector('.text-properties-panel')).toBeNull();
         expect(panel.panel).toBeNull();
@@ -129,5 +130,77 @@ describe('TextPropertiesPanel baseline: render and visibility contracts', () => 
         ctx.eventBus.emit('tool:selection:clear');
         expect(panel.currentId).toBeNull();
         expect(panel.panel.style.display).toBe('none');
+    });
+});
+
+describe('TextPropertiesPanel _addHighlight: content sync with live editor', () => {
+    let ctx;
+    let panel;
+
+    beforeEach(() => {
+        ctx = createTextPropertiesPanelContext();
+        panel = new TextPropertiesPanel(ctx.container, ctx.eventBus, ctx.core);
+        panel.attach();
+    });
+
+    afterEach(() => {
+        panel?.destroy();
+        ctx?.cleanup();
+        document.querySelector('.moodboard-text-input')?.remove();
+    });
+
+    it('includes content in StateChanged when a live editor is open', () => {
+        // Объект с initialContent = "Hello"
+        ctx.setObject('t1', { properties: { content: 'Hello', highlights: [] } });
+        panel.currentId = 't1';
+
+        // Симулируем открытый редактор с уже изменённым текстом "Hello World"
+        const textarea = document.createElement('textarea');
+        textarea.className = 'moodboard-text-input';
+        textarea.value = 'Hello World';
+        document.body.appendChild(textarea);
+
+        // Снимаем снэпшот выделения (символы 6..11 = "World")
+        panel._savedTextSelection = { start: 6, end: 11 };
+
+        const emittedStateChanges = [];
+        const origEmit = ctx.eventBus.emit;
+        ctx.eventBus.emit = vi.fn((event, payload) => {
+            emittedStateChanges.push({ event, payload });
+            origEmit.call(ctx.eventBus, event, payload);
+        });
+
+        panel._addHighlight('#ffff00', 6, 11, 't1');
+
+        const stateEvt = emittedStateChanges.find(
+            (e) => e.event === 'object:state:changed' || (e.payload?.updates?.properties?.highlights)
+        );
+        expect(stateEvt).toBeTruthy();
+        // content должен быть синхронизирован из живого редактора
+        expect(stateEvt.payload.updates.properties.content).toBe('Hello World');
+        // диапазон подсветки корректный
+        expect(stateEvt.payload.updates.properties.highlights).toEqual([
+            { start: 6, end: 11, color: '#ffff00' },
+        ]);
+    });
+
+    it('omits content in StateChanged when no live editor is open', () => {
+        ctx.setObject('t1', { properties: { content: 'Hello', highlights: [] } });
+        panel.currentId = 't1';
+
+        const emittedStateChanges = [];
+        const origEmit = ctx.eventBus.emit;
+        ctx.eventBus.emit = vi.fn((event, payload) => {
+            emittedStateChanges.push({ event, payload });
+            origEmit.call(ctx.eventBus, event, payload);
+        });
+
+        panel._addHighlight('#ffff00', 0, 5, 't1');
+
+        const stateEvt = emittedStateChanges.find(
+            (e) => e.payload?.updates?.properties?.highlights
+        );
+        expect(stateEvt).toBeTruthy();
+        expect(stateEvt.payload.updates.properties.content).toBeUndefined();
     });
 });

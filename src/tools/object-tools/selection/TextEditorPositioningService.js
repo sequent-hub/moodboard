@@ -42,6 +42,12 @@ export function positionRegularTextEditor({
 
     let baseLeftPx = screenPos.x;
     let baseTopPx = screenPos.y;
+    // Computed padding-top of the static .mb-text element (e.g. 0.3em for list/markdown types).
+    // The static element top edge ≠ text glyph top: glyphs start paddingTop pixels lower.
+    // The editor wrapper must be shifted down by the same amount so text doesn't jump.
+    let staticPadTop = 0;
+    let baseWidthPx = null;
+    let baseHeightPx = null;
     try {
         if (!create && objectId && typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
             const el = window.moodboardHtmlTextLayer.idToEl.get(objectId);
@@ -50,6 +56,16 @@ export function positionRegularTextEditor({
                 const cssTop = parseFloat(el.style.top || 'NaN');
                 if (isFinite(cssLeft)) baseLeftPx = cssLeft;
                 if (isFinite(cssTop)) baseTopPx = cssTop;
+                const rect = el.getBoundingClientRect?.();
+                if (rect && isFinite(rect.width) && rect.width > 0) baseWidthPx = rect.width;
+                if (rect && isFinite(rect.height) && rect.height > 0) baseHeightPx = rect.height;
+                if (typeof window.getComputedStyle === 'function') {
+                    try {
+                        const cs = window.getComputedStyle(el);
+                        const pt = parseFloat(cs.paddingTop);
+                        if (isFinite(pt) && pt > 0) staticPadTop = pt;
+                    } catch (_) {}
+                }
             }
         }
     } catch (_) {}
@@ -57,7 +73,7 @@ export function positionRegularTextEditor({
     const leftPx = Math.round(baseLeftPx - padLeft);
     const topPx = create
         ? Math.round(baseTopPx - padTop - (lineHeightPx / 2))
-        : Math.round(baseTopPx - padTop);
+        : Math.round(baseTopPx + staticPadTop - padTop + 1);
 
     wrapper.style.left = `${leftPx}px`;
     wrapper.style.top = `${topPx}px`;
@@ -70,6 +86,8 @@ export function positionRegularTextEditor({
         lineHeightPx,
         baseLeftPx,
         baseTopPx,
+        baseWidthPx,
+        baseHeightPx,
     };
 }
 
