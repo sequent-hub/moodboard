@@ -1575,9 +1575,42 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+    /* Тулбар прижимаем ближе к краю, чтобы оставить максимум холста.
+       Высоту регулирует ToolbarResponsiveController (схлопывание в «Ещё»). */
+    .moodboard-workspace__toolbar {
+        left: 8px;
+    }
+
     .moodboard-toolbar {
-        overflow-x: auto;
-        padding: 10px;
+        padding: 6px;
+        gap: 6px;
+    }
+
+    /* Зум- и карта-бары компактнее и ближе к краю на телефоне */
+    .moodboard-zoombar {
+        right: 72px;
+        bottom: 16px;
+        padding: 6px;
+        gap: 6px;
+    }
+
+    .moodboard-mapbar {
+        right: 8px;
+        bottom: 16px;
+        padding: 6px;
+    }
+
+    .moodboard-zoombar__menu,
+    .moodboard-mapbar__popup {
+        right: 0;
+    }
+
+    /* Мини-карта не должна перекрывать половину экрана */
+    .moodboard-mapbar__popup {
+        width: 60vw;
+        height: 28vh;
+        min-width: 180px;
+        min-height: 120px;
     }
 }
 

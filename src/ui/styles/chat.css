@@ -32,6 +32,49 @@
     }
 }
 
+/* Mobile (≤768px): панель генерации — компактный bottom-sheet во всю ширину,
+   приподнят над зум/карта-баром, не наезжает на тулбар и холст. */
+@media (max-width: 768px) {
+    .moodboard-chat {
+        left: 8px;
+        right: 8px;
+        bottom: 84px; /* выше зум/карта-бара (16px + 60px touch-кнопки + зазор) */
+        transform: none;
+        width: auto;
+        max-width: none;
+    }
+
+    .moodboard-chat__composer {
+        min-height: 0;
+        padding: 0 6px 6px 8px;
+        gap: 6px;
+    }
+
+    /* iOS не зумит инпут при font-size ≥ 16px */
+    .moodboard-chat__textarea {
+        font-size: 16px;
+        min-height: 40px;
+        height: 40px;
+        padding: 12px 0 4px;
+    }
+
+    /* Пилюли и кнопка отправки переносятся, чтобы не выпадать за край */
+    .moodboard-chat__actions-row {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .moodboard-chat__pills {
+        gap: 8px 10px;
+        flex-wrap: wrap;
+    }
+
+    /* История диалога не должна занимать весь экран на телефоне */
+    .moodboard-chat__history {
+        max-height: 40vh;
+    }
+}
+
 .moodboard-chat__history {
     max-height: 360px;
     overflow-y: auto;

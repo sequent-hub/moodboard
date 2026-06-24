@@ -111,3 +111,23 @@
 .moodboard-topbar__button--zoom { width: 32px; height: 32px; font-size: 16px; }
 .moodboard-topbar__zoom-label { min-width: 48px; text-align: center; font-size: 14px; }
 
+/* Mobile (≤768px): топбар не должен выходить за край экрана. Сжимаем зазоры,
+   ограничиваем ширину вьюпортом и даём прокрутку внутри пилюли, если кнопок много. */
+@media (max-width: 768px) {
+    .moodboard-topbar {
+        top: 8px;
+        left: 8px;
+        gap: 2px;
+        padding: 6px;
+        max-width: calc(100vw - 16px);
+        overflow-x: auto;
+        scrollbar-width: none; /* Firefox */
+    }
+
+    .moodboard-topbar::-webkit-scrollbar { display: none; }
+
+    .moodboard-topbar__button { flex: 0 0 auto; }
+
+    .moodboard-topbar__divider { margin: 0 3px; }
+}
+
