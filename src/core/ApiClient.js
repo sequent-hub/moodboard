@@ -241,7 +241,30 @@ export class ApiClient {
                 }
                 return cleanedObj;
             }
-            
+
+            if (obj.type === 'video') {
+                const topSrcRaw = typeof obj.src === 'string' ? obj.src : '';
+                const propSrcRaw = typeof obj.properties?.src === 'string' ? obj.properties.src : '';
+                const normalizedSrc = topSrcRaw.trim() || propSrcRaw.trim();
+
+                if (!normalizedSrc) {
+                    throw new Error(`Video object "${obj.id || 'unknown'}" has no src. Save is blocked.`);
+                }
+                if (/^data:/i.test(normalizedSrc) || /^blob:/i.test(normalizedSrc)) {
+                    throw new Error(`Video object "${obj.id || 'unknown'}" contains forbidden data/blob src. Save is blocked.`);
+                }
+
+                const cleanedObj = {
+                    ...obj,
+                    src: normalizedSrc
+                };
+                if (cleanedObj.properties?.src) {
+                    cleanedObj.properties = { ...cleanedObj.properties };
+                    delete cleanedObj.properties.src;
+                }
+                return cleanedObj;
+            }
+
             return obj;
         });
 
@@ -296,7 +319,23 @@ export class ApiClient {
                     }
                     return restoredObj;
                 }
-                
+
+                if (obj.type === 'video') {
+                    const topSrc = typeof obj.src === 'string' ? obj.src.trim() : '';
+                    const propSrc = typeof obj.properties?.src === 'string' ? obj.properties.src.trim() : '';
+                    const normalizedSrc = topSrc || propSrc;
+                    if (!normalizedSrc) return obj;
+                    const restoredObj = {
+                        ...obj,
+                        src: normalizedSrc
+                    };
+                    if (restoredObj.properties?.src) {
+                        restoredObj.properties = { ...restoredObj.properties };
+                        delete restoredObj.properties.src;
+                    }
+                    return restoredObj;
+                }
+
                 return obj;
             })
         );

@@ -63,6 +63,7 @@ export const Events = {
 		PasteAt: 'ui:paste-at',
         PasteImage: 'ui:paste-image',
         PasteImageAt: 'ui:paste-image-at',
+        PasteVideoAt: 'ui:paste-video-at',
 		ZoomIn: 'ui:zoom:in',
 		ZoomOut: 'ui:zoom:out',
 		ZoomReset: 'ui:zoom:reset',

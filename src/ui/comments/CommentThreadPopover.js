@@ -136,7 +136,9 @@ export class CommentThreadPopover {
             position: 'absolute',
             inset: '0',
             pointerEvents: 'none',
-            zIndex: 26,
+            // Выше панелей свойств (text-properties-layer = 10050, *PropertiesPanel = 10000),
+            // иначе открытый поверх объекта попап комментария оказывается под тулбаром свойств.
+            zIndex: 10060,
         });
         this.container.appendChild(this.layer);
 

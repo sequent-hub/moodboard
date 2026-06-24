@@ -972,6 +972,43 @@ export class ChatWindow {
         });
     }
 
+    _placeGeneratedVideoOnBoard(result, skeletonWorld = null) {
+        if (!this._boardCore?.eventBus) return;
+        const src = result?.videoUrl;
+        if (!src) {
+            if (this._refs?.errorBlock) {
+                this._refs.errorBlock.textContent = 'Видео сгенерировано, но ссылка отсутствует.';
+                this._refs.errorBlock.classList.add('is-visible');
+            }
+            return;
+        }
+
+        const world = this._boardCore.pixi?.worldLayer || this._boardCore.pixi?.app?.stage;
+        const s = world?.scale?.x || 1;
+
+        // Приоритет — мировая точка скелетона: видео приземляется туда, где была заглушка,
+        // даже если пользователь панорамировал/зумил во время генерации.
+        let x;
+        let y;
+        if (skeletonWorld) {
+            x = Math.round(skeletonWorld.x * s + (world?.x || 0));
+            y = Math.round(skeletonWorld.y * s + (world?.y || 0));
+        } else {
+            const composerRect = this._refs?.composer?.getBoundingClientRect?.();
+            x = composerRect ? Math.round(composerRect.left + composerRect.width / 2) : 400;
+            y = composerRect ? Math.round(composerRect.top - 200) : 200;
+        }
+
+        this._boardCore.eventBus.emit(Events.UI.PasteVideoAt, {
+            x,
+            y,
+            src,
+            mimeType: result?.mimeType || 'video/mp4',
+            poster: null,
+            skipUpload: true
+        });
+    }
+
     _clearBoardSelection() {
         if (typeof this._boardCore?.selectTool?.clearSelection === 'function') {
             this._boardCore.selectTool.clearSelection();
@@ -1227,15 +1264,9 @@ export class ChatWindow {
         }
         if (state.status === 'done') {
             this._composer?.setStreaming(false);
+            const skeletonWorld = this._videoSkeletonWorld;
             this._clearVideoSkeleton();
-            // Тип объекта «видео» на доске не существует. Событие Events.UI.PasteImageAt
-            // ожидает data URL картинки — видео-URL несовместим. Размещение на доске
-            // выходит за рамки текущей фазы (нет объекта типа video).
-            console.info('[ChatWindow] Видео готово. Размещение на доске не поддерживается: нет объекта типа video.', state.result?.videoUrl);
-            if (this._refs?.errorBlock) {
-                this._refs.errorBlock.textContent = 'Видео сгенерировано. Размещение на доске появится в следующей фазе.';
-                this._refs.errorBlock.classList.add('is-visible');
-            }
+            this._placeGeneratedVideoOnBoard(state.result, skeletonWorld);
         }
         if (state.status === 'error') {
             this._composer?.setStreaming(false);

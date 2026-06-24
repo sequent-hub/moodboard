@@ -380,6 +380,54 @@ export function setupClipboardFlow(core) {
         }
     });
 
+    core.eventBus.on(Events.UI.PasteVideoAt, ({ x, y, src, mimeType, poster, aiMessageId, skipUpload = true }) => {
+        if (!src) return;
+        const world = core.pixi.worldLayer || core.pixi.app.stage;
+        const s = world?.scale?.x || 1;
+        const worldX = (x - (world?.x || 0)) / s;
+        const worldY = (y - (world?.y || 0)) / s;
+
+        const placeVideo = (natW, natH) => {
+            const ar = (natW > 0 && natH > 0) ? natW / natH : (16 / 9);
+            const w = 300;
+            const h = Math.max(1, Math.round(w / ar));
+            const created = core.createObject(
+                'video',
+                { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) },
+                {
+                    src,
+                    width: w,
+                    height: h,
+                    mimeType: mimeType || 'video/mp4',
+                    poster: poster || null,
+                    loop: true,
+                    muted: true,
+                    ...(aiMessageId ? { aiMessageId } : {})
+                }
+            );
+            // Видео не проходит через SaveManager до подтверждения — раскрываем сразу,
+            // как для AI-картинок и 3D-скринов.
+            if (skipUpload && created?.id) {
+                core._pendingPersistAckVisibilityIds?.delete(created.id);
+                core._setObjectVisibility?.(created.id, true);
+            }
+        };
+
+        // Узнаём натуральные пропорции из метаданных видео (для aspect-ratio).
+        try {
+            const probe = document.createElement('video');
+            probe.preload = 'metadata';
+            probe.muted = true;
+            probe.addEventListener('loadedmetadata', () => {
+                placeVideo(probe.videoWidth || 0, probe.videoHeight || 0);
+            }, { once: true });
+            probe.addEventListener('error', () => placeVideo(0, 0), { once: true });
+            probe.src = src;
+        } catch (_) {
+            placeVideo(0, 0);
+        }
+    });
+
     core.eventBus.on(Events.Tool.DuplicateRequest, (data) => {
         const { originalId, position } = data || {};
         if (!originalId) return;

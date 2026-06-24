@@ -248,7 +248,16 @@ export class PixiEngine {
         const pixiObject = this.objects.get(objectId);
         if (pixiObject) {
             console.log('🗑️ PixiEngine: удаляем объект из сцены:', objectId);
-            
+
+            // Видео: останавливаем HTMLVideoElement и снимаем listeners до уничтожения
+            // спрайта. Без этого видео продолжает играть и тикать текстуру — утечка.
+            // Хук сужен до 'video', чтобы не задеть destroy() фреймов/коннекторов,
+            // у которых контейнер уничтожается общим путём ниже (иначе двойной destroy).
+            const mbMeta = pixiObject._mb;
+            if (mbMeta?.type === 'video' && typeof mbMeta.instance?.destroy === 'function') {
+                try { mbMeta.instance.destroy(); } catch (_) {}
+            }
+
             // Удаляем из родительского контейнера
             if (this.worldLayer) {
                 this.worldLayer.removeChild(pixiObject);
