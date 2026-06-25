@@ -1,8 +1,32 @@
 import { Events } from '../../../core/events/Events.js';
 import {
+    applyNoteEditorBox,
     createNoteEditorUpdater,
     registerNoteEditorSync,
 } from './TextEditorSyncService.js';
+
+// Разметка иконки запрета (assets/icons/ban.svg). stroke=currentColor — цвет задаётся CSS.
+const NOTE_BAN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M4.929 4.929 19.07 19.071"/></svg>';
+
+/**
+ * Создаёт (или переиспользует) оверлей запрета ввода внутри wrapper редактора записки
+ * и возвращает функцию переключения его видимости.
+ * @param {HTMLElement} wrapper
+ * @returns {(visible: boolean) => void}
+ */
+function ensureNoteLimitBan(wrapper) {
+    let banEl = wrapper.querySelector('.moodboard-note-limit-ban');
+    if (!banEl) {
+        banEl = document.createElement('div');
+        banEl.className = 'moodboard-note-limit-ban';
+        banEl.innerHTML = NOTE_BAN_SVG;
+        banEl.style.display = 'none';
+        wrapper.appendChild(banEl);
+    }
+    return (visible) => {
+        banEl.style.display = visible ? 'flex' : 'none';
+    };
+}
 
 export function setupNoteInlineEditor(controller, params) {
     const {
@@ -35,69 +59,50 @@ export function setupNoteInlineEditor(controller, params) {
         }
     }
 
-    // Текст у записки центрирован по обеим осям; textarea тоже центрируем
-    const horizontalPadding = 16; // немного больше, чем раньше
-    // Преобразуем мировые размеры/отступы в CSS-пиксели с учётом текущего зума
-    const viewResLocal = (controller.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
+    // Текст у записки центрирован по обеим осям; редактор повторяет блок текста.
+    const horizontalPadding = 16;
+    // Мировые размеры/отступы → CSS-пиксели. Множитель = worldScale, БЕЗ деления на
+    // renderer.resolution: screenPos берётся из toGlobal (см. InlineEditorPositioningService),
+    // который уже возвращает CSS-px независимо от res, а сама записка рисуется в PIXI, где
+    // 1 мировая единица = worldScale CSS-px. Лишнее /res занижало ширину блока и слагаемое
+    // центрирования (noteWidth*scale/2) → при зуме браузера ≠100% (res≠1) редактор уезжал влево.
     const worldLayerRefForCss = controller.textEditor.world || (controller.app?.stage);
     const sForCss = worldLayerRefForCss?.scale?.x || 1;
-    const sCssLocal = sForCss / viewResLocal;
-    const editorWidthWorld = Math.min(360, Math.max(1, noteWidth - (horizontalPadding * 2)));
-    const editorHeightWorld = Math.min(180, Math.max(1, noteHeight - (horizontalPadding * 2)));
-    const editorWidthPx = Math.max(1, Math.round(editorWidthWorld * sCssLocal));
-    const editorHeightPx = Math.max(1, Math.round(editorHeightWorld * sCssLocal));
-    const textCenterXWorld = noteWidth / 2;
-    const textCenterYWorld = noteHeight / 2;
-    const editorLeftWorld = textCenterXWorld - (editorWidthWorld / 2);
-    const editorTopWorld = textCenterYWorld - (editorHeightWorld / 2);
-    wrapper.style.left = `${Math.round(screenPos.x + editorLeftWorld * sCssLocal)}px`;
-    wrapper.style.top = `${Math.round(screenPos.y + editorTopWorld * sCssLocal)}px`;
-    // Устанавливаем размеры редактора (центрируем по контенту) в CSS-пикселях
-    textarea.style.width = `${editorWidthPx}px`;
-    textarea.style.height = `${editorHeightPx}px`;
-    wrapper.style.width = `${editorWidthPx}px`;
-    wrapper.style.height = `${editorHeightPx}px`;
+    const sCssLocal = sForCss;
 
-    // Для записок: авто-ресайз редактора под содержимое с сохранением центрирования.
-    // backdrop (видимые глифы) обязан повторять выравнивание textarea, иначе каретка,
-    // позиционируемая по center-align textarea, уходит вправо от прижатого влево текста.
-    textarea.style.textAlign = 'center';
     const backdrop = wrapper.querySelector('.moodboard-text-backdrop');
-    if (backdrop) {
-        backdrop.style.textAlign = 'center';
-    }
-    const maxEditorWidthPx = Math.max(1, Math.round((noteWidth - (horizontalPadding * 2)) * sCssLocal));
-    const maxEditorHeightPx = Math.max(1, Math.round((noteHeight - (horizontalPadding * 2)) * sCssLocal));
-    const MIN_NOTE_EDITOR_W = 20;
+
+    // Оверлей запрета ввода: показывается по центру записки, когда достигнут лимит
+    // строк (NOTE_MAX_LINES). Иконка — assets/icons/ban.svg (stroke=currentColor).
+    const setBanVisible = ensureNoteLimitBan(wrapper);
+
+    // Внутренний блок текста = границы записки минус отступы, ограничение ширины 360 —
+    // как в NoteObject._getVisibleTextWidth.
     const MIN_NOTE_EDITOR_H = Math.max(1, computeLineHeightPx(effectiveFontPx));
+    const innerWorldW = Math.max(1, Math.min(360, noteWidth - (horizontalPadding * 2)));
+    const innerWorldH = Math.max(1, noteHeight - (horizontalPadding * 2));
+    const boxW = Math.max(1, Math.round(innerWorldW * sCssLocal));
+    const innerH = Math.max(MIN_NOTE_EDITOR_H, Math.round(innerWorldH * sCssLocal));
 
     const autoSizeNote = () => {
-        // Сначала сбрасываем размеры, чтобы измерить естественные
-        textarea.style.width = 'auto';
-        textarea.style.height = 'auto';
+        const result = applyNoteEditorBox(textarea, backdrop, {
+            boxW,
+            innerH,
+            effectiveFontPx,
+        });
+        wrapper.style.width = `${boxW}px`;
+        wrapper.style.height = `${result.contentH}px`;
 
-        // Ширина по содержимому, но не шире границ записки (в CSS-пикселях)
-        const naturalW = Math.ceil(textarea.scrollWidth + 1);
-        const targetW = Math.min(maxEditorWidthPx, Math.max(MIN_NOTE_EDITOR_W, naturalW));
-        textarea.style.width = `${targetW}px`;
-        wrapper.style.width = `${targetW}px`;
-
-        // Высота по содержимому, c нижним пределом = одна строка
-        const computed = (typeof window !== 'undefined') ? window.getComputedStyle(textarea) : null;
-        const lineH = (computed ? parseFloat(computed.lineHeight) : computeLineHeightPx(effectiveFontPx));
-        const naturalH = Math.ceil(textarea.scrollHeight);
-        const targetH = Math.min(maxEditorHeightPx, Math.max(MIN_NOTE_EDITOR_H, naturalH));
-        textarea.style.height = `${targetH}px`;
-        wrapper.style.height = `${targetH}px`;
-
-        // Центрируем wrapper внутри записки после смены размеров (в CSS-пикселях)
-        const left = Math.round(screenPos.x + (noteWidth * sCssLocal) / 2 - (targetW / 2));
-        const top = Math.round(screenPos.y + (noteHeight * sCssLocal) / 2 - (targetH / 2));
+        // Центрируем блок контента внутри записки по обеим осям (как PIXI-текст).
+        const left = Math.round(screenPos.x + (noteWidth * sCssLocal) / 2 - (boxW / 2));
+        const top = Math.round(screenPos.y + (noteHeight * sCssLocal) / 2 - (result.contentH / 2));
         wrapper.style.left = `${left}px`;
         wrapper.style.top = `${top}px`;
+        return result;
     };
     // Первый вызов — синхронизировать с текущим содержимым
-    autoSizeNote();
+    const initial = autoSizeNote();
+    setBanVisible(!!(initial && initial.full));
 
     // Динамическое обновление позиции/размера редактора при зуме/панорамировании/трансформациях
     const updateNoteEditor = createNoteEditorUpdater(controller, {
@@ -115,5 +120,5 @@ export function setupNoteInlineEditor(controller, params) {
     });
     registerNoteEditorSync(controller, { objectId, updateNoteEditor });
 
-    return { updateNoteEditor };
+    return { updateNoteEditor, setBanVisible };
 }

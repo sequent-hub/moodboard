@@ -83,6 +83,7 @@ export class HoverLiftController {
         this._isDragging = false;
         this._isResizing = false;
         this._isRotating = false;
+        this._isConnecting = false;
         /** Set<id> — выделенные объекты (по _mb.objectId) */
         this._selectedIds = new Set();
 
@@ -217,9 +218,20 @@ export class HoverLiftController {
         return world?.scale?.x ?? 1;
     }
 
+    /**
+     * Внешняя блокировка hover на время протягивания коннектора.
+     * Цель коннектора не должна играть scale/lift: иначе её визуальные
+     * границы выходят за рамку подсветки, которая строится по логическим bounds.
+     * @param {boolean} active
+     */
+    setConnecting(active) {
+        this._isConnecting = !!active;
+        if (this._isConnecting) this._snapBackAll();
+    }
+
     /** Можно ли сейчас показывать hover */
     _isBlocked(pixiObject) {
-        if (this._isDragging || this._isResizing || this._isRotating) return true;
+        if (this._isDragging || this._isResizing || this._isRotating || this._isConnecting) return true;
         const id = pixiObject._mb?.objectId;
         if (id && this._selectedIds.has(id)) return true;
         return false;

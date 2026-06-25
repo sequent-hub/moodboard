@@ -102,34 +102,6 @@ export class ConnectorDragController {
     }
 
     /**
-     * Визуальные габариты объекта с учётом hover-трансформации (scale + подъём).
-     * Подсветка коннектора должна совпадать с тем, что видит пользователь, а не
-     * с логическими bounds из состояния. Привязка коннектора при этом остаётся
-     * на логических bounds — трансформируется только прямоугольник подсветки.
-     */
-    _visualBounds(objectId, bounds) {
-        const hoverLift = this.core?.pixi?.hoverLift;
-        if (!hoverLift) return bounds;
-
-        const pixiReq = { objectId, pixiObject: null };
-        this.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
-        const pixiObject = pixiReq.pixiObject;
-        if (!pixiObject) return bounds;
-
-        const t = hoverLift.getVisualTransform(pixiObject);
-        if (!t) return bounds;
-
-        const width  = bounds.width  * t.scaleMulX;
-        const height = bounds.height * t.scaleMulY;
-        return {
-            x: t.centerX - width  / 2,
-            y: t.centerY - height / 2,
-            width,
-            height,
-        };
-    }
-
-    /**
      * Возвращает ближайший якорь из TARGET_ANCHORS в пределах ANCHOR_SNAP_CSS от worldPt,
      * иначе null. Приоритет выше грани — вызывать в _resolveEnd первым.
      */
@@ -200,6 +172,9 @@ export class ConnectorDragController {
             if (Math.abs(e.clientX - this._startX) < DRAG_THRESHOLD
              && Math.abs(e.clientY - this._startY) < DRAG_THRESHOLD) return;
             this._dragging = true;
+            // Гасим hover-lift на время протягивания: цель не должна масштабироваться
+            // и подниматься, иначе её границы вылезают за рамку подсветки.
+            this.core?.pixi?.hoverLift?.setConnecting(true);
             const world = this._world();
             if (world) {
                 this._previewGraphics   = new PIXI.Graphics();
@@ -220,9 +195,12 @@ export class ConnectorDragController {
         if (objectId && objectId !== this._sourceTerminal?.boundId) {
             const bounds = this._objectBounds(objectId);
             if (bounds) {
-                const visual = this._visualBounds(objectId, bounds);
+                // Рамку строим строго по логическим bounds — коннектор привязывается
+                // к ним же. Hover-трансформацию (scale/lift) не учитываем: иначе рамка
+                // выпирает за периметр объекта (раздув ×scale + подъём центра вверх) и
+                // отстаёт от анимации, т.к. перерисовывается только на pointermove.
                 this._highlightGraphics.lineStyle({ width: 2, color: 0x2563EB, alpha: 0.85 });
-                this._highlightGraphics.drawRect(visual.x, visual.y, visual.width, visual.height);
+                this._highlightGraphics.drawRect(bounds.x, bounds.y, bounds.width, bounds.height);
                 // Подводим превью к коннектору, если курсор в зоне магнита
                 const snapAnchor = this._snapToAnchor(bounds, worldPt);
                 if (snapAnchor) {
@@ -249,6 +227,7 @@ export class ConnectorDragController {
         const source      = this._sourceTerminal;
         this._dragging        = false;
         this._sourceTerminal  = null;
+        this.core?.pixi?.hoverLift?.setConnecting(false);
         this._clearGraphics();
 
         if (!source) return;
@@ -360,6 +339,7 @@ export class ConnectorDragController {
     destroy() {
         document.removeEventListener('pointermove', this._boundMove);
         document.removeEventListener('pointerup',   this._boundUp);
+        this.core?.pixi?.hoverLift?.setConnecting(false);
         if (this._pendingDupListener) {
             this.eventBus?.off(Events.Tool.DuplicateReady, this._pendingDupListener);
             this._pendingDupListener = null;

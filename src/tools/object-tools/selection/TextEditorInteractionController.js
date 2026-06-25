@@ -214,6 +214,7 @@ export function bindTextEditorInteractions(controller, {
     isShape,
     autoSize,
     updateNoteEditor,
+    setNoteBanVisible,
     finalize,
     listType,
 }) {
@@ -327,7 +328,31 @@ export function bindTextEditorInteractions(controller, {
     // уносил текст вправо от фигуры. Поэтому ввод в фигуре границы не меняет.
     let inputHandler;
     if (isNote) {
-        inputHandler = () => { try { if (updateNoteEditor) updateNoteEditor(); } catch (_) {} };
+        // Лимит строк записки: если очередной ввод превышает вместимость (>25 строк или
+        // не влезает по высоте при минимальном шрифте), откатываем значение и показываем
+        // иконку запрета. Иначе пересчитываем подгонку и держим иконку, пока записка полна.
+        let lastGoodValue = textarea.value;
+        let lastGoodSel = textarea.selectionStart || 0;
+        inputHandler = () => {
+            try {
+                const res = updateNoteEditor ? updateNoteEditor() : null;
+                // Откатываем только рост текста, превысивший вместимость. Удаление/замену
+                // на более короткое значение всегда принимаем, иначе из переполненного
+                // состояния нельзя выйти.
+                const growing = textarea.value.length > lastGoodValue.length;
+                if (res && res.fits === false && growing) {
+                    const restorePos = Math.min(lastGoodSel, lastGoodValue.length);
+                    textarea.value = lastGoodValue;
+                    textarea.selectionStart = textarea.selectionEnd = restorePos;
+                    if (updateNoteEditor) updateNoteEditor();
+                    if (setNoteBanVisible) setNoteBanVisible(true);
+                } else {
+                    lastGoodValue = textarea.value;
+                    lastGoodSel = textarea.selectionStart || 0;
+                    if (setNoteBanVisible) setNoteBanVisible(!!(res && res.full));
+                }
+            } catch (_) {}
+        };
     } else if (isShape) {
         inputHandler = () => {};
     } else {

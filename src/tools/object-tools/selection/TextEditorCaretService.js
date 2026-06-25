@@ -8,6 +8,45 @@ const propertiesToCopy = [
 ];
 
 let mirrorDiv = null;
+let glyphMeasureCanvas = null;
+
+// Возвращает выступ чернил (ink) глифа за его advance width в CSS-px. У рукописных и
+// наклонных шрифтов (например Caveat) правый край буквы выходит за ширину продвижения,
+// по которой считается позиция каретки, поэтому она визуально наезжает на символ.
+// actualBoundingBoxRight — расстояние от точки отрисовки до правого края чернил;
+// разница с width даёт величину выступа. <=0 для обычных прямых шрифтов.
+function measureGlyphRightOverflow(computed, ch) {
+    if (!ch || ch === '\n') {
+        return 0;
+    }
+    try {
+        if (typeof document === 'undefined') {
+            return 0;
+        }
+        if (!glyphMeasureCanvas) {
+            glyphMeasureCanvas = document.createElement('canvas');
+        }
+        const ctx = glyphMeasureCanvas.getContext('2d');
+        if (!ctx) {
+            return 0;
+        }
+        const fontStyle = computed.fontStyle || 'normal';
+        const fontWeight = computed.fontWeight || 'normal';
+        const fontSize = computed.fontSize || '16px';
+        const fontFamily = computed.fontFamily || 'sans-serif';
+        ctx.font = `${fontStyle} ${fontWeight} ${fontSize} ${fontFamily}`;
+        const metrics = ctx.measureText(ch);
+        const advance = metrics.width || 0;
+        const inkRight = metrics.actualBoundingBoxRight;
+        if (!Number.isFinite(inkRight)) {
+            return 0;
+        }
+        const overflow = inkRight - advance;
+        return overflow > 0 ? overflow : 0;
+    } catch (_) {
+        return 0;
+    }
+}
 
 export function getCaretCoordinates(element, position) {
     if (!mirrorDiv) {
@@ -84,6 +123,17 @@ export function updateCustomCaret(textarea, caretEl) {
     // Calculate width based on font size to match stroke thickness
     const computed = window.getComputedStyle(textarea);
     const fontSize = parseFloat(computed.fontSize) || 16;
+
+    // Сдвиг каретки вправо складывается из выступа чернил последней буквы (у рукописных/
+    // наклонных шрифтов глиф вылазит за advance width) и межбуквенного интервала текста.
+    // Применяем только в конце строки — в середине следующий символ и так перекрывает выступ.
+    const value = textarea.value || '';
+    const atLineEnd = pos >= value.length || value[pos] === '\n';
+    const lastChar = pos > 0 ? value[pos - 1] : '';
+    const inkOverflow = atLineEnd ? measureGlyphRightOverflow(computed, lastChar) : 0;
+    const letterSpacing = parseFloat(computed.letterSpacing);
+    const spacingGap = Number.isFinite(letterSpacing) ? Math.max(0, letterSpacing) : 0;
+    const caretGap = inkOverflow + spacingGap;
     // Толщина каретки пропорциональна шрифту (≈7% размера). Минимум 1px — при сильном
     // отдалении каретка остаётся видимой и не нарушает пропорцию. Жёсткий пол 2px убран,
     // чтобы при уменьшении масштаба каретка масштабировалась вместе с текстом.
@@ -103,7 +153,7 @@ export function updateCustomCaret(textarea, caretEl) {
     }
 
     caretEl.style.top = `${top - 2}px`;
-    caretEl.style.left = `${left - Math.floor(caretWidth / 2)}px`;
+    caretEl.style.left = `${left - Math.floor(caretWidth / 2) + caretGap}px`;
     caretEl.style.height = `${coords.height}px`;
     caretEl.style.width = `${caretWidth}px`;
     caretEl.style.backgroundColor = caretColor;

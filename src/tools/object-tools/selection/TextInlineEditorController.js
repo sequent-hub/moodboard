@@ -140,7 +140,10 @@ export function openTextEditor(object, create = false) {
                     const wt = inst.textField.worldTransform;
                     const scaleY = Math.max(0.0001, Math.hypot(wt.c || 0, wt.d || 0));
                     const baseFS = parseFloat(inst.textField.style?.fontSize || fontSize || 14) || (fontSize || 14);
-                    effectiveFontPx = Math.max(1, Math.round(baseFS * (scaleY / viewResEarly)));
+                    // worldTransform.scaleY = worldScale; CSS-размер глифа PIXI-записки = baseFS*worldScale
+                    // (res в трансформ сцены не входит). Деление на viewResEarly делало шрифт редактора
+                    // мельче статического при res≠1 и рассогласовывало перенос строк с записанным текстом.
+                    effectiveFontPx = Math.max(1, Math.round(baseFS * scaleY));
                 }
             } catch (_) {}
         } else if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {
@@ -317,6 +320,7 @@ export function openTextEditor(object, create = false) {
 
     // Для записок позиционируем редактор внутри записки
     let updateNoteEditor = null;
+    let setNoteBanVisible = null;
     let regularEditorVisualBox = null;
     if (objectType === 'note') {
         const noteSetup = setupNoteInlineEditor(this, {
@@ -332,6 +336,7 @@ export function openTextEditor(object, create = false) {
             toScreen,
         });
         updateNoteEditor = noteSetup.updateNoteEditor;
+        setNoteBanVisible = noteSetup.setBanVisible;
     } else if (isShape) {
         // Shape: редактор занимает весь bounds фигуры, текст вертикально центрирован
         const viewResShape = (this.app?.renderer?.resolution) ||
@@ -444,8 +449,12 @@ export function openTextEditor(object, create = false) {
     const s = worldLayerRef?.scale?.x || 1;
     const viewRes = (this.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
     // Синхронизируем стартовый размер шрифта textarea с текущим зумом (как HtmlTextLayer)
-    // Используем ранее вычисленный effectiveFontPx (до вставки в DOM), если он есть в замыкании
-    textarea.style.fontSize = `${effectiveFontPx}px`;
+    // Используем ранее вычисленный effectiveFontPx (до вставки в DOM), если он есть в замыкании.
+    // Для записки шрифт уже подобран autoSizeNote (fit-to-bounds): сброс к effectiveFontPx
+    // рассинхронизировал бы textarea (по нему считается каретка) с backdrop.
+    if (!isNote) {
+        textarea.style.fontSize = `${effectiveFontPx}px`;
+    }
     // Высоту/ширину поля при входе в редактор берём как максимум из видимого DOM-бокса
     // и размера в состоянии объекта. DOM-бокс .mb-text к этому моменту может быть схлопнут
     // до высоты контента (auto), тогда как в состоянии хранится вручную заданная высота рамки —
@@ -528,6 +537,11 @@ export function openTextEditor(object, create = false) {
         autoSize();
     }
     textarea.focus();
+    // Записка: после фокуса повторно подгоняем блок (focus может изменить layout),
+    // чтобы стартовая каретка считалась от уже подобранного размера шрифта, а не от 32px.
+    if (isNote && updateNoteEditor) {
+        try { updateNoteEditor(); } catch (_) {}
+    }
     // Ручки скрыты в режиме input
     // Локальная CSS-настройка placeholder (меньше базового шрифта)
     const styleEl = attachTextEditorPlaceholderStyle(textarea, {
@@ -588,6 +602,7 @@ export function openTextEditor(object, create = false) {
         isShape,
         autoSize,
         updateNoteEditor,
+        setNoteBanVisible,
         finalize,
         listType: properties.listType || 'none',
     });

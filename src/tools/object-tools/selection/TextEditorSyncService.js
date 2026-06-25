@@ -1,7 +1,18 @@
 import * as PIXI from 'pixi.js';
 import { Events } from '../../../core/events/Events.js';
 import { registerEditorListeners } from './InlineEditorListenersRegistry.js';
-import { computeTextRightPadPx } from '../../../services/text/TextBoxMetrics.js';
+import {
+    computeTextRightPadPx,
+    resolveLineHeightRatio,
+} from '../../../services/text/TextBoxMetrics.js';
+
+// Максимальное число визуальных строк в записке. По достижении лимита ввод
+// блокируется (см. note inputHandler), шрифт до этого сжимается без нижнего предела,
+// чтобы строки помещались по высоте записки.
+export const NOTE_MAX_LINES = 25;
+// Жёсткий пол только чтобы шрифт не стал 0/отрицательным. Ограничения по размеру нет —
+// единственный лимит ввода это NOTE_MAX_LINES.
+const NOTE_MIN_FONT_PX = 1;
 
 // Измеряет ширину текста textarea по реальным глифам через скрытый span.
 // Возвращает ширину самой длинной строки в CSS-px (white-space: pre — без переносов),
@@ -26,6 +37,106 @@ function measureTextareaContentWidth(textarea, value) {
     } catch (_) {
         return 0;
     }
+}
+
+// Высота блока текста (px) при заданном шрифте и ширине, измеренная скрытым div c
+// тем же переносом, что и редактор. Возвращает 0, если layout недоступен (jsdom).
+function measureNoteBlockHeight(text, boxW, fontPx, fontFamily, ratio) {
+    try {
+        if (typeof document === 'undefined' || !document.body) return 0;
+        const m = document.createElement('div');
+        m.style.cssText = 'position:absolute;visibility:hidden;top:-9999px;left:-9999px;padding:0;margin:0;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;';
+        m.style.width = `${boxW}px`;
+        m.style.fontFamily = fontFamily || '';
+        m.style.fontSize = `${fontPx}px`;
+        m.style.lineHeight = `${ratio}`;
+        // \u200b в конце сохраняет высоту хвостового перевода строки при измерении.
+        m.textContent = text && text.length ? `${text}\u200b` : 'W';
+        document.body.appendChild(m);
+        const h = m.getBoundingClientRect().height;
+        m.remove();
+        return Number.isFinite(h) ? h : 0;
+    } catch (_) {
+        return 0;
+    }
+}
+
+// Считает число визуальных строк текста при ЕСТЕСТВЕННОМ размере шрифта (effectiveFontPx),
+// не зависящем от сжатия для отображения. Сжатие меняет fitFont, но не количество строк —
+// поэтому лимит строк должен меряться по неизменному шрифту, иначе блокировка срабатывает
+// преждевременно (при просевшем fitFont деление давало раздутый счёт).
+function countNoteVisualLines(text, boxW, fontPx, fontFamily) {
+    const ratio = resolveLineHeightRatio(fontPx);
+    const oneLine = measureNoteBlockHeight('W', boxW, fontPx, fontFamily, ratio);
+    if (!(oneLine > 0)) return 1;
+    const fullH = measureNoteBlockHeight(text, boxW, fontPx, fontFamily, ratio);
+    return Math.max(1, Math.round(fullH / oneLine));
+}
+
+// Подгоняет inline-редактор записки под её внутренние границы так же, как
+// NoteObject._fitTextToBounds: текст переносится по фиксированной ширине блока (boxW),
+// размер шрифта уменьшается, пока высота контента не влезет в innerH (без нижнего предела).
+// Число строк (для лимита) меряется отдельно по естественному шрифту effectiveFontPx.
+export function applyNoteEditorBox(textarea, backdrop, { boxW, innerH, effectiveFontPx }) {
+    // line-height задаём коэффициентом по текущему размеру (как NoteObject), чтобы
+    // высота строки совпадала с отрисованной запиской.
+    const setWrapStyles = (el, fontPx) => {
+        if (!el) return;
+        el.style.whiteSpace = 'pre-wrap';
+        el.style.wordBreak = 'break-word';
+        el.style.overflowWrap = 'anywhere';
+        el.style.textAlign = 'center';
+        el.style.boxSizing = 'content-box';
+        el.style.padding = '0';
+        el.style.overflow = 'hidden';
+        el.style.fontSize = `${fontPx}px`;
+        el.style.lineHeight = `${resolveLineHeightRatio(fontPx)}`;
+        el.style.width = `${boxW}px`;
+    };
+
+    const fontFamily = (typeof window !== 'undefined' && window.getComputedStyle)
+        ? window.getComputedStyle(textarea).fontFamily
+        : (textarea.style.fontFamily || '');
+    const naturalFont = Math.max(NOTE_MIN_FONT_PX, Math.round(effectiveFontPx));
+    const value = textarea.value || '';
+    const lineCount = countNoteVisualLines(value, boxW, naturalFont, fontFamily);
+
+    // Подбор шрифта детерминированный — высоту блока меряем скрытым div
+    // (measureNoteBlockHeight), а НЕ textarea.scrollHeight. Chromium при быстрых
+    // правках возвращает устаревший (завышенный) scrollHeight даже после смены
+    // font-size, из-за чего цикл уводил шрифт в минимум (1px), а скачок contentH
+    // дёргал каретку. Скрытый div пересоздаётся на каждом замере и стейл-значения
+    // не накапливает. Тот же подход уже применён в createRegularTextAutoSize.
+    let fitFont = naturalFont;
+    let measuredH = measureNoteBlockHeight(value, boxW, fitFont, fontFamily, resolveLineHeightRatio(fitFont));
+    // measuredH === 0 → layout недоступен (jsdom): сжимать нечем, оставляем естественный шрифт.
+    if (measuredH > 0) {
+        for (let safety = 0; safety < 256; safety++) {
+            if (measuredH <= innerH || fitFont <= NOTE_MIN_FONT_PX) break;
+            fitFont = Math.max(NOTE_MIN_FONT_PX, fitFont - 1);
+            measuredH = measureNoteBlockHeight(value, boxW, fitFont, fontFamily, resolveLineHeightRatio(fitFont));
+        }
+    }
+
+    setWrapStyles(textarea, fitFont);
+    textarea.style.minHeight = '0px';
+
+    const naturalH = measuredH > 0
+        ? Math.max(1, Math.ceil(measuredH))
+        : Math.max(1, Math.ceil(textarea.scrollHeight));
+    const contentH = Math.max(1, Math.min(innerH, naturalH));
+
+    textarea.style.height = `${contentH}px`;
+    setWrapStyles(backdrop, fitFont);
+    if (backdrop) {
+        backdrop.style.height = `${contentH}px`;
+    }
+
+    // Единственный лимит — число строк, посчитанное по естественному шрифту.
+    const fits = lineCount <= NOTE_MAX_LINES;
+    const full = lineCount >= NOTE_MAX_LINES;
+
+    return { fitFont, contentH, naturalH, lineCount, fits, full };
 }
 
 export function createRegularTextAutoSize({
@@ -119,10 +230,10 @@ export function createNoteEditorUpdater(controller, {
     effectiveFontPx,
     toScreen,
 }) {
-    const minNoteEditorWidthPx = 20;
     const minNoteEditorHeightPx = Math.max(1, computeLineHeightPx(effectiveFontPx));
 
     return () => {
+        let result = null;
         try {
             const posDataNow = { objectId, position: null };
             const sizeDataNow = { objectId, size: null };
@@ -131,41 +242,38 @@ export function createNoteEditorUpdater(controller, {
             const posNow = posDataNow.position || position;
             const sizeNow = sizeDataNow.size || { width: noteWidth, height: noteHeight };
             const screenNow = toScreen(posNow.x, posNow.y);
-            const viewRes = (controller.app?.renderer?.resolution) || (view.width && view.clientWidth ? (view.width / view.clientWidth) : 1);
             const worldLayerRef = controller.textEditor.world || (controller.app?.stage);
             const scaleX = worldLayerRef?.scale?.x || 1;
-            const scaleCss = scaleX / viewRes;
-            const maxWpx = Math.max(1, Math.round((sizeNow.width - (horizontalPadding * 2)) * scaleCss));
-            const maxHpx = Math.max(1, Math.round((sizeNow.height - (horizontalPadding * 2)) * scaleCss));
+            // worldScale без /res: screenNow приходит из toScreen→toGlobal (CSS-px, res-независим),
+            // а записка — PIXI (1 мир. ед. = worldScale CSS-px). Деление на res уводило бы редактор
+            // влево и сжимало блок при зуме браузера ≠100% (res≠1). См. NoteInlineEditorController.
+            const scaleCss = scaleX;
+            // Внутренний блок текста = границы записки минус отступы, ограничение
+            // ширины 360 — как в NoteObject._getVisibleTextWidth.
+            const innerWorldW = Math.max(1, Math.min(360, sizeNow.width - (horizontalPadding * 2)));
+            const innerWorldH = Math.max(1, sizeNow.height - (horizontalPadding * 2));
+            const boxW = Math.max(1, Math.round(innerWorldW * scaleCss));
+            const innerH = Math.max(minNoteEditorHeightPx, Math.round(innerWorldH * scaleCss));
 
-            textarea.style.width = 'auto';
-            textarea.style.height = 'auto';
-            const naturalW = Math.ceil(textarea.scrollWidth + 1);
-            const naturalH = Math.ceil(textarea.scrollHeight);
-            const widthPx = Math.min(maxWpx, Math.max(minNoteEditorWidthPx, naturalW));
-            const heightPx = Math.min(maxHpx, Math.max(minNoteEditorHeightPx, naturalH));
-
-            textarea.style.width = `${widthPx}px`;
-            wrapper.style.width = `${widthPx}px`;
-            textarea.style.height = `${heightPx}px`;
-            wrapper.style.height = `${heightPx}px`;
-
-            // backdrop рисует видимые глифы и имеет фиксированную высоту в px с момента
-            // открытия (applyEditorSizing — одна строка). Без синхронизации с textarea
-            // многострочный ввод (Enter) обрезается снизу (overflow: hidden).
             const backdrop = wrapper.querySelector('.moodboard-text-backdrop');
-            if (backdrop) {
-                backdrop.style.width = `${widthPx}px`;
-                backdrop.style.height = `${heightPx}px`;
-            }
 
-            const left = Math.round(screenNow.x + (sizeNow.width * scaleCss) / 2 - (widthPx / 2));
-            const top = Math.round(screenNow.y + (sizeNow.height * scaleCss) / 2 - (heightPx / 2));
+            result = applyNoteEditorBox(textarea, backdrop, {
+                boxW,
+                innerH,
+                effectiveFontPx,
+            });
+            const contentH = result.contentH;
+
+            wrapper.style.width = `${boxW}px`;
+            wrapper.style.height = `${contentH}px`;
+
+            // Центрируем блок контента внутри записки по обеим осям (как PIXI-текст).
+            const left = Math.round(screenNow.x + (sizeNow.width * scaleCss) / 2 - (boxW / 2));
+            const top = Math.round(screenNow.y + (sizeNow.height * scaleCss) / 2 - (contentH / 2));
             wrapper.style.left = `${left}px`;
             wrapper.style.top = `${top}px`;
-            textarea.style.width = `${widthPx}px`;
-            textarea.style.height = `${heightPx}px`;
         } catch (_) {}
+        return result;
     };
 }
 
