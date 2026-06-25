@@ -216,12 +216,14 @@ export class HandlesInteractionController {
         let aspectLockDominantAxis = null;
         let isTextTarget = false;
         let isNoteTarget = false;
+        let isVerticalResizeTarget = false;
         {
             const req = { objectId: id, pixiObject: null };
             this.host.eventBus.emit(Events.Tool.GetObjectPixi, req);
             const mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
             isTextTarget = (mbType === 'text' || mbType === 'simple-text');
             isNoteTarget = (mbType === 'note');
+            isVerticalResizeTarget = ['frame', 'text', 'simple-text', 'image'].includes(mbType);
         }
 
         const onMove = (ev) => {
@@ -263,9 +265,9 @@ export class HandlesInteractionController {
                 newW = rotatedBox.width;
                 newH = rotatedBox.height;
             } else {
-                if (dir.includes('e')) newW = Math.max(1, startCSS.width + dx);
+                if (dir.includes('e') && !isVerticalResizeTarget) newW = Math.max(1, startCSS.width + dx);
                 if (dir.includes('s')) newH = Math.max(1, startCSS.height + dy);
-                if (dir.includes('w')) {
+                if (dir.includes('w') && !isVerticalResizeTarget) {
                     newW = Math.max(1, startCSS.width - dx);
                     newLeft = startCSS.left + dx;
                 }
@@ -344,7 +346,7 @@ export class HandlesInteractionController {
                         el.style.width = `${Math.max(1, Math.round(newW))}px`;
                         el.style.height = 'auto';
                         const measured = Math.max(1, Math.round(el.scrollHeight));
-                        newH = measured;
+                        newH = Math.max(newH, measured);
                     }
                 } catch (_) {}
             }
@@ -418,35 +420,30 @@ export class HandlesInteractionController {
                     const mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
                     isFrameTarget = mbType === 'frame';
                 }
-                const resizeEndData = {
-                    object: id,
-                    oldSize: { width: startWorld.width, height: startWorld.height },
-                    newSize: { width: worldW, height: worldH },
-                    oldPosition: { x: startWorld.x, y: startWorld.y },
-                    newPosition: isFrameTarget ? null : (isEdgeLeftOrTop ? { x: worldX, y: worldY } : { x: startWorld.x, y: startWorld.y }),
-                };
-                this.host.eventBus.emit(Events.Tool.ResizeEnd, resizeEndData);
-                try {
-                    const req2 = { objectId: id, pixiObject: null };
-                    this.host.eventBus.emit(Events.Tool.GetObjectPixi, req2);
-                    const mbType2 = req2.pixiObject && req2.pixiObject._mb && req2.pixiObject._mb.type;
-                    if (mbType2 === 'text' || mbType2 === 'simple-text') {
+                
+                let finalWorldH = worldH;
+                if (isTextTarget) {
+                    try {
                         const textLayer = (typeof window !== 'undefined') ? window.moodboardHtmlTextLayer : null;
                         const el = textLayer && textLayer.idToEl ? textLayer.idToEl.get && textLayer.idToEl.get(id) : null;
                         if (el) {
                             el.style.width = `${Math.max(1, Math.round(endCSS.width))}px`;
                             el.style.height = 'auto';
                             const measured = Math.max(1, Math.round(el.scrollHeight));
-                            const worldH2 = measured / s;
-                            const fixData = {
-                                object: id,
-                                size: { width: worldW, height: worldH2 },
-                                position: isFrameTarget ? null : (isEdgeLeftOrTop ? { x: worldX, y: worldY } : { x: startWorld.x, y: startWorld.y }),
-                            };
-                            this.host.eventBus.emit(Events.Tool.ResizeUpdate, fixData);
+                            const finalCssH = Math.max(measured, endCSS.height);
+                            finalWorldH = finalCssH / s;
                         }
-                    }
-                } catch (_) {}
+                    } catch (_) {}
+                }
+
+                const resizeEndData = {
+                    object: id,
+                    oldSize: { width: startWorld.width, height: startWorld.height },
+                    newSize: { width: worldW, height: finalWorldH },
+                    oldPosition: { x: startWorld.x, y: startWorld.y },
+                    newPosition: edgeFinalPositionChanged ? { x: worldX, y: worldY } : { x: startWorld.x, y: startWorld.y },
+                };
+                this.host.eventBus.emit(Events.Tool.ResizeEnd, resizeEndData);
             }
         };
 
@@ -626,7 +623,7 @@ export class HandlesInteractionController {
                         el.style.width = `${Math.max(1, Math.round(newW))}px`;
                         el.style.height = 'auto';
                         const measured = Math.max(1, Math.round(el.scrollHeight));
-                        newH = measured;
+                        newH = Math.max(newH, measured);
                     }
                 } catch (_) {}
             }
@@ -717,7 +714,7 @@ export class HandlesInteractionController {
             } else {
                 const edgeFinalPositionChanged = (endCSS.left !== startCSS.left) || (endCSS.top !== startCSS.top);
                 let finalWorldH = worldH;
-                if (isTextTarget && (edge === 'left' || edge === 'right')) {
+                if (isTextTarget) {
                     try {
                         const textLayer = (typeof window !== 'undefined') ? window.moodboardHtmlTextLayer : null;
                         const el = textLayer && textLayer.idToEl ? textLayer.idToEl.get && textLayer.idToEl.get(id) : null;
@@ -725,7 +722,8 @@ export class HandlesInteractionController {
                             el.style.width = `${Math.max(1, Math.round(endCSS.width))}px`;
                             el.style.height = 'auto';
                             const measured = Math.max(1, Math.round(el.scrollHeight));
-                            finalWorldH = measured / s;
+                            const finalCssH = Math.max(measured, endCSS.height);
+                            finalWorldH = finalCssH / s;
                         }
                     } catch (_) {}
                 }

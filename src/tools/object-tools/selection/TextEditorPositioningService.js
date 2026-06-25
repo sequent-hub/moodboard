@@ -71,9 +71,10 @@ export function positionRegularTextEditor({
     } catch (_) {}
 
     const leftPx = Math.round(baseLeftPx - padLeft);
-    const topPx = create
-        ? Math.round(baseTopPx - padTop - (lineHeightPx / 2))
-        : Math.round(baseTopPx + staticPadTop - padTop + 1);
+    // Верх текста редактора привязываем к точке клика (= верх рамки ручек и будущего
+    // статического текста). Прежний create-якорь `- lineHeightPx/2` (центрирование каретки
+    // по клику) поднимал текст на пол-строки выше рамки mb-handles-box-obj_.
+    const topPx = Math.round(baseTopPx + staticPadTop - padTop + 1);
 
     wrapper.style.left = `${leftPx}px`;
     wrapper.style.top = `${topPx}px`;

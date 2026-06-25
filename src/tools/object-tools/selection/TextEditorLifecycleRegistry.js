@@ -71,6 +71,13 @@ export function cleanupActiveTextEditor(controller, wrapper) {
             unregisterEditorListeners(controller.eventBus, controller.textEditor._listeners);
         }
     } catch (_) {}
+    // Снимаем таймер дебаунса и флаг подавления каретки (редактор мог закрыться в процессе зума)
+    try {
+        if (typeof controller.textEditor?._caretHideTimer === 'function') {
+            controller.textEditor._caretHideTimer();
+        }
+        if (controller.textEditor) controller.textEditor._caretSuppressed = false;
+    } catch (_) {}
 
     wrapper.remove();
     controller.textEditor = {

@@ -102,6 +102,34 @@ export class ConnectorDragController {
     }
 
     /**
+     * Визуальные габариты объекта с учётом hover-трансформации (scale + подъём).
+     * Подсветка коннектора должна совпадать с тем, что видит пользователь, а не
+     * с логическими bounds из состояния. Привязка коннектора при этом остаётся
+     * на логических bounds — трансформируется только прямоугольник подсветки.
+     */
+    _visualBounds(objectId, bounds) {
+        const hoverLift = this.core?.pixi?.hoverLift;
+        if (!hoverLift) return bounds;
+
+        const pixiReq = { objectId, pixiObject: null };
+        this.eventBus.emit(Events.Tool.GetObjectPixi, pixiReq);
+        const pixiObject = pixiReq.pixiObject;
+        if (!pixiObject) return bounds;
+
+        const t = hoverLift.getVisualTransform(pixiObject);
+        if (!t) return bounds;
+
+        const width  = bounds.width  * t.scaleMulX;
+        const height = bounds.height * t.scaleMulY;
+        return {
+            x: t.centerX - width  / 2,
+            y: t.centerY - height / 2,
+            width,
+            height,
+        };
+    }
+
+    /**
      * Возвращает ближайший якорь из TARGET_ANCHORS в пределах ANCHOR_SNAP_CSS от worldPt,
      * иначе null. Приоритет выше грани — вызывать в _resolveEnd первым.
      */
@@ -192,8 +220,9 @@ export class ConnectorDragController {
         if (objectId && objectId !== this._sourceTerminal?.boundId) {
             const bounds = this._objectBounds(objectId);
             if (bounds) {
+                const visual = this._visualBounds(objectId, bounds);
                 this._highlightGraphics.lineStyle({ width: 2, color: 0x2563EB, alpha: 0.85 });
-                this._highlightGraphics.drawRect(bounds.x, bounds.y, bounds.width, bounds.height);
+                this._highlightGraphics.drawRect(visual.x, visual.y, visual.width, visual.height);
                 // Подводим превью к коннектору, если курсор в зоне магнита
                 const snapAnchor = this._snapToAnchor(bounds, worldPt);
                 if (snapAnchor) {

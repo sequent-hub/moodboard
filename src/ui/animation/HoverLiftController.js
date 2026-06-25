@@ -172,6 +172,26 @@ export class HoverLiftController {
         this._entries.delete(pixiObject);
     }
 
+    /**
+     * Текущая визуальная hover-трансформация объекта относительно его базы.
+     * Нужна, чтобы внешние оверлеи (подсветка коннектора) совпадали с
+     * масштабированным/приподнятым на hover объектом.
+     * @param {import('pixi.js').DisplayObject} pixiObject
+     * @returns {{ scaleMulX: number, scaleMulY: number, centerX: number, centerY: number } | null}
+     */
+    getVisualTransform(pixiObject) {
+        const entry = this._entries.get(pixiObject);
+        if (!entry) return null;
+        const baseScaleX = entry.baseScaleX || 1;
+        const baseScaleY = entry.baseScaleY || 1;
+        return {
+            scaleMulX: (pixiObject.scale?.x ?? baseScaleX) / baseScaleX,
+            scaleMulY: (pixiObject.scale?.y ?? baseScaleY) / baseScaleY,
+            centerX: pixiObject.x,
+            centerY: pixiObject.y,
+        };
+    }
+
     /** Обновить базовые значения после внешнего resize/move */
     syncBase(pixiObject) {
         const entry = this._entries.get(pixiObject);

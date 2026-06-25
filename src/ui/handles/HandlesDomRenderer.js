@@ -9,6 +9,15 @@ import { MINDMAP_LAYOUT } from '../mindmap/MindmapLayoutConfig.js';
 import { MindmapStatePatchCommand } from '../../core/commands/MindmapStatePatchCommand.js';
 
 const HANDLES_ACCENT_COLOR = '#80D8FF';
+const VERTICAL_RESIZE_CURSOR_COLOR = '#6B7280';
+const VERTICAL_RESIZE_CURSOR = 'url("/icons/move-vertical.svg") 12 12, ns-resize';
+const VERTICAL_RESIZE_CURSOR_TYPES = new Set(['frame', 'text', 'simple-text', 'image']);
+const VERTICAL_RESIZE_CORNER_CURSOR_ANGLES = {
+    nw: -45,
+    se: -45,
+    ne: 45,
+    sw: 45,
+};
 const REVIT_SHOW_IN_MODEL_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" aria-hidden="true" focusable="false"><path d="M384 64C366.3 64 352 78.3 352 96C352 113.7 366.3 128 384 128L466.7 128L265.3 329.4C252.8 341.9 252.8 362.2 265.3 374.7C277.8 387.2 298.1 387.2 310.6 374.7L512 173.3L512 256C512 273.7 526.3 288 544 288C561.7 288 576 273.7 576 256L576 96C576 78.3 561.7 64 544 64L384 64zM144 160C99.8 160 64 195.8 64 240L64 496C64 540.2 99.8 576 144 576L400 576C444.2 576 480 540.2 480 496L480 416C480 398.3 465.7 384 448 384C430.3 384 416 398.3 416 416L416 496C416 504.8 408.8 512 400 512L144 512C135.2 512 128 504.8 128 496L128 240C128 231.2 135.2 224 144 224L224 224C241.7 224 256 209.7 256 192C256 174.3 241.7 160 224 160L144 160z"/></svg>';
 const MODEL3D_SHOW_IN_VIEWER_ICON_SVG = REVIT_SHOW_IN_MODEL_ICON_SVG;
 const MINDMAP_CHILD_WIDTH_FACTOR = 0.9;
@@ -37,6 +46,19 @@ function resolveBottomSiblingParentId(sourceObjectId, sourceMeta) {
         return sourceObjectId;
     }
     return sourceMeta?.parentId || null;
+}
+
+function shouldUseVerticalResizeCursor(mbType, handleName) {
+    return VERTICAL_RESIZE_CURSOR_TYPES.has(mbType)
+        && (handleName === 'handle' || handleName === 'top' || handleName === 'bottom');
+}
+
+function createVerticalResizeCornerCursor(dir, rotation) {
+    const baseAngle = VERTICAL_RESIZE_CORNER_CURSOR_ANGLES[dir] || 0;
+    const totalAngle = baseAngle + (rotation || 0);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><g transform="rotate(${totalAngle} 12 12)"><path d="M12 2v20" stroke="${VERTICAL_RESIZE_CURSOR_COLOR}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="m8 18 4 4 4-4" stroke="${VERTICAL_RESIZE_CURSOR_COLOR}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="m8 6 4-4 4 4" stroke="${VERTICAL_RESIZE_CURSOR_COLOR}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
+    const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    return `url("${dataUrl}") 12 12, nwse-resize`;
 }
 
 function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
@@ -1166,10 +1188,11 @@ export class HandlesDomRenderer {
         let sourceMindmapProperties = null;
         const occupiedOutgoingSides = new Set();
         const hiddenIncomingSide = { value: null };
+        let mbType = null;
         if (id !== '__group__') {
             const req = { objectId: id, pixiObject: null };
             this.host.eventBus.emit('tool:get:object:pixi', req);
-            const mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
+            mbType = req.pixiObject && req.pixiObject._mb && req.pixiObject._mb.type;
             isFileTarget = mbType === 'file';
             isFrameTarget = mbType === 'frame';
             isMindmapTarget = mbType === 'mindmap';
@@ -1244,7 +1267,9 @@ export class HandlesDomRenderer {
         }
 
         const mkCorner = (dir, x, y) => {
-            const cursor = createRotatedResizeCursor(dir, rotation);
+            const cursor = shouldUseVerticalResizeCursor(mbType, 'handle')
+                ? createVerticalResizeCornerCursor(dir, rotation)
+                : createRotatedResizeCursor(dir, rotation);
             const h = document.createElement('div');
             h.dataset.dir = dir;
             h.dataset.id = id;
@@ -1288,7 +1313,9 @@ export class HandlesDomRenderer {
 
         const edgeSize = 10;
         const makeEdge = (name, style, cursorHandleType) => {
-            const cursor = createRotatedResizeCursor(cursorHandleType, rotation);
+            const cursor = shouldUseVerticalResizeCursor(mbType, name)
+                ? VERTICAL_RESIZE_CURSOR
+                : createRotatedResizeCursor(cursorHandleType, rotation);
             const e = document.createElement('div');
             e.dataset.edge = name;
             e.dataset.id = id;

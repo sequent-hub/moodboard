@@ -104,7 +104,7 @@ describe('HtmlTextLayer coordinate behavior', () => {
         expect(el.style.left).toBe('25px');
         expect(el.style.top).toBe('67px');
         expect(el.style.width).toBe('80px');
-        expect(el.style.height).toBe('20px');
+        expect(el.style.height).toBe('20px'); // высота текстового бокса всегда равна контенту
         expect(el.style.transform).toBe('rotate(90deg)');
     });
 });

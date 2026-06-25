@@ -84,8 +84,10 @@ export function updateCustomCaret(textarea, caretEl) {
     // Calculate width based on font size to match stroke thickness
     const computed = window.getComputedStyle(textarea);
     const fontSize = parseFloat(computed.fontSize) || 16;
-    // Caveat has thicker strokes, Arial is standard. A good heuristic is ~0.06 to 0.08 of font size, min 2px.
-    const caretWidth = Math.max(2, Math.round(fontSize * 0.07));
+    // Толщина каретки пропорциональна шрифту (≈7% размера). Минимум 1px — при сильном
+    // отдалении каретка остаётся видимой и не нарушает пропорцию. Жёсткий пол 2px убран,
+    // чтобы при уменьшении масштаба каретка масштабировалась вместе с текстом.
+    const caretWidth = Math.max(1, Math.round(fontSize * 0.07));
 
     // Цвет текста в textarea теперь прозрачный (видимый текст рисует backdrop-слой),
     // поэтому цвет каретки берём из backdrop, иначе она станет невидимой.

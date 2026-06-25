@@ -138,6 +138,7 @@ export class FrameObject {
 
     /** Скрыть/показать серую рамку (при выделении скрываем, чтобы не накладывалась на синюю) */
     setBorderVisible(visible) {
+        if (this._destroyed || !this.container) return;
         if (this._borderVisible === visible) return;
         this._borderVisible = visible;
         this._redrawPreserveTransform(this.width, this.height, this.fillColor);
@@ -332,6 +333,7 @@ export class FrameObject {
      */
     _onZoomChange(data) {
         if (!data || typeof data.percentage !== 'number') return;
+        if (!this.titleLayer || this.container?.destroyed) return;
         
         const worldScale = data.percentage / 100;
         this.currentWorldScale = worldScale;
@@ -342,7 +344,7 @@ export class FrameObject {
      * Масштаб и позиция слоя заголовка — компенсируем зум, держим постоянный экранный размер
      */
     _updateTitleScale() {
-        if (!this.titleLayer) return;
+        if (!this.titleLayer || this.titleLayer.destroyed || this.container?.destroyed) return;
 
         const compensationScale = 1 / this.currentWorldScale;
 
@@ -590,9 +592,13 @@ export class FrameObject {
     }
 
     /**
-     * Метод для отписки от событий при уничтожении объекта
+     * Метод для отписки от событий при уничтожении объекта.
+     * Идемпотентен: повторный вызов безопасен.
      */
     destroy() {
+        if (this._destroyed) return;
+        this._destroyed = true;
+
         if (this.eventBus) {
             if (this._boundOnZoomChange) {
                 this.eventBus.off(Events.UI.ZoomPercent, this._boundOnZoomChange);
@@ -605,9 +611,16 @@ export class FrameObject {
                 this._boundOnSelectionAdd = this._boundOnSelectionRemove = this._boundOnSelectionClear = null;
             }
         }
-        if (this.container) {
+
+        if (this.container && !this.container.destroyed) {
             this.container.destroy({ children: true });
         }
+
+        this.container = null;
+        this.titleLayer = null;
+        this.titleText = null;
+        this.titleBg = null;
+        this.graphics = null;
     }
 }
 

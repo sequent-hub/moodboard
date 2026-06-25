@@ -24,7 +24,12 @@ import {
     measureTextEditorPlaceholderWidth,
 } from './TextEditorDomFactory.js';
 import { setupNoteInlineEditor } from './NoteInlineEditorController.js';
-import { createRegularTextAutoSize } from './TextEditorSyncService.js';
+import {
+    createRegularTextAutoSize,
+    createRegularTextEditorUpdater,
+    registerRegularTextEditorSync,
+} from './TextEditorSyncService.js';
+import { updateCustomCaret } from './TextEditorCaretService.js';
 import { TEXT_BOX_BOTTOM_PAD_PX } from '../../../services/text/TextBoxMetrics.js';
 import { buildHtmlWithRanges } from '../../../ui/HtmlTextLayer.js';
 
@@ -441,10 +446,14 @@ export function openTextEditor(object, create = false) {
     // Синхронизируем стартовый размер шрифта textarea с текущим зумом (как HtmlTextLayer)
     // Используем ранее вычисленный effectiveFontPx (до вставки в DOM), если он есть в замыкании
     textarea.style.fontSize = `${effectiveFontPx}px`;
-    const initialWpx = regularEditorVisualBox?.width
-        || (initialSize ? Math.max(1, (initialSize.width || 0) * s / viewRes) : null);
-    const initialHpx = regularEditorVisualBox?.height
-        || (initialSize ? Math.max(1, (initialSize.height || 0) * s / viewRes) : null);
+    // Высоту/ширину поля при входе в редактор берём как максимум из видимого DOM-бокса
+    // и размера в состоянии объекта. DOM-бокс .mb-text к этому моменту может быть схлопнут
+    // до высоты контента (auto), тогда как в состоянии хранится вручную заданная высота рамки —
+    // её и нужно сохранить, иначе поле ввода схлопывается до одной строки.
+    const stateWpx = initialSize ? Math.max(1, (initialSize.width || 0) * s / viewRes) : 0;
+    const stateHpx = initialSize ? Math.max(1, (initialSize.height || 0) * s / viewRes) : 0;
+    const initialWpx = Math.max(regularEditorVisualBox?.width || 0, stateWpx) || null;
+    const initialHpx = Math.max(regularEditorVisualBox?.height || 0, stateHpx) || null;
 
     // Определяем минимальные границы для всех типов объектов
     let minWBound = initialWpx || 120; // базово близко к призраку
@@ -477,6 +486,12 @@ export function openTextEditor(object, create = false) {
             wrapper.style.width = `${initialWpx}px`;
         }
         if (initialHpx) {
+            // Стартовую высоту ставим, чтобы не было вспышки при открытии, но minHBound НЕ
+            // поднимаем до obj.height: высота поля авто-подгоняется под контент (как статический
+            // .mb-text). Прежнее `minHBound = max(minHBound, initialHpx)` фиксировало рамку на
+            // высоте obj.height; при завышенном obj.height поле оставалось высоким (пустой зазор
+            // под текстом), особенно при зуме — baseBounds кэшировал завышенный minH и масштабировал
+            // его. Обычный текст не имеет ручной высоты, поэтому фиксировать её не нужно.
             textarea.style.height = `${initialHpx}px`;
             wrapper.style.height = `${initialHpx}px`;
         }
@@ -576,6 +591,30 @@ export function openTextEditor(object, create = false) {
         finalize,
         listType: properties.listType || 'none',
     });
+
+    // Обычный текст: держим редактор выровненным по объекту и масштабируем шрифт при зуме/пэне.
+    // Вертикальный якорь редактора унифицирован (см. positionRegularTextEditor), поэтому sync
+    // безопасен и для сессии создания — без него только что созданный текст не масштабировался при зуме.
+    // Записки используют собственный registerNoteEditorSync, фигуре синхронизация не нужна.
+    if (!isNote && !isShape && objectId) {
+        const updateRegularTextEditor = createRegularTextEditorUpdater(this, {
+            objectId,
+            position,
+            view,
+            textarea,
+            wrapper,
+            autoSize,
+            baseFontPxAtOpen: effectiveFontPx,
+            sCssAtOpen: s / viewRes,
+        });
+        const updateCaretAfterZoom = () => {
+            updateCustomCaret(textarea, this.textEditor && this.textEditor.caret);
+        };
+        registerRegularTextEditorSync(this, {
+            updateEditor: updateRegularTextEditor,
+            updateCaret: updateCaretAfterZoom,
+        });
+    }
 }
 
 export function closeTextEditor(commit) {

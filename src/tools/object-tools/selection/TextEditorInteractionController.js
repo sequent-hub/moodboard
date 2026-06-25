@@ -8,6 +8,7 @@ import {
     showStaticTextAfterEditing,
     updateGlobalTextEditorHandlesLayer,
 } from './TextEditorLifecycleRegistry.js';
+import { unregisterEditorListeners } from './InlineEditorListenersRegistry.js';
 
 export function applyTextEditorCaretFromClick({ create, objectId, object, textarea }) {
     try {
@@ -286,6 +287,12 @@ export function bindTextEditorInteractions(controller, {
     const keydownHandler = (e) => {
         const isList = listType && listType !== 'none';
         if (e.key === 'Enter') {
+            // В записке Enter переносит каретку на новую строку (нативное поведение
+            // textarea), а не завершает ввод. Завершение — по клику вне записки (blur)
+            // или по Escape. Высота поля пересчитывается через 'input' → updateNoteEditor.
+            if (isNote) {
+                return;
+            }
             if (isList && !e.shiftKey) {
                 e.preventDefault();
                 const start = textarea.selectionStart;
@@ -359,6 +366,10 @@ export function bindTextEditorInteractions(controller, {
     };
 
     const caretUpdateHandler = () => {
+        // _caretSuppressed выставляется registerRegularTextEditorSync на время зума:
+        // не перерисовываем каретку, пока она должна быть скрыта (избегаем мигания
+        // каретки старого размера в промежуточных кадрах при Ctrl±).
+        if (controller.textEditor && controller.textEditor._caretSuppressed) return;
         if (controller.textEditor && controller.textEditor.caret) {
             updateCustomCaret(textarea, controller.textEditor.caret);
         }
@@ -444,6 +455,9 @@ export function closeTextEditorFromState(controller, commit) {
         }
     }
 
+    if (Array.isArray(controller.textEditor._listeners)) {
+        try { unregisterEditorListeners(controller.eventBus, controller.textEditor._listeners); } catch (_) {}
+    }
     if (typeof removeDomListeners === 'function') {
         try { removeDomListeners(); } catch (_) {}
     }

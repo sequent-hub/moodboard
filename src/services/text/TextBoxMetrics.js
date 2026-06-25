@@ -98,6 +98,92 @@ export function applyTextStyles(el, { fontSizePx, baseFontSizePx, fontFamily, pr
     el.style.textRendering = 'optimizeLegibility';
 }
 
+// Канвас и кеш для измерения видимых границ глифов (см. computeSingleLineCenterDelta).
+// getContext оборачиваем в try/catch: в jsdom (тесты) он не реализован и иначе шумит в stderr.
+let _vCenterCtx = null;
+try {
+    if (typeof document !== 'undefined') {
+        _vCenterCtx = document.createElement('canvas').getContext('2d');
+    }
+} catch (_) {
+    _vCenterCtx = null;
+}
+const _vCenterCache = new Map();
+const _VCENTER_CACHE_LIMIT = 512;
+
+/**
+ * Дельта высоты (px) для вертикального центрирования видимых глифов в однострочном
+ * текстовом боксе.
+ *
+ * Проблема: line-box шрифта резервирует сверху место под прописные и верхние выносные,
+ * которого строчный текст не занимает. Из-за этого буквы визуально прижаты к низу рамки
+ * (сверху пустого места больше, снизу меньше), и на отдельных стадиях зума перекос
+ * усиливается округлением. Возвращаем «верхний резерв − нижний резерв»: добавив это к
+ * высоте бокса, уравниваем зазоры сверху и снизу вокруг реальных букв.
+ *
+ * Измеряем по фактически отрисованному элементу (его computed-стили, baseline и
+ * округление на текущем зуме), поэтому остаточная асимметрия не превышает 1px на любой
+ * стадии. Результат кешируется по сигнатуре «шрифт+размер+контент», чтобы не запускать
+ * измерение на каждый кадр пана/зума.
+ *
+ * @param {HTMLElement} el — элемент .mb-text с уже выставленной height:auto
+ * @returns {number|null} целочисленная дельта (может быть отрицательной), либо null,
+ *   если центрирование неприменимо (пустой/многострочный текст, окружение без layout/canvas)
+ */
+export function computeSingleLineCenterDelta(el) {
+    if (!el || !_vCenterCtx || typeof el.getBoundingClientRect !== 'function' || typeof window === 'undefined') {
+        return null;
+    }
+    const text = el.textContent || '';
+    if (!text.trim() || text.includes('\n')) {
+        return null;
+    }
+    let cs;
+    try {
+        cs = window.getComputedStyle(el);
+    } catch (_) {
+        return null;
+    }
+    const key = `${cs.fontFamily}|${cs.fontWeight}|${cs.fontStyle}|${cs.lineHeight}|${cs.fontSize}|${text}`;
+    const cached = _vCenterCache.get(key);
+    if (cached !== undefined) {
+        return cached;
+    }
+
+    let delta = null;
+    try {
+        const elRect = el.getBoundingClientRect();
+        const lineBoxHeight = el.scrollHeight;
+        // Базовая линия строки: inline-block нулевой высоты, выровненный по baseline,
+        // верхней гранью садится ровно на базовую линию текста.
+        const marker = document.createElement('span');
+        marker.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline;';
+        el.appendChild(marker);
+        const baselineRel = marker.getBoundingClientRect().top - elRect.top;
+        el.removeChild(marker);
+
+        _vCenterCtx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        const m = _vCenterCtx.measureText(text);
+        const ascent = m.actualBoundingBoxAscent;
+        const descent = m.actualBoundingBoxDescent;
+        if (Number.isFinite(ascent) && Number.isFinite(descent) && lineBoxHeight > 0) {
+            const inkTop = baselineRel - ascent;
+            const inkBottom = baselineRel + descent;
+            const topReserve = inkTop;
+            const bottomReserve = lineBoxHeight - inkBottom;
+            delta = Math.round(topReserve - bottomReserve);
+        }
+    } catch (_) {
+        delta = null;
+    }
+
+    if (_vCenterCache.size >= _VCENTER_CACHE_LIMIT) {
+        _vCenterCache.clear();
+    }
+    _vCenterCache.set(key, delta);
+    return delta;
+}
+
 /**
  * Применяет параметры размера поля для inline-редактора (textarea/backdrop).
  * Отдельно от applyTextStyles, чтобы не дублировать логику в статическом слое.

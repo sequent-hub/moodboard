@@ -9,6 +9,7 @@ import {
     resolveLineHeightRatio,
     computeTextRightPadPx,
     resolveStaticTextPadding,
+    computeSingleLineCenterDelta,
     TEXT_BOX_BOTTOM_PAD_PX,
 } from '../services/text/TextBoxMetrics.js';
 
@@ -761,16 +762,26 @@ export class HtmlTextLayer {
             }
         } catch (_) {}
 
-        // Гарантируем, что высота соответствует контенту (особенно после смены font-size)
+        // Высота текстового бокса всегда равна высоте контента: рамка облегает строки,
+        // под текстом нет пустого зазора. Высоту объекта (logHeight = round(h*s)) здесь
+        // НЕ учитываем — иначе единожды завышенный obj.height (дефолт при создании или
+        // остаток от прежнего многострочного текста) залипал, и появлялся зазор после зума.
         try {
             el.style.height = 'auto';
-            // Добавим небольшой нижний отступ для хвостов букв, чтобы не отсекались (например, у «з»)
-            const hCss = Math.max(1, Math.round(el.scrollHeight + TEXT_BOX_BOTTOM_PAD_PX));
+            // Для обычного однострочного текста центрируем видимые буквы по вертикали:
+            // line-box резервирует сверху место под прописные/выносные, которого строчный
+            // текст не занимает, поэтому буквы кажутся прижатыми к низу рамки. centerDelta
+            // уравнивает верхний и нижний зазоры вокруг глифов. Для markdown/списков и в
+            // окружении без layout (jsdom) дельта = null → сохраняем прежний нижний отступ
+            // TEXT_BOX_BOTTOM_PAD_PX под хвосты букв (например, «з», «у»).
+            const centerDelta = (!isMarkdown && !useList)
+                ? computeSingleLineCenterDelta(el)
+                : null;
+            const extra = (centerDelta === null) ? TEXT_BOX_BOTTOM_PAD_PX : centerDelta;
+            const hCss = Math.max(1, Math.round(el.scrollHeight + extra));
             el.style.height = `${hCss}px`;
-            // Обновим высоту для лога, если её ещё не устанавливали
-            if (!logHeight) {
-                logHeight = hCss;
-            }
+            // Обновим высоту для лога
+            logHeight = hCss;
         } catch (_) {}
         
         console.log(`🔍 HtmlTextLayer: позиция обновлена для ${objectId}:`, {
@@ -910,19 +921,26 @@ export class HtmlTextLayer {
             // Измеряем фактическую высоту HTML-текста
             el.style.height = 'auto';
             const measured = Math.max(1, Math.round(el.scrollHeight));
-            el.style.height = `${measured}px`;
-            // Пересчитываем мировую высоту и отправляем обновление размера через события ResizeUpdate
+            
             const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
             const s = world?.scale?.x || 1;
             const res = (this.core?.pixi?.app?.renderer?.resolution) || 1;
-            const worldH = (measured * res) / s;
-            // Узнаём текущую ширину в мире
+            const worldH_auto = (measured * res) / s;
+            
+            const currentWorldH = obj?.height || 0;
+            // Высота объекта всегда подгоняется под контент (и вверх, и вниз): без сжатия
+            // единожды завышенная высота залипала и давала пустой зазор под текстом.
+            const finalWorldH = worldH_auto;
+            const finalCssH = Math.round((finalWorldH * s) / res);
+            
+            el.style.height = `${finalCssH}px`;
+            
             const worldW = obj?.width || 0;
             const position = obj?.position || null;
-            if (worldW > 0 && position) {
+            if (worldW > 0 && position && finalWorldH !== currentWorldH) {
                 this.core.eventBus.emit(Events.Tool.ResizeUpdate, {
                     object: objectId,
-                    size: { width: worldW, height: worldH },
+                    size: { width: worldW, height: finalWorldH },
                     position
                 });
             }

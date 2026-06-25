@@ -1,3 +1,5 @@
+import { Events } from '../../core/events/Events.js';
+
 const PASSIVE_FALSE = { passive: false };
 
 export class ToolManagerLifecycle {
@@ -70,12 +72,49 @@ export class ToolManagerLifecycle {
 
         manager._onWindowWheel = (event) => {
             try {
-                if (event && event.ctrlKey && manager.isMouseOverContainer) {
-                    event.preventDefault();
+                if (!event || !(event.ctrlKey || event.metaKey)) return;
+                // Гасим браузерный зум страницы при Ctrl/Cmd+колесо в пределах мудборда,
+                // независимо от того, над холстом курсор или над HTML-панелью
+                event.preventDefault();
+
+                // _onWheel (на canvas) ловит зум, когда цель события — сам canvas.
+                // HTML-оверлеи (textarea редактора текста, ручки и т.п.) — соседи canvas,
+                // а не его потомки, поэтому их wheel-события не всплывают через canvas.
+                // Ловим их здесь: эмитируем WheelZoom, если событие пришло изнутри
+                // контейнера мудборда, но НЕ с самого canvas (чтобы не дублировать).
+                if (event.target !== manager.container) {
+                    const parent = manager.container && manager.container.parentElement;
+                    if (parent && parent.contains(event.target)) {
+                        const canvasRect = manager.container.getBoundingClientRect();
+                        const x = event.clientX - canvasRect.left;
+                        const y = event.clientY - canvasRect.top;
+                        manager.eventBus.emit(Events.Tool.WheelZoom, { x, y, delta: event.deltaY });
+                    }
                 }
             } catch (_) {}
         };
         window.addEventListener('wheel', manager._onWindowWheel, PASSIVE_FALSE);
+
+        // Перехватываем браузерный зум страницы (Ctrl +/-/0) и масштабируем только холст
+        manager._onWindowZoomKeys = (event) => {
+            try {
+                if (!event || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+                const key = event.key;
+                let zoomEvent = null;
+                if (key === '=' || key === '+') {
+                    zoomEvent = Events.UI.ZoomIn;
+                } else if (key === '-' || key === '_') {
+                    zoomEvent = Events.UI.ZoomOut;
+                } else if (key === '0') {
+                    zoomEvent = Events.UI.ZoomReset;
+                }
+                if (!zoomEvent) return;
+                event.preventDefault();
+                event.stopPropagation();
+                manager.eventBus.emit(zoomEvent);
+            } catch (_) {}
+        };
+        window.addEventListener('keydown', manager._onWindowZoomKeys, true);
     }
 
     static destroy(manager) {
@@ -110,6 +149,13 @@ export class ToolManagerLifecycle {
                 window.removeEventListener('wheel', manager._onWindowWheel);
             } catch (_) {}
             manager._onWindowWheel = null;
+        }
+
+        if (manager._onWindowZoomKeys) {
+            try {
+                window.removeEventListener('keydown', manager._onWindowZoomKeys, true);
+            } catch (_) {}
+            manager._onWindowZoomKeys = null;
         }
 
         if (manager.gestures) {

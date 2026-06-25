@@ -7,6 +7,16 @@ import {
 import { createTextFormatControls } from './TextFormatControls.js';
 import { createTextLockMoreControls } from './TextLockMoreControls.js';
 
+const NO_COLOR_ICON_SVG = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 23.5C18.3513 23.5 23.5 18.3513 23.5 12C23.5 5.64873 18.3513 0.5 12 0.5C5.64873 0.5 0.5 5.64873 0.5 12C0.5 18.3513 5.64873 23.5 12 23.5Z" stroke="#B2B2B2" stroke-width="1.2"></path><path d="M4.27344 19.7266L19.7148 4.28516" stroke="#B2B2B2" stroke-width="1.2"></path></svg>`;
+
+function createNoColorIcon(extraStyle = '') {
+    const wrapper = document.createElement('span');
+    wrapper.className = 'no-color-icon';
+    wrapper.style.cssText = `display:inline-flex;pointer-events:none;width:20px;height:20px;${extraStyle}`;
+    wrapper.innerHTML = NO_COLOR_ICON_SVG;
+    return wrapper;
+}
+
 export function createTextPropertiesPanelRenderer(panelInstance) {
     const panel = document.createElement('div');
     panel.className = 'text-properties-panel';
@@ -106,20 +116,18 @@ export function updateCurrentBgColorButton(panelInstance, color) {
                 line.remove();
             }
 
-            if (!panelInstance.currentBgColorButton.querySelector('img.no-color-icon')) {
-                const img = document.createElement('img');
-                img.src = '/icons/no-color.svg';
-                img.className = 'no-color-icon';
-                img.style.cssText = 'width: 20px; height: 20px; pointer-events: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);';
-                panelInstance.currentBgColorButton.appendChild(img);
+            if (!panelInstance.currentBgColorButton.querySelector('.no-color-icon')) {
+                panelInstance.currentBgColorButton.appendChild(
+                    createNoColorIcon('position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);')
+                );
             }
         } else {
             panelInstance.currentBgColorButton.style.backgroundColor = color;
             panelInstance.currentBgColorButton.title = `Цвет выделения: ${color}`;
             
-            const img = panelInstance.currentBgColorButton.querySelector('img.no-color-icon');
-            if (img) {
-                img.remove();
+            const icon = panelInstance.currentBgColorButton.querySelector('.no-color-icon');
+            if (icon) {
+                icon.remove();
             }
             
             const line = panelInstance.currentBgColorButton.querySelector('div');
@@ -514,11 +522,7 @@ function createHighlightColorGrid(panelInstance, container) {
                 position: relative;
             `;
 
-            const img = document.createElement('img');
-            img.src = '/icons/no-color.svg';
-            img.className = 'no-color-icon';
-            img.style.cssText = 'width: 20px; height: 20px; pointer-events: none;';
-            colorButton.appendChild(img);
+            colorButton.appendChild(createNoColorIcon());
         } else {
             colorButton.style.cssText = `
                 width: 28px;
@@ -668,11 +672,7 @@ function createBackgroundColorGrid(panelInstance, container) {
                 position: relative;
             `;
 
-            const img = document.createElement('img');
-            img.src = '/icons/no-color.svg';
-            img.className = 'no-color-icon';
-            img.style.cssText = 'width: 20px; height: 20px; pointer-events: none;';
-            colorButton.appendChild(img);
+            colorButton.appendChild(createNoColorIcon());
         } else {
             colorButton.style.cssText = `
                 width: 28px;

@@ -58,8 +58,14 @@ export function setupNoteInlineEditor(controller, params) {
     wrapper.style.width = `${editorWidthPx}px`;
     wrapper.style.height = `${editorHeightPx}px`;
 
-    // Для записок: авто-ресайз редактора под содержимое с сохранением центрирования
+    // Для записок: авто-ресайз редактора под содержимое с сохранением центрирования.
+    // backdrop (видимые глифы) обязан повторять выравнивание textarea, иначе каретка,
+    // позиционируемая по center-align textarea, уходит вправо от прижатого влево текста.
     textarea.style.textAlign = 'center';
+    const backdrop = wrapper.querySelector('.moodboard-text-backdrop');
+    if (backdrop) {
+        backdrop.style.textAlign = 'center';
+    }
     const maxEditorWidthPx = Math.max(1, Math.round((noteWidth - (horizontalPadding * 2)) * sCssLocal));
     const maxEditorHeightPx = Math.max(1, Math.round((noteHeight - (horizontalPadding * 2)) * sCssLocal));
     const MIN_NOTE_EDITOR_W = 20;

@@ -249,13 +249,20 @@ export class PixiEngine {
         if (pixiObject) {
             console.log('🗑️ PixiEngine: удаляем объект из сцены:', objectId);
 
-            // Видео: останавливаем HTMLVideoElement и снимаем listeners до уничтожения
-            // спрайта. Без этого видео продолжает играть и тикать текстуру — утечка.
-            // Хук сужен до 'video', чтобы не задеть destroy() фреймов/коннекторов,
-            // у которых контейнер уничтожается общим путём ниже (иначе двойной destroy).
             const mbMeta = pixiObject._mb;
-            if (mbMeta?.type === 'video' && typeof mbMeta.instance?.destroy === 'function') {
-                try { mbMeta.instance.destroy(); } catch (_) {}
+            const mbInstance = mbMeta?.instance;
+
+            // Видео: останавливаем HTMLVideoElement и снимаем listeners до уничтожения спрайта.
+            // Фрейм и другие объекты с instance.destroy(): снимаем подписки с EventBus ДО того,
+            // как PIXI-контейнер будет уничтожен. FrameObject.destroy() сам уничтожает контейнер,
+            // поэтому после него ручной pixiObject.destroy() не нужен — флаг handledByInstance.
+            let handledByInstance = false;
+            if (typeof mbInstance?.destroy === 'function') {
+                try { mbInstance.destroy(); } catch (_) {}
+                // Типы, чей instance.destroy() полностью берёт на себя PIXI-cleanup
+                if (mbMeta.type === 'frame') {
+                    handledByInstance = true;
+                }
             }
 
             // Удаляем из родительского контейнера
@@ -266,7 +273,12 @@ export class PixiEngine {
             }
             
             // ИСПРАВЛЕНИЕ: Полная очистка для изображений/эмоджи
-            if (pixiObject instanceof PIXI.Sprite) {
+            if (handledByInstance) {
+                // instance.destroy() уже уничтожил PIXI-контейнер и снял все подписки
+                if (this.hoverLift) {
+                    try { this.hoverLift.detach(pixiObject); } catch (_) {}
+                }
+            } else if (pixiObject instanceof PIXI.Sprite) {
                 console.log('🗑️ PixiEngine: очищаем ресурсы изображения/эмоджи');
                 
                 // Очищаем текстуру (data URL, blob URL — освобождаем память)
