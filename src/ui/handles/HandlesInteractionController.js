@@ -1,4 +1,9 @@
 import { Events } from '../../core/events/Events.js';
+import { computeTextRightPadPx, TEXT_BOX_BOTTOM_PAD_PX } from '../../services/text/TextBoxMetrics.js';
+
+// Границы кегля (в мировых единицах) при масштабировании текста угловой ручкой.
+const TEXT_CORNER_MIN_FONT = 6;
+const TEXT_CORNER_MAX_FONT = 512;
 
 export class HandlesInteractionController {
     constructor(host) {
@@ -226,7 +231,77 @@ export class HandlesInteractionController {
             isVerticalResizeTarget = ['frame', 'text', 'simple-text', 'image'].includes(mbType);
         }
 
+        // Угловая ручка текста масштабирует кегль (текст растёт/уменьшается, рамка облегает).
+        // Боковые ручки текста сохраняют прежнее поведение (только высота).
+        const isTextCornerScale = !isGroup && isTextTarget && ['nw', 'ne', 'sw', 'se'].includes(dir);
+        let startFontWorld = 16;
+        let textCornerEl = null;
+        let lastFontEmitted = null;
+        if (isTextCornerScale) {
+            const obj = this.host.core?.state?.state?.objects?.find((o) => o.id === id);
+            startFontWorld = (obj && (obj.fontSize || obj.properties?.fontSize)) || 16;
+            const textLayer = (typeof window !== 'undefined') ? window.moodboardHtmlTextLayer : null;
+            textCornerEl = textLayer?.idToEl?.get ? textLayer.idToEl.get(id) : null;
+            if (!obj?.fontSize && textCornerEl && typeof window.getComputedStyle === 'function') {
+                const csF = parseFloat(window.getComputedStyle(textCornerEl).fontSize);
+                if (csF) startFontWorld = Math.max(1, Math.round(csF * rendererRes / s));
+            }
+        }
+
         const onMove = (ev) => {
+            if (isTextCornerScale) {
+                const dx = ev.clientX - startMouse.x;
+                const dy = ev.clientY - startMouse.y;
+                const candW = Math.max(1, startCSS.width + (dir.includes('e') ? dx : -dx));
+                const candH = Math.max(1, startCSS.height + (dir.includes('s') ? dy : -dy));
+                const startDiag = Math.max(1, Math.hypot(startCSS.width, startCSS.height));
+                const k = Math.hypot(candW, candH) / startDiag;
+                let newFont = Math.round(startFontWorld * k);
+                newFont = Math.max(TEXT_CORNER_MIN_FONT, Math.min(TEXT_CORNER_MAX_FONT, newFont));
+                if (newFont !== lastFontEmitted) {
+                    lastFontEmitted = newFont;
+                    this.host.eventBus.emit(Events.Object.StateChanged, {
+                        objectId: id,
+                        updates: { fontSize: newFont },
+                    });
+                }
+
+                // Истинный размер контента при новом кегле, без учёта нижней границы width в updateOne.
+                let cssW = startCSS.width;
+                let cssH = startCSS.height;
+                if (textCornerEl) {
+                    const fontCss = (typeof window.getComputedStyle === 'function')
+                        ? (parseFloat(window.getComputedStyle(textCornerEl).fontSize) || (newFont * s / rendererRes))
+                        : (newFont * s / rendererRes);
+                    textCornerEl.style.width = 'auto';
+                    cssW = Math.max(1, Math.ceil(textCornerEl.scrollWidth) + computeTextRightPadPx(fontCss));
+                    textCornerEl.style.width = `${cssW}px`;
+                    textCornerEl.style.height = 'auto';
+                    cssH = Math.max(1, Math.ceil(textCornerEl.scrollHeight) + TEXT_BOX_BOTTOM_PAD_PX);
+                    textCornerEl.style.height = `${cssH}px`;
+                }
+                const worldW = Math.max(1, cssW / s);
+                const worldH = Math.max(1, cssH / s);
+
+                // Закреплён противоположный перетаскиваемому углу: он остаётся на месте.
+                const anchorX = dir.includes('w') ? (startWorld.x + startWorld.width) : startWorld.x;
+                const anchorY = dir.includes('n') ? (startWorld.y + startWorld.height) : startWorld.y;
+                const newX = dir.includes('w') ? (anchorX - worldW) : anchorX;
+                const newY = dir.includes('n') ? (anchorY - worldH) : anchorY;
+
+                this.host.eventBus.emit(Events.Tool.ResizeUpdate, {
+                    object: id,
+                    size: { width: worldW, height: worldH },
+                    position: { x: newX, y: newY },
+                });
+
+                box.style.left = `${offsetLeft + tx + newX * s}px`;
+                box.style.top = `${offsetTop + ty + newY * s}px`;
+                box.style.width = `${Math.max(1, worldW * s)}px`;
+                box.style.height = `${Math.max(1, worldH * s)}px`;
+                this.host._repositionBoxChildren(box);
+                return;
+            }
             const maintainAspectRatio = !!ev.shiftKey;
             if (isGroup && maintainAspectRatio !== previousMaintainAspectRatio) {
                 startCSS = this._readBoxCss(box);
@@ -394,6 +469,23 @@ export class HandlesInteractionController {
         const onUp = () => {
             document.removeEventListener('pointermove', onMove);
             document.removeEventListener('pointerup', onUp);
+
+            if (isTextCornerScale) {
+                // Кегль уже сохранён слитой UpdateTextStyleCommand из onMove.
+                // Финализируем геометрию (размер/позиция) для undo через ResizeEnd.
+                const obj = this.host.core?.state?.state?.objects?.find((o) => o.id === id);
+                const finalSize = { width: obj?.width || startWorld.width, height: obj?.height || startWorld.height };
+                const finalPos = { x: obj?.position?.x ?? startWorld.x, y: obj?.position?.y ?? startWorld.y };
+                this.host.eventBus.emit(Events.Tool.ResizeEnd, {
+                    object: id,
+                    oldSize: { width: startWorld.width, height: startWorld.height },
+                    newSize: finalSize,
+                    oldPosition: { x: startWorld.x, y: startWorld.y },
+                    newPosition: finalPos,
+                });
+                return;
+            }
+
             const endCSS = {
                 left: parseFloat(box.style.left),
                 top: parseFloat(box.style.top),

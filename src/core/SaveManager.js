@@ -125,8 +125,15 @@ export class SaveManager {
      * Немедленное сохранение
      */
     async saveImmediately(data = null) {
-        if (this.isRequestInProgress) return;
-        
+        // Флаг ставится синхронно, до любого await: между проверкой и установкой
+        // не должно быть yield-точки, иначе два подряд идущих markAsChanged()
+        // проходят guard и читают один baseVersion → второй ловит 409 stale_base_version.
+        if (this.isRequestInProgress) {
+            this._pendingResave = true;
+            return;
+        }
+        this.isRequestInProgress = true;
+
         try {
             // Получаем данные для сохранения
             const saveData = data || await this.getBoardData();
@@ -169,7 +176,6 @@ export class SaveManager {
                 return; // Данные не изменились
             }
             
-            this.isRequestInProgress = true;
             this.updateSaveStatus('saving');
             
             // Отправляем данные на сервер

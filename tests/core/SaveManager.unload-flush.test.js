@@ -39,13 +39,15 @@ describe('SaveManager - no timer/unload autosave', () => {
         vi.restoreAllMocks();
     });
 
-    it('не регистрирует window/document listeners для unload/pagehide/visibilitychange', () => {
+    it('регистрирует pagehide/visibilitychange для flush при выходе, но не beforeunload', () => {
         const windowEvents = addWindowListenerSpy.mock.calls.map((args) => args[0]);
         const documentEvents = addDocumentListenerSpy.mock.calls.map((args) => args[0]);
 
+        // beforeunload не используется: async fetch на нём не успевает, flush идёт через sendBeacon.
         expect(windowEvents).not.toContain('beforeunload');
-        expect(windowEvents).not.toContain('pagehide');
-        expect(documentEvents).not.toContain('visibilitychange');
+        // Flush последней правки при закрытии вкладки/сворачивании.
+        expect(windowEvents).toContain('pagehide');
+        expect(documentEvents).toContain('visibilitychange');
     });
 
     it('не подписывается на таймерное периодическое сохранение', () => {
