@@ -75,6 +75,45 @@ describe('TextPropertiesPanel baseline: render and visibility contracts', () => 
         expect(panel.bgColorInput.value).toBe('#ff9999');
     });
 
+    it('shows a non-preset font size by injecting a dynamic option (regression)', () => {
+        ctx.setObject('text-1', {
+            properties: {
+                fontFamily: 'Roboto, Arial, sans-serif',
+                fontSize: 22,
+            },
+        });
+        ctx.setSelected(['text-1']);
+
+        panel.updateFromSelection();
+
+        expect(panel.fontSizeSelect.value).toBe('22');
+        expect(panel.fontSizeSelect.selectedIndex).toBeGreaterThanOrEqual(0);
+
+        const dynamic = panel.fontSizeSelect.querySelector('option[data-dynamic="true"]');
+        expect(dynamic).not.toBeNull();
+        expect(dynamic.value).toBe('22');
+
+        const sizes = Array.from(panel.fontSizeSelect.options).map((o) => parseFloat(o.value));
+        const prev = sizes[panel.fontSizeSelect.selectedIndex - 1];
+        const next = sizes[panel.fontSizeSelect.selectedIndex + 1];
+        expect(prev).toBe(20);
+        expect(next).toBe(24);
+    });
+
+    it('drops the stale dynamic option when switching to a preset size', () => {
+        ctx.setObject('text-1', { properties: { fontSize: 22 } });
+        ctx.setSelected(['text-1']);
+        panel.updateFromSelection();
+        expect(panel.fontSizeSelect.querySelector('option[data-dynamic="true"]')).not.toBeNull();
+
+        ctx.setObject('text-1', { properties: { fontSize: 24 } });
+        panel.updateFromSelection();
+
+        expect(panel.fontSizeSelect.value).toBe('24');
+        expect(panel.fontSizeSelect.querySelector('option[data-dynamic="true"]')).toBeNull();
+        expect(panel.fontSizeSelect.options).toHaveLength(14);
+    });
+
     it('applies default control values when text object has no properties payload', () => {
         ctx.setObject('text-1', { properties: {} });
         ctx.setSelected(['text-1']);

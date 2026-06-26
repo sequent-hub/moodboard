@@ -165,6 +165,113 @@ describe('TextInlineEditorController baseline: commit/cancel', () => {
         });
     });
 
+    it('outside-close keeps empty new note on the board (no delete)', () => {
+        setupNoteResponders(eventBus, {
+            objectId: 'note-empty-keep',
+            position: { x: 30, y: 30 },
+            size: { width: 160, height: 100 },
+        });
+
+        openTextEditor.call(
+            ctx,
+            {
+                object: {
+                    id: 'note-empty-keep',
+                    type: 'note',
+                    position: { x: 30, y: 30 },
+                    properties: { content: '', fontSize: 18 },
+                },
+            },
+            true
+        );
+
+        ctx.textEditor.textarea.value = '';
+        ctx._closeTextEditor(true);
+
+        expect(collectEventPayloads(eventBus, Events.Tool.ObjectsDelete)).toHaveLength(0);
+        expect(collectEventPayloads(eventBus, Events.UI.NoteEditEnd)).toContainEqual({
+            objectId: 'note-empty-keep',
+        });
+    });
+
+    it('blur keeps empty new note on the board (no delete)', () => {
+        setupNoteResponders(eventBus, {
+            objectId: 'note-empty-blur',
+            position: { x: 40, y: 40 },
+            size: { width: 160, height: 100 },
+        });
+
+        openTextEditor.call(
+            ctx,
+            {
+                object: {
+                    id: 'note-empty-blur',
+                    type: 'note',
+                    position: { x: 40, y: 40 },
+                    properties: { content: '', fontSize: 18 },
+                },
+            },
+            true
+        );
+
+        ctx.textEditor.textarea.value = '';
+        ctx.textEditor.textarea.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+
+        expect(collectEventPayloads(eventBus, Events.Tool.ObjectsDelete)).toHaveLength(0);
+    });
+
+    it('outside-close keeps empty new shape on the board (no delete)', () => {
+        setupNoteResponders(eventBus, {
+            objectId: 'shape-empty-keep',
+            position: { x: 50, y: 50 },
+            size: { width: 120, height: 120 },
+        });
+
+        openTextEditor.call(
+            ctx,
+            {
+                object: {
+                    id: 'shape-empty-keep',
+                    type: 'shape',
+                    position: { x: 50, y: 50 },
+                    properties: { content: '', fontSize: 18 },
+                },
+            },
+            true
+        );
+
+        ctx.textEditor.textarea.value = '';
+        ctx._closeTextEditor(true);
+
+        expect(collectEventPayloads(eventBus, Events.Tool.ObjectsDelete)).toHaveLength(0);
+    });
+
+    it('blur keeps empty new shape on the board (no delete)', () => {
+        setupNoteResponders(eventBus, {
+            objectId: 'shape-empty-blur',
+            position: { x: 60, y: 60 },
+            size: { width: 120, height: 120 },
+        });
+
+        openTextEditor.call(
+            ctx,
+            {
+                object: {
+                    id: 'shape-empty-blur',
+                    type: 'shape',
+                    position: { x: 60, y: 60 },
+                    properties: { content: '', fontSize: 18 },
+                },
+            },
+            true
+        );
+
+        ctx.textEditor.textarea.value = '';
+        ctx.textEditor.textarea.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+
+        expect(collectEventPayloads(eventBus, Events.Tool.ObjectsDelete)).toHaveLength(0);
+    });
+
     it('blur with empty value on new creation cancels and deletes object', () => {
         openTextEditor.call(
             ctx,

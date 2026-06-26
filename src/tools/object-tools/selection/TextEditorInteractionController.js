@@ -229,7 +229,10 @@ export function bindTextEditorInteractions(controller, {
 
             const value = (textarea.value || '').trim();
             if (isNewCreation && value.length === 0) {
-                finalize(false);
+                // Записка и фигура остаются на доске пустыми: finalize(true) при пустом
+                // значении не коммитит контент, но и не запускает удаление нового объекта
+                // (см. shouldDeleteEmptyNewCreation). Для текста — прежнее удаление.
+                finalize(isNote || isShape);
                 return;
             }
             finalize(true);
@@ -457,7 +460,10 @@ export function closeTextEditorFromState(controller, commit) {
     const properties = controller.textEditor.properties;
     const isNewCreation = controller.textEditor.isNewCreation;
     const initialContent = controller.textEditor.initialContent ?? '';
-    const shouldDeleteEmptyNewCreation = !commitValue && !!isNewCreation && !!objectId;
+    // Записку и фигуру не удаляем при закрытии редактора пустыми (клик вне объекта):
+    // элемент должен оставаться на доске даже без текста. Текст — прежнее поведение.
+    const shouldDeleteEmptyNewCreation = !commitValue && !!isNewCreation && !!objectId
+        && objectType !== 'note' && objectType !== 'shape';
 
     if (objectId) {
         if (typeof window !== 'undefined' && window.moodboardHtmlTextLayer) {

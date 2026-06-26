@@ -527,7 +527,7 @@ export class TextPropertiesPanel {
             : getFallbackControlValues();
 
         this.fontSelect.value = values.fontFamily;
-        this.fontSizeSelect.value = values.fontSize;
+        this._setFontSizeValue(values.fontSize);
         this._updateCurrentColorButton(values.color);
         this._updateCurrentHighlightButton(values.highlightColor);
         this._updateCurrentBgColorButton(values.backgroundColor);
@@ -545,6 +545,45 @@ export class TextPropertiesPanel {
         if (this.lineHeightSlider) {
             this.lineHeightSlider.value = String(values.lineHeight !== null ? values.lineHeight : LINE_HEIGHT_DEFAULT);
         }
+    }
+
+    // Нативный <select> отрисовывается пустым, если присвоить ему value, которого
+    // нет среди <option> (selectedIndex становится -1). Размер текста после ресайза
+    // может выходить за пределы пресет-списка, поэтому для нестандартного значения
+    // вставляем временный <option> в позицию по возрастанию — поле всегда показывает
+    // фактический размер, а степперы продолжают двигаться по соседним значениям.
+    _setFontSizeValue(rawValue) {
+        const select = this.fontSizeSelect;
+        if (!select) {
+            return;
+        }
+
+        const value = String(rawValue);
+
+        const prevDynamic = select.querySelector('option[data-dynamic="true"]');
+        if (prevDynamic) {
+            prevDynamic.remove();
+        }
+
+        const hasOption = Array.from(select.options).some((opt) => opt.value === value);
+        if (!hasOption) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value;
+            option.dataset.dynamic = 'true';
+
+            const numeric = parseFloat(value);
+            const insertBeforeIndex = Array.from(select.options).findIndex(
+                (opt) => parseFloat(opt.value) > numeric,
+            );
+            if (insertBeforeIndex === -1) {
+                select.appendChild(option);
+            } else {
+                select.insertBefore(option, select.options[insertBeforeIndex]);
+            }
+        }
+
+        select.value = value;
     }
 
     reposition() {
