@@ -23,6 +23,9 @@ export class SaveManager {
         this.retryCount = 0;
         this.lastSavedData = null;
         this.hasUnsavedChanges = false;
+        // Если изменение пришло, пока предыдущий запрос ещё в полёте, помечаем
+        // необходимость дозаписи: иначе последняя правка перед выходом теряется.
+        this._pendingResave = false;
         this._listenersAttached = false;
         this._handlers = {};
         
@@ -76,6 +79,25 @@ export class SaveManager {
         };
 
         this.eventBus.on(Events.History.Changed, this._handlers.onHistoryChanged);
+
+        // Flush при выходе: закрытие вкладки (pagehide) и сворачивание/скрытие
+        // (visibilitychange → hidden). Асинхронный fetch на unload не успевает,
+        // поэтому используем navigator.sendBeacon в _flushViaBeacon().
+        this._handlers.onPageHide = () => {
+            this._flushViaBeacon();
+        };
+        this._handlers.onVisibilityChange = () => {
+            if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+                this._flushViaBeacon();
+            }
+        };
+
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+            window.addEventListener('pagehide', this._handlers.onPageHide);
+        }
+        if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+            document.addEventListener('visibilitychange', this._handlers.onVisibilityChange);
+        }
     }
     
     /**
@@ -83,6 +105,12 @@ export class SaveManager {
      */
     markAsChanged() {
         this.hasUnsavedChanges = true;
+        // Если запрос уже выполняется, нельзя терять это изменение: помечаем
+        // дозапись, она запустится в finally текущего сохранения.
+        if (this.isRequestInProgress) {
+            this._pendingResave = true;
+            return;
+        }
         this.saveImmediately();
     }
     
@@ -215,6 +243,74 @@ export class SaveManager {
             this.handleSaveError(error, data);
         } finally {
             this.isRequestInProgress = false;
+            // Изменение, пришедшее во время этого запроса, ещё не сохранено —
+            // запускаем повторное сохранение со свежими данными доски.
+            // Дедуп по lastSavedData отфильтрует случай "данные не менялись".
+            if (this._pendingResave) {
+                this._pendingResave = false;
+                this.saveImmediately();
+            }
+        }
+    }
+
+    /**
+     * Синхронно получает данные доски (для отправки через sendBeacon на выходе).
+     * Обработчик Save.GetBoardData заполняет requestData.data синхронно.
+     */
+    _getBoardDataSync() {
+        const requestData = { data: null };
+        try {
+            this.eventBus.emit(Events.Save.GetBoardData, requestData);
+        } catch (_) {
+            // no-op
+        }
+        return requestData.data;
+    }
+
+    /**
+     * Финальное сохранение при выходе через navigator.sendBeacon.
+     * Гарантирует доставку последней правки при закрытии вкладки/модалки/панели,
+     * когда обычный async fetch не успевает завершиться. Эндпоинт публичный
+     * (middleware moodboard.cors, без CSRF), поэтому токен не требуется.
+     */
+    _flushViaBeacon() {
+        try {
+            if (!this.hasUnsavedChanges) return;
+            if (typeof navigator === 'undefined' || typeof navigator.sendBeacon !== 'function') return;
+
+            const data = this._getBoardDataSync();
+            if (!data || typeof data !== 'object') return;
+
+            const boardId = data.id || 'default';
+            // Бэкенд и загрузка ожидают state в форме внутреннего boardData
+            // ({ name, objects, description }). core.getBoardData() оборачивает
+            // его в { id, settings, boardData }, а ApiClient.saveBoard разворачивает
+            // обратно перед отправкой — повторяем это здесь, иначе сохранится
+            // неверная форма и доска откроется пустой.
+            const stateForSave = (data.boardData && typeof data.boardData === 'object')
+                ? data.boardData
+                : data;
+            const baseVersion = typeof this._versionGetter === 'function'
+                ? this._versionGetter()
+                : null;
+            const validBaseVersion = (baseVersion !== null && Number.isFinite(Number(baseVersion)) && Number(baseVersion) > 0)
+                ? Number(baseVersion)
+                : null;
+
+            const payload = {
+                moodboardId: boardId,
+                state: stateForSave,
+                actionType: 'command_execute',
+                ...(validBaseVersion !== null ? { baseVersion: validBaseVersion } : {})
+            };
+
+            const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+            const queued = navigator.sendBeacon(this.options.saveEndpoint, blob);
+            if (queued) {
+                this.hasUnsavedChanges = false;
+            }
+        } catch (_) {
+            // Flush на выходе не должен бросать исключения.
         }
     }
     
@@ -499,6 +595,10 @@ export class SaveManager {
      * Очистка ресурсов
      */
     destroy() {
+        // Финальный flush перед снятием слушателей: покрывает закрытие модалки/панели,
+        // когда событие pagehide не срабатывает (SPA, без выгрузки документа).
+        this._flushViaBeacon();
+
         if (this.saveTimer) {
             clearTimeout(this.saveTimer);
             this.saveTimer = null;
@@ -506,6 +606,12 @@ export class SaveManager {
 
         // Удаляем обработчики событий, передавая исходные callback-ссылки.
         if (this._handlers.onHistoryChanged) this.eventBus.off(Events.History.Changed, this._handlers.onHistoryChanged);
+        if (this._handlers.onPageHide && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+            window.removeEventListener('pagehide', this._handlers.onPageHide);
+        }
+        if (this._handlers.onVisibilityChange && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+            document.removeEventListener('visibilitychange', this._handlers.onVisibilityChange);
+        }
 
         this._listenersAttached = false;
         this._handlers = {};
