@@ -41,7 +41,9 @@ export class HistoryManager {
             lastCommand.mergeWith(command);
             this._executeCommandSafely(lastCommand);
             this.eventBus.emit('history:changed', {
-                historySize: this.history.length
+                historySize: this.history.length,
+                canUndo: this.currentIndex >= 0,
+                canRedo: this.currentIndex < this.history.length - 1,
             });
             return;
         }
@@ -67,7 +69,9 @@ export class HistoryManager {
         // Уведомляем об изменении истории
         this.eventBus.emit(Events.History.Changed, {
             historySize: this.history.length,
-            currentCommand: command.toString()
+            currentCommand: command.toString(),
+            canUndo: this.currentIndex >= 0,
+            canRedo: this.currentIndex < this.history.length - 1,
         });
 
 
@@ -107,7 +111,9 @@ export class HistoryManager {
         this.currentIndex = -1;
         
         this.eventBus.emit(Events.History.Changed, {
-            historySize: 0
+            historySize: 0,
+            canUndo: false,
+            canRedo: false,
         });
 
 

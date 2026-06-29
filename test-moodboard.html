@@ -27,9 +27,12 @@
 
         const container = document.getElementById('app');
 
-        // Инициализация холста без бекенда и сохранения
+        // Локальный холст с сохранением и историей версий через server/ (dev-прокси).
+        // boardId обязателен: без него undo/redo (навигация по версиям) не работает.
         const moodboard = new MoodBoard(container, {
-            theme: 'light'
+            theme: 'light',
+            boardId: 'local-dev',
+            autoSave: true
         });
 
         // Экспорт для отладки в консоли

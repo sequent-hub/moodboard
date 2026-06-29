@@ -230,6 +230,12 @@ export class CoreMoodBoard {
                     historySize: data.historySize,
                 });
             }
+            if (data && ('canUndo' in data || 'canRedo' in data)) {
+                this.eventBus.emit(Events.UI.UpdateHistoryButtons, {
+                    canUndo: !!data.canUndo,
+                    canRedo: !!data.canRedo,
+                });
+            }
         });
     }
 
