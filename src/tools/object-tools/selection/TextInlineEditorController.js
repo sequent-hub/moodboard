@@ -510,8 +510,12 @@ export function openTextEditor(object, create = false) {
         ? ({ widthPx, heightPx }) => {
             try {
                 const scaleX = (worldLayerRef?.scale?.x) || 1;
-                const widthWorld = Math.max(1, Math.ceil(widthPx * viewRes / scaleX));
-                const heightWorld = Math.max(1, Math.round(heightPx * viewRes / scaleX));
+                // Мировой размер resolution-независим: CSS = world × scale (как toGlobal),
+                // без множителя renderer.resolution. Прежний × viewRes раздувал obj.height
+                // при браузерном зуме/HiDPI (res ≠ 1), и рамка выделения во время
+                // редактирования была в res раз выше текста.
+                const widthWorld = Math.max(1, Math.ceil(widthPx / scaleX));
+                const heightWorld = Math.max(1, Math.round(heightPx / scaleX));
                 const posReq = { objectId, position: null };
                 this.eventBus.emit(Events.Tool.GetObjectPosition, posReq);
                 this.eventBus.emit(Events.Tool.ResizeUpdate, {

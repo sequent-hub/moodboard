@@ -124,23 +124,6 @@ export class ConnectionAnchorsLayer {
         this._eventsAttached = false;
     }
 
-    _getSingleSelectionWorldBounds(id) {
-        const positionData = { objectId: id, position: null };
-        const sizeData = { objectId: id, size: null };
-        this.eventBus.emit(Events.Tool.GetObjectPosition, positionData);
-        this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
-        
-        if (positionData.position && sizeData.size) {
-            return {
-                x: positionData.position.x,
-                y: positionData.position.y,
-                width: sizeData.size.width,
-                height: sizeData.size.height,
-            };
-        }
-        return null;
-    }
-
     update() {
         if (!this.layer) return;
         if (this._commentPopoverOpen) return;
@@ -174,7 +157,11 @@ export class ConnectionAnchorsLayer {
             return;
         }
 
-        const worldBounds = this._getSingleSelectionWorldBounds(id);
+        // Границы считаем тем же сервисом, что и рамка выделения
+        // (HandlesPositioningService.getSingleSelectionWorldBounds): для текста это
+        // реальный DOM-бокс .mb-text, а не state-размер. Иначе якоря смещены
+        // относительно рамки, т.к. у текста DOM-бокс ≠ сохранённый width/height.
+        const worldBounds = this.positioningService.getSingleSelectionWorldBounds(id, req.pixiObject);
         if (!worldBounds) return;
 
         const cssRect = this.positioningService.worldBoundsToCssRect(worldBounds);

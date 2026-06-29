@@ -4,6 +4,8 @@ import { registerEditorListeners } from './InlineEditorListenersRegistry.js';
 import {
     computeTextRightPadPx,
     resolveLineHeightRatio,
+    computeSingleLineCenterDelta,
+    TEXT_BOX_BOTTOM_PAD_PX,
 } from '../../../services/text/TextBoxMetrics.js';
 
 // Максимальное число визуальных строк в записке. По достижении лимита ввод
@@ -186,14 +188,36 @@ export function createRegularTextAutoSize({
         // число визуальных строк = число переводов строки.
         let lhRatio = parseFloat(textarea.style.lineHeight);
         if (!isFinite(lhRatio) || lhRatio <= 0 || lhRatio > 4) lhRatio = 1.2;
-        const cs = (typeof window !== 'undefined' && window.getComputedStyle)
-            ? window.getComputedStyle(textarea)
-            : null;
-        const padV = cs
-            ? ((parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0))
-            : 0;
         const lineCount = value.length ? (value.split('\n').length) : 1;
-        const naturalH = Math.max(1, Math.ceil(lineCount * fontPx * lhRatio + padV));
+        // Вертикальная геометрия должна совпадать со статическим .mb-text
+        // (HtmlTextLayer.updateOne): высота = line-box + extra, где extra для одиночной
+        // строки — дельта центрирования глифов, иначе нижний запас TEXT_BOX_BOTTOM_PAD_PX.
+        // Паддинги textarea/backdrop обнуляем: статический слой кладёт весь запас снизу
+        // (padding 0), поэтому прежний 1px сверху уводил текст в редакторе ниже, чем после
+        // блюра, и менял высоту рамки. Backdrop делит кеш дельты со статикой (один ключ),
+        // поэтому высота поля совпадает со статикой пиксель в пиксель.
+        textarea.style.paddingTop = '0px';
+        textarea.style.paddingBottom = '0px';
+        if (backdrop) {
+            backdrop.style.paddingTop = '0px';
+            backdrop.style.paddingBottom = '0px';
+        }
+        let naturalH;
+        if (lineCount === 1 && backdrop) {
+            // Одиночную строку считаем ровно как статический .mb-text
+            // (HtmlTextLayer.updateOne): height auto → scrollHeight → + центр-дельта.
+            // Детерминированная формула round(fontPx*lhRatio) расходилась со scrollHeight
+            // на 1px при дробном devicePixelRatio (масштаб Windows 110/125/150%), из-за чего
+            // высота рамки ввода отличалась от статики. Общий scrollHeight + общий кеш дельты
+            // гарантируют совпадение при любом dpr.
+            backdrop.style.height = 'auto';
+            const sh = backdrop.scrollHeight;
+            const d = computeSingleLineCenterDelta(backdrop);
+            const extra = (d === null) ? TEXT_BOX_BOTTOM_PAD_PX : d;
+            naturalH = Math.max(1, Math.round(sh + extra));
+        } else {
+            naturalH = Math.max(1, lineCount * Math.round(fontPx * lhRatio) + TEXT_BOX_BOTTOM_PAD_PX);
+        }
         const targetH = Math.round(Math.max(bounds.minH, naturalH));
         textarea.style.height = `${targetH}px`;
         wrapper.style.height = `${targetH}px`;
@@ -366,7 +390,11 @@ export function createRegularTextEditorUpdater(controller, {
             } catch (_) {}
 
             const leftPx = Math.round(baseLeft - padLeft);
-            const topPx = Math.round(baseTop + staticPadTop - padTop + 1);
+            // Текст в редакторе выровнен по верху (padding 0, как статический .mb-text),
+            // поэтому верх обёртки = верх объекта + статический верхний отступ. Прежний
+            // «+1» компенсировал убранный теперь 1px верхнего паддинга textarea и опускал
+            // строку ниже статики.
+            const topPx = Math.round(baseTop + staticPadTop - padTop);
             wrapper.style.left = `${leftPx}px`;
             wrapper.style.top = `${topPx}px`;
             controller.textEditor._cssLeftPx = leftPx;

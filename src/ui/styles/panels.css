@@ -189,6 +189,7 @@
 .moodboard-minimap-canvas { display: block; width: 280px; height: 180px; border-radius: 8px; }
 
 .text-properties-panel {
+    box-sizing: border-box;
     position: absolute;
     pointer-events: auto;
     display: flex;
@@ -634,7 +635,7 @@
     box-sizing: border-box;
     min-width: 70px;
     width: 70px;
-    height: 36px;
+    height: 34px;
     padding: 4px 0px;
     font-size: 13px;
     background-color: #fff;
@@ -723,7 +724,7 @@
     border: none;
     border-radius: 4px;
     background-color: #fff;
-    height: 36px;
+    height: 34px;
     box-sizing: border-box;
 }
 
@@ -739,6 +740,16 @@
     padding: 0 4px 0 8px;
     font-size: 13px;
     cursor: pointer;
+    /* Панель — светлая поверхность. Хост может форсить color-scheme: dark
+       (как futurello), из-за чего нативный select и его опции рендерятся белым
+       текстом на белом фоне. Фиксируем светлую схему и явные цвета. */
+    color-scheme: light;
+    color: #111827;
+}
+
+.text-properties-panel .font-size-select option {
+    color: #111827;
+    background-color: #fff;
 }
 
 .text-properties-panel .font-size-steppers {

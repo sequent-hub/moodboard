@@ -10,6 +10,7 @@ import {
     computeTextRightPadPx,
     resolveStaticTextPadding,
     computeSingleLineCenterDelta,
+    clearSingleLineCenterDeltaCache,
     TEXT_BOX_BOTTOM_PAD_PX,
 } from '../services/text/TextBoxMetrics.js';
 
@@ -364,12 +365,23 @@ export class HtmlTextLayer {
         // Отслеживаем выделение, чтобы не показывать hover у выделенных объектов
         this._onSelectionAdd = (data) => {
             const id = data?.object ?? data?.objectId ?? data?.id ?? data;
-            if (id) {
-                this._selectedIds.add(String(id));
-                if (this._hoveredTextId === String(id)) {
-                    this._hoveredTextId = null;
-                    this._animTextHoverOut(String(id));
-                }
+            if (!id) return;
+            const sid = String(id);
+            this._selectedIds.add(sid);
+            if (this._hoveredTextId === sid) this._hoveredTextId = null;
+            // Рамку выделения слой ручек строит по getBoundingClientRect .mb-text,
+            // который включает CSS-transform hover-lift (translateY/scale). Если выделение
+            // происходит на приподнятом hover-тексте, рамка снимается со смещённого/
+            // увеличенного бокса, а после анимированного отката hover текст возвращается —
+            // рамка же остаётся смещённой (её никто не пересчитывает). Поэтому сбрасываем
+            // hover МГНОВЕННО (без твина) и форсируем пересчёт рамки по осевшему боксу.
+            const state = this._hoverStates.get(sid);
+            if (state && (Math.abs(state.ty) > 0.001 || Math.abs(state.sc - 1) > 0.001)) {
+                gsap.killTweensOf(state);
+                state.ty = 0;
+                state.sc = 1;
+                this._applyHoverTransform(sid);
+                this.eventBus.emit(Events.Object.TransformUpdated, { objectId: id });
             }
         };
         this._onSelectionRemove = (data) => {
@@ -386,9 +398,22 @@ export class HtmlTextLayer {
         this.updateAll();
 
         // После загрузки веб-шрифтов переизмеряем все боксы: до swap шрифта scrollHeight
-        // фиксируется по fallback-метрикам, после — по реальным глифам.
-        if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
-            document.fonts.ready.then(() => this.updateAll()).catch(() => {});
+        // и метрики глифов фиксируются по fallback-шрифту, после — по реальным глифам.
+        // Кеш вертикального центрирования сбрасываем ПЕРЕД updateAll, иначе одиночная
+        // строка остаётся смещённой вниз: дельта, посчитанная на fallback-шрифте,
+        // залипает (ключ кеша не зависит от состояния загрузки шрифта).
+        if (typeof document !== 'undefined' && document.fonts) {
+            const refitAfterFonts = () => {
+                clearSingleLineCenterDeltaCache();
+                this.updateAll();
+            };
+            if (document.fonts.ready) {
+                document.fonts.ready.then(refitAfterFonts).catch(() => {});
+            }
+            if (typeof document.fonts.addEventListener === 'function') {
+                this._onFontsLoadingDone = refitAfterFonts;
+                document.fonts.addEventListener('loadingdone', this._onFontsLoadingDone);
+            }
         }
 
         // Хелпер: при каждом обновлении ручек — обновляем HTML блок
@@ -399,6 +424,13 @@ export class HtmlTextLayer {
     }
 
     destroy() {
+        if (this._onFontsLoadingDone
+            && typeof document !== 'undefined'
+            && document.fonts
+            && typeof document.fonts.removeEventListener === 'function') {
+            document.fonts.removeEventListener('loadingdone', this._onFontsLoadingDone);
+            this._onFontsLoadingDone = null;
+        }
         if (this.layer) this.layer.remove();
         this.layer = null;
         this.idToEl.clear();
@@ -918,20 +950,37 @@ export class HtmlTextLayer {
             // а форма (квадрат остаётся квадратом) не подгоняется под высоту текста.
             const obj = (this.core.state.state.objects || []).find(o => o.id === objectId);
             if (obj?.type === 'shape') return;
-            // Измеряем фактическую высоту HTML-текста
+            // Измеряем фактическую высоту HTML-текста ровно так же, как updateOne
+            // (scrollHeight + extra): иначе _autoFitTextHeight фиксирует высоту без
+            // центр-дельты, шлёт ResizeUpdate с завышенным боксом, рамка выделения
+            // снимается по нему, а следующий updateOne досаживает финальную (меньшую)
+            // высоту уже без обновления рамки — рамка остаётся выше текста.
             el.style.height = 'auto';
-            const measured = Math.max(1, Math.round(el.scrollHeight));
+            const props = obj?.properties || {};
+            const content = obj?.content || props.content;
+            const useList = !!(props.listType && props.listType !== 'none');
+            const isMarkdown = !useList && resolveMarkdown(obj?.properties, content);
+            const centerDelta = (!isMarkdown && !useList)
+                ? computeSingleLineCenterDelta(el)
+                : null;
+            const extra = (centerDelta === null) ? TEXT_BOX_BOTTOM_PAD_PX : centerDelta;
+            const measured = Math.max(1, Math.round(el.scrollHeight + extra));
             
             const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
             const s = world?.scale?.x || 1;
-            const res = (this.core?.pixi?.app?.renderer?.resolution) || 1;
-            const worldH_auto = (measured * res) / s;
+            // Мировой размер обязан быть resolution-независимым: позиции и ширина текста
+            // конвертируются через toGlobal как CSS = world × scale, без множителя
+            // renderer.resolution. Раньше высота писалась как measured × res / s, поэтому
+            // при браузерном зуме/HiDPI (res ≠ 1) obj.height оказывался в res раз больше
+            // ширины, и рамка выделения (строится по obj.height через toGlobal, без res)
+            // получалась в res раз выше реального текста — буквы прижимались к верху рамки.
+            const worldH_auto = measured / s;
             
             const currentWorldH = obj?.height || 0;
             // Высота объекта всегда подгоняется под контент (и вверх, и вниз): без сжатия
             // единожды завышенная высота залипала и давала пустой зазор под текстом.
             const finalWorldH = worldH_auto;
-            const finalCssH = Math.round((finalWorldH * s) / res);
+            const finalCssH = Math.round(finalWorldH * s);
             
             el.style.height = `${finalCssH}px`;
             
