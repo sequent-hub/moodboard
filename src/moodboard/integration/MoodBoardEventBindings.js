@@ -111,6 +111,62 @@ export function bindTopbarEvents(board) {
     });
 }
 
+/**
+ * Аддитивно переприменяет локальные объекты, которых нет в текущем (только что
+ * перечитанном с сервера) состоянии доски. Вызывается после 409
+ * stale_base_version, чтобы не потерять только что созданные локально объекты
+ * (например, нарисованный штрих). Серверные объекты не трогаем — это безопасный
+ * union по id, а не перезапись чужих данных.
+ * @returns {number} сколько объектов переприменено
+ */
+function reapplyLocalOnlyObjects(board, pendingData) {
+    const core = board?.coreMoodboard;
+    if (!core || typeof core.createObjectFromData !== 'function') {
+        return 0;
+    }
+
+    const pendingObjects = Array.isArray(pendingData?.boardData?.objects)
+        ? pendingData.boardData.objects
+        : Array.isArray(pendingData?.objects)
+            ? pendingData.objects
+            : [];
+    if (pendingObjects.length === 0) {
+        return 0;
+    }
+
+    const currentObjects = Array.isArray(core.state?.state?.objects)
+        ? core.state.state.objects
+        : [];
+    const currentIds = new Set(currentObjects.map((obj) => obj && obj.id).filter(Boolean));
+
+    let reapplied = 0;
+    for (const obj of pendingObjects) {
+        if (!obj || !obj.id || currentIds.has(obj.id)) {
+            continue;
+        }
+        try {
+            // Клонируем: createObjectFromData мутирует objectData (transform/properties).
+            const created = core.createObjectFromData(JSON.parse(JSON.stringify(obj)));
+            if (created) {
+                reapplied++;
+            }
+        } catch (error) {
+            console.warn('⚠️ rebase после 409: не удалось переприменить объект', obj.id, error);
+        }
+    }
+
+    if (reapplied > 0) {
+        // PIXI-объекты (рисунок) перерисовываются сразу; для текстовых/заметок
+        // синхронизируем HTML-оверлеи, как это делает DataManager.loadData.
+        setTimeout(() => {
+            try { window.moodboardHtmlTextLayer?.rebuildFromState?.(); } catch (_) {}
+            try { window.moodboardHtmlTextLayer?.updateAll?.(); } catch (_) {}
+        }, 0);
+    }
+
+    return reapplied;
+}
+
 export function bindSaveCallbacks(board) {
     if (!board.coreMoodboard || !board.coreMoodboard.eventBus) {
         return;
@@ -125,9 +181,15 @@ export function bindSaveCallbacks(board) {
             return (v !== null && Number.isFinite(Number(v)) && Number(v) > 0) ? Number(v) : null;
         });
 
-        // На 409 stale_base_version — перечитываем latest с сервера, не затираем чужие данные.
-        saveManager.setReloadHandler(async () => {
+        // На 409 stale_base_version — перечитываем latest с сервера (не затираем
+        // чужие данные) и аддитивно переприменяем локальные НОВЫЕ объекты, которых
+        // ещё нет в свежем состоянии (например, только что нарисованный штрих).
+        // Возвращаем число переприменённых объектов, чтобы SaveManager понял,
+        // нужно ли пересохранять с актуальной версией.
+        saveManager.setReloadHandler(async (context = {}) => {
             await loadExistingBoard(board, null, { fallbackToSeedOnError: false });
+            const reapplied = reapplyLocalOnlyObjects(board, context?.pendingData);
+            return { reapplied };
         });
     }
 

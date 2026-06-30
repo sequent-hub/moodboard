@@ -26,6 +26,10 @@ export class SaveManager {
         // Если изменение пришло, пока предыдущий запрос ещё в полёте, помечаем
         // необходимость дозаписи: иначе последняя правка перед выходом теряется.
         this._pendingResave = false;
+        // Счётчик последовательных rebase после 409: ограничивает цикл
+        // «reload → reapply → resave → снова 409», если сервер уходит вперёд
+        // в каждом раунде. Сбрасывается при успешном сохранении.
+        this._staleRebaseCount = 0;
         this._listenersAttached = false;
         this._handlers = {};
         
@@ -134,9 +138,13 @@ export class SaveManager {
         }
         this.isRequestInProgress = true;
 
+        // Доступно и в catch: на 409 нужно переприменить именно эти локальные данные.
+        let pendingSaveData = null;
+
         try {
             // Получаем данные для сохранения
             const saveData = data || await this.getBoardData();
+            pendingSaveData = saveData;
 
             // Защита: если данные не получены (например, при уничтожении/отписке обработчиков) — выходим без ошибки
             if (!saveData || typeof saveData !== 'object') {
@@ -194,6 +202,7 @@ export class SaveManager {
                 this.lastSavedData = JSON.parse(JSON.stringify(saveData));
                 this.hasUnsavedChanges = false;
                 this.retryCount = 0;
+                this._staleRebaseCount = 0;
                 this.updateSaveStatus('saved');
                 
                 // Эмитируем событие успешного сохранения
@@ -214,26 +223,49 @@ export class SaveManager {
                 return;
             }
 
-            // 409 stale_base_version: экземпляр устарел — нельзя перезаписывать сервер.
-            // Перечитываем latest. Retry исключён — это не transient-ошибка.
+            // 409 stale_base_version: локальный baseVersion отстал от сервера
+            // (типично — гонка «финальное сохранение при закрытии ещё не доехало,
+            // а переоткрытие уже загрузило предыдущую версию»). Перезаписывать
+            // сервер целиком нельзя — затрём чужие правки. Поэтому:
+            //   1) перечитываем latest (reloadHandler выставляет актуальный baseVersion),
+            //   2) переприменяем поверх локальные НОВЫЕ объекты (например, только что
+            //      нарисованный штрих) — reloadHandler возвращает их число,
+            //   3) пересохраняем с актуальной версией.
+            // Так рисунок не теряется, а аддитивный merge не удаляет серверные данные.
             if (error?.code === 'stale_base_version') {
                 console.warn(
                     'SaveManager: 409 stale_base_version — версия доски устарела. Перечитываю latest с сервера...',
                     error.message
                 );
                 if (typeof this._reloadHandler === 'function') {
+                    this._staleRebaseCount++;
                     try {
-                        await this._reloadHandler();
-                        // После перезагрузки сбрасываем кеш: следующее изменение
-                        // сохранится с актуальной версией без ложного дедупа.
+                        const result = (this._staleRebaseCount <= this.options.maxRetries)
+                            ? await this._reloadHandler({
+                                pendingData: pendingSaveData,
+                                currentVersion: error.currentVersion ?? null,
+                            })
+                            : await this._reloadHandler();
+                        // После перезагрузки сбрасываем кеш дедупа: пересохранение
+                        // должно уйти на сервер с актуальной версией.
                         this.lastSavedData = null;
-                        this.hasUnsavedChanges = false;
-                        this.updateSaveStatus('saved');
-                        console.warn(
-                            'SaveManager: состояние доски перечитано с сервера. ' +
-                            'Локальное pending-изменение отменено во избежание затирания чужих данных. ' +
-                            'TODO: переприменить pending-изменение поверх свежего состояния.'
-                        );
+
+                        const reapplied = Number(result?.reapplied) || 0;
+                        if (reapplied > 0 && this._staleRebaseCount <= this.options.maxRetries) {
+                            // Локальные новые объекты переприменены поверх свежего
+                            // состояния — пересохраняем их с актуальным baseVersion.
+                            this.hasUnsavedChanges = true;
+                            this._pendingResave = true; // finally запустит saveImmediately()
+                            this.updateSaveStatus('saving');
+                        } else {
+                            // Нечего переприменять (или превышен лимит rebase) —
+                            // оставляем перечитанное серверное состояние как есть.
+                            this.hasUnsavedChanges = false;
+                            this.updateSaveStatus('saved');
+                            if (this._staleRebaseCount > this.options.maxRetries) {
+                                console.warn('SaveManager: превышен лимит rebase после 409, оставляю серверное состояние.');
+                            }
+                        }
                     } catch (reloadErr) {
                         console.error('SaveManager: ошибка перечитывания после 409:', reloadErr);
                         this.updateSaveStatus('error', reloadErr.message);
