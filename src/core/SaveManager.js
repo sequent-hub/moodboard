@@ -251,9 +251,14 @@ export class SaveManager {
                         this.lastSavedData = null;
 
                         const reapplied = Number(result?.reapplied) || 0;
-                        if (reapplied > 0 && this._staleRebaseCount <= this.options.maxRetries) {
+                        // resave=true приходит, когда перечитать сервер не удалось,
+                        // но версия принята из ответа 409 — локальное состояние нужно
+                        // пересохранить с актуальным baseVersion (иначе рисунок не уйдёт).
+                        const forceResave = result?.resave === true;
+                        if ((reapplied > 0 || forceResave) && this._staleRebaseCount <= this.options.maxRetries) {
                             // Локальные новые объекты переприменены поверх свежего
-                            // состояния — пересохраняем их с актуальным baseVersion.
+                            // состояния (или версия принята напрямую) — пересохраняем
+                            // их с актуальным baseVersion.
                             this.hasUnsavedChanges = true;
                             this._pendingResave = true; // finally запустит saveImmediately()
                             this.updateSaveStatus('saving');

@@ -187,9 +187,30 @@ export function bindSaveCallbacks(board) {
         // Возвращаем число переприменённых объектов, чтобы SaveManager понял,
         // нужно ли пересохранять с актуальной версией.
         saveManager.setReloadHandler(async (context = {}) => {
-            await loadExistingBoard(board, null, { fallbackToSeedOnError: false });
-            const reapplied = reapplyLocalOnlyObjects(board, context?.pendingData);
-            return { reapplied };
+            const serverVersion = Number(context?.currentVersion);
+            const hasServerVersion = Number.isFinite(serverVersion) && serverVersion > 0;
+            try {
+                await loadExistingBoard(board, null, { fallbackToSeedOnError: false });
+                const reapplied = reapplyLocalOnlyObjects(board, context?.pendingData);
+                return { reapplied };
+            } catch (error) {
+                // Перечитать latest не удалось (типичный случай — GET вернул 404,
+                // потому что мета-запись доски ещё не создана, а история уже есть).
+                // Но сервер сообщил авторитетную версию прямо в ответе 409
+                // (currentVersion). Берём её напрямую, чтобы пересохранить локальное
+                // состояние с корректным baseVersion и не зациклиться на 409.
+                if (hasServerVersion) {
+                    board.historyHeadVersion = serverVersion;
+                    board.currentLoadedVersion = serverVersion;
+                    board.historyCursorVersion = serverVersion;
+                    console.warn(
+                        `⚠️ rebase после 409: перечитывание не удалось (${error?.message || error}); `
+                        + `приняли версию ${serverVersion} из ответа сервера и пересохраняем локальное состояние.`
+                    );
+                    return { reapplied: 0, resave: true };
+                }
+                throw error;
+            }
         });
     }
 
