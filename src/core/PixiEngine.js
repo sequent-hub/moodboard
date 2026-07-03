@@ -13,6 +13,25 @@ export class PixiEngine {
     }
 
     async init() {
+        // Некоторые GPU (мобильные планшеты) поддерживают меньше MSAA-сэмплов, чем Pixi
+        // запрашивает для render-target/фильтров. Без ограничения это даёт
+        // "renderbufferStorageMultisample: samples too large" → incomplete framebuffer →
+        // объекты не отрисовываются. Обрезаем число сэмплов до максимума устройства.
+        if (typeof WebGL2RenderingContext !== 'undefined') {
+            const proto = WebGL2RenderingContext.prototype;
+            if (!proto.__mbMsaaClamped && typeof proto.renderbufferStorageMultisample === 'function') {
+                const origRBSM = proto.renderbufferStorageMultisample;
+                proto.renderbufferStorageMultisample = function (target, samples, internalformat, width, height) {
+                    try {
+                        const max = this.getParameter(this.MAX_SAMPLES) || 0;
+                        if (max && samples > max) { samples = max; }
+                    } catch (_) {}
+                    return origRBSM.call(this, target, samples, internalformat, width, height);
+                };
+                proto.__mbMsaaClamped = true;
+            }
+        }
+
         this.app = new PIXI.Application({
             width: this.options.width,
             height: this.options.height,

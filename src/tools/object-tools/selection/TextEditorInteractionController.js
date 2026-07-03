@@ -218,6 +218,7 @@ export function bindTextEditorInteractions(controller, {
     finalize,
     listType,
 }) {
+    const editorCreatedAt = Date.now();
     const blurHandler = () => {
         const editorObjectId = controller?.textEditor?.objectId || null;
         setTimeout(() => {
@@ -226,6 +227,14 @@ export function bindTextEditorInteractions(controller, {
             if (!controller?.textEditor?.active) return;
             if ((controller?.textEditor?.objectId || null) !== editorObjectId) return;
             if (controller?.textEditor?._closingByOutside) return;
+
+            // На touch создающий тап порождает синтетический mousedown по холсту,
+            // который тут же снимает фокус с только что созданного пустого поля.
+            // В течение короткого окна после создания не финализируем, а возвращаем фокус.
+            if (isNewCreation && (Date.now() - editorCreatedAt) < 400) {
+                try { textarea.focus(); } catch (_) {}
+                return;
+            }
 
             const value = (textarea.value || '').trim();
             if (isNewCreation && value.length === 0) {
