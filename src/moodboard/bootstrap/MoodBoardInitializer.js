@@ -61,6 +61,10 @@ export async function wireCommentsSubsystem(board) {
 
     try {
         await board.commentService.loadInitial();
+        // Экземпляр мог быть уничтожен (destroy() при переключении вкладки/повторном
+        // открытии), пока висел медленный запрос комментариев. Тогда coreMoodboard и
+        // слои уже обнулены — не трогаем их, иначе обращение к null рушит init.
+        if (board.destroyed) return;
         board.commentPinLayer.rebuild();
         const initialThreadId = board.options.initialThreadId;
         if (initialThreadId != null) {
@@ -100,9 +104,15 @@ export async function initializeMoodBoard(board) {
         board.topbarContainer = topbar;
 
         await initCoreMoodBoard(board);
+        // Каждый await — окно, в котором destroy() (переключение вкладки/повторное
+        // открытие) обнуляет coreMoodboard. После await проверяем флаг и прекращаем
+        // инициализацию уничтоженного экземпляра, иначе wireMoodBoardServices/
+        // loadExistingBoard падают на чтении свойств null и оставляют пустой контейнер.
+        if (board.destroyed) return;
         createMoodBoardManagers(board);
         createMoodBoardUi(board);
         await wireCommentsSubsystem(board);
+        if (board.destroyed) return;
         wireMoodBoardServices(board);
         bindSaveCallbacks(board);
 
