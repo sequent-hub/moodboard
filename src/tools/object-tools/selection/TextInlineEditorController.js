@@ -77,7 +77,7 @@ export function openTextEditor(object, create = false) {
             this.textEditor.objectType === objectType
         );
         if (sameEditorObject && this.textEditor.textarea) {
-            try { this.textEditor.textarea.focus(); } catch (_) {}
+            try { this.textEditor.textarea.focus({ preventScroll: true }); } catch (_) {}
             return;
         }
         this._closeTextEditor(true);
@@ -540,7 +540,11 @@ export function openTextEditor(object, create = false) {
     if (!isNote && !isShape && create) {
         autoSize();
     }
-    textarea.focus();
+    // preventScroll: на планшете экранная клавиатура иначе триггерит нативный
+    // scroll-into-view, который прокручивает контейнер холста — фигура и поле
+    // ввода уезжают вниз от точки тапа. Позиция редактора уже привязана к
+    // координатам канваса, нативная прокрутка здесь только мешает.
+    textarea.focus({ preventScroll: true });
     // Записка: после фокуса повторно подгоняем блок (focus может изменить layout),
     // чтобы стартовая каретка считалась от уже подобранного размера шрифта, а не от 32px.
     if (isNote && updateNoteEditor) {

@@ -232,7 +232,7 @@ export function bindTextEditorInteractions(controller, {
             // который тут же снимает фокус с только что созданного пустого поля.
             // В течение короткого окна после создания не финализируем, а возвращаем фокус.
             if (isNewCreation && (Date.now() - editorCreatedAt) < 400) {
-                try { textarea.focus(); } catch (_) {}
+                try { textarea.focus({ preventScroll: true }); } catch (_) {}
                 return;
             }
 
@@ -291,7 +291,7 @@ export function bindTextEditorInteractions(controller, {
         // Страховочный возврат фокуса на случай, если браузер всё-таки убрал фокус.
         setTimeout(() => {
             if (controller?.textEditor?.active && textarea) {
-                try { textarea.focus(); } catch (_) {}
+                try { textarea.focus({ preventScroll: true }); } catch (_) {}
             }
         }, 0);
     };

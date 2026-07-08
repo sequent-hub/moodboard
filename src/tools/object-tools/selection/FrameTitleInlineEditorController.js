@@ -89,7 +89,7 @@ export function openFrameTitleEditor(object, _create = false) {
         _frameInstance: frameInstance,
     };
 
-    input.focus();
+    input.focus({ preventScroll: true });
     input.select();
 
     const finalize = (commit) => this._closeFrameTitleEditor(commit);

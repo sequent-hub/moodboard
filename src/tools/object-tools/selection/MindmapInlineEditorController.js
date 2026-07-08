@@ -837,7 +837,7 @@ export function openMindmapEditor(object, create = false) {
         _removeDomListeners: removeDomListeners,
     };
 
-    textarea.focus();
+    textarea.focus({ preventScroll: true });
     applyMindmapCaretFromClick({
         create,
         objectId,

@@ -105,7 +105,7 @@ export function openFileNameEditor(object, create = false) {
     };
 
     // Фокусируем и выделяем весь текст
-    input.focus();
+    input.focus({ preventScroll: true });
     input.select();
 
     // Функция завершения редактирования
