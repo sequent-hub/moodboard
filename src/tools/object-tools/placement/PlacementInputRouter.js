@@ -262,7 +262,9 @@ export class PlacementInputRouter {
                                     id: objectData.id,
                                     type: 'shape',
                                     position: objectData.position,
-                                    properties: { content: '' }
+                                    // kind обязателен: без него редактор берёт safe-area как для квадрата
+                                    // (полные границы), и текст в круге/треугольнике вылезает за контур.
+                                    properties: { content: '', kind: objectData.properties?.kind || 'square' }
                                 },
                                 create: true
                             });

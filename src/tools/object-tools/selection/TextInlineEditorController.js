@@ -32,6 +32,7 @@ import {
 import { updateCustomCaret } from './TextEditorCaretService.js';
 import { TEXT_BOX_BOTTOM_PAD_PX } from '../../../services/text/TextBoxMetrics.js';
 import { buildHtmlWithRanges } from '../../../ui/HtmlTextLayer.js';
+import { getShapeTextSafeArea, getShapeTextClipPath } from '../../../objects/shape/shapeTextArea.js';
 
 export function openTextEditor(object, create = false) {
 
@@ -99,6 +100,9 @@ export function openTextEditor(object, create = false) {
         const meta = pixiReq.pixiObject && pixiReq.pixiObject._mb ? pixiReq.pixiObject._mb.properties || {} : {};
         if (meta.content) properties.content = meta.content;
         if (meta.fontSize) properties.fontSize = meta.fontSize;
+        // kind берём из самого объекта, если его не передали в payload — иначе safe-area
+        // фигуры считается как для квадрата и текст вылезает за контур круга/треугольника.
+        if (meta.kind && !properties.kind) properties.kind = meta.kind;
     }
 
     // Уведомляем о начале редактирования (для разных типов отдельно)
@@ -355,27 +359,67 @@ export function openTextEditor(object, create = false) {
             if (sizeData.size) { shapeW = sizeData.size.width; shapeH = sizeData.size.height; }
         }
 
-        const shapeCssW = Math.max(1, Math.round(shapeW * sCssShape));
-        const shapeCssH = Math.max(1, Math.round(shapeH * sCssShape));
-        // Центрируем каретку по вертикали: padding-top = (высота фигуры - высота одной строки) / 2
-        const oneLinePx = Math.max(1, Math.round(effectiveFontPx * 1.4));
-        const paddingTopShape = Math.max(0, Math.round((shapeCssH - oneLinePx) / 2));
+        // Text-safe area: редактор занимает не весь bounds, а вписанный в контур
+        // фигуры прямоугольник — иначе строки при вводе вылезают за наклонные стороны.
+        const kindShape = properties?.kind || 'square';
+        const safeShape = getShapeTextSafeArea(kindShape, shapeW, shapeH);
+        const safeLeftCss = Math.round(safeShape.left * sCssShape);
+        const safeTopCss = Math.round(safeShape.top * sCssShape);
+        const shapeCssW = Math.max(1, Math.round(safeShape.width * sCssShape));
+        const shapeCssH = Math.max(1, Math.round(safeShape.height * sCssShape));
 
-        wrapper.style.left = `${Math.round(screenPos.x)}px`;
-        wrapper.style.top = `${Math.round(screenPos.y)}px`;
+        // Фактическая line-height textarea в px: читаем computed style, т.к. textarea
+        // уже вставлена в DOM (view.parentElement.appendChild выше). Это надёжнее, чем
+        // hardcode * 1.4 — реальный коэффициент зависит от baseFontSizePx через resolveLineHeightRatio.
+        let shapeLineHeightPx = Math.max(1, Math.round(effectiveFontPx * 1.4));
+        try {
+            if (typeof window !== 'undefined' && window.getComputedStyle) {
+                const lhComputed = parseFloat(window.getComputedStyle(textarea).lineHeight);
+                if (isFinite(lhComputed) && lhComputed > 0) shapeLineHeightPx = Math.round(lhComputed);
+            }
+        } catch (_) {}
+
+        // backdrop: text center = shape center → paddingTop = (H - lineH) / 2
+        const backdropPadTop = Math.max(0, Math.round((shapeCssH - shapeLineHeightPx) / 2));
+        // textarea: компенсируем -2px смещение в updateCustomCaret (caretEl.style.top = top - 2),
+        // чтобы визуальная каретка тоже встала строго по центру фигуры
+        const textareaPadTop = backdropPadTop + 2;
+
+        wrapper.style.left = `${Math.round(screenPos.x) + safeLeftCss}px`;
+        wrapper.style.top = `${Math.round(screenPos.y) + safeTopCss}px`;
         wrapper.style.width = `${shapeCssW}px`;
         wrapper.style.height = `${shapeCssH}px`;
+        // Клип по контуру: при вводе текст, вышедший за наклонные стороны, прячется.
+        wrapper.style.clipPath = getShapeTextClipPath(kindShape) || 'none';
 
         textarea.style.width = `${shapeCssW}px`;
         textarea.style.height = `${shapeCssH}px`;
         textarea.style.boxSizing = 'border-box';
+        // Перенос строк внутри фигуры (applyEditorSizing ставит white-space:pre — без
+        // переноса текст рос бы вбок и вылезал за границы). Совпадает со статическим
+        // слоем (mb-shape-text), поэтому строки в редакторе и после совпадают.
+        textarea.style.whiteSpace = 'pre-wrap';
+        textarea.style.wordBreak = 'break-word';
+        textarea.style.overflowWrap = 'break-word';
+        if (backdrop) {
+            backdrop.style.whiteSpace = 'pre-wrap';
+            backdrop.style.wordBreak = 'break-word';
+            backdrop.style.overflowWrap = 'break-word';
+        }
+        // CSS .moodboard-text-input задаёт transition: all 0.2s — он анимирует padding-top
+        // от старого значения к вычисленному. Начальный расчёт каретки (setTimeout 0 в
+        // bindTextEditorInteractions) читает промежуточный padding и ставит каретку у верха
+        // фигуры; центр появляется только после ввода. Отключаем анимацию, чтобы padding
+        // применился мгновенно и каретка сразу встала по центру.
+        textarea.style.transition = 'none';
         
         if (backdrop) {
             backdrop.style.width = `${shapeCssW}px`;
             backdrop.style.height = `${shapeCssH}px`;
             backdrop.style.boxSizing = 'border-box';
             backdrop.style.display = 'block';
-            backdrop.style.paddingTop = `${paddingTopShape}px`;
+            backdrop.style.transition = 'none';
+            backdrop.style.paddingTop = `${backdropPadTop}px`;
             backdrop.style.paddingBottom = '0px';
         }
         
@@ -385,8 +429,47 @@ export function openTextEditor(object, create = false) {
         // padding-bottom:0 перебивает CSS .moodboard-text-input (5px), чтобы не раздувать
         // высоту поля относительно крошечной фигуры.
         textarea.style.display = 'block';
-        textarea.style.paddingTop = `${paddingTopShape}px`;
+        textarea.style.paddingTop = `${textareaPadTop}px`;
         textarea.style.paddingBottom = '0px';
+
+        // Вертикаль: пока текст помещается — центр по середине фигуры; при
+        // переполнении — рост вверх (низ/каретка видны, старые строки уходят выше).
+        // Пересчитываем paddingTop по фактической высоте контента, т.к. фиксированный
+        // padding центрирует только одну строку. Замер — по backdrop (видимый слой).
+        const applyShapeVerticalAlign = () => {
+            let contentH = shapeLineHeightPx;
+            if (backdrop) {
+                // Замер реальной высоты контента: у backdrop фиксированная height,
+                // поэтому scrollHeight не опускается ниже неё — временно снимаем height
+                // и padding, иначе одна строка «измеряется» как полный box и padding=0.
+                const prevPad = backdrop.style.paddingTop;
+                const prevH = backdrop.style.height;
+                backdrop.style.paddingTop = '0px';
+                backdrop.style.height = 'auto';
+                contentH = backdrop.scrollHeight;
+                backdrop.style.height = prevH;
+                backdrop.style.paddingTop = prevPad;
+            }
+            const overflow = contentH > shapeCssH + 1;
+            const bdPad = overflow ? 0 : Math.max(0, Math.round((shapeCssH - contentH) / 2));
+            if (backdrop) {
+                backdrop.style.paddingTop = `${bdPad}px`;
+                backdrop.scrollTop = overflow ? backdrop.scrollHeight : 0;
+            }
+            textarea.style.paddingTop = `${bdPad + 2}px`;
+            textarea.scrollTop = overflow ? textarea.scrollHeight : 0;
+        };
+        const scheduleShapeVerticalAlign = () => {
+            // rAF: даём syncBackdrop (input-листенер) обновить содержимое до замера.
+            requestAnimationFrame(() => {
+                applyShapeVerticalAlign();
+                if (this.textEditor && this.textEditor.caret) {
+                    updateCustomCaret(textarea, this.textEditor.caret);
+                }
+            });
+        };
+        textarea.addEventListener('input', scheduleShapeVerticalAlign);
+        scheduleShapeVerticalAlign();
 
         this.textEditor._cssLeftPx = Math.round(screenPos.x);
         this.textEditor._cssTopPx = Math.round(screenPos.y);

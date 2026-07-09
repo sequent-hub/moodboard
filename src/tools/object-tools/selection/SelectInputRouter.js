@@ -322,7 +322,7 @@ export function onDoubleClick(event) {
                 id: hitResult.object,
                 type: 'shape',
                 position: posData.position,
-                properties: { content: shapeContent },
+                properties: { content: shapeContent, kind: pix._mb?.properties?.kind || 'square' },
                 caretClick: {
                     clientX: event?.originalEvent?.clientX,
                     clientY: event?.originalEvent?.clientY,

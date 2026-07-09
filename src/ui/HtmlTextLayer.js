@@ -4,6 +4,7 @@ import { Events } from '../core/events/Events.js';
 import * as PIXI from 'pixi.js';
 import { renderRichText, hasMath } from '../utils/richText.js';
 import { renderTextList } from './text-properties/TextListRenderer.js';
+import { getShapeTextSafeArea, getShapeTextClipPath } from '../objects/shape/shapeTextArea.js';
 import {
     applyTextStyles,
     resolveLineHeightRatio,
@@ -714,12 +715,46 @@ export class HtmlTextLayer {
             if (el.dataset.baseFontSize !== String(newShapeFS)) {
                 el.dataset.baseFontSize = String(newShapeFS);
             }
+            // Реальный размер применяется здесь: при смене шрифта в панели фигуры updateOne
+            // раньше обновлял только dataset, а style.fontSize оставался с момента создания.
+            el.style.fontSize = `${newShapeFS}px`;
             el.style.fontFamily = textProps.fontFamily || 'Inter, sans-serif';
             el.style.color = textProps.color || '#111111';
             el.style.fontWeight = textProps.bold ? 'bold' : '';
             el.style.fontStyle = textProps.italic ? 'italic' : '';
             const shapeContent = obj.properties?.content || '';
             if (el.textContent !== shapeContent) el.textContent = shapeContent;
+            // Text-safe area: оверлей занимает не весь bounds, а вписанный в контур
+            // фигуры прямоугольник (overflow: hidden клипует по нему). Иначе текст
+            // выходит за наклонные стороны треугольника/ромба/круга/стрелки.
+            if (w > 0 && h > 0) {
+                const kind = obj.properties?.kind || 'square';
+                const safe = getShapeTextSafeArea(kind, w, h);
+                const sx = logWidth / w;
+                const sy = logHeight / h;
+                const safeLeft = Math.round(logLeft + safe.left * sx);
+                const safeTop = Math.round(logTop + safe.top * sy);
+                const safeW = Math.max(1, Math.round(safe.width * sx));
+                const safeH = Math.max(1, Math.round(safe.height * sy));
+                el.style.left = `${safeLeft}px`;
+                el.style.top = `${safeTop}px`;
+                el.style.width = `${safeW}px`;
+                el.style.height = `${safeH}px`;
+                // Поворот должен идти вокруг центра фигуры, а не центра safe-area.
+                const originX = (logLeft + logWidth / 2) - safeLeft;
+                const originY = (logTop + logHeight / 2) - safeTop;
+                el.style.transformOrigin = `${originX}px ${originY}px`;
+                // Клип по контуру: текст, вышедший за наклонные стороны, прячется внутри.
+                el.style.clipPath = getShapeTextClipPath(kind) || 'none';
+            }
+            // Вертикальное выравнивание: пока текст помещается — центр по середине
+            // фигуры; при переполнении — прижимаем к низу safe-area, чтобы текст рос
+            // вверх (низ зафиксирован, верхние строки уходят выше и обрезаются
+            // overflow: hidden). Замер overflow делаем при flex-start — при
+            // align-items:center контент вылезает вверх/вниз и scrollHeight врёт.
+            el.style.alignItems = 'flex-start';
+            const overflowsBox = el.scrollHeight > el.clientHeight + 1;
+            el.style.alignItems = overflowsBox ? 'flex-end' : 'center';
             return;
         }
 
