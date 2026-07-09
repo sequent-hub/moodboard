@@ -185,7 +185,11 @@ export function setupLayerAndViewportFlow(core) {
                 settings: { pan: { x: world.x || 0, y: world.y || 0 } }
             });
         } catch (_) {}
-        core.eventBus.emit(Events.Viewport.Changed);
+        // Во время pan не эмитим Viewport.Changed: все viewport-реактивные компоненты
+        // уже репозиционируются по Tool.PanUpdate, а повторный Viewport.Changed заставлял
+        // их пересчитываться дважды за одно движение. Сетка — единственный получатель
+        // Viewport.Changed без подписки на PanUpdate — обновляется прямым вызовом.
+        core.boardService?.refreshGridViewport?.();
     });
 
     core.eventBus.on(Events.UI.ZoomSelection, () => {
