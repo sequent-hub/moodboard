@@ -2090,7 +2090,38 @@ export class ChatWindow {
         return y;
     }
 
+    _getViewportCenter() {
+        const rect = this._container?.getBoundingClientRect?.();
+        if (rect && rect.width > 0 && rect.height > 0) {
+            return {
+                x: Math.round(rect.left + rect.width / 2),
+                y: Math.round(rect.top + rect.height / 2)
+            };
+        }
+        return null;
+    }
+
     _getImageGroupAnchor() {
+        // Базовый якорь — центр видимой области холста: центр заглушки (и итогового
+        // изображения) должен совпадать с серединой экрана. Ряд из нескольких изображений
+        // держим на общей горизонтальной оси через existingCenterY.
+        const viewportCenter = this._getViewportCenter();
+        if (viewportCenter) {
+            const existingCenterY = this._getAiImageLaneCenterScreenY();
+            const [wr, hr] = parseFormatRatio(this._formatId);
+            const actualHeight = Math.round(BOARD_IMAGE_WIDTH / (wr / hr));
+
+            let y = existingCenterY ?? viewportCenter.y;
+            if (existingCenterY == null) {
+                y = this._clampImageGroupAnchorY(y, actualHeight, 0);
+            }
+
+            return {
+                x: viewportCenter.x,
+                y: Math.round(y)
+            };
+        }
+
         const composerRect = this._refs?.composer?.getBoundingClientRect?.();
         if (composerRect) {
             const existingCenterY = this._getAiImageLaneCenterScreenY();
