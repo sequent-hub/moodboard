@@ -315,7 +315,10 @@ export function openMindmapEditor(object, create = false) {
         backdrop.style.height = '100%';
         backdrop.style.display = 'flex';
         backdrop.style.alignItems = 'center';
-        backdrop.style.justifyContent = 'center';
+        // flex-start, а не center: textarea (источник координат каретки) left-aligned,
+        // backdrop должен совпадать с ней по горизонтали, иначе видимый текст уезжает
+        // относительно каретки на короткой строке/placeholder.
+        backdrop.style.justifyContent = 'flex-start';
     }
 
     const initialCssWidth = targetWidth;
@@ -330,16 +333,6 @@ export function openMindmapEditor(object, create = false) {
                 : ((typeof objectWidth === 'number' && objectWidth > 0)
                     ? objectWidth
                     : ((typeof properties.width === 'number' && properties.width > 0) ? properties.width : MINDMAP_LAYOUT.width))
-        )
-    );
-    const stableBaseWorldHeight = Math.max(
-        1,
-        Math.round(
-            (typeof properties.capsuleBaseHeight === 'number' && properties.capsuleBaseHeight > 0)
-                ? properties.capsuleBaseHeight
-                : ((typeof objectHeight === 'number' && objectHeight > 0)
-                    ? objectHeight
-                    : ((typeof properties.height === 'number' && properties.height > 0) ? properties.height : MINDMAP_LAYOUT.height))
         )
     );
     const resizeSession = {
@@ -449,9 +442,12 @@ export function openMindmapEditor(object, create = false) {
         const placeholderWidth = measureMindmapTextWidthPx(textarea, measureEl, textarea.placeholder || '');
         const baseCssWidth = Math.max(1, Math.round(stableBaseWorldWidth * getWorldToCssScale()));
         const placeholderCssWidth = Math.max(1, Math.ceil(placeholderWidth + padding.left + padding.right));
+        // Ширина пустого состояния (плейсхолдер/база) — нижняя граница и при вводе,
+        // чтобы капсула не схлопывалась на первой букве, а росла только когда текст длиннее.
+        const emptyStateCssWidth = Math.max(baseCssWidth, placeholderCssWidth);
         const rawNextCssWidth = hasText
-            ? Math.max(1, Math.ceil(textWidth + padding.left + padding.right))
-            : Math.max(baseCssWidth, placeholderCssWidth);
+            ? Math.max(emptyStateCssWidth, Math.ceil(textWidth + padding.left + padding.right))
+            : emptyStateCssWidth;
         const level = properties?.mindmap?.level ?? 0;
         const isRoot = level === 0;
         const minCssW = Math.max(1, Math.round(
@@ -463,7 +459,13 @@ export function openMindmapEditor(object, create = false) {
         const nextCssWidth = Math.max(minCssW, Math.min(maxCssW, rawNextCssWidth));
         const lineCount = getEditorLineCount();
         const lineHeightPx = getEditorLineHeightPx();
-        const baseCssHeight = Math.max(1, Math.round(stableBaseWorldHeight * getWorldToCssScale()));
+        // Высота одной строки капсулы = вертикальный паддинг + line-height — та же формула,
+        // что в статическом слое (MindmapHtmlTextLayer._autoFitNodeWidth: scrollHeight).
+        // Раньше базой служил capsuleBaseHeight (MINDMAP_LAYOUT.height=40), который меньше
+        // паддинга+строки, из-за чего поле сжималось при вводе и «прыгало» обратно на blur.
+        const basePaddingYWorld = Math.max(0, Math.round(properties.paddingY ?? MINDMAP_LAYOUT.paddingY));
+        const paddingYCss = Math.max(0, Math.round(basePaddingYWorld * getWorldToCssScale()));
+        const baseCssHeight = Math.max(1, 2 * paddingYCss + lineHeightPx);
         const nextCssHeight = Math.max(1, Math.ceil(baseCssHeight + (Math.max(1, lineCount) - 1) * lineHeightPx));
 
         const currentCssWidth = Math.max(1, Math.round(parseFloat(wrapper.style.width || `${initialCssWidth}`)));

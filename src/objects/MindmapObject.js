@@ -56,9 +56,14 @@ export class MindmapObject {
         const rot = g.rotation || 0;
 
         this._draw();
-        g.pivot.set(Math.floor(this.width / 2), Math.floor(this.height / 2));
-        g.x = Math.round(centerX);
-        g.y = Math.round(centerY);
+        // Точный pivot (size/2, без floor) и точный центр: при нечётной ширине/высоте
+        // floor терял 0.5px, из-за чего капсула смещалась вниз-вправо относительно
+        // бокса объекта (position — целые числа). Рамка выделения строится по боксу
+        // объекта, поэтому во время резайза/редактирования её верх уходил выше капсулы.
+        // top-left = center - pivot = position (целое) → грани попадают в целый пиксель.
+        g.pivot.set(this.width / 2, this.height / 2);
+        g.x = centerX;
+        g.y = centerY;
         g.rotation = rot;
     }
 

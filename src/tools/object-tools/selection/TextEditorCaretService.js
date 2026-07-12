@@ -115,10 +115,24 @@ export function updateCustomCaret(textarea, caretEl) {
     
     const pos = textarea.selectionStart;
     const coords = getCaretCoordinates(textarea, pos);
-    
+
+    // Смещение textarea относительно родителя каретки (wrapper). В обычном редакторе
+    // textarea прижата к top:0/left:0 wrapper — смещение нулевое. В mindmap-редакторе
+    // textarea центрируется flex-ом и дополнительно сдвигается через transform: translateY,
+    // поэтому без этой компенсации каретка "прилипает" к верхнему левому углу капсулы.
+    let offsetX = 0;
+    let offsetY = 0;
+    const caretParent = caretEl.parentElement;
+    if (caretParent) {
+        const parentRect = caretParent.getBoundingClientRect();
+        const textareaRect = textarea.getBoundingClientRect();
+        offsetX = textareaRect.left - parentRect.left;
+        offsetY = textareaRect.top - parentRect.top;
+    }
+
     // Adjust for scroll
-    const top = coords.top - textarea.scrollTop;
-    const left = coords.left - textarea.scrollLeft;
+    const top = offsetY + coords.top - textarea.scrollTop;
+    const left = offsetX + coords.left - textarea.scrollLeft;
     
     // Calculate width based on font size to match stroke thickness
     const computed = window.getComputedStyle(textarea);
