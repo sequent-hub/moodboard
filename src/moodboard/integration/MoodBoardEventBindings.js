@@ -18,6 +18,14 @@ function shouldOpenEditorForObject(objectType) {
         || objectType === 'file';
 }
 
+// Картинки при размещении не выделяем: выделение с попаданием в AI-композер —
+// только осознанный клик пользователя по уже лежащему на мудборде изображению.
+function shouldSelectOnCreate(objectType) {
+    return objectType !== 'image'
+        && objectType !== 'revit-screenshot-img'
+        && objectType !== 'model3d-screenshot-img';
+}
+
 function focusCreatedObject(board, createdObject) {
     if (!board?.coreMoodboard?.eventBus || !createdObject?.id) return;
     const objectType = createdObject?.type || null;
@@ -32,7 +40,7 @@ function focusCreatedObject(board, createdObject) {
     setTimeout(() => {
         board.coreMoodboard.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'select' });
         const selectTool = getSelectTool(board);
-        if (typeof selectTool?.setSelection === 'function') {
+        if (shouldSelectOnCreate(objectType) && typeof selectTool?.setSelection === 'function') {
             selectTool.setSelection([createdObject.id]);
         }
         if (shouldOpenEditorForObject(objectType)) {

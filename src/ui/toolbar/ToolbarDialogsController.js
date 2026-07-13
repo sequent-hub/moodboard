@@ -24,6 +24,28 @@ export class ToolbarDialogsController {
                     return;
                 }
 
+                const isImage = !!(file.type && file.type.startsWith('image/'));
+
+                if (isImage) {
+                    // Изображение, выбранное через диалог вложений, размещаем как картинку
+                    // (тот же путь, что и OS drag-and-drop), а не как файл-карточку.
+                    this.toolbar.eventBus.emit(Events.Place.ImageSelected, {
+                        file: file,
+                        fileName: file.name,
+                        fileSize: file.size,
+                        mimeType: file.type,
+                        properties: {
+                            width: 300,
+                            height: 200
+                        }
+                    });
+
+                    this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                    this.toolbar.placeSelectedButtonId = 'image';
+                    this.toolbar.setActiveToolbarButton('place');
+                    return;
+                }
+
                 // Файл выбран - запускаем режим "призрака"
                 this.toolbar.eventBus.emit(Events.Place.FileSelected, {
                     file: file,

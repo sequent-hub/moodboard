@@ -1,5 +1,68 @@
 import { Events } from '../../core/events/Events.js';
 import { ToolManagerGuards } from './ToolManagerGuards.js';
+import { createDropPlaceholder } from '../../utils/dropPlaceholder.js';
+
+/**
+ * Считывает натуральные пропорции файла-картинки локально (без сети), чтобы
+ * заглушка сразу получила тот же размер, что и будущее изображение.
+ * @returns {Promise<number>} aspectRatio (w/h), либо дефолт 3/2 при сбое.
+ */
+function readImageAspectRatio(file) {
+    return new Promise((resolve) => {
+        let url = null;
+        const done = (ar) => {
+            try { if (url) URL.revokeObjectURL(url); } catch (_) { /* no-op */ }
+            resolve(ar);
+        };
+        try {
+            url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+                const w = img.naturalWidth || 0;
+                const h = img.naturalHeight || 0;
+                done(w > 0 && h > 0 ? w / h : 1.5);
+            };
+            img.onerror = () => done(1.5);
+            img.src = url;
+        } catch (_) {
+            done(1.5);
+        }
+    });
+}
+
+/**
+ * Создаёт градиентную заглушку в worldLayer точно там и того размера,
+ * какими окажется приземлённое изображение (см. ClipboardFlow PasteImageAt:
+ * ширина 300 мировых ед., высота 300/AR, центр в точке дропа + веерный сдвиг).
+ * @returns {Promise<string|null>} placeholderId
+ */
+async function createImageDropPlaceholder(manager, file, baseScreenX, baseScreenY, index) {
+    const core = manager.core;
+    const app = core?.pixi?.app;
+    const world = core?.pixi?.worldLayer || app?.stage;
+    if (!core || !app || !world || typeof core.registerDropPlaceholder !== 'function') {
+        return null;
+    }
+
+    const ar = await readImageAspectRatio(file);
+    const w = 300;
+    const h = Math.max(1, Math.round(w / ar));
+
+    // Тот же экранный сдвиг веером, что и в emitAt (25 px на каждую следующую картинку).
+    const offset = 25 * index;
+    const screenX = baseScreenX + offset;
+    const screenY = baseScreenY + offset;
+    const scale = world?.scale?.x || 1;
+    const worldX = (screenX - (world?.x || 0)) / scale;
+    const worldY = (screenY - (world?.y || 0)) / scale;
+
+    const placeholder = createDropPlaceholder(app, w, h);
+    placeholder.node.x = Math.round(worldX - Math.round(w / 2));
+    placeholder.node.y = Math.round(worldY - Math.round(h / 2));
+    world.addChild(placeholder.node);
+
+    return core.registerDropPlaceholder({ destroy: placeholder.destroy });
+}
 
 function createPointerEvent(manager, event, extras = {}) {
     const rect = manager.container.getBoundingClientRect();
@@ -275,9 +338,10 @@ export class ToolEventRouter {
             return { dx: direction.x * step * ring, dy: direction.y * step * ring };
         };
 
-        const emitAt = (src, name, offsetIndex = 0) => {
+        const emitAt = (src, name, offsetIndex = 0, placeholderId = null) => {
             if (!isCurrentDrop()) {
                 logDropDebug(diagnostics, 'emit_skipped_stale_drop', { route: 'image', offsetIndex });
+                if (placeholderId) manager.core?.removeDropPlaceholder?.(placeholderId);
                 return;
             }
             const offset = 25 * offsetIndex;
@@ -285,7 +349,8 @@ export class ToolEventRouter {
                 x: x + offset,
                 y: y + offset,
                 src,
-                name
+                name,
+                placeholderId
             });
         };
 
@@ -314,6 +379,23 @@ export class ToolEventRouter {
         const imageFiles = limitedFiles.filter((file) => file.type && file.type.startsWith('image/'));
         if (imageFiles.length > 0) {
             logDropDebug(diagnostics, 'route_image_files', { count: imageFiles.length });
+
+            // Мгновенно рисуем градиентные заглушки на местах будущих картинок,
+            // чтобы перекрыть лаг аплоада и подтверждения сохранения.
+            const placeholderIds = await Promise.all(
+                imageFiles.map((file, index) => {
+                    if (!isCurrentDrop()) return null;
+                    return createImageDropPlaceholder(manager, file, x, y, index)
+                        .catch(() => null);
+                })
+            );
+            // Если дроп устарел, пока считали пропорции — снимаем созданные заглушки.
+            if (!isCurrentDrop()) {
+                for (const pid of placeholderIds) {
+                    if (pid) manager.core?.removeDropPlaceholder?.(pid);
+                }
+            }
+
             const imagePlacements = await mapWithConcurrency(imageFiles, 2, async (file, index) => {
                 logDropDebug(diagnostics, 'image_upload_start', {
                     fileName: file.name || 'image',
@@ -327,6 +409,7 @@ export class ToolEventRouter {
                             logDropDebug(diagnostics, 'image_upload_stale_drop_ignored', {
                                 fileName: uploadResult?.name || file.name || 'image'
                             });
+                            if (placeholderIds[index]) manager.core?.removeDropPlaceholder?.(placeholderIds[index]);
                             return null;
                         }
                         logDropDebug(diagnostics, 'image_upload_success', {
@@ -344,6 +427,7 @@ export class ToolEventRouter {
                             diagnostics,
                             { fileName: file.name || 'image' }
                         );
+                        if (placeholderIds[index]) manager.core?.removeDropPlaceholder?.(placeholderIds[index]);
                         return null;
                     }
                 } catch (error) {
@@ -361,12 +445,13 @@ export class ToolEventRouter {
                             message: error?.message || String(error)
                         }
                     );
+                    if (placeholderIds[index]) manager.core?.removeDropPlaceholder?.(placeholderIds[index]);
                     return null;
                 }
             });
             for (const placement of imagePlacements) {
                 if (!placement) continue;
-                emitAt(placement.src, placement.name, placement.index);
+                emitAt(placement.src, placement.name, placement.index, placeholderIds[placement.index]);
             }
             logDropDebug(diagnostics, 'drop_done', { route: 'image_files', itemsProcessed: imageFiles.length });
             return;

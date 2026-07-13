@@ -296,7 +296,7 @@ export function setupClipboardFlow(core) {
         }
     });
 
-    core.eventBus.on(Events.UI.PasteImageAt, async ({ x, y, src, name, skipUpload, aiMessageId, objectType, modelUrl, format }) => {
+    core.eventBus.on(Events.UI.PasteImageAt, async ({ x, y, src, name, skipUpload, aiMessageId, objectType, modelUrl, format, placeholderId }) => {
         if (!src) return;
 
         // Отдельный путь для 3D-скрина: без resolveRevitImagePayload и без загрузки на сервер
@@ -327,7 +327,10 @@ export function setupClipboardFlow(core) {
         }
 
         const uploaded = await ensureServerImage({ src, name, skipUpload });
-        if (!uploaded?.src) return;
+        if (!uploaded?.src) {
+            if (placeholderId) core.removeDropPlaceholder?.(placeholderId);
+            return;
+        }
         const world = core.pixi.worldLayer || core.pixi.app.stage;
         const s = world?.scale?.x || 1;
         const worldX = (x - (world?.x || 0)) / s;
@@ -358,6 +361,10 @@ export function setupClipboardFlow(core) {
                 { x: Math.round(worldX - Math.round(w / 2)), y: Math.round(worldY - Math.round(h / 2)) },
                 properties
             );
+            // Связываем drop-заглушку с объектом: снимется, когда картинка станет видимой.
+            if (placeholderId && createdData?.id) {
+                core.linkDropPlaceholderToObject?.(createdData.id, placeholderId);
+            }
             // data:-URL изображения (AI-генерация) не проходят через SaveManager,
             // поэтому Events.Save.Success никогда не придёт и объект останется скрытым.
             // Раскрываем сразу, минуя ожидание подтверждения сохранения.
@@ -372,10 +379,12 @@ export function setupClipboardFlow(core) {
             img.decoding = 'async';
             img.onload = () => { void placeWithAspect(img.naturalWidth || 0, img.naturalHeight || 0); };
             img.onerror = () => {
+                if (placeholderId) core.removeDropPlaceholder?.(placeholderId);
                 alert('Не удалось загрузить изображение с сервера. Изображение не добавлено.');
             };
             img.src = uploaded.src;
         } catch (_) {
+            if (placeholderId) core.removeDropPlaceholder?.(placeholderId);
             alert('Не удалось загрузить изображение с сервера. Изображение не добавлено.');
         }
     });

@@ -69,6 +69,11 @@ export class CoreMoodBoard {
         this.gridSnapResolver = new GridSnapResolver(this);
         // Объекты, требующие подтверждения сохранения (image/file), показываем только после save:success.
         this._pendingPersistAckVisibilityIds = new Set();
+
+        // Градиентные заглушки на месте перетащенных картинок (пока идёт аплоад/сохранение).
+        this._dropPlaceholders = new Map(); // placeholderId -> { destroy, timeoutId, objectId }
+        this._dropPlaceholderByObject = new Map(); // objectId -> placeholderId
+        this._dropPlaceholderSeq = 0;
         
         // Связываем SaveManager с ApiClient для правильной обработки изображений
         this.saveManager.setApiClient(this.apiClient);
@@ -490,6 +495,10 @@ export class CoreMoodBoard {
         if (pixiObject) {
             pixiObject.visible = !!visible;
         }
+        // Картинка реально появилась на доске → снимаем её drop-заглушку.
+        if (visible) {
+            this._removeDropPlaceholderForObject(objectId);
+        }
     }
 
     revealPendingObjectsAfterSave() {
@@ -498,6 +507,66 @@ export class CoreMoodBoard {
             this._setObjectVisibility(objectId, true);
         }
         this._pendingPersistAckVisibilityIds.clear();
+    }
+
+    /**
+     * Регистрирует градиентную заглушку drag-and-drop. Заглушку создаёт вызывающий
+     * код (ToolEventRouter) и добавляет в worldLayer; здесь храним только её lifecycle.
+     * @param {{ destroy: () => void }} entry
+     * @returns {string} placeholderId
+     */
+    registerDropPlaceholder(entry) {
+        if (!entry || typeof entry.destroy !== 'function') return null;
+        const placeholderId = `dph_${++this._dropPlaceholderSeq}`;
+        // Страховка от утечки: если объект так и не появится (ошибка сохранения и т.п.).
+        const timeoutId = setTimeout(() => this.removeDropPlaceholder(placeholderId), 30000);
+        this._dropPlaceholders.set(placeholderId, {
+            destroy: entry.destroy,
+            timeoutId,
+            objectId: null,
+        });
+        return placeholderId;
+    }
+
+    /** Связывает заглушку с созданным объектом; если объект уже видим — снимает сразу. */
+    linkDropPlaceholderToObject(objectId, placeholderId) {
+        if (!placeholderId) return;
+        const entry = this._dropPlaceholders.get(placeholderId);
+        if (!entry) return;
+        entry.objectId = objectId;
+        this._dropPlaceholderByObject.set(objectId, placeholderId);
+        const pixiObject = this.pixi?.objects?.get?.(objectId);
+        if (pixiObject && pixiObject.visible) {
+            this.removeDropPlaceholder(placeholderId);
+        }
+    }
+
+    removeDropPlaceholder(placeholderId) {
+        const entry = this._dropPlaceholders.get(placeholderId);
+        if (!entry) return;
+        this._dropPlaceholders.delete(placeholderId);
+        if (entry.objectId) {
+            this._dropPlaceholderByObject.delete(entry.objectId);
+        }
+        try {
+            if (entry.timeoutId) clearTimeout(entry.timeoutId);
+        } catch (_) { /* no-op */ }
+        try {
+            entry.destroy();
+        } catch (_) { /* no-op */ }
+    }
+
+    _removeDropPlaceholderForObject(objectId) {
+        const placeholderId = this._dropPlaceholderByObject.get(objectId);
+        if (placeholderId) {
+            this.removeDropPlaceholder(placeholderId);
+        }
+    }
+
+    clearDropPlaceholders() {
+        for (const placeholderId of Array.from(this._dropPlaceholders.keys())) {
+            this.removeDropPlaceholder(placeholderId);
+        }
     }
 
     // === Прикрепления к фреймам ===
@@ -701,7 +770,12 @@ export class CoreMoodBoard {
         
         // Устанавливаем флаг уничтожения
         this.destroyed = true;
-        
+
+        // Снимаем незакрытые drop-заглушки (тикеры/текстуры/ноды)
+        try {
+            this.clearDropPlaceholders();
+        } catch (_) { /* no-op */ }
+
         // Останавливаем ResizeObserver
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
