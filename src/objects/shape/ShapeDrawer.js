@@ -191,6 +191,27 @@ function _drawFillShape(g, w, h, kind, cornerRadius) {
             g.lineTo(skew, 0);
             break;
         }
+        case 'dialog': {
+            const r = Math.max(2, Math.min(w, h) * 0.16);
+            const bodyBottom = h - Math.max(4, h * 0.22);
+            const tailRightBase = w * 0.42;
+            const tailLeftBase = w * 0.24;
+            const tailTipX = w * 0.18;
+            g.moveTo(r, 0);
+            g.lineTo(w - r, 0);
+            g.arcTo(w, 0, w, r, r);
+            g.lineTo(w, bodyBottom - r);
+            g.arcTo(w, bodyBottom, w - r, bodyBottom, r);
+            g.lineTo(tailRightBase, bodyBottom);
+            g.lineTo(tailTipX, h);
+            g.lineTo(tailLeftBase, bodyBottom);
+            g.lineTo(r, bodyBottom);
+            g.arcTo(0, bodyBottom, 0, bodyBottom - r, r);
+            g.lineTo(0, r);
+            g.arcTo(0, 0, r, 0, r);
+            g.closePath();
+            break;
+        }
         case 'arrow': {
             const shaftH = Math.max(6, h * 0.3);
             const shaftY = (h - shaftH) / 2;

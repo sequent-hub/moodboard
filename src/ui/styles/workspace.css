@@ -1386,7 +1386,11 @@
 .shape-parallelogram {
     width: 17px; height: 11px; background: #ffffff; border: 1.5px solid #94a3b8; transform: skewX(-20deg);
 }
-.shape-arrow { font-size: 16px; color: #94a3b8; line-height: 1; }
+.shape-dialog {
+    width: 15px; height: 15px; color: #94a3b8;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.shape-dialog svg { width: 15px; height: 15px; display: block; }
 
 
 

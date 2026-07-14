@@ -63,6 +63,12 @@ export function getShapeTextSafeArea(kind, w, h) {
             const shaftY = (H - shaftH) / 2;
             return { left: 0, top: shaftY, width: W * 0.6, height: shaftH };
         }
+        case 'dialog': {
+            // Тело облачка (без хвостика снизу) — bodyBottom совпадает с ShapeDrawer.
+            // Текст центрируется по вертикали внутри тела, а не всего бокса с хвостом.
+            const bodyBottom = H - Math.max(4, H * 0.22);
+            return { left: 0, top: 0, width: W, height: bodyBottom };
+        }
         case 'square':
         case 'rounded':
         default:
