@@ -8,6 +8,30 @@ const TEXT_CORNER_MAX_FONT = 512;
 export class HandlesInteractionController {
     constructor(host) {
         this.host = host;
+        this._dragCursorStyleEl = null;
+    }
+
+    // Во время drag указатель уходит с маленького div-а ручки на canvas,
+    // и браузер подменяет курсор на дефолтный canvas-курсор — иконка ресайза пропадает.
+    // Глобальный <style> с !important держит нужную иконку видимой на всём документе.
+    _lockDragCursor(cursorValue) {
+        if (!cursorValue || typeof document === 'undefined') return;
+        this._unlockDragCursor();
+        const styleEl = document.createElement('style');
+        styleEl.textContent = `* { cursor: ${cursorValue} !important; }`;
+        document.head.appendChild(styleEl);
+        this._dragCursorStyleEl = styleEl;
+    }
+
+    _unlockDragCursor() {
+        if (this._dragCursorStyleEl) {
+            this._dragCursorStyleEl.remove();
+            this._dragCursorStyleEl = null;
+        }
+    }
+
+    destroy() {
+        this._unlockDragCursor();
     }
 
     _parseBoxRotation(box) {
@@ -190,6 +214,8 @@ export class HandlesInteractionController {
                 }
             }
         }
+
+        this._lockDragCursor(e.currentTarget.style.cursor);
 
         const world = this.host.core.pixi.worldLayer || this.host.core.pixi.app.stage;
         const s = world?.scale?.x || 1;
@@ -469,6 +495,7 @@ export class HandlesInteractionController {
         const onUp = () => {
             document.removeEventListener('pointermove', onMove);
             document.removeEventListener('pointerup', onUp);
+            this._unlockDragCursor();
 
             if (isTextCornerScale) {
                 // Кегль уже сохранён слитой UpdateTextStyleCommand из onMove.
@@ -546,6 +573,7 @@ export class HandlesInteractionController {
     onEdgeResizeDown(e) {
         e.preventDefault();
         e.stopPropagation();
+        this._lockDragCursor(e.currentTarget.style.cursor);
         const id = e.currentTarget.dataset.id;
         const isGroup = id === '__group__';
         const edge = e.currentTarget.dataset.edge;
@@ -756,6 +784,7 @@ export class HandlesInteractionController {
         const onUp = () => {
             document.removeEventListener('pointermove', onMove);
             document.removeEventListener('pointerup', onUp);
+            this._unlockDragCursor();
 
             // Клик по рамке без перетаскивания на текстовом объекте → редактирование
             if (!_edgeHasMoved && isTextTarget && !isGroup) {

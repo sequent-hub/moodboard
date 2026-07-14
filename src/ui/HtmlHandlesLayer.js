@@ -89,6 +89,7 @@ export class HtmlHandlesLayer {
         this._onDprChange = null;
       }
       this.eventBridge.detach();
+      this.interactionController.destroy();
 
       if (this.layer) {
         this.layer.remove();

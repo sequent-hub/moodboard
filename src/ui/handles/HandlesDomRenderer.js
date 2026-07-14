@@ -11,7 +11,7 @@ import { MindmapStatePatchCommand } from '../../core/commands/MindmapStatePatchC
 const HANDLES_ACCENT_COLOR = '#80D8FF';
 const VERTICAL_RESIZE_CURSOR_COLOR = '#6B7280';
 const VERTICAL_RESIZE_CURSOR = 'url("/icons/move-vertical.svg") 12 12, ns-resize';
-const VERTICAL_RESIZE_CURSOR_TYPES = new Set(['frame', 'text', 'simple-text', 'image']);
+const VERTICAL_RESIZE_CURSOR_TYPES = new Set(['frame', 'text', 'simple-text', 'image', 'shape']);
 const VERTICAL_RESIZE_CORNER_CURSOR_ANGLES = {
     nw: -45,
     se: -45,
@@ -50,15 +50,26 @@ function resolveBottomSiblingParentId(sourceObjectId, sourceMeta) {
 
 function shouldUseVerticalResizeCursor(mbType, handleName) {
     return VERTICAL_RESIZE_CURSOR_TYPES.has(mbType)
-        && (handleName === 'handle' || handleName === 'top' || handleName === 'bottom');
+        && (handleName === 'handle'
+            || handleName === 'top'
+            || handleName === 'bottom'
+            || handleName === 'left'
+            || handleName === 'right');
+}
+
+function buildVerticalResizeArrowCursor(totalAngle, fallback) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><g transform="rotate(${totalAngle} 12 12)"><path d="M12 2v20" stroke="${VERTICAL_RESIZE_CURSOR_COLOR}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="m8 18 4 4 4-4" stroke="${VERTICAL_RESIZE_CURSOR_COLOR}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="m8 6 4-4 4 4" stroke="${VERTICAL_RESIZE_CURSOR_COLOR}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
+    const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    return `url("${dataUrl}") 12 12, ${fallback}`;
 }
 
 function createVerticalResizeCornerCursor(dir, rotation) {
     const baseAngle = VERTICAL_RESIZE_CORNER_CURSOR_ANGLES[dir] || 0;
-    const totalAngle = baseAngle + (rotation || 0);
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><g transform="rotate(${totalAngle} 12 12)"><path d="M12 2v20" stroke="${VERTICAL_RESIZE_CURSOR_COLOR}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="m8 18 4 4 4-4" stroke="${VERTICAL_RESIZE_CURSOR_COLOR}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="m8 6 4-4 4 4" stroke="${VERTICAL_RESIZE_CURSOR_COLOR}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
-    const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-    return `url("${dataUrl}") 12 12, nwse-resize`;
+    return buildVerticalResizeArrowCursor(baseAngle + (rotation || 0), 'nwse-resize');
+}
+
+function createHorizontalResizeCursor(rotation) {
+    return buildVerticalResizeArrowCursor(90 + (rotation || 0), 'ew-resize');
 }
 
 function relayoutMindmapBranchLevel({ core, eventBus, parentId, side }) {
@@ -1313,9 +1324,14 @@ export class HandlesDomRenderer {
 
         const edgeSize = 10;
         const makeEdge = (name, style, cursorHandleType) => {
-            const cursor = shouldUseVerticalResizeCursor(mbType, name)
-                ? VERTICAL_RESIZE_CURSOR
-                : createRotatedResizeCursor(cursorHandleType, rotation);
+            let cursor;
+            if (shouldUseVerticalResizeCursor(mbType, name)) {
+                cursor = (name === 'left' || name === 'right')
+                    ? createHorizontalResizeCursor(rotation)
+                    : VERTICAL_RESIZE_CURSOR;
+            } else {
+                cursor = createRotatedResizeCursor(cursorHandleType, rotation);
+            }
             const e = document.createElement('div');
             e.dataset.edge = name;
             e.dataset.id = id;
