@@ -227,6 +227,10 @@ export class NotePropertiesPanel {
             backgroundColor: '#fff',
             cursor: 'pointer',
             minWidth: '140px',
+            // Хост может форсить color-scheme: dark (как futurello), из-за чего
+            // нативный select и его опции рендерятся белым текстом на белом фоне.
+            colorScheme: 'light',
+            color: '#111827',
         });
         this.fontSelect = fontSelect;
 
@@ -249,6 +253,8 @@ export class NotePropertiesPanel {
             option.value = font.value;
             option.textContent = font.name;
             option.style.fontFamily = font.value;
+            option.style.color = '#111827';
+            option.style.backgroundColor = '#fff';
             fontSelect.appendChild(option);
         });
 
@@ -322,7 +328,12 @@ export class NotePropertiesPanel {
             border: '1px solid #ccc',
             borderRadius: '4px',
             fontSize: '11px',
-            textAlign: 'center'
+            textAlign: 'center',
+            // Хост может форсить color-scheme: dark (как futurello) — фиксируем
+            // светлую схему и явные цвета, иначе число становится белым на чёрном.
+            colorScheme: 'light',
+            color: '#111827',
+            backgroundColor: '#fff'
         });
 
         fontSizeInput.addEventListener('change', () => {
