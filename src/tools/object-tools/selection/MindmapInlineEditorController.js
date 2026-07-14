@@ -385,6 +385,13 @@ export function openMindmapEditor(object, create = false) {
         if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
             window.requestAnimationFrame(() => {
                 alignTextareaLineTop();
+                // Каретка позиционируется по textarea.getBoundingClientRect(). После
+                // выравнивания раскладка textarea окончательна — пересчитываем каретку,
+                // иначе в медленном окружении она остаётся в позиции раннего кадра
+                // (когда textarea ещё не сжат/не отцентрован) и «прилипает» к верху капсулы.
+                if (this.textEditor && this.textEditor.caret && this.textEditor.textarea === textarea) {
+                    updateCustomCaret(textarea, this.textEditor.caret);
+                }
             });
         }
     };
@@ -846,6 +853,20 @@ export function openMindmapEditor(object, create = false) {
         object,
         textarea,
     });
+
+    // При открытии редактора textarea сжимается до одной строки и центрируется flex-ом
+    // асинхронно; первый расчёт каретки может произойти до устаканивания раскладки
+    // (offsetY ≈ 0 → каретка у верха капсулы). Пересчитываем после двух кадров, когда
+    // геометрия textarea окончательна — независимо от скорости окружения.
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                if (this.textEditor && this.textEditor.caret && this.textEditor.textarea === textarea) {
+                    updateCustomCaret(textarea, this.textEditor.caret);
+                }
+            });
+        });
+    }
 }
 
 export function closeMindmapEditor(commit) {
