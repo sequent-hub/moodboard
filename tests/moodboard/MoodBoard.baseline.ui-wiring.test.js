@@ -37,7 +37,6 @@ describe('MoodBoard baseline: UI wiring contracts', () => {
 
         const core = lastCoreInstance();
         const toolbar = mockState.toolbarInstances[0];
-        const saveStatus = mockState.saveStatusInstances[0];
         const topbar = mockState.topbarInstances[0];
         const zoomPanel = mockState.zoomPanelInstances[0];
         const mapPanel = mockState.mapPanelInstances[0];
@@ -58,7 +57,8 @@ describe('MoodBoard baseline: UI wiring contracts', () => {
             'dark',
             { emojiBasePath: '/emoji-assets' },
         ]);
-        expect(saveStatus.args).toEqual([board.workspaceElement, core.eventBus]);
+        expect(board.saveStatus).toBeNull();
+        expect(mockState.saveStatusInstances).toHaveLength(0);
         expect(topbar.args).toEqual([board.topbarContainer, core.eventBus, 'dark']);
         expect(zoomPanel.args).toEqual([board.workspaceElement, core.eventBus]);
         expect(mapPanel.args).toEqual([board.workspaceElement, core.eventBus]);

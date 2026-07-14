@@ -58,7 +58,7 @@ describe('MoodBoard baseline: init flow and public API smoke', () => {
         expect(board.dataManager).toBeTruthy();
         expect(board.actionHandler).toBeTruthy();
         expect(board.toolbar).toBe(mockState.toolbarInstances[0]);
-        expect(board.saveStatus).toBe(mockState.saveStatusInstances[0]);
+        expect(board.saveStatus).toBeNull();
         expect(board.topbar).toBe(mockState.topbarInstances[0]);
         expect(board.zoombar).toBe(mockState.zoomPanelInstances[0]);
         expect(board.mapbar).toBe(mockState.mapPanelInstances[0]);

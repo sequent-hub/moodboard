@@ -1,5 +1,4 @@
 import { Toolbar } from '../../ui/Toolbar.js';
-import { SaveStatus } from '../../ui/SaveStatus.js';
 import { Topbar } from '../../ui/Topbar.js';
 import { ZoomPanel } from '../../ui/ZoomPanel.js';
 import { MapPanel } from '../../ui/MapPanel.js';
@@ -39,11 +38,6 @@ function initToolbar(board) {
     if (typeof window !== 'undefined') {
         window.reloadIcon = (iconName) => board.toolbar.reloadToolbarIcon(iconName);
     }
-
-    board.saveStatus = new SaveStatus(
-        board.workspaceElement,
-        board.coreMoodboard.eventBus
-    );
 
     bindToolbarEvents(board);
 }

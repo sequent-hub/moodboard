@@ -63,7 +63,7 @@ describe('MoodBoard baseline: destroy lifecycle contracts', () => {
         expect(container.querySelector('.moodboard-workspace')).toBeNull();
 
         expect(mockState.toolbarInstances[0].destroy).toHaveBeenCalledTimes(1);
-        expect(mockState.saveStatusInstances[0].destroy).toHaveBeenCalledTimes(1);
+        expect(mockState.saveStatusInstances).toHaveLength(0);
         expect(mockState.textPropertiesPanelInstances[0].destroy).toHaveBeenCalledTimes(1);
         expect(mockState.framePropertiesPanelInstances[0].destroy).toHaveBeenCalledTimes(1);
         expect(mockState.notePropertiesPanelInstances[0].destroy).toHaveBeenCalledTimes(1);
