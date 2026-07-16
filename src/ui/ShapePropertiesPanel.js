@@ -4,7 +4,6 @@ import {
     buildShapeGroup,
     buildFillGroup,
     buildBorderGroup,
-    buildRadiusGroup,
     buildTextGroup,
 } from './shape-properties/ShapePropertiesPanelDom.js';
 import {
@@ -221,27 +220,19 @@ export class ShapePropertiesPanel {
         panel.className = 'shape-properties-panel';
         panel.id = 'shape-properties-panel';
 
-        // Строка 1: форма, заливка, рамка, фаска
-        const row1 = document.createElement('div');
-        row1.className = 'spp-row';
-        row1.appendChild(buildShapeGroup(this));
-        row1.appendChild(sep());
-        const [fillLabel, fillWrap] = buildFillGroup(this);
-        row1.appendChild(fillLabel);
-        row1.appendChild(fillWrap);
-        row1.appendChild(sep());
-        row1.appendChild(buildBorderGroup(this));
-        row1.appendChild(sep());
-        const [rLabel, rGroup] = buildRadiusGroup(this);
-        row1.appendChild(rLabel);
-        row1.appendChild(rGroup);
-        panel.appendChild(row1);
+        // Единый ряд: текстовые свойства, а форма/заливка/рамка вставлены после «Жирный»
+        const row = document.createElement('div');
+        row.className = 'spp-row';
+        buildTextGroup(this).forEach(n => row.appendChild(n));
 
-        // Строка 2: текстовые свойства
-        const row2 = document.createElement('div');
-        row2.className = 'spp-row';
-        buildTextGroup(this).forEach(n => row2.appendChild(n));
-        panel.appendChild(row2);
+        let anchor = this._boldBtn;
+        [sep(), buildShapeGroup(this), sep(), buildFillGroup(this), sep(), buildBorderGroup(this)]
+            .forEach((node) => {
+                anchor.parentNode.insertBefore(node, anchor.nextSibling);
+                anchor = node;
+            });
+
+        panel.appendChild(row);
 
         this.panel = panel;
         this.container.appendChild(panel);
@@ -264,6 +255,10 @@ export class ShapePropertiesPanel {
         if (this._openPopoverEl) {
             this._openPopoverEl.style.display = 'none';
             this._openPopoverEl = null;
+        }
+        if (this._openCustomPickerPopover) {
+            this._openCustomPickerPopover.style.display = 'none';
+            this._openCustomPickerPopover = null;
         }
         document.removeEventListener('click', this._boundDocClick);
     }

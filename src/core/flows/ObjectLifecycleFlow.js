@@ -40,7 +40,7 @@ const NOTE_STYLE_DEFAULTS = {
  * oldValue === newValue для всех полей → hasChanges = false → return false.
  * @returns {boolean} true, если команда создана и применена
  */
-const SHAPE_PROP_KEYS = ['kind', 'cornerRadius', 'borderColor', 'borderWidth', 'borderStyle', 'borderOpacity'];
+const SHAPE_PROP_KEYS = ['kind', 'cornerRadius', 'borderColor', 'borderWidth', 'borderStyle', 'borderOpacity', 'fillOpacity'];
 
 function tryCreateShapeStyleCommand(core, object, objectId, updates) {
     if (object.type !== 'shape') return false;

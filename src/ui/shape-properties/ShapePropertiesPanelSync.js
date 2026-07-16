@@ -1,7 +1,5 @@
 import { FONT_OPTIONS, FONT_SIZE_OPTIONS } from '../text-properties/TextPropertiesPanelMapper.js';
-import { SHAPE_ICONS } from './ShapePropertiesPanelDom.js';
-
-const CARET_SVG = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="#888" stroke-width="1.5" stroke-linecap="round"/></svg>';
+import { SHAPE_ICONS, ALIGN_ICONS } from './ShapePropertiesPanelDom.js';
 
 /**
  * Синхронизирует все контролы панели с текущим состоянием объекта.
@@ -16,7 +14,7 @@ export function updateControlsFromObject(inst) {
 
     _syncKind(inst, props.kind || 'square');
     _syncRadius(inst, props.cornerRadius ?? 0);
-    _syncFillColor(inst, data.color ?? 0xFFFFFF);
+    _syncFillColor(inst, data.color ?? 0xFFFFFF, props.fillOpacity ?? 1);
     _syncBorder(inst, props);
     _syncText(inst, props.text || {});
 }
@@ -29,6 +27,9 @@ export function updateBorderStyleBtns(inst, active) {
 }
 
 export function setAlign(inst, value) {
+    if (inst._alignTrigger && ALIGN_ICONS[value]) {
+        inst._alignTrigger.innerHTML = ALIGN_ICONS[value];
+    }
     if (!inst._alignBtns) return;
     Object.entries(inst._alignBtns).forEach(([val, btn]) => {
         btn.classList.toggle('spp-btn--active', val === value);
@@ -55,7 +56,11 @@ function _syncKind(inst, kind) {
             b.classList.toggle('spp-kind-btn--active', b.dataset.kind === kind));
     }
     if (inst._kindTrigger && SHAPE_ICONS[kind]) {
-        inst._kindTrigger.innerHTML = SHAPE_ICONS[kind] + CARET_SVG;
+        inst._kindTrigger.innerHTML = SHAPE_ICONS[kind];
+    }
+    if (inst._radiusGroup) {
+        const supportsRadius = kind === 'square' || kind === 'rounded';
+        inst._radiusGroup.classList.toggle('spp-radius-group--hidden', !supportsRadius);
     }
 }
 
@@ -66,11 +71,21 @@ function _syncRadius(inst, cr) {
     }
 }
 
-function _syncFillColor(inst, fillPixi) {
+function _syncFillColor(inst, fillPixi, fillOpacity) {
+    const isTransparent = fillOpacity === 0;
+
     if (inst._fillColorBtn) {
-        inst._fillColorBtn.style.backgroundColor = pixiToHex(fillPixi);
+        inst._fillColorBtn.style.backgroundColor = isTransparent ? '' : pixiToHex(fillPixi);
+        inst._fillColorBtn.classList.toggle('spp-color-btn--transparent', isTransparent);
     }
-    syncSwatches(inst._fillSwatches, pixiToHex(fillPixi));
+
+    if (isTransparent) {
+        inst._fillSwatches?.forEach(s =>
+            s.classList.toggle('spp-color-swatch--active', s === inst._fillTransparentBtn));
+    } else {
+        syncSwatches(inst._fillSwatches, pixiToHex(fillPixi));
+        inst._fillTransparentBtn?.classList.remove('spp-color-swatch--active');
+    }
 }
 
 function _syncBorder(inst, props) {
@@ -118,7 +133,7 @@ function _syncText(inst, text) {
         inst._boldBtn.classList.toggle('spp-btn--active', !!text.bold);
     }
 
-    setAlign(inst, text.textAlign || 'center');
+    setAlign(inst, text.textAlign || 'left');
 
     if (inst._listBtn) {
         inst._listBtn.classList.toggle('spp-btn--active', text.list === 'bullet');

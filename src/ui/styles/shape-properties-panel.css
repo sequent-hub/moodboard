@@ -82,6 +82,7 @@
 }
 .spp-trigger:hover { background: #f5f5f5; }
 .spp-trigger svg { flex-shrink: 0; }
+.spp-trigger[title='Форма'] { border-color: transparent; }
 
 /* Label */
 .spp-label {
@@ -104,6 +105,13 @@
     box-sizing: border-box;
     position: relative;
 }
+.spp-color-btn--transparent {
+    background-image:
+        linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%),
+        linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 4px 4px;
+}
 
 /* Select */
 .spp-select {
@@ -120,19 +128,6 @@
 }
 .spp-select--font { min-width: 110px; }
 .spp-select--size { min-width: 54px; }
-
-/* Radius row: compact */
-.spp-radius-group {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-.spp-radius-slider {
-    width: 64px;
-    height: 4px;
-    cursor: pointer;
-    accent-color: #2563EB;
-}
 
 /* ── Popovers ─────────────────────────────────────────────────────────────── */
 
@@ -155,7 +150,6 @@
 }
 .spp-kind-btn {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     width: 40px;
@@ -165,8 +159,6 @@
     background: #fafafa;
     cursor: pointer;
     padding: 0;
-    gap: 2px;
-    font-size: 9px;
     color: #666;
     transition: background 0.12s, border-color 0.12s;
 }
@@ -199,6 +191,25 @@
 }
 .spp-color-swatch:hover { transform: scale(1.1); }
 .spp-color-swatch--white { border-color: #ccc; }
+.spp-color-swatch--transparent {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+}
+.spp-color-swatch--transparent svg {
+    width: 24px;
+    height: 24px;
+    pointer-events: none;
+}
+/* Галочка-индикатор скрыта — иконка прозрачности должна быть видна всегда, активность показывает рамка */
+.spp-color-swatch--transparent .spp-tick {
+    display: none !important;
+}
+.spp-color-swatch--transparent.spp-color-swatch--active {
+    border-color: #2563EB;
+    border-width: 2px;
+}
 .spp-color-swatch .spp-tick {
     position: absolute;
     left: 50%;
@@ -213,17 +224,178 @@
 }
 .spp-color-swatch--active .spp-tick { display: block; }
 
+/* Кастомный цвет: кружок-индикатор и плюс-кнопка */
+.spp-color-swatch--custom {
+    border: 1px solid #ccc;
+}
+.spp-color-custom-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    color: #555;
+    border: 1px dashed #bbb;
+}
+.spp-color-custom-btn:hover {
+    background: #f0f0f0;
+    color: #111;
+}
+.spp-color-custom-btn svg {
+    width: 12px;
+    height: 12px;
+    pointer-events: none;
+}
+
+/* Отдельный поповер палитры, привязанный к плюсу */
+.spp-cp-anchor {
+    position: relative;
+    width: 26px;
+    height: 26px;
+}
+.spp-cp-popover {
+    top: 100%;
+    left: 0;
+    margin-top: 6px;
+}
+.spp-cp-confirm {
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    background: #2563EB;
+    color: #fff;
+    font-size: 12px;
+    font-family: 'Roboto', Arial, sans-serif;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+.spp-cp-confirm:hover {
+    background: #1D4ED8;
+}
+.spp-cp {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 176px;
+}
+.spp-cp-sv {
+    position: relative;
+    width: 100%;
+    height: 120px;
+    border-radius: 6px;
+    cursor: crosshair;
+    background-image:
+        linear-gradient(to top, #000, transparent),
+        linear-gradient(to right, #fff, transparent);
+    touch-action: none;
+}
+.spp-cp-sv-pointer {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    box-sizing: border-box;
+}
+.spp-cp-hue {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    background: linear-gradient(
+        to right,
+        #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%
+    );
+}
+.spp-cp-hue::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid #999;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+}
+.spp-cp-hue::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid #999;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+}
+.spp-cp-hex-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 0 6px;
+    height: 26px;
+}
+.spp-cp-hex-hash {
+    font-size: 12px;
+    color: #999;
+}
+.spp-cp-hex {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 12px;
+    font-family: 'Roboto', Arial, sans-serif;
+    color: #333;
+    text-transform: uppercase;
+    width: 100%;
+    min-width: 0;
+}
+
 /* Border popover layout */
 .spp-border-group {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 20px;
     min-width: 200px;
 }
 .spp-border-row {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+.spp-border-row--colors {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
+.spp-border-row--colors .spp-color-grid {
+    margin-bottom: 0;
+    width: 100%;
+    grid-template-columns: repeat(6, 26px);
+    justify-content: space-between;
+}
+.spp-border-row--slider {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+}
+.spp-border-row--slider .spp-border-label {
+    min-width: 0;
+}
+.spp-radius-group--hidden {
+    display: none !important;
+}
+.spp-slider-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
 }
 .spp-border-label {
     font-size: 11px;
@@ -247,4 +419,28 @@
     color: #555;
     min-width: 28px;
     text-align: right;
+}
+
+.shape-properties-panel .current-color-button {
+    width: 28px;
+    height: 28px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background-color: transparent !important;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    position: relative;
+    transition: background 0.15s;
+    color: #374151;
+}
+
+.shape-properties-panel .current-color-button:hover {
+    background: #f0f0f0;
+    color: #111827;
 }

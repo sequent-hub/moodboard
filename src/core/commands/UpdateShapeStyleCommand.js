@@ -2,7 +2,7 @@
  * Команда изменения стиля фигуры (цвет заливки, тип, обводка, радиус скругления) — одно действие в истории.
  * Поддерживает частичные обновления: хранит только те поля, которые изменились.
  *
- * Снапшот: { color?, properties?: { kind?, cornerRadius?, borderColor?, borderWidth?, borderStyle?, borderOpacity? } }
+ * Снапшот: { color?, properties?: { kind?, cornerRadius?, borderColor?, borderWidth?, borderStyle?, borderOpacity?, fillOpacity? } }
  */
 import { BaseCommand } from './BaseCommand.js';
 import { Events } from '../events/Events.js';
@@ -68,9 +68,9 @@ export class UpdateShapeStyleCommand extends BaseCommand {
             if (snapshot.properties) {
                 const p = snapshot.properties;
 
-                // kind и cornerRadius — через setProperties (borderStyle идёт только в setStroke)
-                if ((p.kind !== undefined || p.cornerRadius !== undefined) && instance.setProperties) {
-                    instance.setProperties({ kind: p.kind, cornerRadius: p.cornerRadius });
+                // kind, cornerRadius, fillOpacity — через setProperties (borderStyle идёт только в setStroke)
+                if ((p.kind !== undefined || p.cornerRadius !== undefined || p.fillOpacity !== undefined) && instance.setProperties) {
+                    instance.setProperties({ kind: p.kind, cornerRadius: p.cornerRadius, fillOpacity: p.fillOpacity });
                 }
 
                 // Параметры обводки (borderStyle здесь тоже)

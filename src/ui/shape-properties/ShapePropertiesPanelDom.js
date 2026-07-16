@@ -3,22 +3,149 @@ import {
     FONT_SIZE_OPTIONS,
     TEXT_COLOR_PRESETS,
 } from '../text-properties/TextPropertiesPanelMapper.js';
+import transparentIconSvg from '../../assets/icons/transparent.svg?raw';
+import plusIconSvg from '../../assets/icons/plus.svg?raw';
+import { createColorPicker } from './ColorPickerPopover.js';
+
+const CUSTOM_COLOR_KEYS = {
+    fill:   'mb:shapeFill:customColor',
+    border: 'mb:shapeBorder:customColor',
+    text:   'mb:shapeText:customColor',
+};
+
+function loadCustomColor(storageKey) {
+    try {
+        const v = localStorage.getItem(storageKey);
+        return v && /^#[0-9A-Fa-f]{6}$/.test(v) ? v.toUpperCase() : null;
+    } catch {
+        return null;
+    }
+}
+
+function saveCustomColor(storageKey, hex) {
+    try {
+        localStorage.setItem(storageKey, hex.toUpperCase());
+    } catch {
+        /* localStorage недоступен — сохранение пропускаем */
+    }
+}
+
+/**
+ * Добавляет в цветовой грид кнопку кастомного цвета (плюс) с отдельным
+ * поповером-палитрой и один кликабельный кружок выбранного цвета.
+ *
+ * @param {object} inst  Панель свойств.
+ * @param {object} cfg
+ * @param {HTMLElement}   cfg.grid       Грид, куда добавить кружок и плюс.
+ * @param {HTMLElement[]} cfg.swatches   Массив свотчей блока (для active-состояния).
+ * @param {string}        cfg.storageKey Ключ localStorage.
+ * @param {() => string}  cfg.getFallbackHex  Текущий цвет объекта для инициализации палитры.
+ * @param {(hex: string) => void} cfg.applyColor  Применение цвета (emit + индикатор).
+ * @param {boolean}       [cfg.closeParentOnCircleClick=true]
+ */
+function attachCustomColorControl(inst, cfg) {
+    const {
+        grid, swatches, storageKey, getFallbackHex, applyColor,
+        closeParentOnCircleClick = true,
+    } = cfg;
+
+    const customSwatch = document.createElement('button');
+    customSwatch.type = 'button';
+    customSwatch.className = 'spp-color-swatch spp-color-swatch--custom';
+    customSwatch.title = 'Кастомный цвет';
+    customSwatch.style.display = 'none';
+    const tick = document.createElement('span');
+    tick.className = 'spp-tick';
+    customSwatch.appendChild(tick);
+    customSwatch.addEventListener('click', () => {
+        const hex = customSwatch.dataset.colorHex;
+        if (!hex) return;
+        swatches.forEach(s => s.classList.remove('spp-color-swatch--active'));
+        customSwatch.classList.add('spp-color-swatch--active');
+        applyColor(hex);
+        if (closeParentOnCircleClick) inst._closePopover();
+    });
+    grid.appendChild(customSwatch);
+    swatches.push(customSwatch);
+
+    const saved = loadCustomColor(storageKey);
+    if (saved) {
+        customSwatch.style.display = '';
+        customSwatch.style.backgroundColor = saved;
+        customSwatch.dataset.colorHex = saved;
+    }
+
+    const anchor = document.createElement('div');
+    anchor.className = 'spp-cp-anchor';
+
+    const plusBtn = document.createElement('button');
+    plusBtn.type = 'button';
+    plusBtn.className = 'spp-color-swatch spp-color-custom-btn';
+    plusBtn.title = 'Выбрать цвет';
+    plusBtn.innerHTML = plusIconSvg;
+    anchor.appendChild(plusBtn);
+
+    const pickerPopover = document.createElement('div');
+    pickerPopover.className = 'spp-popover spp-cp-popover';
+    pickerPopover.style.display = 'none';
+    const picker = createColorPicker(saved || '#FFFFFF');
+    pickerPopover.appendChild(picker.el);
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.type = 'button';
+    confirmBtn.className = 'spp-cp-confirm';
+    confirmBtn.textContent = 'Готово';
+    confirmBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const hex = picker.getHex().toUpperCase();
+        customSwatch.style.display = '';
+        customSwatch.style.backgroundColor = hex;
+        customSwatch.dataset.colorHex = hex;
+        saveCustomColor(storageKey, hex);
+        swatches.forEach(s => s.classList.remove('spp-color-swatch--active'));
+        customSwatch.classList.add('spp-color-swatch--active');
+        applyColor(hex);
+        pickerPopover.style.display = 'none';
+    });
+    picker.el.appendChild(confirmBtn);
+    anchor.appendChild(pickerPopover);
+    grid.appendChild(anchor);
+
+    plusBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const show = pickerPopover.style.display === 'none';
+        if (inst._openCustomPickerPopover && inst._openCustomPickerPopover !== pickerPopover) {
+            inst._openCustomPickerPopover.style.display = 'none';
+        }
+        pickerPopover.style.display = show ? 'block' : 'none';
+        inst._openCustomPickerPopover = show ? pickerPopover : null;
+        if (show) picker.setHex(customSwatch.dataset.colorHex || getFallbackHex() || '#FFFFFF');
+    });
+
+    return { customSwatch, plusBtn, picker, pickerPopover };
+}
 
 // ── Константы ─────────────────────────────────────────────────────────────────
 
 export const FILL_COLORS = [
-    { name: 'Белый',       hex: '#FFFFFF', pixi: 0xFFFFFF },
-    { name: 'Светлый серый', hex: '#F5F5F5', pixi: 0xF5F5F5 },
-    { name: 'Голубой',     hex: '#DBEAFE', pixi: 0xDBEAFE },
-    { name: 'Зеленый',     hex: '#DCFCE7', pixi: 0xDCFCE7 },
-    { name: 'Желтый',      hex: '#FEF9C3', pixi: 0xFEF9C3 },
-    { name: 'Розовый',     hex: '#FCE7F3', pixi: 0xFCE7F3 },
-    { name: 'Синий',       hex: '#BFDBFE', pixi: 0xBFDBFE },
-    { name: 'Оранжевый',   hex: '#FED7AA', pixi: 0xFED7AA },
-    { name: 'Красный',     hex: '#FECACA', pixi: 0xFECACA },
+    { name: 'Серый',       hex: '#D4D4D4', pixi: 0xD4D4D4 },
+    { name: 'Темно-серый', hex: '#737373', pixi: 0x737373 },
     { name: 'Черный',      hex: '#1A1A1A', pixi: 0x1A1A1A },
-    { name: 'Темно-серый', hex: '#404040', pixi: 0x404040 },
-    { name: 'Темно-синий', hex: '#1E3A5F', pixi: 0x1E3A5F },
+    { name: 'Синий',       hex: '#2563EB', pixi: 0x2563EB },
+    { name: 'Красный',     hex: '#EF4444', pixi: 0xEF4444 },
+    { name: 'Зеленый',     hex: '#22C55E', pixi: 0x22C55E },
+    { name: 'Желтый',      hex: '#EAB308', pixi: 0xEAB308 },
+    { name: 'Фиолетовый',  hex: '#A855F7', pixi: 0xA855F7 },
+    { name: 'Белый',       hex: '#FFFFFF', pixi: 0xFFFFFF },
+    { name: 'Прозрачный',  hex: '#E5E7EB', pixi: 0xE5E7EB },
+    { name: 'Оранжевый',   hex: '#F97316', pixi: 0xF97316 },
+    { name: 'Розовый',     hex: '#EC4899', pixi: 0xEC4899 },
+    { name: 'Светло-серый', hex: '#999999', pixi: 0x999999 },
+    { name: 'Малиновый',   hex: '#FF2D55', pixi: 0xFF2D55 },
+    { name: 'Пурпурный',   hex: '#CB30E0', pixi: 0xCB30E0 },
+    { name: 'Индиго',      hex: '#6155F5', pixi: 0x6155F5 },
+    { name: 'Голубой',     hex: '#00C0E8', pixi: 0x00C0E8 },
+    { name: 'Золотой',     hex: '#FFCC00', pixi: 0xFFCC00 },
 ];
 
 export const BORDER_COLORS = [
@@ -34,6 +161,12 @@ export const BORDER_COLORS = [
     { name: 'Прозрачный',  hex: '#E5E7EB', pixi: 0xE5E7EB },
     { name: 'Оранжевый',   hex: '#F97316', pixi: 0xF97316 },
     { name: 'Розовый',     hex: '#EC4899', pixi: 0xEC4899 },
+    { name: 'Светло-серый', hex: '#999999', pixi: 0x999999 },
+    { name: 'Малиновый',   hex: '#FF2D55', pixi: 0xFF2D55 },
+    { name: 'Пурпурный',   hex: '#CB30E0', pixi: 0xCB30E0 },
+    { name: 'Индиго',      hex: '#6155F5', pixi: 0x6155F5 },
+    { name: 'Голубой',     hex: '#00C0E8', pixi: 0x00C0E8 },
+    { name: 'Золотой',     hex: '#FFCC00', pixi: 0xFFCC00 },
 ];
 
 export const SHAPE_KINDS = [
@@ -56,7 +189,11 @@ export const SHAPE_ICONS = {
     arrow:         '<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><polygon points="2,8 2,14 13,14 13,18 21,11 13,4 13,8" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
 };
 
-const CARET_SVG = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="#888" stroke-width="1.5" stroke-linecap="round"/></svg>';
+export const ALIGN_ICONS = {
+    left: '<svg width="16" height="14" viewBox="0 0 16 14"><line x1="1" y1="3" x2="15" y2="3" stroke="currentColor" stroke-width="1.5"/><line x1="1" y1="7" x2="10" y2="7" stroke="currentColor" stroke-width="1.5"/><line x1="1" y1="11" x2="13" y2="11" stroke="currentColor" stroke-width="1.5"/></svg>',
+    center: '<svg width="16" height="14" viewBox="0 0 16 14"><line x1="1" y1="3" x2="15" y2="3" stroke="currentColor" stroke-width="1.5"/><line x1="3" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5"/><line x1="2" y1="11" x2="14" y2="11" stroke="currentColor" stroke-width="1.5"/></svg>',
+    right: '<svg width="16" height="14" viewBox="0 0 16 14"><line x1="1" y1="3" x2="15" y2="3" stroke="currentColor" stroke-width="1.5"/><line x1="6" y1="7" x2="15" y2="7" stroke="currentColor" stroke-width="1.5"/><line x1="3" y1="11" x2="15" y2="11" stroke="currentColor" stroke-width="1.5"/></svg>',
+};
 
 // ── Строители секций ──────────────────────────────────────────────────────────
 
@@ -89,13 +226,14 @@ export function buildColorGrid(container, colors, onPick, swatchesOut) {
         swatchesOut.push(btn);
     });
     container.appendChild(grid);
+    return grid;
 }
 
 export function buildShapeGroup(inst) {
     const trigger = document.createElement('button');
     trigger.className = 'spp-trigger';
     trigger.title = 'Форма';
-    trigger.innerHTML = SHAPE_ICONS['square'] + CARET_SVG;
+    trigger.innerHTML = SHAPE_ICONS['square'];
     inst._kindTrigger = trigger;
 
     const popover = document.createElement('div');
@@ -111,8 +249,7 @@ export function buildShapeGroup(inst) {
         btn.className = 'spp-kind-btn';
         btn.title = label;
         btn.dataset.kind = kind;
-        btn.innerHTML = (SHAPE_ICONS[kind] || '') +
-            `<span>${label.length > 8 ? label.slice(0, 7) + '\u2026' : label}</span>`;
+        btn.innerHTML = SHAPE_ICONS[kind] || '';
         btn.addEventListener('click', () => {
             inst._emit({ updates: { properties: { kind } } });
             inst._closePopover();
@@ -138,10 +275,6 @@ export function buildShapeGroup(inst) {
 }
 
 export function buildFillGroup(inst) {
-    const label = document.createElement('span');
-    label.className = 'spp-label';
-    label.textContent = 'Заливка:';
-
     const btn = document.createElement('button');
     btn.className = 'spp-color-btn';
     btn.style.backgroundColor = '#FFFFFF';
@@ -152,11 +285,57 @@ export function buildFillGroup(inst) {
     const popover = document.createElement('div');
     popover.className = 'spp-popover';
     Object.assign(popover.style, { top: '100%', left: '0', marginTop: '4px' });
-    buildColorGrid(popover, FILL_COLORS, (color) => {
+    const grid = buildColorGrid(popover, FILL_COLORS, (color) => {
+        inst._fillColorBtn.classList.remove('spp-color-btn--transparent');
         inst._fillColorBtn.style.backgroundColor = color.hex;
-        inst._emit({ updates: { color: color.pixi } });
+        inst._emit({ updates: { color: color.pixi, properties: { fillOpacity: 1 } } });
         inst._closePopover();
     }, inst._fillSwatches);
+
+    const transparentBtn = document.createElement('button');
+    transparentBtn.type = 'button';
+    transparentBtn.className = 'spp-color-swatch spp-color-swatch--transparent';
+    transparentBtn.title = 'Без заливки';
+    transparentBtn.innerHTML = transparentIconSvg;
+    const transparentTick = document.createElement('span');
+    transparentTick.className = 'spp-tick';
+    transparentBtn.appendChild(transparentTick);
+    transparentBtn.addEventListener('click', () => {
+        const data = inst.core?.getObjectData?.(inst.currentId);
+        const currentFillOpacity = data?.properties?.fillOpacity ?? 1;
+        if (currentFillOpacity === 0) return;
+        inst._fillSwatches.forEach(s => s.classList.remove('spp-color-swatch--active'));
+        transparentBtn.classList.add('spp-color-swatch--active');
+        inst._fillColorBtn.classList.add('spp-color-btn--transparent');
+        inst._emit({ updates: { properties: { fillOpacity: 0 } } });
+        inst._closePopover();
+    });
+    grid.appendChild(transparentBtn);
+    inst._fillSwatches.push(transparentBtn);
+    inst._fillTransparentBtn = transparentBtn;
+
+    // Кастомный цвет заливки: кружок + плюс с поповером-палитрой
+    const fillCustom = attachCustomColorControl(inst, {
+        grid,
+        swatches: inst._fillSwatches,
+        storageKey: CUSTOM_COLOR_KEYS.fill,
+        getFallbackHex: () => {
+            const data = inst.core?.getObjectData?.(inst.currentId);
+            return data?.color != null
+                ? `#${(data.color >>> 0).toString(16).padStart(6, '0')}`
+                : '#FFFFFF';
+        },
+        applyColor: (hex) => {
+            const pixi = parseInt(hex.replace('#', ''), 16);
+            inst._fillColorBtn.classList.remove('spp-color-btn--transparent');
+            inst._fillColorBtn.style.backgroundColor = hex;
+            inst._emit({ updates: { color: pixi, properties: { fillOpacity: 1 } } });
+        },
+        closeParentOnCircleClick: true,
+    });
+    inst._fillCustomSwatch = fillCustom.customSwatch;
+    inst._fillCustomBtn = fillCustom.plusBtn;
+
     inst._fillPopover = popover;
 
     const wrap = document.createElement('div');
@@ -169,16 +348,15 @@ export function buildFillGroup(inst) {
         inst._togglePopover(popover);
     });
 
-    return [label, wrap];
+    return wrap;
 }
 
 export function buildBorderGroup(inst) {
     const trigger = document.createElement('button');
-    trigger.className = 'spp-trigger';
+    trigger.className = 'spp-btn';
     trigger.title = 'Рамка';
     trigger.innerHTML =
-        '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="13" height="13" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>' +
-        '<span style="font-size:11px;color:#555">Рамка</span>' + CARET_SVG;
+        '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-icon lucide-circle"><circle cx="12" cy="12" r="10"/></svg>';
     inst._borderTrigger = trigger;
 
     const popover = document.createElement('div');
@@ -189,7 +367,8 @@ export function buildBorderGroup(inst) {
     group.className = 'spp-border-group';
 
     // Стиль линии
-    const styleRow = _borderRow('Стиль:');
+    const styleRow = document.createElement('div');
+    styleRow.className = 'spp-border-row spp-border-row--style';
     const styleBtns = document.createElement('div');
     styleBtns.className = 'spp-style-btns';
     inst._borderStyleBtns = {};
@@ -214,7 +393,7 @@ export function buildBorderGroup(inst) {
     group.appendChild(styleRow);
 
     // Толщина
-    const [widthRow, widthSlider, widthVal] = _sliderRow('Толщина:', 0, 10, 0.5, 1);
+    const [widthRow, widthSlider, widthVal] = _sliderRow('Толщина', 0, 10, 0.5, 1);
     inst._borderWidthSlider = widthSlider;
     inst._borderWidthVal = widthVal;
     widthSlider.addEventListener('input', () => {
@@ -225,7 +404,7 @@ export function buildBorderGroup(inst) {
     group.appendChild(widthRow);
 
     // Прозрачность
-    const [opacityRow, opacitySlider, opacityVal] = _sliderRow('Прозрачность:', 0, 100, 1, 100, '%');
+    const [opacityRow, opacitySlider, opacityVal] = _sliderRow('Прозрачность', 0, 100, 1, 100, '%');
     inst._borderOpacitySlider = opacitySlider;
     inst._borderOpacityVal = opacityVal;
     opacitySlider.addEventListener('input', () => {
@@ -235,34 +414,41 @@ export function buildBorderGroup(inst) {
     });
     group.appendChild(opacityRow);
 
-    // Цвет рамки
-    const colorRow = _borderRow('Цвет рамки:');
-    const colorSwatch = document.createElement('button');
-    colorSwatch.className = 'spp-color-btn';
-    colorSwatch.style.backgroundColor = '#D4D4D4';
-    colorSwatch.title = 'Цвет рамки';
-    inst._borderColorBtn = colorSwatch;
+    // Угол
+    group.appendChild(buildRadiusGroup(inst));
+
+    // Цвет рамки — грид цветов прямо в попапе рамки
+    const colorRow = document.createElement('div');
+    colorRow.className = 'spp-border-row spp-border-row--colors';
+    const colorLbl = document.createElement('span');
+    colorLbl.className = 'spp-border-label';
+    colorLbl.textContent = 'Цвет рамки:';
+    colorRow.appendChild(colorLbl);
+
+    inst._borderColorBtn = null;
+    inst._borderColorPopover = null;
     inst._borderSwatches = [];
-
-    const bcPopover = document.createElement('div');
-    bcPopover.className = 'spp-popover';
-    Object.assign(bcPopover.style, { top: '100%', left: '0', marginTop: '4px', position: 'absolute' });
-    buildColorGrid(bcPopover, BORDER_COLORS, (color) => {
-        inst._borderColorBtn.style.backgroundColor = color.hex;
+    const borderGrid = buildColorGrid(colorRow, BORDER_COLORS, (color) => {
         inst._emit({ updates: { properties: { borderColor: color.pixi } } });
-        inst._closePopover();
     }, inst._borderSwatches);
-    inst._borderColorPopover = bcPopover;
 
-    const cWrap = document.createElement('div');
-    cWrap.style.position = 'relative';
-    cWrap.appendChild(colorSwatch);
-    cWrap.appendChild(bcPopover);
-    colorSwatch.addEventListener('click', (e) => {
-        e.stopPropagation();
-        inst._togglePopover(bcPopover);
+    attachCustomColorControl(inst, {
+        grid: borderGrid,
+        swatches: inst._borderSwatches,
+        storageKey: CUSTOM_COLOR_KEYS.border,
+        getFallbackHex: () => {
+            const data = inst.core?.getObjectData?.(inst.currentId);
+            const bc = data?.properties?.borderColor ?? 0xD4D4D4;
+            return `#${(bc >>> 0).toString(16).padStart(6, '0')}`;
+        },
+        applyColor: (hex) => {
+            const pixi = parseInt(hex.replace('#', ''), 16);
+            if (inst._borderColorBtn) inst._borderColorBtn.style.backgroundColor = hex;
+            inst._emit({ updates: { properties: { borderColor: pixi } } });
+        },
+        closeParentOnCircleClick: false,
     });
-    colorRow.appendChild(cWrap);
+
     group.appendChild(colorRow);
 
     popover.appendChild(group);
@@ -282,27 +468,11 @@ export function buildBorderGroup(inst) {
 }
 
 export function buildRadiusGroup(inst) {
-    const label = document.createElement('span');
-    label.className = 'spp-label';
-    label.textContent = 'Угол:';
-
-    const group = document.createElement('div');
-    group.className = 'spp-radius-group';
-
-    const slider = document.createElement('input');
-    slider.type = 'range';
-    slider.min = '0';
-    slider.max = '50';
-    slider.step = '1';
-    slider.value = '0';
-    slider.className = 'spp-radius-slider';
+    const [row, slider, valLabel] = _sliderRow('Угол', 0, 50, 1, 0);
+    row.classList.add('spp-radius-group');
+    inst._radiusGroup = row;
     slider.title = 'Радиус скругления';
     inst._radiusSlider = slider;
-
-    const valLabel = document.createElement('span');
-    valLabel.className = 'spp-label';
-    valLabel.textContent = '0';
-    valLabel.style.minWidth = '20px';
     inst._radiusVal = valLabel;
 
     slider.addEventListener('input', () => {
@@ -311,19 +481,11 @@ export function buildRadiusGroup(inst) {
         inst._emit({ updates: { properties: { cornerRadius: v } } });
     });
 
-    group.appendChild(slider);
-    group.appendChild(valLabel);
-    return [label, group];
+    return row;
 }
 
 export function buildTextGroup(inst) {
     const nodes = [];
-
-    // Шрифт
-    const fontLabel = document.createElement('span');
-    fontLabel.className = 'spp-label';
-    fontLabel.textContent = 'Шрифт:';
-    nodes.push(fontLabel);
 
     const fontSelect = document.createElement('select');
     fontSelect.className = 'spp-select spp-select--font';
@@ -339,12 +501,6 @@ export function buildTextGroup(inst) {
     });
     inst._fontSelect = fontSelect;
     nodes.push(fontSelect);
-
-    // Размер
-    const sizeLabel = document.createElement('span');
-    sizeLabel.className = 'spp-label';
-    sizeLabel.textContent = 'Р:';
-    nodes.push(sizeLabel);
 
     const sizeSelect = document.createElement('select');
     sizeSelect.className = 'spp-select spp-select--size';
@@ -363,17 +519,33 @@ export function buildTextGroup(inst) {
 
     nodes.push(sep());
 
-    // Цвет текста
-    const tcLabel = document.createElement('span');
-    tcLabel.className = 'spp-label';
-    tcLabel.textContent = 'Цвет:';
-    nodes.push(tcLabel);
-
     const tcBtn = document.createElement('button');
-    tcBtn.className = 'spp-color-btn';
-    tcBtn.style.backgroundColor = '#111111';
+    tcBtn.type = 'button';
+    tcBtn.className = 'current-color-button spp-text-color-btn';
+    tcBtn.style.background = 'transparent';
     tcBtn.title = 'Цвет текста';
+
+    const colorIcon = document.createElement('span');
+    colorIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5636 13.9875L12 5L15.4364 13.9875"></path><path d="M9.88525 10.8155H14.1147"></path></svg>';
+    colorIcon.style.cssText = 'width: 24px; height: 24px; pointer-events: none; display: flex; align-items: center; justify-content: center;';
+
+    const colorIndicator = document.createElement('div');
+    colorIndicator.style.cssText = `
+        width: 18px;
+        height: 5px;
+        position: absolute;
+        bottom: 2px;
+        background: #111111;
+        box-shadow: rgba(0, 0, 0, 0.1) 0px 0px 0px 1px inset;
+        border-radius: 2px;
+    `;
+
+    tcBtn.appendChild(colorIcon);
+    tcBtn.appendChild(colorIndicator);
+
     inst._textColorBtn = tcBtn;
+    inst._textColorIndicator = colorIndicator;
+    inst._textColorSwatches = [];
     inst._textColorSwatches = [];
 
     const tcPopover = document.createElement('div');
@@ -411,23 +583,52 @@ export function buildTextGroup(inst) {
 
     // Выравнивание
     inst._alignBtns = {};
+
+    const alignTrigger = document.createElement('button');
+    alignTrigger.className = 'spp-trigger spp-btn';
+    alignTrigger.title = 'Выравнивание';
+    alignTrigger.innerHTML = ALIGN_ICONS['left'];
+    inst._alignTrigger = alignTrigger;
+
+    const alignPopover = document.createElement('div');
+    alignPopover.className = 'spp-popover';
+    Object.assign(alignPopover.style, { top: '100%', left: '0', marginTop: '4px', display: 'none', padding: '4px' });
+    inst._alignPopover = alignPopover;
+
+    const alignGrid = document.createElement('div');
+    alignGrid.style.display = 'flex';
+    alignGrid.style.gap = '2px';
+
     [
-        { value: 'left',   svg: '<svg width="16" height="14" viewBox="0 0 16 14"><line x1="1" y1="3" x2="15" y2="3" stroke="currentColor" stroke-width="1.5"/><line x1="1" y1="7" x2="10" y2="7" stroke="currentColor" stroke-width="1.5"/><line x1="1" y1="11" x2="13" y2="11" stroke="currentColor" stroke-width="1.5"/></svg>', title: 'По левому краю' },
-        { value: 'center', svg: '<svg width="16" height="14" viewBox="0 0 16 14"><line x1="1" y1="3" x2="15" y2="3" stroke="currentColor" stroke-width="1.5"/><line x1="3" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5"/><line x1="2" y1="11" x2="14" y2="11" stroke="currentColor" stroke-width="1.5"/></svg>', title: 'По центру' },
-        { value: 'right',  svg: '<svg width="16" height="14" viewBox="0 0 16 14"><line x1="1" y1="3" x2="15" y2="3" stroke="currentColor" stroke-width="1.5"/><line x1="6" y1="7" x2="15" y2="7" stroke="currentColor" stroke-width="1.5"/><line x1="3" y1="11" x2="15" y2="11" stroke="currentColor" stroke-width="1.5"/></svg>', title: 'По правому краю' },
-    ].forEach(({ value, svg, title }) => {
+        { value: 'left',   title: 'По левому краю' },
+        { value: 'center', title: 'По центру' },
+        { value: 'right',  title: 'По правому краю' },
+    ].forEach(({ value, title }) => {
         const b = document.createElement('button');
         b.className = 'spp-btn';
         b.title = title;
-        b.innerHTML = svg;
+        b.innerHTML = ALIGN_ICONS[value];
         b.dataset.align = value;
         b.addEventListener('click', () => {
             inst._setAlign(value);
             inst._emit({ updates: { properties: { text: { textAlign: value } } } });
+            inst._closePopover();
         });
         inst._alignBtns[value] = b;
-        nodes.push(b);
+        alignGrid.appendChild(b);
     });
+
+    alignPopover.appendChild(alignGrid);
+
+    const alignWrap = document.createElement('div');
+    alignWrap.style.position = 'relative';
+    alignWrap.appendChild(alignTrigger);
+    alignWrap.appendChild(alignPopover);
+    alignTrigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        inst._togglePopover(alignPopover);
+    });
+    nodes.push(alignWrap);
 
     nodes.push(sep());
 
@@ -450,12 +651,6 @@ export function buildTextGroup(inst) {
     nodes.push(listBtn);
 
     nodes.push(sep());
-
-    // Межстрочный интервал
-    const lhLabel = document.createElement('span');
-    lhLabel.className = 'spp-label';
-    lhLabel.textContent = 'Интервал:';
-    nodes.push(lhLabel);
 
     const lhSelect = document.createElement('select');
     lhSelect.className = 'spp-select';
@@ -489,7 +684,12 @@ function _borderRow(labelText) {
 }
 
 function _sliderRow(labelText, min, max, step, defVal, suffix = '') {
-    const row = _borderRow(labelText);
+    const row = document.createElement('div');
+    row.className = 'spp-border-row spp-border-row--slider';
+
+    const controls = document.createElement('div');
+    controls.className = 'spp-slider-controls';
+
     const slider = document.createElement('input');
     slider.type = 'range';
     slider.min = String(min);
@@ -500,8 +700,16 @@ function _sliderRow(labelText, min, max, step, defVal, suffix = '') {
     const valLabel = document.createElement('span');
     valLabel.className = 'spp-slider-value';
     valLabel.textContent = `${defVal}${suffix}`;
-    row.appendChild(slider);
-    row.appendChild(valLabel);
+
+    controls.appendChild(slider);
+    controls.appendChild(valLabel);
+
+    const lbl = document.createElement('span');
+    lbl.className = 'spp-border-label';
+    lbl.textContent = labelText;
+
+    row.appendChild(controls);
+    row.appendChild(lbl);
     return [row, slider, valLabel];
 }
 
@@ -522,12 +730,28 @@ function _buildTextColorGrid(container, inst) {
         btn.addEventListener('click', () => {
             inst._textColorSwatches.forEach(s => s.classList.remove('spp-color-swatch--active'));
             btn.classList.add('spp-color-swatch--active');
-            inst._textColorBtn.style.backgroundColor = color;
+            inst._textColorIndicator.style.backgroundColor = color;
             inst._emit({ updates: { properties: { text: { color } } } });
             inst._closePopover();
         });
         grid.appendChild(btn);
         inst._textColorSwatches.push(btn);
     });
+
+    attachCustomColorControl(inst, {
+        grid,
+        swatches: inst._textColorSwatches,
+        storageKey: CUSTOM_COLOR_KEYS.text,
+        getFallbackHex: () => {
+            const data = inst.core?.getObjectData?.(inst.currentId);
+            return data?.properties?.text?.color || '#111111';
+        },
+        applyColor: (hex) => {
+            if (inst._textColorIndicator) inst._textColorIndicator.style.backgroundColor = hex;
+            inst._emit({ updates: { properties: { text: { color: hex } } } });
+        },
+        closeParentOnCircleClick: true,
+    });
+
     container.appendChild(grid);
 }

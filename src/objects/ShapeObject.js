@@ -6,6 +6,7 @@ const DEFAULTS = {
     borderWidth: 1,
     borderStyle: 'solid',
     borderOpacity: 1,
+    fillOpacity: 1,
 };
 
 /**
@@ -20,6 +21,7 @@ const DEFAULTS = {
  *   properties.borderWidth            — толщина обводки (world px), дефолт 1
  *   properties.borderStyle            — 'solid'|'dashed'|'dotted', дефолт 'solid'
  *   properties.borderOpacity          — 0..1, дефолт 1
+ *   properties.fillOpacity            — 0..1, дефолт 1 (0 — без заливки)
  */
 export class ShapeObject {
     /**
@@ -38,6 +40,7 @@ export class ShapeObject {
         this.borderWidth = props.borderWidth ?? DEFAULTS.borderWidth;
         this.borderStyle = props.borderStyle ?? DEFAULTS.borderStyle;
         this.borderOpacity = props.borderOpacity ?? DEFAULTS.borderOpacity;
+        this.fillOpacity = props.fillOpacity ?? DEFAULTS.fillOpacity;
 
         this.graphics = new PIXI.Graphics();
         this._draw(this.width, this.height);
@@ -65,11 +68,12 @@ export class ShapeObject {
         this._redrawPreserveTransform(this.width, this.height);
     }
 
-    /** Обновить свойства фигуры (тип, радиус скругления, стиль обводки) */
-    setProperties({ kind, cornerRadius, borderStyle } = {}) {
+    /** Обновить свойства фигуры (тип, радиус скругления, стиль обводки, прозрачность заливки) */
+    setProperties({ kind, cornerRadius, borderStyle, fillOpacity } = {}) {
         if (kind) this.kind = kind;
         if (typeof cornerRadius === 'number') this.cornerRadius = cornerRadius;
         if (borderStyle !== undefined) this.borderStyle = borderStyle;
+        if (typeof fillOpacity === 'number') this.fillOpacity = fillOpacity;
         this._redrawPreserveTransform(this.width, this.height);
     }
 
@@ -105,6 +109,6 @@ export class ShapeObject {
             borderWidth: this.borderWidth,
             borderStyle: this.borderStyle,
             borderOpacity: this.borderOpacity,
-        });
+        }, this.fillOpacity);
     }
 }

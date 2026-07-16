@@ -19,6 +19,7 @@ function drawDashedPolygon(g, pts, dash, gap) {
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const segLen = Math.sqrt(dx * dx + dy * dy);
+        if (segLen === 0) continue;
         const ux = dx / segLen;
         const uy = dy / segLen;
         let pos = 0;
@@ -55,6 +56,38 @@ function drawDashedRect(g, x, y, w, h, dash, gap) {
         { x, y: y + h },
     ];
     drawDashedPolygon(g, pts, dash, gap);
+}
+
+/**
+ * Рисует пунктирный скруглённый прямоугольник по дискретизированному периметру.
+ */
+function drawDashedRoundedRect(g, x, y, w, h, radius, dash, gap) {
+    if (radius === 0) {
+        drawDashedRect(g, x, y, w, h, dash, gap);
+        return;
+    }
+
+    const points = [];
+    const cornerSteps = Math.max(4, Math.ceil(radius / 2));
+    const appendArc = (cx, cy, startAngle, endAngle, includeEnd = true) => {
+        const lastStep = includeEnd ? cornerSteps : cornerSteps - 1;
+        for (let i = 1; i <= lastStep; i++) {
+            const angle = startAngle + ((endAngle - startAngle) * i) / cornerSteps;
+            points.push({ x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius });
+        }
+    };
+
+    points.push({ x: x + radius, y });
+    points.push({ x: x + w - radius, y });
+    appendArc(x + w - radius, y + radius, -Math.PI / 2, 0);
+    points.push({ x: x + w, y: y + h - radius });
+    appendArc(x + w - radius, y + h - radius, 0, Math.PI / 2);
+    points.push({ x: x + radius, y: y + h });
+    appendArc(x + radius, y + h - radius, Math.PI / 2, Math.PI);
+    points.push({ x, y: y + radius });
+    appendArc(x + radius, y + radius, Math.PI, (3 * Math.PI) / 2, false);
+
+    drawDashedPolygon(g, points, dash, gap);
 }
 
 /**
@@ -114,17 +147,21 @@ function dashParams(style) {
  *   @param {number}  stroke.borderWidth
  *   @param {'solid'|'dashed'|'dotted'} stroke.borderStyle
  *   @param {number}  stroke.borderOpacity
+ * @param {number} [fillOpacity=1] прозрачность заливки, 0 — без заливки
  */
-export function drawShape(g, w, h, color, kind, cornerRadius, stroke) {
+export function drawShape(g, w, h, color, kind, cornerRadius, stroke, fillOpacity = 1) {
     const { borderColor, borderWidth, borderStyle, borderOpacity } = stroke;
     const isDash = borderWidth > 0 && (borderStyle === 'dashed' || borderStyle === 'dotted');
     const { dash, gap } = dashParams(borderStyle);
 
     g.clear();
 
-    // --- заливка (всегда solid через beginFill/endFill) ---
+    // --- заливка (всегда solid-геометрия через beginFill/endFill, прозрачность через alpha) ---
+    // PIXI помечает fillStyle.visible=false при alpha===0 и исключает эту область из
+    // GraphicsGeometry.containsPoint — фигура становится непрокликиваемой изнутри.
+    // Минимальный alpha > 0 визуально неотличим от полной прозрачности, но сохраняет hit-test.
     g.lineStyle(0);
-    g.beginFill(color, 1);
+    g.beginFill(color, fillOpacity > 0 ? fillOpacity : 0.0001);
     _drawFillShape(g, w, h, kind, cornerRadius);
     g.endFill();
 
@@ -145,8 +182,8 @@ export function drawShape(g, w, h, color, kind, cornerRadius, stroke) {
             const r = Math.min(w, h) / 2;
             drawDashedCircle(g, w / 2, h / 2, r, dash, gap);
         } else {
-            // square и rounded — прямоугольный периметр
-            drawDashedRect(g, 0, 0, w, h, dash, gap);
+            const radius = _normalizeCornerRadius(kind, cornerRadius, w, h);
+            drawDashedRoundedRect(g, 0, 0, w, h, radius, dash, gap);
         }
     }
 }
@@ -162,9 +199,14 @@ function _drawFillShape(g, w, h, kind, cornerRadius) {
             g.drawCircle(w / 2, h / 2, r);
             break;
         }
-        case 'rounded': {
-            const r = cornerRadius || 10;
-            g.drawRoundedRect(0, 0, w, h, r);
+        case 'rounded':
+        case 'square': {
+            const radius = _normalizeCornerRadius(kind, cornerRadius, w, h);
+            if (radius > 0) {
+                g.drawRoundedRect(0, 0, w, h, radius);
+            } else {
+                g.drawRect(0, 0, w, h);
+            }
             break;
         }
         case 'triangle': {
@@ -222,10 +264,15 @@ function _drawFillShape(g, w, h, kind, cornerRadius) {
             g.lineTo(w * 0.6, 0);
             break;
         }
-        case 'square':
         default: {
             g.drawRect(0, 0, w, h);
             break;
         }
     }
+}
+
+function _normalizeCornerRadius(kind, cornerRadius, w, h) {
+    const fallback = kind === 'rounded' ? 10 : 0;
+    const radius = Number.isFinite(cornerRadius) ? Math.max(0, cornerRadius) : fallback;
+    return Math.min(radius, Math.max(0, w) / 2, Math.max(0, h) / 2);
 }
