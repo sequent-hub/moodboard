@@ -3,8 +3,8 @@ import * as PIXI from 'pixi.js';
 
 const LASER_COLOR = 0xff2222;
 const LASER_DOT_COLOR = 0xff4444;
-const TRAIL_MAX_POINTS = 30;
-const FADE_STEPS = 20;
+const TRAIL_MAX_POINTS = 200;
+const FADE_STEPS = 50;
 const FADE_INTERVAL_MS = 40;
 
 /**
@@ -79,7 +79,7 @@ export class LaserPointerTool extends BaseTool {
 
         for (let i = 1; i < n; i++) {
             const t = i / n;
-            const width = Math.max(1, t * 3);
+            const width = Math.max(2, t * 3);
             this.graphics.lineStyle(width, LASER_COLOR, t * 0.85);
             this.graphics.moveTo(this.points[i - 1].x, this.points[i - 1].y);
             this.graphics.lineTo(this.points[i].x, this.points[i].y);
