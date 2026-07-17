@@ -103,6 +103,9 @@ export function openTextEditor(object, create = false) {
         // kind берём из самого объекта, если его не передали в payload — иначе safe-area
         // фигуры считается как для квадрата и текст вылезает за контур круга/треугольника.
         if (meta.kind && !properties.kind) properties.kind = meta.kind;
+        // widthMode берём из живого состояния: без него редактор не узнает, что ширина
+        // зафиксирована боковой ручкой, и при вводе сбросил бы её на ширину контента.
+        if (meta.widthMode !== undefined) properties.widthMode = meta.widthMode;
     }
 
     // Уведомляем о начале редактирования (для разных типов отдельно)
@@ -618,17 +621,34 @@ export function openTextEditor(object, create = false) {
         }
         : null;
 
+    // Фиксированная ширина: если пользователь ранее задал ширину боковой ручкой
+    // (properties.widthMode === 'fixed'), редактор не подгоняет ширину под контент, а
+    // переносит текст внутри заданной ширины — иначе двойной клик по сужённому тексту
+    // сбросил бы ширину обратно на ширину контента.
+    const isFixedWidthText = !isNote && !isShape && !!objectId && properties.widthMode === 'fixed';
+    const getFixedWidthPx = isFixedWidthText
+        ? () => {
+            const sizeReq = { objectId, size: null };
+            this.eventBus.emit(Events.Tool.GetObjectSize, sizeReq);
+            const scaleX = (worldLayerRef?.scale?.x) || 1;
+            const wWorld = sizeReq.size?.width || 0;
+            return wWorld > 0 ? Math.max(1, Math.round(wWorld * scaleX)) : null;
+        }
+        : null;
+
     const autoSize = createRegularTextAutoSize({
         textarea,
         wrapper,
         minWBound,
         minHBound,
         onSizeChange: syncRegularTextSizeToObject,
+        getFixedWidthPx,
     });
 
-    // Для существующего текста стартовый размер уже взят из видимого DOM-бокса:
-    // пересчёт нужен только после фактического ввода, иначе рамка прыгает при входе в редактор.
-    if (!isNote && !isShape && create) {
+    // Для существующего текста стартовый размер обычно берётся из видимого DOM-бокса
+    // (пересчёт при входе дёргал бы рамку). Но для фиксированной ширины первичный autoSize
+    // обязателен — иначе длинный текст откроется одной непереносящейся строкой до ввода.
+    if (!isNote && !isShape && (create || isFixedWidthText)) {
         autoSize();
     }
     // preventScroll: на планшете экранная клавиатура иначе триггерит нативный

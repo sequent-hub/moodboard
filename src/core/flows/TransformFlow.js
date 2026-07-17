@@ -34,6 +34,18 @@ export function setupTransformFlow(core) {
                 startPosition: { x: object.position.x, y: object.position.y },
                 dominantAxis: null,
             };
+
+            // Текст: горизонтальная боковая ручка (e/w) переводит блок в режим
+            // фиксированной ширины. Дальше текст переносится по словам внутри заданной
+            // ширины (в т.ч. при сужении), а не растёт в одну строку. Флаг ставим один раз.
+            const isText = object.type === 'text' || object.type === 'simple-text';
+            const horizontalHandle = data.handle === 'e' || data.handle === 'w';
+            if (isText && horizontalHandle && object.properties?.widthMode !== 'fixed') {
+                core.eventBus.emit(Events.Object.StateChanged, {
+                    objectId: data.object,
+                    updates: { properties: { widthMode: 'fixed' } },
+                });
+            }
         }
     });
 

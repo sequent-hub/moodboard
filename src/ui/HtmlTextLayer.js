@@ -354,6 +354,17 @@ export class HtmlTextLayer {
         this.eventBus.on(Events.Tool.DragUpdate, ({ object }) => this.updateOne(object));
         this.eventBus.on(Events.Tool.ResizeUpdate, ({ object }) => this.updateOne(object));
         this.eventBus.on(Events.Tool.RotateUpdate, ({ object }) => this.updateOne(object));
+        // После завершения ресайза текста фиксированной ширины перенос строк мог
+        // увеличить высоту — сохраняем её в состоянии и пересобираем рамку выделения
+        // (ResizeController по боковой ручке высоту не меняет).
+        this.eventBus.on(Events.Tool.ResizeEnd, ({ object }) => {
+            const obj = (this.core?.state?.state?.objects || []).find(o => o.id === object);
+            if (obj && (obj.type === 'text' || obj.type === 'simple-text')) {
+                this._autoFitTextHeight(object);
+                this.updateOne(object);
+                this.eventBus.emit(Events.Object.TransformUpdated, { objectId: object });
+            }
+        });
         this.eventBus.on(Events.Tool.GroupDragUpdate, ({ objects }) => {
             const ids = Array.isArray(objects) ? objects : [];
             ids.forEach(id => this.updateOne(id));
@@ -797,6 +808,11 @@ export class HtmlTextLayer {
         const listType = props.listType;
         const useList = listType && listType !== 'none';
         const isMarkdown = !useList && resolveMarkdown(obj.properties, content);
+        // Пользователь вручную задал ширину боковой ручкой (см. TransformFlow ResizeStart):
+        // блок переходит в режим фиксированной ширины — текст переносится по словам, а не
+        // растёт в одну строку. Актуально только для plain-текста (markdown уже переносится
+        // по ширине состояния средствами CSS, список — тоже).
+        const fixedWidth = !useList && !isMarkdown && props.widthMode === 'fixed';
         if (typeof content === 'string') {
             if (useList) {
                 el.dataset.renderedContent = '';
@@ -843,14 +859,27 @@ export class HtmlTextLayer {
             }
         }
 
-        // Гарантируем, что рамка не прилипает к тексту справа: ширина блока всегда
-        // не меньше реальной ширины текста + правый отступ. Слой ручек строит рамку
-        // по getBoundingClientRect этого .mb-text, поэтому запас распространяется и на неё.
-        // Для markdown-элементов блок не применяется: перенос слов управляется CSS,
-        // и width:auto сломал бы wrapping.
+        // Ширина текстового блока.
+        // • fixedWidth (пользователь потянул боковую ручку) — уважаем ширину из состояния
+        //   (она уже выставлена выше) и включаем перенос по словам. Ширину под контент НЕ
+        //   подгоняем, иначе сузить поле было бы невозможно.
+        // • Иначе рамка облегает текст: ширина = max(текущая, ширина текста + правый отступ).
+        //   Слой ручек строит рамку по getBoundingClientRect этого .mb-text, поэтому запас
+        //   распространяется и на неё. Для markdown/списка блок не применяется: перенос слов
+        //   управляется CSS, и width:auto сломал бы wrapping.
         try {
             const hasContent = !!(el.textContent && el.textContent.trim());
-            if (hasContent && !angle && !isMarkdown && !useList && !(props.textAlign && props.textAlign !== 'left')) {
+            if (fixedWidth) {
+                el.style.whiteSpace = 'pre-wrap';
+                el.style.overflowWrap = 'break-word';
+                logWidth = parseFloat(el.style.width) || logWidth;
+            } else if (hasContent && !angle && !isMarkdown && !useList && !(props.textAlign && props.textAlign !== 'left')) {
+                // Восстанавливаем однострочный режим, если ширина перестала быть фиксированной
+                // (например, после undo): без этого блок остался бы с переносом pre-wrap.
+                if (el.style.whiteSpace === 'pre-wrap') {
+                    el.style.whiteSpace = 'pre';
+                    el.style.overflowWrap = '';
+                }
                 const rightMargin = computeTextRightPadPx(fontSizePx);
                 const prevWidth = el.style.width;
                 el.style.width = 'auto';

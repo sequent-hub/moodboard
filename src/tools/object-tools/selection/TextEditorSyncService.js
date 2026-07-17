@@ -147,6 +147,7 @@ export function createRegularTextAutoSize({
     minWBound,
     minHBound,
     onSizeChange,
+    getFixedWidthPx = null,
 }) {
     // Минимальные границы хранятся в мутабельном объекте: при зуме они
     // пересчитываются (см. createRegularTextEditorUpdater), чтобы рамка
@@ -158,6 +159,46 @@ export function createRegularTextAutoSize({
     const backdrop = wrapper.querySelector('.moodboard-text-backdrop');
 
     const autoSize = () => {
+        // Режим фиксированной ширины (пользователь задал ширину боковой ручкой):
+        // ширину не подгоняем под контент, текст переносится по словам, высота растёт.
+        const fixedWidthPx = typeof getFixedWidthPx === 'function' ? getFixedWidthPx() : null;
+        if (fixedWidthPx && fixedWidthPx > 0) {
+            const targetW = Math.round(fixedWidthPx);
+            textarea.style.whiteSpace = 'pre-wrap';
+            textarea.style.overflowWrap = 'break-word';
+            textarea.style.width = `${targetW}px`;
+            wrapper.style.width = `${targetW}px`;
+            textarea.style.paddingTop = '0px';
+            textarea.style.paddingBottom = '0px';
+            if (backdrop) {
+                backdrop.style.whiteSpace = 'pre-wrap';
+                backdrop.style.overflowWrap = 'break-word';
+                backdrop.style.width = `${targetW}px`;
+                backdrop.style.paddingTop = '0px';
+                backdrop.style.paddingBottom = '0px';
+            }
+            // Высоту меряем по фактическому переносу на видимом слое (backdrop), как в
+            // статическом .mb-text: scrollHeight + центр-дельта (одна строка) либо нижний
+            // запас (многострочный).
+            let naturalH;
+            const measureEl = backdrop || textarea;
+            const prevH = measureEl.style.height;
+            measureEl.style.height = 'auto';
+            const sh = measureEl.scrollHeight;
+            const d = computeSingleLineCenterDelta(measureEl);
+            const extra = (d === null) ? TEXT_BOX_BOTTOM_PAD_PX : d;
+            naturalH = Math.max(1, Math.round(sh + extra));
+            if (measureEl === backdrop) measureEl.style.height = prevH;
+            const targetH = Math.round(Math.max(bounds.minH, naturalH));
+            textarea.style.height = `${targetH}px`;
+            wrapper.style.height = `${targetH}px`;
+            if (backdrop) backdrop.style.height = `${targetH}px`;
+            if (typeof onSizeChange === 'function') {
+                onSizeChange({ widthPx: targetW, heightPx: targetH });
+            }
+            return;
+        }
+
         textarea.style.width = 'auto';
         textarea.style.height = 'auto';
 
