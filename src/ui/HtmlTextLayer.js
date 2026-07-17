@@ -94,25 +94,41 @@ function _buildHtmlWithLinks(content, links) {
  * @param {Array<{start:number, end:number, color:string}>|null} highlights
  * @returns {string} готовый innerHTML
  */
-export function buildHtmlWithRanges(content, links, highlights) {
+// Inline-начертания хранятся как диапазоны {start,end,type} в properties.formats
+// (по аналогии с highlights/links) и рендерятся тегами БЕЗ вставки markdown-символов
+// в текст — поэтому в редакторе и статике не видно `*`, `**`, `~~`.
+const FORMAT_TAGS = {
+    bold: ['<strong>', '</strong>'],
+    italic: ['<em>', '</em>'],
+    underline: ['<u>', '</u>'],
+    strikethrough: ['<s>', '</s>'],
+};
+const FORMAT_TYPES = Object.keys(FORMAT_TAGS);
+
+export function buildHtmlWithRanges(content, links, highlights, formats) {
     const validLinks = (links || [])
         .filter(l => typeof l.start === 'number' && typeof l.end === 'number' && l.end > l.start && l.url);
     const validHighlights = (highlights || [])
         .filter(h => typeof h.start === 'number' && typeof h.end === 'number' && h.end > h.start && h.color);
+    const validFormats = (formats || [])
+        .filter(f => typeof f.start === 'number' && typeof f.end === 'number' && f.end > f.start && FORMAT_TAGS[f.type]);
 
-    if (validLinks.length === 0 && validHighlights.length === 0) return _escapeHtml(content);
-    if (validHighlights.length === 0) return _buildHtmlWithLinks(content, validLinks);
+    if (validLinks.length === 0 && validHighlights.length === 0 && validFormats.length === 0) {
+        return _escapeHtml(content);
+    }
+    if (validHighlights.length === 0 && validFormats.length === 0) {
+        return _buildHtmlWithLinks(content, validLinks);
+    }
 
     // Строим набор граничных точек всех диапазонов, делим текст на сегменты
     const boundaries = new Set([0, content.length]);
-    for (const l of validLinks) {
-        boundaries.add(Math.max(0, l.start));
-        boundaries.add(Math.min(content.length, l.end));
-    }
-    for (const h of validHighlights) {
-        boundaries.add(Math.max(0, h.start));
-        boundaries.add(Math.min(content.length, h.end));
-    }
+    const addBounds = (r) => {
+        boundaries.add(Math.max(0, Math.min(content.length, r.start)));
+        boundaries.add(Math.max(0, Math.min(content.length, r.end)));
+    };
+    validLinks.forEach(addBounds);
+    validHighlights.forEach(addBounds);
+    validFormats.forEach(addBounds);
 
     const points = [...boundaries].sort((a, b) => a - b);
 
@@ -121,6 +137,14 @@ export function buildHtmlWithRanges(content, links, highlights) {
         const s = points[i];
         const e = points[i + 1];
         let text = _escapeHtml(content.slice(s, e));
+
+        // Начертания — самый внутренний слой (внутри mark/link).
+        for (const type of FORMAT_TYPES) {
+            if (validFormats.some(f => f.type === type && f.start <= s && f.end >= e)) {
+                const [open, close] = FORMAT_TAGS[type];
+                text = `${open}${text}${close}`;
+            }
+        }
 
         const hi = validHighlights.find(h => h.start <= s && h.end >= e);
         const link = validLinks.find(l => l.start <= s && l.end >= e);
@@ -249,7 +273,9 @@ export class HtmlTextLayer {
                 const _obj = this.core?.state?.state?.objects?.find(o => o.id === objectId);
                 const isMarkdown = resolveMarkdown(_obj?.properties, content);
                 const _links = !isMarkdown ? (_obj?.properties?.links || null) : null;
-                this._syncElementContent(el, content, isMarkdown, _links);
+                const _highlights = !isMarkdown ? (_obj?.properties?.highlights || null) : null;
+                const _formats = !isMarkdown ? (_obj?.properties?.formats || null) : null;
+                this._syncElementContent(el, content, isMarkdown, _links, _highlights, _formats);
                 if (el.classList.contains('mb-text--md') !== isMarkdown) {
                     el.classList.toggle('mb-text--md', isMarkdown);
                     el.style.whiteSpace = isMarkdown ? 'normal' : 'pre';
@@ -543,10 +569,11 @@ export class HtmlTextLayer {
         el.style.whiteSpace = isMarkdown ? 'normal' : 'pre';
         el.style.overflow = 'visible';
         if (isMarkdown) el.style.overflowWrap = 'break-word';
-        el.style.padding = resolveStaticTextPadding({ isMarkdown, useList: false });
+        el.style.padding = resolveStaticTextPadding({ useList: false });
         const initLinks = !isMarkdown ? (props.links || null) : null;
         const initHighlights = !isMarkdown ? (props.highlights || null) : null;
-        this._syncElementContent(el, content, isMarkdown, initLinks, initHighlights);
+        const initFormats = !isMarkdown ? (props.formats || null) : null;
+        this._syncElementContent(el, content, isMarkdown, initLinks, initHighlights, initFormats);
         // Базовые размеры сохраняем в dataset
         const fs = objectData.fontSize || objectData.properties?.fontSize || 32;
         const bw = Math.max(1, objectData.width || objectData.properties?.baseW || 160);
@@ -787,12 +814,13 @@ export class HtmlTextLayer {
                 el.classList.remove('mb-text--md');
                 el.style.whiteSpace = 'normal';
                 el.style.overflowWrap = 'break-word';
-                el.style.padding = resolveStaticTextPadding({ isMarkdown: false, useList: true });
+                el.style.padding = resolveStaticTextPadding({ useList: true });
             } else {
                 el.dataset.renderedList = '';
                 const plainLinks = !isMarkdown ? (props.links || null) : null;
                 const plainHighlights = !isMarkdown ? (props.highlights || null) : null;
-                const contentChanged = this._syncElementContent(el, content, isMarkdown, plainLinks, plainHighlights);
+                const plainFormats = !isMarkdown ? (props.formats || null) : null;
+                const contentChanged = this._syncElementContent(el, content, isMarkdown, plainLinks, plainHighlights, plainFormats);
                 if (contentChanged) {
                     console.log(`🔍 HtmlTextLayer: содержимое обновлено в updateOne для ${objectId}:`, content);
                 }
@@ -806,7 +834,7 @@ export class HtmlTextLayer {
                 // после режима списка inline padding сброшен на CSS 0.3em, и без
                 // безусловного восстановления обычный текст сохраняет лишний отступ
                 // сверху — статическая рамка уезжает выше глифов относительно поля ввода.
-                el.style.padding = resolveStaticTextPadding({ isMarkdown, useList: false });
+                el.style.padding = resolveStaticTextPadding({ useList: false });
             }
         }
 
@@ -835,13 +863,15 @@ export class HtmlTextLayer {
         // остаток от прежнего многострочного текста) залипал, и появлялся зазор после зума.
         try {
             el.style.height = 'auto';
-            // Для обычного однострочного текста центрируем видимые буквы по вертикали:
-            // line-box резервирует сверху место под прописные/выносные, которого строчный
-            // текст не занимает, поэтому буквы кажутся прижатыми к низу рамки. centerDelta
-            // уравнивает верхний и нижний зазоры вокруг глифов. Для markdown/списков и в
-            // окружении без layout (jsdom) дельта = null → сохраняем прежний нижний отступ
-            // TEXT_BOX_BOTTOM_PAD_PX под хвосты букв (например, «з», «у»).
-            const centerDelta = (!isMarkdown && !useList)
+            // Центрируем видимые буквы однострочного текста по вертикали (обычного и
+            // однострочного markdown — инлайн-форматирование выделения через tpp-format-modal
+            // переводит текст в markdown, но однострочный он должен центрироваться так же,
+            // как plain): line-box резервирует сверху место под прописные/выносные, которого
+            // строчный текст не занимает, поэтому буквы кажутся прижатыми к низу рамки.
+            // computeSingleLineCenterDelta сам вернёт null для многострочного markdown и
+            // окружения без layout (jsdom) → остаётся нижний отступ TEXT_BOX_BOTTOM_PAD_PX
+            // под хвосты букв (например, «з», «у»). Списки не центрируем.
+            const centerDelta = !useList
                 ? computeSingleLineCenterDelta(el)
                 : null;
             const extra = (centerDelta === null) ? TEXT_BOX_BOTTOM_PAD_PX : centerDelta;
@@ -864,21 +894,23 @@ export class HtmlTextLayer {
     }
 
     /** Обновляет innerHTML/textContent только при реальной смене content, флага markdown, ссылок или подсветки */
-    _syncElementContent(el, content, isMarkdown, links, highlights) {
+    _syncElementContent(el, content, isMarkdown, links, highlights, formats) {
         if (typeof content !== 'string') return false;
         const mdFlag = isMarkdown ? '1' : '0';
         const linksKey = (Array.isArray(links) && links.length > 0) ? JSON.stringify(links) : '';
         const highlightsKey = (Array.isArray(highlights) && highlights.length > 0) ? JSON.stringify(highlights) : '';
+        const formatsKey = (Array.isArray(formats) && formats.length > 0) ? JSON.stringify(formats) : '';
         if (
             el.dataset.renderedContent === content &&
             el.dataset.renderedMd === mdFlag &&
             (el.dataset.renderedLinks || '') === linksKey &&
-            (el.dataset.renderedHighlights || '') === highlightsKey
+            (el.dataset.renderedHighlights || '') === highlightsKey &&
+            (el.dataset.renderedFormats || '') === formatsKey
         ) return false;
         if (isMarkdown) {
             el.innerHTML = renderRichText(content);
-        } else if (linksKey || highlightsKey) {
-            el.innerHTML = buildHtmlWithRanges(content, links, highlights);
+        } else if (linksKey || highlightsKey || formatsKey) {
+            el.innerHTML = buildHtmlWithRanges(content, links, highlights, formats);
         } else {
             el.textContent = content;
         }
@@ -886,6 +918,7 @@ export class HtmlTextLayer {
         el.dataset.renderedMd = mdFlag;
         el.dataset.renderedLinks = linksKey;
         el.dataset.renderedHighlights = highlightsKey;
+        el.dataset.renderedFormats = formatsKey;
         return true;
     }
 
@@ -992,10 +1025,8 @@ export class HtmlTextLayer {
             // высоту уже без обновления рамки — рамка остаётся выше текста.
             el.style.height = 'auto';
             const props = obj?.properties || {};
-            const content = obj?.content || props.content;
             const useList = !!(props.listType && props.listType !== 'none');
-            const isMarkdown = !useList && resolveMarkdown(obj?.properties, content);
-            const centerDelta = (!isMarkdown && !useList)
+            const centerDelta = !useList
                 ? computeSingleLineCenterDelta(el)
                 : null;
             const extra = (centerDelta === null) ? TEXT_BOX_BOTTOM_PAD_PX : centerDelta;

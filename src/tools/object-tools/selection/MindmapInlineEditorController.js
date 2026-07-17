@@ -785,6 +785,7 @@ export function openMindmapEditor(object, create = false) {
         if (!backdrop) return;
         let currentHighlights = properties.highlights || null;
         let currentLinks = properties.links || null;
+        let currentFormats = properties.formats || null;
         if (objectId) {
             try {
                 const pixiReq = { objectId, pixiObject: null };
@@ -795,11 +796,12 @@ export function openMindmapEditor(object, create = false) {
                 if (props) {
                     if (Array.isArray(props.highlights)) currentHighlights = props.highlights;
                     if (Array.isArray(props.links)) currentLinks = props.links;
+                    if (Array.isArray(props.formats)) currentFormats = props.formats;
                 }
             } catch (_) {}
         }
         const content = textarea.value;
-        backdrop.innerHTML = buildHtmlWithRanges(content, currentLinks, currentHighlights);
+        backdrop.innerHTML = buildHtmlWithRanges(content, currentLinks, currentHighlights, currentFormats);
     };
 
     textarea.addEventListener('blur', onBlur);

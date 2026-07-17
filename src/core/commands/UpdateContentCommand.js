@@ -63,6 +63,13 @@ export class UpdateContentCommand extends BaseCommand {
                     content
                 );
             }
+            if (Array.isArray(object.properties.formats) && object.properties.formats.length > 0) {
+                object.properties.formats = _adjustFormats(
+                    object.properties.formats,
+                    oldContent,
+                    content
+                );
+            }
             object.properties.content = content;
 
             const isMindmap = object.type === 'mindmap';
@@ -185,6 +192,47 @@ function _adjustHighlights(highlights, oldText, newText) {
             acc.push({ start: start + delta, end: end + delta, color });
         }
         // Подсветка перекрывает изменённый диапазон — удаляем
+        return acc;
+    }, []);
+}
+
+/**
+ * Пересчитывает диапазоны inline-начертаний (formats) после изменения контента.
+ * Алгоритм идентичен _adjustHighlights: общий префикс/суффикс, сдвиг или удаление.
+ * @param {Array<{start:number,end:number,type:string}>} formats
+ * @param {string} oldText
+ * @param {string} newText
+ * @returns {Array<{start:number,end:number,type:string}>}
+ */
+function _adjustFormats(formats, oldText, newText) {
+    if (!formats || formats.length === 0) return formats;
+
+    let prefixLen = 0;
+    const minLen = Math.min(oldText.length, newText.length);
+    while (prefixLen < minLen && oldText[prefixLen] === newText[prefixLen]) prefixLen++;
+
+    let oldSuffix = 0;
+    while (
+        oldSuffix < oldText.length - prefixLen &&
+        oldSuffix < newText.length - prefixLen &&
+        oldText[oldText.length - 1 - oldSuffix] === newText[newText.length - 1 - oldSuffix]
+    ) oldSuffix++;
+
+    const oldChangeEnd = oldText.length - oldSuffix;
+    const newChangeEnd = newText.length - oldSuffix;
+    const delta = newChangeEnd - oldChangeEnd;
+
+    return formats.reduce((acc, fmt) => {
+        const { start, end, type } = fmt;
+        if (end <= prefixLen) {
+            acc.push({ start, end, type });
+        } else if (start >= oldChangeEnd) {
+            acc.push({ start: start + delta, end: end + delta, type });
+        } else if (start <= prefixLen && end >= oldChangeEnd) {
+            // Правка целиком внутри отформатированного диапазона — растягиваем его.
+            acc.push({ start, end: end + delta, type });
+        }
+        // Иначе диапазон частично перекрыт правкой — удаляем.
         return acc;
     }, []);
 }

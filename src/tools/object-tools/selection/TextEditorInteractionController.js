@@ -384,6 +384,7 @@ export function bindTextEditorInteractions(controller, {
         // через Events.Object.StateChanged), с fallback на свойства редактора.
         let currentHighlights = editorProps.highlights || null;
         let currentLinks = editorProps.links || null;
+        let currentFormats = editorProps.formats || null;
         if (objectId) {
             try {
                 const pixiReq = { objectId, pixiObject: null };
@@ -394,12 +395,13 @@ export function bindTextEditorInteractions(controller, {
                 if (props) {
                     if (Array.isArray(props.highlights)) currentHighlights = props.highlights;
                     if (Array.isArray(props.links)) currentLinks = props.links;
+                    if (Array.isArray(props.formats)) currentFormats = props.formats;
                 }
             } catch (_) {}
         }
         
         const content = textarea.value;
-        backdrop.innerHTML = buildHtmlWithRanges(content, currentLinks, currentHighlights);
+        backdrop.innerHTML = buildHtmlWithRanges(content, currentLinks, currentHighlights, currentFormats);
     };
 
     const caretUpdateHandler = () => {

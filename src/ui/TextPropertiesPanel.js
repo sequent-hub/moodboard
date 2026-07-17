@@ -41,6 +41,9 @@ import {
     resetCurrentSelection,
 } from './text-properties/TextPropertiesPanelState.js';
 
+// Типы inline-начертаний, хранимых диапазонами в properties.formats.
+const FORMAT_RANGE_TYPES = new Set(['bold', 'italic', 'underline', 'strikethrough']);
+
 /**
  * TextPropertiesPanel — всплывающая панель свойств для текстовых объектов
  */
@@ -219,6 +222,10 @@ export class TextPropertiesPanel {
         if (!activeEditor || activeEditor.selectionStart === activeEditor.selectionEnd) {
             return false;
         }
+        // Начертания (bold/italic/underline/strikethrough) идут через диапазоны, не сюда.
+        if (formatType !== 'color') {
+            return false;
+        }
 
         const start = activeEditor.selectionStart;
         const end = activeEditor.selectionEnd;
@@ -226,55 +233,137 @@ export class TextPropertiesPanel {
         const selected = text.substring(start, end);
         const before = text.substring(0, start);
         const after = text.substring(end);
-        
-        let newSelected = selected;
-        
-        const toggleWrap = (str, prefix, suffix = prefix) => {
-            if (str.startsWith(prefix) && str.endsWith(suffix)) {
-                return str.substring(prefix.length, str.length - suffix.length);
-            }
-            return `${prefix}${str}${suffix}`;
-        };
-        
-        switch (formatType) {
-            case 'color': {
-                const cleanSelected = selected.replace(/<span[^>]*>/g, '').replace(/<\/span>/g, '');
-                newSelected = `<span style="color: ${value}">${cleanSelected}</span>`;
-                break;
-            }
-            case 'bold':
-                newSelected = toggleWrap(selected, '**');
-                break;
-            case 'italic':
-                newSelected = toggleWrap(selected, '*');
-                break;
-            case 'underline':
-                newSelected = toggleWrap(selected, '<u>', '</u>');
-                break;
-            case 'strikethrough':
-                newSelected = toggleWrap(selected, '~~');
-                break;
-        }
-        
+
+        const cleanSelected = selected.replace(/<span[^>]*>/g, '').replace(/<\/span>/g, '');
+        const newSelected = `<span style="color: ${value}">${cleanSelected}</span>`;
+
         activeEditor.value = before + newSelected + after;
-        
-        // Restore selection
-        activeEditor.selectionStart = start;
-        activeEditor.selectionEnd = start + newSelected.length;
-        
-        // Force markdown mode so HTML/MD tags are rendered
+        activeEditor.selectionStart = before.length;
+        activeEditor.selectionEnd = before.length + newSelected.length;
+
+        // Цвет выделения хранится HTML-тегом в тексте, поэтому включаем markdown-рендер.
         this.eventBus.emit(Events.Object.StateChanged, {
             objectId: this.currentId,
             updates: buildMarkdownUpdate(true),
         });
-        
-        // Update the object's content
         this.eventBus.emit(Events.Tool.UpdateObjectContent, {
             objectId: this.currentId,
             content: activeEditor.value
         });
-        
+
         return true;
+    }
+
+    /**
+     * Тоггл inline-начертания на выделении через диапазоны properties.formats — БЕЗ
+     * вставки markdown-символов в текст. Благодаря этому `*`, `**`, `~~` не появляются
+     * ни в редакторе, ни в статическом рендере, а длина текста и позиция каретки не
+     * меняются. Рендер диапазонов — buildHtmlWithRanges (тот же путь, что highlights).
+     * @param {'bold'|'italic'|'underline'|'strikethrough'} type
+     * @returns {boolean} true — если выделение было и формат обработан
+     */
+    _applyFormatRangeToSelection(type) {
+        if (!FORMAT_RANGE_TYPES.has(type)) {
+            return false;
+        }
+        const editor = document.querySelector('.moodboard-text-input');
+        if (!editor || editor.selectionStart === editor.selectionEnd) {
+            return false;
+        }
+
+        const contentLength = editor.value.length;
+        const safeEnd = Math.min(editor.selectionEnd, contentLength);
+        const safeStart = Math.min(editor.selectionStart, safeEnd);
+        if (safeStart >= safeEnd) {
+            return false;
+        }
+
+        const props = getObjectProperties(this.eventBus, this.currentId);
+        const oldFormats = Array.isArray(props?.formats) ? props.formats : [];
+        const covered = this._selectionFullyFormatted(oldFormats, type, safeStart, safeEnd);
+        const newFormats = covered
+            ? this._removeFormatRange(oldFormats, type, safeStart, safeEnd)
+            : this._addFormatRange(oldFormats, type, safeStart, safeEnd);
+
+        // Синхронизируем текущее значение редактора вместе с диапазонами, иначе
+        // UpdateContentCommand пересчитает их по устаревшему тексту (как для highlights).
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: { properties: { formats: newFormats, content: editor.value } },
+        });
+        this._updateTextAppearance(this.currentId, { formats: newFormats });
+
+        // applyTextAppearanceToDom шлёт синтетический input — восстанавливаем выделение.
+        editor.selectionStart = safeStart;
+        editor.selectionEnd = safeEnd;
+
+        const btnMap = {
+            bold: this.boldBtn,
+            italic: this.italicBtn,
+            underline: this.underlineBtn,
+            strikethrough: this.strikethroughBtn,
+        };
+        if (btnMap[type]) {
+            btnMap[type].classList.toggle('is-active', !covered);
+        }
+        return true;
+    }
+
+    /** Полностью ли [start,end) покрыт диапазонами формата данного типа. */
+    _selectionFullyFormatted(formats, type, start, end) {
+        const sorted = formats
+            .filter(f => f.type === type && f.end > f.start)
+            .sort((a, b) => a.start - b.start);
+        let cursor = start;
+        for (const f of sorted) {
+            if (f.start > cursor) {
+                break;
+            }
+            if (f.end > cursor) {
+                cursor = f.end;
+            }
+            if (cursor >= end) {
+                return true;
+            }
+        }
+        return cursor >= end;
+    }
+
+    /** Добавляет диапазон формата, сливая пересекающиеся/смежные того же типа. */
+    _addFormatRange(formats, type, start, end) {
+        const others = formats.filter(f => f.type !== type);
+        const same = formats.filter(f => f.type === type);
+        let s = start;
+        let e = end;
+        const disjoint = [];
+        for (const f of same) {
+            if (f.end < s || f.start > e) {
+                disjoint.push(f);
+            } else {
+                s = Math.min(s, f.start);
+                e = Math.max(e, f.end);
+            }
+        }
+        return [...others, ...disjoint, { start: s, end: e, type }]
+            .sort((a, b) => a.start - b.start);
+    }
+
+    /** Убирает формат данного типа с [start,end), сохраняя огрызки вне выделения. */
+    _removeFormatRange(formats, type, start, end) {
+        const result = formats.filter(f => f.type !== type);
+        for (const f of formats.filter(f => f.type === type)) {
+            if (f.end <= start || f.start >= end) {
+                result.push(f);
+                continue;
+            }
+            if (f.start < start) {
+                result.push({ start: f.start, end: start, type });
+            }
+            if (f.end > end) {
+                result.push({ start: end, end: f.end, type });
+            }
+        }
+        return result.sort((a, b) => a.start - b.start);
     }
 
     _changeTextColor(color) {
@@ -352,7 +441,7 @@ export class TextPropertiesPanel {
             return;
         }
 
-        if (this._applyFormatToSelection(prop, null)) {
+        if (this._applyFormatRangeToSelection(prop)) {
             return;
         }
 

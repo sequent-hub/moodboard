@@ -145,15 +145,46 @@ export function computeSingleLineCenterDelta(el) {
         return null;
     }
     const text = el.textContent || '';
-    if (!text.trim() || text.includes('\n')) {
+    if (!text.trim()) {
         return null;
     }
+
+    // Markdown рендерит текст внутри блочных детей (<p>, <h*>...). Маркер и метрики
+    // нужно снимать НА блоке, а не на .mb-text: span, добавленный после блока, уедет на
+    // новую строку и даст неверный baseline. Центрируем только однострочный markdown —
+    // один блок без <br> и с одной line-box; многострочный markdown отдаём под нижний
+    // паддинг (delta = null), как и раньше.
+    let measureEl = el;
+    const blockChildren = el.children ? Array.from(el.children) : [];
+    if (blockChildren.length > 0) {
+        if (blockChildren.length > 1) {
+            return null;
+        }
+        const only = blockChildren[0];
+        if (only.querySelector && only.querySelector('br')) {
+            return null;
+        }
+        measureEl = only;
+    } else if (text.includes('\n')) {
+        // Plain-текст (white-space: pre): перевод строки = несколько визуальных строк.
+        return null;
+    }
+
     let cs;
     try {
-        cs = window.getComputedStyle(el);
+        cs = window.getComputedStyle(measureEl);
     } catch (_) {
         return null;
     }
+
+    // Геометрическая проверка на одну строку (надёжна и для markdown, где в textContent
+    // нет переводов строк между блоками).
+    const lineHeightPx = parseFloat(cs.lineHeight);
+    const lineBoxHeight = measureEl.scrollHeight;
+    if (Number.isFinite(lineHeightPx) && lineHeightPx > 0 && lineBoxHeight > lineHeightPx * 1.6) {
+        return null;
+    }
+
     const key = `${cs.fontFamily}|${cs.fontWeight}|${cs.fontStyle}|${cs.lineHeight}|${cs.fontSize}|${text}`;
     const cached = _vCenterCache.get(key);
     if (cached !== undefined) {
@@ -162,15 +193,14 @@ export function computeSingleLineCenterDelta(el) {
 
     let delta = null;
     try {
-        const elRect = el.getBoundingClientRect();
-        const lineBoxHeight = el.scrollHeight;
+        const elRect = measureEl.getBoundingClientRect();
         // Базовая линия строки: inline-block нулевой высоты, выровненный по baseline,
         // верхней гранью садится ровно на базовую линию текста.
         const marker = document.createElement('span');
         marker.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline;';
-        el.appendChild(marker);
+        measureEl.appendChild(marker);
         const baselineRel = marker.getBoundingClientRect().top - elRect.top;
-        el.removeChild(marker);
+        measureEl.removeChild(marker);
 
         _vCenterCtx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
         const m = _vCenterCtx.measureText(text);
@@ -212,17 +242,24 @@ export function applyEditorSizing(el, lineHeightPx) {
 
 /**
  * Inline-значение `padding` статического .mb-text по текущему режиму.
- * Обычный текст → '0' (рамка плотно по глифам, как в редакторе);
- * список/markdown → '' (берётся CSS `.mb-text { padding: 0.3em }`).
+ * Обычный текст и markdown → '0' (рамка плотно по глифам, как в редакторе);
+ * список → '' (берётся CSS `.mb-text { padding: 0.3em }`).
+ *
+ * Markdown обязан хугать текст так же, как обычный режим: инлайн-форматирование
+ * выделения (tpp-format-modal) переводит объект в markdown, и лишний CSS-отступ
+ * 0.3em сверху/снизу раздувал рамку однострочного текста (одно и то же начертание
+ * через свойство объекта давало 46px, через выделение — 62px). Межблочные отступы
+ * многострочного markdown обеспечивают собственные margin у блоков (p, h1-h6, ul),
+ * а не внешний бокс.
  *
  * Применяется детерминированно при каждом проходе: если возвращать паддинг только
  * при смене режима, обычный текст после режима списка сохраняет CSS-отступ 0.3em
  * сверху, и статическая рамка оказывается выше глифов, чем поле ввода.
- * @param {{ isMarkdown?: boolean, useList?: boolean }} mode
+ * @param {{ useList?: boolean }} mode
  * @returns {string}
  */
-export function resolveStaticTextPadding({ isMarkdown = false, useList = false } = {}) {
-    if (useList || isMarkdown) {
+export function resolveStaticTextPadding({ useList = false } = {}) {
+    if (useList) {
         return '';
     }
     return '0';
