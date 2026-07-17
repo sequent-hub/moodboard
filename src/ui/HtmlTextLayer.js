@@ -288,6 +288,11 @@ export class HtmlTextLayer {
                 // строящаяся по getBoundingClientRect этого блока, оказывается выше текста.
                 this._autoFitTextHeight(objectId);
                 this.updateOne(objectId);
+                // Рамку выделения перерисовываем по актуальному DOM-боксу: при коммите
+                // многострочного текста ResizeUpdate финализации снимает её раньше синка
+                // контента, а _autoFitTextHeight не шлёт свой ResizeUpdate, если высота
+                // уже совпала. Без этого события рамка остаётся на высоте одной строки.
+                this.eventBus.emit(Events.Object.TransformUpdated, { objectId });
                 console.log(`🔍 HtmlTextLayer: содержимое обновлено для ${objectId}:`, content);
             } else {
                 console.warn(`❌ HtmlTextLayer: не удалось обновить содержимое для ${objectId}:`, { el: !!el, content });

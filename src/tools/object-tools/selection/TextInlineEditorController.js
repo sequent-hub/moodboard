@@ -576,6 +576,9 @@ export function openTextEditor(object, create = false) {
         if (initialWpx) {
             textarea.style.width = `${initialWpx}px`;
             wrapper.style.width = `${initialWpx}px`;
+            // backdrop рисует видимые глифы; без синхронизации ширины длинные строки
+            // обрезались бы его overflow: hidden.
+            if (backdrop) backdrop.style.width = `${initialWpx}px`;
         }
         if (initialHpx) {
             // Стартовую высоту ставим, чтобы не было вспышки при открытии, но minHBound НЕ
@@ -586,6 +589,11 @@ export function openTextEditor(object, create = false) {
             // его. Обычный текст не имеет ручной высоты, поэтому фиксировать её не нужно.
             textarea.style.height = `${initialHpx}px`;
             wrapper.style.height = `${initialHpx}px`;
+            // applyEditorSizing инициализирует backdrop высотой в одну строку с
+            // overflow-y: hidden, а autoSize при открытии существующего текста не
+            // вызывается. Без этой синхронизации у многострочного текста в режиме
+            // правки видна только первая строка — остальные обрезаются backdrop'ом.
+            if (backdrop) backdrop.style.height = `${initialHpx}px`;
         }
     }
     // Автоподгон
