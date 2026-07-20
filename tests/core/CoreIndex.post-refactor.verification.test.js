@@ -102,6 +102,25 @@ describe('Post-refactor verification: layer and viewport flows', () => {
 });
 
 describe('Post-refactor verification: wiring/lifecycle risks', () => {
+    it('deletes a selected image through the Delete keyboard action', () => {
+        const ctx = createCoreBaselineContext({
+            objects: [{ id: 'image-1', type: 'image', position: { x: 10, y: 10 }, width: 100, height: 80 }],
+        });
+        ctx.toolManager = {
+            getActiveTool: () => ({
+                name: 'select',
+                selectedObjects: new Set(['image-1']),
+            }),
+        };
+
+        CoreMoodBoard.prototype.setupToolEvents.call(ctx);
+        CoreMoodBoard.prototype.setupKeyboardEvents.call(ctx);
+        ctx.eventBus.emit(Events.Keyboard.Delete);
+
+        expect(ctx.state.getObjects()).not.toContainEqual(expect.objectContaining({ id: 'image-1' }));
+        expect(ctx.pixi.removeObject).toHaveBeenCalledWith('image-1');
+    });
+
     it('re-running setupToolEvents does not duplicate handlers for the same event', () => {
         const ctx = createCoreBaselineContext({
             objects: [{ id: 'obj-1', type: 'note', position: { x: 10, y: 10 }, width: 100, height: 80 }],

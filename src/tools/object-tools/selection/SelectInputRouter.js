@@ -411,11 +411,6 @@ export function onKeyDown(event) {
     }
 
     switch (event.key) {
-        case 'Delete':
-        case 'Backspace':
-            this.deleteSelectedObjects();
-            break;
-
         case 'a':
             if (event.ctrlKey) {
                 this.selectAll();
