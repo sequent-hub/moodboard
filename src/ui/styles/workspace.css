@@ -1657,7 +1657,7 @@
     z-index: 10000;
     opacity: 0;
     visibility: hidden;
-    transition: all 0.2s ease;
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
     transform: translateX(-4px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
