@@ -136,6 +136,7 @@ function _buildForm(panelInstance, textarea, ctx) {
     const okBtn = document.createElement('button');
     okBtn.type = 'button';
     okBtn.className = 'tpp-link-form-ok';
+    okBtn.id = 'tpp-link-form-ok';
     okBtn.textContent = 'OK';
 
     row.appendChild(urlInput);

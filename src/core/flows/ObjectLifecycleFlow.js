@@ -26,12 +26,13 @@ const TEXT_STYLE_DEFAULTS = {
     listType: 'none',
 };
 
-const NOTE_STYLE_PROPS = ['fontFamily', 'fontSize', 'textColor', 'backgroundColor'];
+const NOTE_STYLE_PROPS = ['fontFamily', 'fontSize', 'textColor', 'backgroundColor', 'textAlign'];
 const NOTE_STYLE_DEFAULTS = {
     fontFamily: 'Caveat, Arial, cursive',
     fontSize: 32,
     textColor: 0x1a1a1a,
     backgroundColor: 0xfff9c4,
+    textAlign: 'center',
 };
 
 /**
@@ -437,6 +438,9 @@ export function setupObjectLifecycleFlow(core) {
                     }
                     if (updates.properties.fontFamily !== undefined) {
                         styleUpdates.fontFamily = updates.properties.fontFamily;
+                    }
+                    if (updates.properties.textAlign !== undefined) {
+                        styleUpdates.textAlign = updates.properties.textAlign;
                     }
 
                     if (Object.keys(styleUpdates).length > 0) {

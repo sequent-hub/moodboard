@@ -17,6 +17,17 @@ function createNoColorIcon(extraStyle = '') {
     return wrapper;
 }
 
+// Стабильный слаг цвета для id-атрибута свотча: 'transparent' -> 'none', hex -> без '#'.
+function colorSlug(hex) {
+    return hex === 'transparent' ? 'none' : hex.replace('#', '').toLowerCase();
+}
+
+// Слаг названия шрифта для id-атрибута опции: убирает кавычки/запятые семейства
+// шрифта и оставляет только читаемое имя ("Rubik Mono One" -> "rubik-mono-one").
+function fontSlug(name) {
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
 export function createTextPropertiesPanelRenderer(panelInstance) {
     const panel = document.createElement('div');
     panel.className = 'text-properties-panel';
@@ -167,6 +178,7 @@ function createFontControls(panelInstance, panel) {
         const item = document.createElement('button');
         item.type = 'button';
         item.className = 'font-dropdown__item';
+        item.id = `tpp-font-option-${fontSlug(font.name)}`;
         item.setAttribute('role', 'option');
         item.dataset.value = font.value;
         item.textContent = font.name;
@@ -235,11 +247,13 @@ function createFontControls(panelInstance, panel) {
     panelInstance.fontSizeUpBtn = document.createElement('button');
     panelInstance.fontSizeUpBtn.type = 'button';
     panelInstance.fontSizeUpBtn.className = 'font-size-stepper font-size-stepper--up';
+    panelInstance.fontSizeUpBtn.id = 'tpp-btn-font-size-up';
     panelInstance.fontSizeUpBtn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg" style="top: 1px;"><path d="M8.25 6.75L5 3.25L1.75 6.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
 
     panelInstance.fontSizeDownBtn = document.createElement('button');
     panelInstance.fontSizeDownBtn.type = 'button';
     panelInstance.fontSizeDownBtn.className = 'font-size-stepper font-size-stepper--down';
+    panelInstance.fontSizeDownBtn.id = 'tpp-btn-font-size-down';
     panelInstance.fontSizeDownBtn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="bottom: 1px;"><path d="M8.25 3.25L5 6.75L1.75 3.25"></path></svg>';
 
     stepperContainer.appendChild(panelInstance.fontSizeUpBtn);
@@ -277,6 +291,7 @@ function createCompactColorSelector(panelInstance, panel) {
     panelInstance.currentColorButton.type = 'button';
     panelInstance.currentColorButton.title = 'Выбрать цвет';
     panelInstance.currentColorButton.className = 'current-color-button';
+    panelInstance.currentColorButton.id = 'tpp-btn-text-color';
 
     const colorIcon = document.createElement('span');
     colorIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5636 13.9875L12 5L15.4364 13.9875"></path><path d="M9.88525 10.8155H14.1147"></path></svg>';
@@ -336,6 +351,7 @@ function createColorGrid(panelInstance, container) {
         const colorButton = document.createElement('button');
         colorButton.type = 'button';
         colorButton.title = preset.name;
+        colorButton.id = `tpp-text-color-swatch-${colorSlug(preset.color)}`;
         colorButton.dataset.colorValue = preset.color;
         colorButton.style.cssText = `
             width: 28px;
@@ -423,6 +439,7 @@ function createCompactHighlightSelector(panelInstance, panel) {
     panelInstance.currentHighlightButton.type = 'button';
     panelInstance.currentHighlightButton.title = 'Выбрать цвет фона текста';
     panelInstance.currentHighlightButton.className = 'current-highlight-button';
+    panelInstance.currentHighlightButton.id = 'tpp-btn-highlight-color';
 
     const highlightIcon = document.createElement('span');
     highlightIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.431 13.4828L17.5 6.27586L15.2241 4L8.01724 10.069M11.431 13.4828L6.5 15L8.01724 10.069M11.431 13.4828L8.01724 10.069" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
@@ -482,6 +499,7 @@ function createHighlightColorGrid(panelInstance, container) {
         const colorButton = document.createElement('button');
         colorButton.type = 'button';
         colorButton.title = preset.name;
+        colorButton.id = `tpp-highlight-color-swatch-${colorSlug(preset.color)}`;
         colorButton.dataset.colorValue = preset.color;
 
         if (preset.color === 'transparent') {
@@ -591,6 +609,7 @@ function createCompactBackgroundSelector(panelInstance, panel) {
     panelInstance.currentBgColorButton.type = 'button';
     panelInstance.currentBgColorButton.title = 'Выбрать цвет выделения';
     panelInstance.currentBgColorButton.className = 'current-bgcolor-button';
+    panelInstance.currentBgColorButton.id = 'tpp-btn-bg-color';
 
     panelInstance.bgColorDropdown = document.createElement('div');
     panelInstance.bgColorDropdown.id = `tpp-bgcolor-dropdown-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -632,6 +651,7 @@ function createBackgroundColorGrid(panelInstance, container) {
         const colorButton = document.createElement('button');
         colorButton.type = 'button';
         colorButton.title = preset.name;
+        colorButton.id = `tpp-bg-color-swatch-${colorSlug(preset.color)}`;
         colorButton.dataset.colorValue = preset.color;
 
         if (preset.color === 'transparent') {

@@ -1,4 +1,5 @@
 import { Events } from '../core/events/Events.js';
+import { makeAlignButtons } from './text-properties/TextFormatControls.js';
 
 /**
  * Панель свойств записки
@@ -122,7 +123,8 @@ export class NotePropertiesPanel {
             flexDirection: 'row',
             alignItems: 'center',
             gap: '8px',
-            padding: '8px 40px',
+            boxSizing: 'border-box',
+            padding: '0 22px',
             backgroundColor: 'white',
             border: '1px solid #e0e0e0',
             borderRadius: '9999px',
@@ -130,7 +132,7 @@ export class NotePropertiesPanel {
             fontSize: '12px',
             fontFamily: 'Arial, sans-serif',
             minWidth: '320px',
-            height: '40px',
+            height: '36px',
             zIndex: '10000',
             backdropFilter: 'blur(4px)'
         });
@@ -271,12 +273,12 @@ export class NotePropertiesPanel {
             'backgroundColorButton',
             'backgroundColorPalette',
             [
-                { name: 'Желтый', hex: '#FFF9C4', pixi: 0xFFF9C4 },
-                { name: 'Розовый', hex: '#FCE4EC', pixi: 0xFCE4EC },
-                { name: 'Голубой', hex: '#E3F2FD', pixi: 0xE3F2FD },
-                { name: 'Зеленый', hex: '#E8F5E8', pixi: 0xE8F5E8 },
-                { name: 'Оранжевый', hex: '#FFF3E0', pixi: 0xFFF3E0 },
-                { name: 'Сиреневый', hex: '#F3E5F5', pixi: 0xF3E5F5 }
+                { name: 'Желтый', slug: 'yellow', hex: '#FFF9C4', pixi: 0xFFF9C4 },
+                { name: 'Розовый', slug: 'pink', hex: '#FCE4EC', pixi: 0xFCE4EC },
+                { name: 'Голубой', slug: 'blue', hex: '#E3F2FD', pixi: 0xE3F2FD },
+                { name: 'Зеленый', slug: 'green', hex: '#E8F5E8', pixi: 0xE8F5E8 },
+                { name: 'Оранжевый', slug: 'orange', hex: '#FFF3E0', pixi: 0xFFF3E0 },
+                { name: 'Сиреневый', slug: 'lilac', hex: '#F3E5F5', pixi: 0xF3E5F5 }
             ],
             'backgroundColor'
         );
@@ -284,17 +286,17 @@ export class NotePropertiesPanel {
         // Раздел "Граница" удалён по требованиям дизайна
 
         // Контейнер для цвета текста
-        const textContainer = this._createColorControl(
+        const textContainer = this._createTextColorControl(
             'Текст:',
             'textColorButton',
             'textColorPalette',
             [
-                { name: 'Черный', hex: '#1A1A1A', pixi: 0x1A1A1A },
-                { name: 'Серый', hex: '#666666', pixi: 0x666666 },
-                { name: 'Синий', hex: '#1976D2', pixi: 0x1976D2 },
-                { name: 'Зеленый', hex: '#388E3C', pixi: 0x388E3C },
-                { name: 'Красный', hex: '#D32F2F', pixi: 0xD32F2F },
-                { name: 'Фиолетовый', hex: '#7B1FA2', pixi: 0x7B1FA2 }
+                { name: 'Черный', slug: 'black', hex: '#1A1A1A', pixi: 0x1A1A1A },
+                { name: 'Серый', slug: 'gray', hex: '#666666', pixi: 0x666666 },
+                { name: 'Синий', slug: 'blue', hex: '#1976D2', pixi: 0x1976D2 },
+                { name: 'Зеленый', slug: 'green', hex: '#388E3C', pixi: 0x388E3C },
+                { name: 'Красный', slug: 'red', hex: '#D32F2F', pixi: 0xD32F2F },
+                { name: 'Фиолетовый', slug: 'purple', hex: '#7B1FA2', pixi: 0x7B1FA2 }
             ],
             'textColor'
         );
@@ -348,10 +350,26 @@ export class NotePropertiesPanel {
         fontSizeContainer.appendChild(fontSizeLabel);
         fontSizeContainer.appendChild(fontSizeInput);
 
+        // Контрол выравнивания текста — идентичен tpp-btn-align-trigger текстовой панели
+        this.alignControl = makeAlignButtons();
+        this.alignControl.addEventListener('change', (e) => this._changeTextAlign(e.target.value));
+
         panel.appendChild(fontContainer);
         panel.appendChild(backgroundContainer);
         panel.appendChild(textContainer);
         panel.appendChild(fontSizeContainer);
+        panel.appendChild(this.alignControl._container);
+    }
+
+    _changeTextAlign(v) {
+        if (!this.currentId) {
+            return;
+        }
+
+        this.eventBus.emit(Events.Object.StateChanged, {
+            objectId: this.currentId,
+            updates: { properties: { textAlign: v } },
+        });
     }
 
     _createColorControl(labelText, buttonProperty, paletteProperty, colors, propertyName) {
@@ -372,6 +390,7 @@ export class NotePropertiesPanel {
         });
 
         const button = document.createElement('button');
+        button.id = `note-properties-panel__${propertyName}-button`;
         Object.assign(button.style, {
             width: '24px',
             height: '24px',
@@ -381,6 +400,97 @@ export class NotePropertiesPanel {
             backgroundColor: colors[0].hex,
             padding: '0'
         });
+
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._toggleColorPalette(button, paletteProperty);
+        });
+
+        this[buttonProperty] = button;
+
+        // Создаем палитру
+        const palette = this._createColorPalette(colors, propertyName);
+        this[paletteProperty] = palette;
+
+        container.appendChild(label);
+        container.appendChild(button);
+        container.appendChild(palette);
+
+        return container;
+    }
+
+    _createTextColorControl(labelText, buttonProperty, paletteProperty, colors, propertyName) {
+        const container = document.createElement('div');
+        Object.assign(container.style, {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            position: 'relative'
+        });
+
+        const label = document.createElement('span');
+        label.textContent = labelText;
+        Object.assign(label.style, {
+            fontSize: '11px',
+            color: '#666',
+            minWidth: '32px'
+        });
+
+        const button = document.createElement('button');
+        button.id = `note-properties-panel__${propertyName}-button`;
+        Object.assign(button.style, {
+            width: '28px',
+            height: '28px',
+            border: '1px solid transparent',
+            borderRadius: '4px',
+            backgroundColor: 'transparent',
+            cursor: 'pointer',
+            margin: '0',
+            padding: '0',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxSizing: 'border-box',
+            position: 'relative',
+            transition: 'background 0.15s',
+            color: '#6B7280'
+        });
+
+        button.addEventListener('mouseenter', () => {
+            button.style.backgroundColor = '#f0f0f0';
+            button.style.color = '#111827';
+        });
+        button.addEventListener('mouseleave', () => {
+            button.style.backgroundColor = 'transparent';
+            button.style.color = '#6B7280';
+        });
+
+        const colorIcon = document.createElement('span');
+        colorIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5636 13.9875L12 5L15.4364 13.9875"></path><path d="M9.88525 10.8155H14.1147"></path></svg>';
+        Object.assign(colorIcon.style, {
+            width: '24px',
+            height: '24px',
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+        });
+
+        const indicator = document.createElement('div');
+        Object.assign(indicator.style, {
+            width: '18px',
+            height: '5px',
+            position: 'absolute',
+            bottom: '2px',
+            backgroundColor: colors[0].hex,
+            boxShadow: 'rgba(0, 0, 0, 0.1) 0px 0px 0px 1px inset',
+            borderRadius: '2px'
+        });
+        this.textColorIndicator = indicator;
+
+        button.appendChild(colorIcon);
+        button.appendChild(indicator);
 
         button.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -420,6 +530,7 @@ export class NotePropertiesPanel {
 
         colors.forEach(color => {
             const colorSwatch = document.createElement('div');
+            colorSwatch.id = `note-properties-panel__${propertyName}-swatch-${color.slug}`;
             colorSwatch.dataset.colorValue = color.hex;
             Object.assign(colorSwatch.style, {
                 width: '22px',
@@ -516,8 +627,9 @@ export class NotePropertiesPanel {
             this.backgroundColorButton.style.borderColor = this._darkenHex(color.hex, 0.28);
             this.backgroundColorButton.title = `Цвет фона: ${color.name}`;
         } else if (propertyName === 'textColor' && this.textColorButton) {
-            this.textColorButton.style.backgroundColor = color.hex;
-            this.textColorButton.style.borderColor = this._darkenHex(color.hex, 0.28);
+            if (this.textColorIndicator) {
+                this.textColorIndicator.style.backgroundColor = color.hex;
+            }
             this.textColorButton.title = `Цвет текста: ${color.name}`;
         }
 
@@ -565,7 +677,10 @@ export class NotePropertiesPanel {
             }
             // Раздел "Граница" удалён — пропускаем обновление кнопки границы
             if (this.textColorButton && props.textColor !== undefined) {
-                this._updateColorButton(this.textColorButton, props.textColor);
+                const hexColor = `#${props.textColor.toString(16).padStart(6, '0').toUpperCase()}`;
+                if (this.textColorIndicator) {
+                    this.textColorIndicator.style.backgroundColor = hexColor;
+                }
             }
 
             // Обновляем размер шрифта
@@ -576,6 +691,11 @@ export class NotePropertiesPanel {
             // Обновляем выбранный шрифт
             if (this.fontSelect) {
                 this.fontSelect.value = props.fontFamily || 'Pacifico, Arial, sans-serif';
+            }
+
+            // Обновляем выравнивание текста (у записки по умолчанию — по центру)
+            if (this.alignControl) {
+                this.alignControl.value = props.textAlign || 'center';
             }
         }
     }

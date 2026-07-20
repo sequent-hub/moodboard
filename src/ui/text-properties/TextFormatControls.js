@@ -33,6 +33,7 @@ function makeToggleBtn(svgStr, title, prop) {
     btn.type = 'button';
     btn.title = title;
     btn.className = 'tpp-format-btn';
+    btn.id = `tpp-btn-${prop}`;
     btn.dataset.formatProp = prop;
     btn.innerHTML = svgStr;
     return btn;
@@ -56,6 +57,7 @@ function makeListButtons() {
     triggerBtn.type = 'button';
     triggerBtn.title = 'Список';
     triggerBtn.className = 'tpp-format-btn tpp-list-trigger';
+    triggerBtn.id = 'tpp-btn-list-trigger';
     triggerBtn.innerHTML = SVG_LIST_BULLET;
 
     const modal = document.createElement('div');
@@ -68,6 +70,7 @@ function makeListButtons() {
         optBtn.type = 'button';
         optBtn.title = title;
         optBtn.className = 'tpp-list-modal-option';
+        optBtn.id = `tpp-list-option-${value}`;
         optBtn.dataset.listValue = value;
         optBtn.innerHTML = svg;
         optBtn.addEventListener('click', (e) => {
@@ -142,7 +145,7 @@ function makeListButtons() {
     return proxy;
 }
 
-function makeAlignButtons() {
+export function makeAlignButtons() {
     const container = document.createElement('div');
     container.className = 'tpp-align-btns';
 
@@ -160,6 +163,7 @@ function makeAlignButtons() {
     const triggerBtn = document.createElement('button');
     triggerBtn.type = 'button';
     triggerBtn.className = 'tpp-format-btn tpp-align-btn tpp-align-trigger';
+    triggerBtn.id = 'tpp-btn-align-trigger';
     triggerBtn.dataset.alignValue = 'left';
 
     // Модальный попап
@@ -173,6 +177,7 @@ function makeAlignButtons() {
         optBtn.type = 'button';
         optBtn.title = title;
         optBtn.className = 'tpp-align-modal-option';
+        optBtn.id = `tpp-align-option-${value}`;
         optBtn.dataset.alignValue = value;
         optBtn.innerHTML = svg;
         optBtn.addEventListener('click', (e) => {
@@ -262,6 +267,7 @@ function makeFormatButtons(panelInstance) {
     triggerBtn.type = 'button';
     triggerBtn.title = 'Форматирование текста';
     triggerBtn.className = 'tpp-format-btn tpp-format-trigger';
+    triggerBtn.id = 'tpp-btn-format-trigger';
     triggerBtn.innerHTML = SVG_TEXT_FORMAT;
 
     const modal = document.createElement('div');
@@ -327,6 +333,7 @@ function makeLineHeightControl(panelInstance) {
     triggerBtn.type = 'button';
     triggerBtn.title = 'Межстрочный интервал';
     triggerBtn.className = 'tpp-format-btn';
+    triggerBtn.id = 'tpp-btn-line-height-trigger';
     triggerBtn.innerHTML = SVG_LINE_HEIGHT;
 
     const modal = document.createElement('div');

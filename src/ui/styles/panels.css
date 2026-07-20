@@ -1009,6 +1009,79 @@
     background: #f3f4f6;
 }
 
+/* Контрол выравнивания текста в панели записки — те же стили, что и в текстовой панели */
+.note-properties-panel .tpp-format-btn {
+    height: 28px;
+    min-width: 28px;
+    padding: 0 4px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #6B7280;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+}
+.note-properties-panel .tpp-format-btn:hover { background: #f0f0f0; color: #111827; }
+.note-properties-panel .tpp-format-btn.is-active {
+    background: #e8eaff;
+    border-color: #6155F5;
+    color: #6155F5;
+}
+
+.note-properties-panel .tpp-align-btns {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    position: relative;
+}
+
+.note-properties-panel .tpp-align-btns img,
+.note-properties-panel .tpp-align-btns svg,
+.note-properties-panel .tpp-align-modal img,
+.note-properties-panel .tpp-align-modal svg {
+    width: 24px;
+    height: 24px;
+}
+
+.note-properties-panel .tpp-align-modal {
+    max-height: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    flex-direction: column;
+    gap: 2px;
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06);
+    padding: 4px;
+    z-index: 4000;
+}
+
+.note-properties-panel .tpp-align-modal-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #374151;
+    transition: background 0.1s;
+    flex-shrink: 0;
+}
+
+.note-properties-panel .tpp-align-modal-option:hover {
+    background: #f3f4f6;
+}
+
 .text-properties-panel .tpp-lh-control {
     display: flex;
     align-items: center;

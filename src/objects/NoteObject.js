@@ -26,6 +26,7 @@ export class NoteObject {
         this.backgroundColor = (typeof props.backgroundColor === 'number') ? props.backgroundColor : 0xFFF9C4; // Светло-желтый
         this.borderColor = (typeof props.borderColor === 'number') ? props.borderColor : 0xF9A825; // Золотистый
         this.textColor = (typeof props.textColor === 'number') ? props.textColor : 0x1A1A1A; // Почти черный для лучшей контрастности
+        this.textAlign = props.textAlign || 'center'; // Выравнивание текста: left | center | right | justify
 
         // Создаем контейнер для записки
         this.container = new PIXI.Container();
@@ -66,7 +67,7 @@ export class NoteObject {
             fontFamily: fontFamily,
             fontSize: this.fontSize,
             fill: this.textColor,
-            align: 'center',
+            align: this.textAlign,
             letterSpacing: 0,
             wordWrap: true,
             breakWords: true,
@@ -120,6 +121,7 @@ export class NoteObject {
                 backgroundColor: this.backgroundColor,
                 borderColor: this.borderColor,
                 textColor: this.textColor,
+                textAlign: this.textAlign,
                 ...objectData.properties 
             }
         };
@@ -276,6 +278,10 @@ export class NoteObject {
             this.textColor = textColor;
             this.textField.style.fill = textColor;
         }
+        if (typeof arguments[0]?.textAlign === 'string') {
+            this.textAlign = arguments[0].textAlign;
+            this.textField.style.align = this.textAlign;
+        }
         
         if (this.container && this.container._mb) {
             this.container._mb.properties = {
@@ -283,7 +289,8 @@ export class NoteObject {
                 fontSize: this.fontSize,
                 backgroundColor: this.backgroundColor,
                 borderColor: this.borderColor,
-                textColor: this.textColor
+                textColor: this.textColor,
+                textAlign: this.textAlign
             };
         }
         
@@ -408,17 +415,31 @@ export class NoteObject {
         this.textField.style.wordWrap = true;
         this.textField.style.breakWords = true;
 
+        // Внутреннее выравнивание строк в текстовом блоке
+        const align = this.textAlign || 'center';
+        this.textField.style.align = align;
+
         // Подгоняем размер шрифта под доступные границы
         this._fitTextToBounds();
 
         // Обновляем текст после подгонки
         this.textField.updateText();
         
-        // Центрируем текст по центру заметки
-        const centerX = this.width / 2;
+        // По вертикали блок всегда по центру записки.
+        // По горизонтали позиционируем сам блок: align управляет только
+        // выравниванием строк внутри блока, но не его местом в записке.
+        const pad = 16;
         const centerY = this.height / 2;
-        this.textField.anchor.set(0.5, 0.5);
-        this.textField.x = centerX;
+        if (align === 'left' || align === 'justify') {
+            this.textField.anchor.set(0, 0.5);
+            this.textField.x = pad;
+        } else if (align === 'right') {
+            this.textField.anchor.set(1, 0.5);
+            this.textField.x = this.width - pad;
+        } else {
+            this.textField.anchor.set(0.5, 0.5);
+            this.textField.x = this.width / 2;
+        }
         this.textField.y = centerY;
     }
 

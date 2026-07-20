@@ -423,7 +423,8 @@ export class CommentThreadPopover {
         header.appendChild(close);
 
         const history = document.createElement('div');
-        history.className = 'moodboard-chat__history comment-thread-popover__history';
+        // Без moodboard-chat__history: его .is-visible в chat.css задаёт display:none.
+        history.className = 'comment-thread-popover__history';
 
         const footer = document.createElement('div');
         footer.className = 'moodboard-chat__input-row comment-thread-popover__footer';

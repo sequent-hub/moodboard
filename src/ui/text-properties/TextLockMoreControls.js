@@ -89,7 +89,10 @@ function _makeMoreWrapper(panelInstance) {
 
         const btn = document.createElement('button');
         btn.className = 'tpp-dropdown-item';
-        if (item.id) btn.dataset.id = `tpp-more-${item.id}`;
+        if (item.id) {
+            btn.id = `tpp-more-${item.id}`;
+            btn.dataset.id = `tpp-more-${item.id}`;
+        }
 
         if (item.icon) {
             const iconSpan = document.createElement('span');

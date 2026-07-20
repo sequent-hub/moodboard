@@ -5,7 +5,7 @@
 import { BaseCommand } from './BaseCommand.js';
 import { Events } from '../events/Events.js';
 
-const NOTE_STYLE_PROPS = ['fontFamily', 'fontSize', 'textColor', 'backgroundColor'];
+const NOTE_STYLE_PROPS = ['fontFamily', 'fontSize', 'textColor', 'backgroundColor', 'textAlign'];
 
 export class UpdateNoteStyleCommand extends BaseCommand {
     /**
@@ -83,6 +83,7 @@ function _propertyLabel(property) {
         fontSize: 'размер шрифта',
         textColor: 'цвет текста',
         backgroundColor: 'фон',
+        textAlign: 'выравнивание текста',
     };
     return labels[property] || property;
 }
