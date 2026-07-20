@@ -115,7 +115,13 @@ export class HandlesPositioningService {
         // getBoundingClientRect повёрнутого элемента — axis-aligned, даст неверный размер.
         if (typeof document !== 'undefined') {
             const textEl = document.querySelector(`.mb-text[data-id="${id}"]`);
-            if (textEl) {
+            // Во время инлайн-редактирования статический .mb-text скрыт через
+            // visibility:hidden, но остаётся в layout со старым (до правки) боксом.
+            // Его getBoundingClientRect вернул бы однострочный размер, и рамка выделения
+            // не росла бы при добавлении строк (Shift+Enter). В этом режиме размер берём
+            // из state — его autoSize редактора держит актуальным через Tool.ResizeUpdate.
+            const isEditingHidden = !!(textEl && textEl.style && textEl.style.visibility === 'hidden');
+            if (textEl && !isEditingHidden) {
                 const rotationData = { objectId: id, rotation: 0 };
                 this.host.eventBus.emit(Events.Tool.GetObjectRotation, rotationData);
                 if (Math.abs(rotationData.rotation || 0) < 0.001) {
