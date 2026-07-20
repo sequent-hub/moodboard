@@ -90,8 +90,14 @@ export function setupClipboardFlow(core) {
         };
     });
 
-    core.eventBus.on(Events.UI.PasteAt, ({ x, y }) => {
+    core.eventBus.on(Events.UI.PasteAt, ({ x: screenX, y: screenY }) => {
         if (!core.clipboard) return;
+        // Меню отдаёт экранные координаты клика; позиции объектов хранятся в мире.
+        // Пересчитываем экран → мир так же, как в PasteImageAt/PasteVideoAt.
+        const world = core.pixi?.worldLayer || core.pixi?.app?.stage;
+        const s = world?.scale?.x || 1;
+        const x = (screenX - (world?.x || 0)) / s;
+        const y = (screenY - (world?.y || 0)) / s;
         if (core.clipboard.type === 'object') {
             core.pasteObject({ x, y });
         } else if (core.clipboard.type === 'group') {
