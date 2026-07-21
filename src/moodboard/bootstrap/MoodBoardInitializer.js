@@ -6,6 +6,7 @@ import { bindSaveCallbacks } from '../integration/MoodBoardEventBindings.js';
 import { CommentService } from '../../services/comments/CommentService.js';
 import { CommentPinLayer } from '../../ui/comments/CommentPinLayer.js';
 import { CommentsBar } from '../../ui/CommentsBar.js';
+import { HoverAnimationToggle } from '../../ui/HoverAnimationToggle.js';
 import { CommentThreadPopover } from '../../ui/comments/CommentThreadPopover.js';
 import { CommentTool } from '../../tools/object-tools/CommentTool.js';
 import { CommentListPanel } from '../../ui/comments/CommentListPanel.js';
@@ -42,6 +43,9 @@ export async function wireCommentsSubsystem(board) {
 
     board.commentsBar = new CommentsBar(board.workspaceElement, core.eventBus);
     board.commentsBar.attach();
+
+    board.hoverAnimationToggle = new HoverAnimationToggle(board.workspaceElement, core.eventBus);
+    board.hoverAnimationToggle.attach();
 
     board.commentListPanel = new CommentListPanel(board.workspaceElement, core.eventBus, core, board.commentService);
     board.commentListPanel.attach();

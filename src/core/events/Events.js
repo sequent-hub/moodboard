@@ -87,6 +87,7 @@ export const Events = {
 		LayerGroupSendBackward: 'ui:layer-group:send-backward',
 		LayerGroupSendToBack: 'ui:layer-group:send-to-back',
 		MapToggle: 'ui:map:toggle',
+		HoverAnimationToggle: 'ui:hover-animation:toggle',
 		PaintPick: 'ui:paint:pick',
 		CursorMove: 'ui:cursor:move',
 	},

@@ -17,6 +17,18 @@ gsap.registerPlugin(CustomEase);
 const EASE_ID = 'hoverLiftSpring';
 CustomEase.create(EASE_ID, 'M0,0 C0.215,0.61 0.355,1 0.71,1.56 0.89,1.72 1,1 1,1');
 
+/** Ключ localStorage: включена ли hover-анимация объектов (по умолчанию — да) */
+export const HOVER_ANIMATION_STORAGE_KEY = 'mb:hover-animation:enabled';
+
+/** Читает сохранённое состояние hover-анимации. Нет ключа → включена. */
+export function readHoverAnimationEnabled() {
+    try {
+        return window.localStorage?.getItem(HOVER_ANIMATION_STORAGE_KEY) !== '0';
+    } catch (_) {
+        return true;
+    }
+}
+
 const DURATION = 0.22;
 const DURATION_BACK = 0.18;
 
@@ -78,6 +90,9 @@ export class HoverLiftController {
 
         /** Map<pixiObject, { baseScaleX, baseScaleY, baseY, shadow, isHovered, tween }> */
         this._entries = new Map();
+
+        /** Пользовательский тумблер hover-анимации (persist в localStorage) */
+        this._enabled = readHoverAnimationEnabled();
 
         /** Флаги блокировки hover */
         this._isDragging = false;
@@ -237,7 +252,18 @@ export class HoverLiftController {
         return false;
     }
 
+    /**
+     * Включить/выключить hover-анимацию объектов. При выключении мгновенно
+     * снимает текущий подъём со всех объектов.
+     * @param {boolean} enabled
+     */
+    setEnabled(enabled) {
+        this._enabled = !!enabled;
+        if (!this._enabled) this._snapBackAll();
+    }
+
     _onOver(pixiObject, preset, entry) {
+        if (!this._enabled) return;
         if (prefersReducedMotion || this._isBlocked(pixiObject)) return;
         if (entry.isHovered) return;
 
@@ -380,6 +406,11 @@ export class HoverLiftController {
         };
         this._onSelectionClear = () => { this._selectedIds.clear(); };
 
+        this._onHoverAnimationToggle = (data) => {
+            this.setEnabled(data?.enabled !== false);
+        };
+        eb.on(Events.UI.HoverAnimationToggle, this._onHoverAnimationToggle);
+
         eb.on(Events.Tool.DragStart, this._onDragStart);
         eb.on(Events.Tool.GroupDragStart, this._onDragStart);
         eb.on(Events.Tool.DragEnd, this._onDragEnd);
@@ -422,5 +453,7 @@ export class HoverLiftController {
         eb.off(Events.Tool.SelectionAdd, this._onSelectionAdd);
         eb.off(Events.Tool.SelectionRemove, this._onSelectionRemove);
         eb.off(Events.Tool.SelectionClear, this._onSelectionClear);
+
+        eb.off(Events.UI.HoverAnimationToggle, this._onHoverAnimationToggle);
     }
 }

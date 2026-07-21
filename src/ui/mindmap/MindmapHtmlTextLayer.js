@@ -3,6 +3,7 @@ import gsap from 'gsap';
 import * as PIXI from 'pixi.js';
 import { MindmapTextOverlayAdapter } from './MindmapTextOverlayAdapter.js';
 import { MINDMAP_LAYOUT, MINDMAP_AUTOFIT } from './MindmapLayoutConfig.js';
+import { readHoverAnimationEnabled } from '../animation/HoverLiftController.js';
 
 const MINDMAP_PLACEHOLDER = 'Напишите что-нибудь';
 const MINDMAP_MAX_LINE_CHARS = MINDMAP_LAYOUT.maxLineChars;
@@ -48,6 +49,8 @@ export class MindmapHtmlTextLayer {
         this._selectedIds = new Set();
         this._pixiHoverHandlers = new Map();
         this._transformActive = false;
+        // Пользовательский тумблер hover-анимации (persist, общий с HoverLiftController)
+        this._hoverAnimationEnabled = readHoverAnimationEnabled();
     }
 
     attach() {
@@ -175,6 +178,11 @@ export class MindmapHtmlTextLayer {
         this.eventBus.on(Events.Tool.SelectionRemove, this._onSelectionRemove);
         this.eventBus.on(Events.Tool.SelectionClear,  this._onSelectionClear);
 
+        // Тумблер hover-анимации: mindmap-текст рендерится как HTML и не проходит
+        // через HoverLiftController, поэтому подписываемся на событие отдельно.
+        this._onHoverAnimationToggle = (data) => this._setHoverAnimationEnabled(data?.enabled !== false);
+        this.eventBus.on(Events.UI.HoverAnimationToggle, this._onHoverAnimationToggle);
+
         this.rebuildFromState();
         this.updateAll();
     }
@@ -183,6 +191,10 @@ export class MindmapHtmlTextLayer {
         if (this._onViewportChanged && this.eventBus) {
             this.eventBus.off(Events.Viewport.Changed, this._onViewportChanged);
             this._onViewportChanged = null;
+        }
+        if (this._onHoverAnimationToggle && this.eventBus) {
+            this.eventBus.off(Events.UI.HoverAnimationToggle, this._onHoverAnimationToggle);
+            this._onHoverAnimationToggle = null;
         }
         for (const [id, state] of this._hoverStates) {
             gsap.killTweensOf(state);
@@ -383,8 +395,33 @@ export class MindmapHtmlTextLayer {
         this._pixiHoverHandlers.delete(objectId);
     }
 
+    /**
+     * Включает/выключает hover-lift mindmap-текста. При выключении мгновенно
+     * снимает активный подъём со всех узлов (аналог HoverLiftController).
+     * @param {boolean} enabled
+     */
+    _setHoverAnimationEnabled(enabled) {
+        this._hoverAnimationEnabled = !!enabled;
+        if (!this._hoverAnimationEnabled) this._snapBackAllHover();
+    }
+
+    /** Немедленно (без твина) сбрасывает hover-подъём всех mindmap-узлов */
+    _snapBackAllHover() {
+        this._hoveredId = null;
+        for (const [objectId, state] of this._hoverStates) {
+            if (Math.abs(state.ty) < 0.001 && Math.abs(state.sc - 1) < 0.001) {
+                continue;
+            }
+            gsap.killTweensOf(state);
+            state.ty = 0;
+            state.sc = 1;
+            this.updateOne(objectId);
+        }
+    }
+
     _onPointerOver(objectId) {
         if (mmPrefersReducedMotion) return;
+        if (!this._hoverAnimationEnabled) return;
         if (this._transformActive) return;
         if (this._selectedIds.has(objectId) || this._selectedIds.has(String(objectId))) return;
         if (this._hoveredId === objectId) return;

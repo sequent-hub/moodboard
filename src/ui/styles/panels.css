@@ -143,6 +143,70 @@
     justify-content: center;
 }
 
+.moodboard-animbar {
+    position: absolute;
+    bottom: 16px;
+    right: 470px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 23px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 9999px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    z-index: 3000;
+    pointer-events: auto;
+    font-family: 'Roboto', Arial, sans-serif;
+}
+
+/* Скользящий тумблер (эталон futurello .board-calendar-create__switch) */
+.moodboard-animbar__switch {
+    position: relative;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 22px;
+    margin: 4px 0;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(25, 48, 66, 0.2);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+.moodboard-animbar__switch.is-on { background: #444; }
+.moodboard-animbar__switch:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(68, 68, 68, 0.28);
+}
+
+.moodboard-animbar__switch-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.moodboard-animbar__switch.is-on .moodboard-animbar__switch-thumb {
+    transform: translateX(18px);
+}
+
+/* Иконка-индикатор состояния анимации */
+.moodboard-animbar__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    color: #444;
+    transition: color 0.2s ease;
+}
+.moodboard-animbar--off .moodboard-animbar__icon { color: #c2c8cf; }
+
 .moodboard-mapbar {
     position: absolute;
     right: 16px;

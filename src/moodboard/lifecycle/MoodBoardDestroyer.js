@@ -85,6 +85,9 @@ export function destroyMoodBoard(board) {
     safeDestroy(board.mapbar, 'mapbar');
     board.mapbar = null;
 
+    safeDestroy(board.hoverAnimationToggle, 'hoverAnimationToggle');
+    board.hoverAnimationToggle = null;
+
     safeDestroy(board.dotGridDebugPanel, 'dotGridDebugPanel');
     board.dotGridDebugPanel = null;
 

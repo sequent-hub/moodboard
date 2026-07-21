@@ -5,6 +5,7 @@ import * as PIXI from 'pixi.js';
 import { renderRichText, hasMath } from '../utils/richText.js';
 import { renderTextList } from './text-properties/TextListRenderer.js';
 import { getShapeTextSafeArea, getShapeTextClipPath } from '../objects/shape/shapeTextArea.js';
+import { readHoverAnimationEnabled } from './animation/HoverLiftController.js';
 import {
     applyTextStyles,
     resolveLineHeightRatio,
@@ -185,6 +186,8 @@ export class HtmlTextLayer {
         this._hoverStates = new Map();
         this._hoveredTextId = null;
         this._selectedIds = new Set();
+        // Пользовательский тумблер hover-анимации (persist, общий с HoverLiftController)
+        this._hoverAnimationEnabled = readHoverAnimationEnabled();
         // objectId -> { rect, onOver, onOut } — слушатели PIXI pointer на хит-rect текста
         this._pixiHoverHandlers = new Map();
         this._transformActive = false;
@@ -436,6 +439,11 @@ export class HtmlTextLayer {
         this.eventBus.on(Events.Tool.SelectionRemove, this._onSelectionRemove);
         this.eventBus.on(Events.Tool.SelectionClear, this._onSelectionClear);
 
+        // Тумблер hover-анимации: текст рендерится как HTML и не проходит через
+        // HoverLiftController, поэтому подписываемся на событие отдельно.
+        this._onHoverAnimationToggle = (data) => this._setHoverAnimationEnabled(data?.enabled !== false);
+        this.eventBus.on(Events.UI.HoverAnimationToggle, this._onHoverAnimationToggle);
+
         // Первичная отрисовка
         this.rebuildFromState();
         this.updateAll();
@@ -507,6 +515,10 @@ export class HtmlTextLayer {
             if (this._onSelectionAdd) this.eventBus.off(Events.Tool.SelectionAdd, this._onSelectionAdd);
             if (this._onSelectionRemove) this.eventBus.off(Events.Tool.SelectionRemove, this._onSelectionRemove);
             if (this._onSelectionClear) this.eventBus.off(Events.Tool.SelectionClear, this._onSelectionClear);
+            if (this._onHoverAnimationToggle) {
+                this.eventBus.off(Events.UI.HoverAnimationToggle, this._onHoverAnimationToggle);
+                this._onHoverAnimationToggle = null;
+            }
         }
     }
 
@@ -1000,8 +1012,33 @@ export class HtmlTextLayer {
         this._pixiHoverHandlers.delete(objectId);
     }
 
+    /**
+     * Включает/выключает hover-lift текста. При выключении мгновенно снимает
+     * активный подъём со всех текстовых элементов (аналог HoverLiftController).
+     * @param {boolean} enabled
+     */
+    _setHoverAnimationEnabled(enabled) {
+        this._hoverAnimationEnabled = !!enabled;
+        if (!this._hoverAnimationEnabled) this._snapBackAllHover();
+    }
+
+    /** Немедленно (без твина) сбрасывает hover-подъём всех текстов */
+    _snapBackAllHover() {
+        this._hoveredTextId = null;
+        for (const [objectId, state] of this._hoverStates) {
+            if (Math.abs(state.ty) < 0.001 && Math.abs(state.sc - 1) < 0.001) {
+                continue;
+            }
+            gsap.killTweensOf(state);
+            state.ty = 0;
+            state.sc = 1;
+            this._applyHoverTransform(objectId);
+        }
+    }
+
     _onTextPointerOver(objectId) {
         if (prefersReducedMotion) return;
+        if (!this._hoverAnimationEnabled) return;
         if (this._transformActive) return;
         if (this._selectedIds.has(objectId) || this._selectedIds.has(String(objectId))) return;
         if (this._hoveredTextId === objectId) return;
