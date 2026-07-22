@@ -1,0 +1,40 @@
+/* Панель свойств mindmap — точечные переопределения поверх shape-properties-panel.css */
+
+/* 1. Кнопки-триггеры (1–5) без рамки */
+#mindmap-properties-panel .spp-trigger {
+    border: none;
+    background: transparent;
+}
+#mindmap-properties-panel .spp-trigger:hover {
+    background: #f5f5f5;
+}
+
+/* 2. Попап «Стиль рамки»: контент не выходит за границы модалки */
+#mindmap-properties-panel .spp-popover {
+    box-sizing: border-box;
+    max-width: 260px;
+    max-height: 70vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+/* 3. Панель наследует класс text-properties-panel, а panels.css задаёт
+   `.text-properties-panel * { max-height: 36px }` — этот кламп сжимал и
+   содержимое поповеров (группа рамки, сетки цветов, кнопки). Снимаем кламп для
+   всех потомков поповеров, чтобы элементы умещались целиком; сам поповер
+   сохраняет max-height:70vh со скроллом-фолбэком из правила выше. */
+#mindmap-properties-panel .spp-popover * {
+    max-height: none;
+}
+#mpp-frame-popover .spp-border-group {
+    gap: 14px;
+}
+#mindmap-properties-panel .spp-border-group {
+    min-width: 0;
+    width: 220px;
+    max-width: 100%;
+}
+#mindmap-properties-panel .spp-border-group .spp-color-grid {
+    width: 100%;
+    grid-template-columns: repeat(6, 1fr);
+    justify-items: center;
+}

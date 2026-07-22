@@ -14,6 +14,7 @@ import { ConnectionAnchorsLayer } from '../../ui/connectors/ConnectionAnchorsLay
 import { ConnectorHandlesLayer } from '../../ui/connectors/ConnectorHandlesLayer.js';
 import { HtmlHandlesLayer } from '../../ui/HtmlHandlesLayer.js';
 import { TextPropertiesPanel } from '../../ui/TextPropertiesPanel.js';
+import { MindmapPropertiesPanel } from '../../ui/MindmapPropertiesPanel.js';
 import { FramePropertiesPanel } from '../../ui/FramePropertiesPanel.js';
 import { NotePropertiesPanel } from '../../ui/NotePropertiesPanel.js';
 import { FilePropertiesPanel } from '../../ui/FilePropertiesPanel.js';
@@ -142,6 +143,9 @@ function initHtmlLayersAndPanels(board) {
 
     board.textPropertiesPanel = new TextPropertiesPanel(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
     board.textPropertiesPanel.attach();
+
+    board.mindmapPropertiesPanel = new MindmapPropertiesPanel(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
+    board.mindmapPropertiesPanel.attach();
 
     board.framePropertiesPanel = new FramePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);
     board.notePropertiesPanel = new NotePropertiesPanel(board.coreMoodboard.eventBus, board.canvasContainer, board.coreMoodboard);

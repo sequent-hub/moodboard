@@ -7,6 +7,10 @@ import {
 } from '../../mindmap/MindmapCompoundContract.js';
 import { MINDMAP_LAYOUT } from '../mindmap/MindmapLayoutConfig.js';
 import { MindmapStatePatchCommand } from '../../core/commands/MindmapStatePatchCommand.js';
+import { getMindmapCollapsePoint } from '../mindmap/MindmapCollapseGraph.js';
+
+const MINDMAP_COLLAPSE_BTN_SIZE = 13;
+const MINDMAP_COLLAPSE_BTN_SIZE_COLLAPSED = 20;
 
 const HANDLES_ACCENT_COLOR = '#80D8FF';
 const VERTICAL_RESIZE_CURSOR_COLOR = '#6B7280';
@@ -26,7 +30,10 @@ const MINDMAP_CHILD_PADDING_FACTOR = 0.5;
 const MINDMAP_CHILD_STROKE_COLOR = 0x16A34A;
 const MINDMAP_CHILD_FILL_ALPHA = 0.25;
 const MINDMAP_CHILD_GAP_MULTIPLIER = 10;
-const MINDMAP_CHILD_VERTICAL_GAP_MULTIPLIER = 1;
+// Вертикальный зазор между сиблингами: базовые 10 мировых единиц × множитель.
+// Множитель 1 давал зазор всего 10 при высоте капсулы ~32 — с учётом авто-подгонки
+// высоты новый узел наезжал на соседний. 3 → зазор 30, узлы не перекрываются.
+const MINDMAP_CHILD_VERTICAL_GAP_MULTIPLIER = 3;
 
 function asBranchColor(value) {
     if (!Number.isFinite(value)) return null;
@@ -1669,16 +1676,77 @@ export class HandlesDomRenderer {
                 btn.dataset.id = id;
                 btn.textContent = '';
                 btn.setAttribute('aria-label', 'Добавить узел mindmap');
+                const centerX = left + Math.round(width / 2);
                 const centerY = top + Math.round(height / 2);
                 const edgeGap = 10;
                 const buttonRadius = 12;
                 const centerOffset = edgeGap + buttonRadius;
-                if (side === 'left') {
-                    btn.style.left = `${Math.round(left - centerOffset)}px`;
-                } else {
-                    btn.style.left = `${Math.round(left + width + centerOffset)}px`;
+                let btnLeft = side === 'left'
+                    ? Math.round(left - centerOffset)
+                    : Math.round(left + width + centerOffset);
+                let btnTop = centerY;
+
+                // Есть дети на этой стороне → есть кнопка collapse. Ставим «+» на
+                // воображаемой линии «центр капсулы → collapse», отодвинув на 10px за неё.
+                if (occupiedOutgoingSides.has(side)) {
+                    const objects = this.host.core?.state?.state?.objects || [];
+                    const collapseWorld = getMindmapCollapsePoint(objects, id, side);
+                    const wbWidth = Number(worldBounds?.width);
+                    const wbHeight = Number(worldBounds?.height);
+                    if (collapseWorld && wbWidth > 0 && wbHeight > 0) {
+                        const scaleX = width / wbWidth;
+                        const scaleY = height / wbHeight;
+                        let collapseCssX = left + (collapseWorld.x - worldBounds.x) * scaleX;
+                        let collapseCssY = top + (collapseWorld.y - worldBounds.y) * scaleY;
+                        let dx = collapseCssX - centerX;
+                        let dy = collapseCssY - centerY;
+                        const len = Math.hypot(dx, dy);
+                        if (len > 0.5) {
+                            dx /= len;
+                            dy /= len;
+                            const collapsed = sourceMindmapProperties?.mindmap?.collapsed === true;
+                            const collapseRadius = (collapsed
+                                ? MINDMAP_COLLAPSE_BTN_SIZE_COLLAPSED
+                                : MINDMAP_COLLAPSE_BTN_SIZE) / 2;
+                            // atEdge: collapse-кнопка отодвинута от ребра капсулы наружу
+                            // (тот же сдвиг, что в MindmapCollapseLayer) — учитываем это,
+                            // чтобы «+» стоял за отодвинутой кнопкой.
+                            if (collapseWorld.atEdge) {
+                                collapseCssX += dx * (collapseRadius + edgeGap);
+                                collapseCssY += dy * (collapseRadius + edgeGap);
+                            }
+                            let dist = collapseRadius + edgeGap + buttonRadius;
+                            // Веер: у основания обе ветки идут вдоль оси и задевают «+».
+                            // Отодвигаем «+» примерно к середине пути до ближайшего ребёнка,
+                            // где ветки уже разошлись. Масштабируется с зумом.
+                            if (collapseWorld.atEdge) {
+                                let nearestProj = Infinity;
+                                (Array.isArray(objects) ? objects : []).forEach((obj) => {
+                                    if (!obj || obj.type !== 'mindmap') return;
+                                    const meta = obj.properties?.mindmap || {};
+                                    if (meta.role !== 'child' || meta.parentId !== id || meta.side !== side) return;
+                                    const r = getMindmapRect(obj);
+                                    const attach = side === 'left'
+                                        ? { x: r.x + r.width, y: r.y + r.height / 2 }
+                                        : side === 'right'
+                                            ? { x: r.x, y: r.y + r.height / 2 }
+                                            : { x: r.x + r.width / 2, y: r.y };
+                                    const aCssX = left + (attach.x - worldBounds.x) * scaleX;
+                                    const aCssY = top + (attach.y - worldBounds.y) * scaleY;
+                                    const proj = (aCssX - collapseCssX) * dx + (aCssY - collapseCssY) * dy;
+                                    if (proj > 0 && proj < nearestProj) nearestProj = proj;
+                                });
+                                if (Number.isFinite(nearestProj)) {
+                                    dist = Math.max(dist, Math.min(0.5 * nearestProj, 140));
+                                }
+                            }
+                            btnLeft = Math.round(collapseCssX + dx * dist);
+                            btnTop = Math.round(collapseCssY + dy * dist);
+                        }
+                    }
                 }
-                btn.style.top = `${centerY}px`;
+                btn.style.left = `${btnLeft}px`;
+                btn.style.top = `${btnTop}px`;
                 btn.addEventListener('pointerdown', (evt) => {
                     evt.preventDefault();
                     evt.stopPropagation();

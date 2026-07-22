@@ -231,7 +231,9 @@ export class MindmapConnectionLayer {
         if (!this.graphics) {
             this.graphics = new PIXI.Graphics();
             this.graphics.name = 'mindmap-connection-layer';
-            this.graphics.zIndex = 2;
+            // Коннекторы рисуем ПОД узлами (узлы имеют zIndex 0), иначе начало
+            // ленты у ребра капсулы закрашивается поверх неё и торчит из-под узла.
+            this.graphics.zIndex = -1;
             const world = this.core?.pixi?.worldLayer || this.core?.pixi?.app?.stage;
             world?.addChild?.(this.graphics);
         }

@@ -167,3 +167,75 @@ export function getChildrenSidesWithChildren(objects, nodeId) {
 
     return sides;
 }
+
+const CHILD_ATTACH_SIDE = { left: 'right', right: 'left', bottom: 'top' };
+
+function nodeRect(node) {
+    const x = Number.isFinite(node?.position?.x) ? node.position.x : 0;
+    const y = Number.isFinite(node?.position?.y) ? node.position.y : 0;
+    const rawW = Number.isFinite(node?.width) ? node.width : node?.properties?.width;
+    const rawH = Number.isFinite(node?.height) ? node.height : node?.properties?.height;
+    const w = Math.max(1, Math.round(Number.isFinite(rawW) ? rawW : 1));
+    const h = Math.max(1, Math.round(Number.isFinite(rawH) ? rawH : 1));
+    return { x, y, w, h };
+}
+
+function anchorPoint(rect, side) {
+    if (side === 'right') return { x: rect.x + rect.w, y: rect.y + rect.h / 2 };
+    if (side === 'left') return { x: rect.x, y: rect.y + rect.h / 2 };
+    if (side === 'bottom') return { x: rect.x + rect.w / 2, y: rect.y + rect.h };
+    return { x: rect.x + rect.w / 2, y: rect.y };
+}
+
+function bezierControls(start, end, side) {
+    if (side === 'bottom') {
+        const spanY = Math.max(30, Math.abs(end.y - start.y) * 0.5);
+        return { cp1: { x: start.x, y: start.y + spanY }, cp2: { x: end.x, y: end.y - spanY } };
+    }
+    const dir = side === 'left' ? -1 : 1;
+    const spanX = Math.max(30, Math.abs(end.x - start.x) * 0.5);
+    return { cp1: { x: start.x + spanX * dir, y: start.y }, cp2: { x: end.x - spanX * dir, y: end.y } };
+}
+
+function cubicAt(p0, p1, p2, p3, t) {
+    const mt = 1 - t;
+    const a = mt * mt * mt, b = 3 * mt * mt * t, c = 3 * mt * t * t, d = t * t * t;
+    return {
+        x: a * p0.x + b * p1.x + c * p2.x + d * p3.x,
+        y: a * p0.y + b * p1.y + c * p2.y + d * p3.y,
+    };
+}
+
+/**
+ * World-точка для кнопки collapse на стороне side узла nodeId.
+ * — Ровно 1 ребёнок на стороне → середина соединяющей линии (bezier t=0.5), atEdge:false.
+ * — 0, >1 детей или collapsed → основание веера (якорь на ребре капсулы), atEdge:true.
+ * Флаг atEdge=true означает, что точка лежит на ребре капсулы и потребитель
+ * должен отодвинуть кнопку наружу в экранных px, чтобы не заходить на капсулу.
+ * @param {object[]} objects
+ * @param {string} nodeId
+ * @param {'left'|'right'|'bottom'} side
+ * @returns {{x:number,y:number,atEdge:boolean}|null}
+ */
+export function getMindmapCollapsePoint(objects, nodeId, side) {
+    if (!VALID_SIDES.has(side)) return null;
+    const { byId, rootByCompoundId } = buildIndexMaps(objects);
+    const parent = byId.get(nodeId);
+    if (!parent) return null;
+
+    const anchor = anchorPoint(nodeRect(parent), side);
+    if (asMeta(parent).collapsed === true) return { x: anchor.x, y: anchor.y, atEdge: true };
+
+    const kids = (Array.isArray(objects) ? objects : []).filter((obj) => {
+        if (!isMindmapNode(obj)) return false;
+        const meta = asMeta(obj);
+        if (meta.role !== CHILD_ROLE || meta.side !== side) return false;
+        return resolveParentId(obj, byId, rootByCompoundId) === nodeId;
+    });
+    if (kids.length !== 1) return { x: anchor.x, y: anchor.y, atEdge: true };
+
+    const end = anchorPoint(nodeRect(kids[0]), CHILD_ATTACH_SIDE[side] || 'top');
+    const { cp1, cp2 } = bezierControls(anchor, end, side);
+    const mid = cubicAt(anchor, cp1, cp2, end, 0.5);
+    return { x: mid.x, y: mid.y, atEdge: false };
+}

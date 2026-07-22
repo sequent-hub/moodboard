@@ -489,7 +489,7 @@
 }
 
 .mb-text--mindmap-content.is-placeholder {
-    opacity: 0.45;
+    opacity: 0.315;
 }
 
 /* HTML handles layer */
@@ -561,7 +561,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: rgba(107, 114, 128, 0.65);
+    background: rgba(107, 114, 128, 0.55);
     color: #ffffff;
     cursor: pointer;
     pointer-events: auto;
@@ -1704,6 +1704,21 @@
 
 .moodboard-text-input::placeholder {
     line-height: inherit;
+}
+
+/*
+ * Инлайн-редактор майндмапа (--mindmap-debug) не вызывает
+ * attachTextEditorPlaceholderStyle, поэтому у его textarea плейсхолдер не
+ * стилизуется и браузер подставляет дефолтный серый (#757575) на полной
+ * непрозрачности — при курсоре он выглядит ярче/плотнее, чем статичный
+ * .mb-text--mindmap-content.is-placeholder (opacity: 0.315). Выравниваем цвет и
+ * прозрачность режима ввода под состояние покоя. -webkit-text-fill-color нужен,
+ * т.к. сам textarea имеет color: transparent (видимый текст рисует backdrop).
+ */
+.moodboard-text-input--mindmap-debug::placeholder {
+    color: #212121;
+    -webkit-text-fill-color: #212121;
+    opacity: 0.315;
 }
 
 @media (pointer: coarse) {

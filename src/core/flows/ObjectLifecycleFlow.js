@@ -464,6 +464,10 @@ export function setupObjectLifecycleFlow(core) {
                     instance.setStyle(styleUpdates);
                 }
             }
+
+            if (object.type === 'mindmap' && updates.properties && typeof instance.setStyle === 'function') {
+                instance.setStyle(updates.properties);
+            }
         }
 
         core.state.markDirty();

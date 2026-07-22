@@ -32,6 +32,9 @@ export function destroyMoodBoard(board) {
     safeDestroy(board.textPropertiesPanel, 'textPropertiesPanel');
     board.textPropertiesPanel = null;
 
+    safeDestroy(board.mindmapPropertiesPanel, 'mindmapPropertiesPanel');
+    board.mindmapPropertiesPanel = null;
+
     safeDestroy(board.framePropertiesPanel, 'framePropertiesPanel');
     board.framePropertiesPanel = null;
 

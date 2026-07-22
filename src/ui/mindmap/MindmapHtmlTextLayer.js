@@ -111,6 +111,15 @@ export class MindmapHtmlTextLayer {
             if (updates.color || updates.properties?.textColor) {
                 el.style.color = updates.color || updates.properties?.textColor;
             }
+            const hasTextStyle = updates.properties
+                && (updates.properties.textStyle !== undefined || updates.properties.textAlign !== undefined);
+            if (hasTextStyle) {
+                const objectData = (this.core?.state?.state?.objects || []).find((o) => o.id === objectId);
+                const contentEl = this.idToContentEl.get(objectId);
+                if (objectData && contentEl) {
+                    this._applyTextStyle(el, contentEl, objectData);
+                }
+            }
             this.updateOne(objectId);
             this._autoFitNodeWidth(objectId);
         });
@@ -227,6 +236,7 @@ export class MindmapHtmlTextLayer {
 
         const el = document.createElement('div');
         el.className = 'mb-text';
+        el.id = `mb-text-mindmap-${objectId}`;
         el.dataset.id = objectId;
         const contentEl = document.createElement('span');
         contentEl.className = 'mb-text--mindmap-content';
@@ -258,6 +268,7 @@ export class MindmapHtmlTextLayer {
 
         const initialContent = objectData.content || objectData.properties?.content || '';
         this._applyContentValue(el, contentEl, initialContent);
+        this._applyTextStyle(el, contentEl, objectData);
         el.dataset.baseFontSize = String(baseFontSize);
         el.dataset.baseW = String(Math.max(1, objectData.width || objectData.properties?.width || MINDMAP_LAYOUT.width));
         el.dataset.baseH = String(Math.max(1, objectData.height || objectData.properties?.height || MINDMAP_LAYOUT.height));
@@ -461,6 +472,32 @@ export class MindmapHtmlTextLayer {
             onUpdate:  () => this.updateOne(objectId),
             onComplete: () => this.updateOne(objectId),
         });
+    }
+
+    /**
+     * Применяет к тексту узла стиль (жирный/курсив/подчёркнутый/зачёркнутый) и
+     * выравнивание. Стиль ставится на content-span (у него в CSS зафиксирован
+     * font-weight: 400), выравнивание — на flex-контейнер через justify-content.
+     */
+    _applyTextStyle(containerEl, contentEl, objectData) {
+        const props = objectData?.properties || {};
+        const style = props.textStyle || {};
+        const align = props.textAlign || 'left';
+
+        if (contentEl) {
+            contentEl.style.fontWeight = style.bold ? '700' : '400';
+            contentEl.style.fontStyle = style.italic ? 'italic' : 'normal';
+            const decorations = [];
+            if (style.underline) decorations.push('underline');
+            if (style.strike) decorations.push('line-through');
+            contentEl.style.textDecoration = decorations.length ? decorations.join(' ') : 'none';
+        }
+
+        if (containerEl) {
+            const justify = align === 'center' ? 'center' : (align === 'right' ? 'flex-end' : 'flex-start');
+            containerEl.style.justifyContent = justify;
+            containerEl.style.textAlign = align;
+        }
     }
 
     _applyContentValue(containerEl, contentEl, rawContent) {

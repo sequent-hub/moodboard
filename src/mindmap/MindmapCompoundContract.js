@@ -5,9 +5,9 @@ const RIGHT_SIDE = 'right';
 const BOTTOM_SIDE = 'bottom';
 const DEBUG_STORAGE_KEY = 'mb:mindmap:compound:debug';
 const BRANCH_COLOR_HEX = Object.freeze([
-    'EF9A9A', 'CE93D8', '90CAF9',
-    '80DEEA', 'A5D6A7', 'E6EE9C',
-    'FFE082', 'BCAAA4', 'B0BEC5',
+    'D32F2F', '8E24AA', '1E88E5',
+    '0097A7', '388E3C', '9E9D24',
+    'FF8F00', '5D4037', '455A64',
 ]);
 export const MINDMAP_BRANCH_COLOR_PALETTE = Object.freeze(
     BRANCH_COLOR_HEX.map((hex) => Number.parseInt(hex, 16))

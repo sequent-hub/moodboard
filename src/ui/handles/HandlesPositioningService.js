@@ -115,13 +115,19 @@ export class HandlesPositioningService {
         // getBoundingClientRect повёрнутого элемента — axis-aligned, даст неверный размер.
         if (typeof document !== 'undefined') {
             const textEl = document.querySelector(`.mb-text[data-id="${id}"]`);
+            // Mindmap-узлы (id `mb-text-mindmap-…`): рамку строим по PIXI-капсуле
+            // (state position/size), а не по DOM-боксу .mb-text. Его getBoundingClientRect
+            // учитывает hover-lift CSS-transform (translate3d + scale 1.06), и при первом
+            // клике (курсор ещё наведён, hover активен) рамка раздувается и уезжает вверх —
+            // отсюда зазор сверху и по бокам. state-размер держит капсулу впритык.
+            const isMindmapNode = !!(textEl && typeof textEl.id === 'string' && textEl.id.startsWith('mb-text-mindmap-'));
             // Во время инлайн-редактирования статический .mb-text скрыт через
             // visibility:hidden, но остаётся в layout со старым (до правки) боксом.
             // Его getBoundingClientRect вернул бы однострочный размер, и рамка выделения
             // не росла бы при добавлении строк (Shift+Enter). В этом режиме размер берём
             // из state — его autoSize редактора держит актуальным через Tool.ResizeUpdate.
             const isEditingHidden = !!(textEl && textEl.style && textEl.style.visibility === 'hidden');
-            if (textEl && !isEditingHidden) {
+            if (textEl && !isEditingHidden && !isMindmapNode) {
                 const rotationData = { objectId: id, rotation: 0 };
                 this.host.eventBus.emit(Events.Tool.GetObjectRotation, rotationData);
                 if (Math.abs(rotationData.rotation || 0) < 0.001) {

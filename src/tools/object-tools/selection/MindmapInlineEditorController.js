@@ -563,6 +563,14 @@ export function openMindmapEditor(object, create = false) {
         // Allow all mindmap "+" buttons to complete their click flow
         // without collapsing current selection in capture phase.
         if (sideButton) return;
+        // Клик по панели свойств mindmap не должен снимать выделение: иначе панель
+        // прячется до того, как отработает нажатая кнопка стиля. Редактирование
+        // корректно завершит blur textarea (onBlur → finalize(true)), а выделение
+        // при этом сохраняется — панель остаётся видимой и применяет стиль.
+        const inMindmapPanel = (typeof target.closest === 'function')
+            ? target.closest('#mindmap-properties-panel')
+            : null;
+        if (inMindmapPanel) return;
         finalize(true);
         if (typeof this.clearSelection === 'function') {
             this.clearSelection();

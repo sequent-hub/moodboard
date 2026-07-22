@@ -9,10 +9,39 @@ import {
 } from './MindmapCollapseGraph.js';
 
 const MINDMAP_TYPE = 'mindmap';
-const BTN_SIZE = 20;
+const BTN_SIZE = 13;
+const BTN_SIZE_COLLAPSED = 20;
+const EDGE_CLEARANCE = 10;
+// Задержка перед скрытием кнопки после ухода курсора с ноды: даёт время
+// перевести курсор через зазор на саму кнопку, не теряя hover.
+const HIDE_DELAY_MS = 260;
+// Дефолты цветов совпадают с MindmapObject (заливка/обводка капсулы).
+const DEFAULT_FILL = 0x3B82F6;
+const DEFAULT_FILL_ALPHA = 0.25;
+const DEFAULT_STROKE = 0x2563EB;
+const OUT_NORMAL = {
+    left: { x: -1, y: 0 },
+    right: { x: 1, y: 0 },
+    bottom: { x: 0, y: 1 },
+};
 
 function asNumber(v, fallback = 0) {
     return Number.isFinite(v) ? v : fallback;
+}
+
+function colorToHex(num, fallback) {
+    if (typeof num !== 'number' || !Number.isFinite(num)) {
+        return fallback;
+    }
+    return '#' + (num & 0xffffff).toString(16).padStart(6, '0');
+}
+
+function colorToRgba(num, alpha, fallbackNum) {
+    const n = (typeof num === 'number' && Number.isFinite(num)) ? num : fallbackNum;
+    const r = (n >> 16) & 0xff;
+    const g = (n >> 8) & 0xff;
+    const b = n & 0xff;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function getWorldRect(node) {
@@ -44,6 +73,8 @@ export class MindmapCollapseLayer {
         this._buttons = new Map();
         /** Tracks which keys have the button currently shown */
         this._shown = new Set();
+        /** Map<key, timeoutId> отложенного скрытия (hover-hysteresis) */
+        this._hideTimers = new Map();
         /** Ключ кнопки, над которой сейчас курсор (чтобы не прятать до клика) */
         this._btnHoverKey = null;
         this._onContainerMove = null;
@@ -110,6 +141,8 @@ export class MindmapCollapseLayer {
             this.layer.remove();
             this.layer = null;
         }
+        this._hideTimers.forEach((timer) => clearTimeout(timer));
+        this._hideTimers.clear();
         this._buttons.clear();
         this._shown.clear();
     }
@@ -185,6 +218,24 @@ export class MindmapCollapseLayer {
         return this.core?.state?.state?.objects || [];
     }
 
+    // Цвет фона холста (hex) — непрозрачная подложка кнопки, чтобы под ней
+    // не просвечивали ветки/сетка. Совпадает с фоном, над которым лежит капсула.
+    _boardBackgroundHex() {
+        const app = this.core?.pixi?.app;
+        const raw = app?.renderer?.background?.color ?? app?.renderer?.backgroundColor;
+        let num = 0xffffff;
+        if (raw != null) {
+            if (typeof raw === 'number') {
+                num = raw;
+            } else if (typeof raw.toNumber === 'function') {
+                num = raw.toNumber();
+            } else if (typeof raw.value === 'number') {
+                num = raw.value;
+            }
+        }
+        return '#' + ((num >>> 0) & 0xffffff).toString(16).padStart(6, '0');
+    }
+
     _rebuildAll() {
         if (!this.layer) return;
         const objects = this._objects();
@@ -200,6 +251,7 @@ export class MindmapCollapseLayer {
         // Remove stale
         for (const key of this._buttons.keys()) {
             if (!needed.has(key)) {
+                this._cancelHideTimer(key);
                 this._buttons.get(key)?.remove();
                 this._buttons.delete(key);
                 this._shown.delete(key);
@@ -222,6 +274,8 @@ export class MindmapCollapseLayer {
 
     _createButton(nodeId, side, key) {
         const btn = document.createElement('div');
+        btn.className = 'mb-mindmap-collapse-btn';
+        btn.id = `mb-mindmap-collapse-btn__${nodeId}--${side}`;
         btn.dataset.nodeId = nodeId;
         btn.dataset.side = side;
         Object.assign(btn.style, {
@@ -244,6 +298,26 @@ export class MindmapCollapseLayer {
             opacity: '0',
         });
 
+        // Метка (число/«−») отдельным span'ом: btn.textContent затирал бы мост.
+        const label = document.createElement('span');
+        label.className = 'mb-mindmap-collapse-btn__label';
+        label.style.pointerEvents = 'none';
+        btn.appendChild(label);
+        btn._label = label;
+
+        // Прозрачный «мост» через зазор EDGE_CLEARANCE до капсулы: продолжает
+        // hover-зону, чтобы движение «капсула → кнопка» не сбрасывало ховер.
+        // Геометрия зависит от стороны и размера — задаётся в _layoutBridge().
+        const bridge = document.createElement('div');
+        bridge.className = 'mb-mindmap-collapse-bridge';
+        Object.assign(bridge.style, {
+            position: 'absolute',
+            background: 'transparent',
+            pointerEvents: 'auto',
+        });
+        btn.appendChild(bridge);
+        btn._bridge = bridge;
+
         btn.addEventListener('pointerenter', () => {
             this._btnHoverKey = key;
             this._syncVisibility();
@@ -253,6 +327,8 @@ export class MindmapCollapseLayer {
             this._syncVisibility();
         });
         btn.addEventListener('pointerdown', (e) => {
+            // Клик по мосту (пустой зазор) не должен сворачивать узел.
+            if (e.target === bridge) return;
             e.stopPropagation();
             e.preventDefault();
             this._toggle(nodeId);
@@ -267,20 +343,52 @@ export class MindmapCollapseLayer {
         const objects = this._objects();
         const node = objects.find((o) => o?.id === nodeId);
         const collapsed = node?.properties?.mindmap?.collapsed === true;
+        // Цвета берём из свойств родительской ноды, чтобы кнопка совпадала
+        // с заливкой/обводкой конкретной капсулы (зелёной/жёлтой/синей).
+        const props = node?.properties || {};
+        const fillCss = colorToRgba(props.fillColor, props.fillAlpha ?? DEFAULT_FILL_ALPHA, DEFAULT_FILL);
+        const strokeCss = colorToHex(props.strokeColor, colorToHex(DEFAULT_STROKE, '#2563EB'));
         if (collapsed) {
             const count = countVisibleDescendantsForBadge(objects, nodeId);
-            btn.textContent = String(count);
+            if (btn._label) {
+                btn._label.textContent = String(count);
+                Object.assign(btn._label.style, {
+                    display: 'inline',
+                    width: 'auto',
+                    height: 'auto',
+                    borderRadius: '0',
+                    background: 'transparent',
+                });
+            }
             Object.assign(btn.style, {
+                width: `${BTN_SIZE_COLLAPSED}px`,
+                height: `${BTN_SIZE_COLLAPSED}px`,
                 background: '#6366f1',
                 color: '#fff',
                 border: 'none',
             });
         } else {
-            btn.textContent = '−';
+            // «−» рисуем полоской, а не текстовым глифом: текстовый минус
+            // центрируется по базовой линии шрифта и визуально уезжает вверх.
+            if (btn._label) {
+                btn._label.textContent = '';
+                Object.assign(btn._label.style, {
+                    display: 'block',
+                    width: '7px',
+                    height: '1.5px',
+                    borderRadius: '1px',
+                    background: 'currentColor',
+                });
+            }
+            // Непрозрачная подложка (цвет фона холста) + слой заливки родителя
+            // сверху: кнопка выглядит как капсула, но ничего под собой не пропускает.
+            const baseHex = this._boardBackgroundHex();
             Object.assign(btn.style, {
-                background: 'rgba(255,255,255,0.94)',
-                color: '#374151',
-                border: '1.5px solid #d1d5db',
+                width: `${BTN_SIZE}px`,
+                height: `${BTN_SIZE}px`,
+                background: `linear-gradient(${fillCss}, ${fillCss}), ${baseHex}`,
+                color: strokeCss,
+                border: `1px solid ${strokeCss}`,
             });
         }
     }
@@ -303,13 +411,53 @@ export class MindmapCollapseLayer {
             const node = objects.find((o) => o?.id === nodeId && o?.type === MINDMAP_TYPE);
             if (!node) return;
 
-            const rect = getWorldRect(node);
-            const wp = anchorWorldPoint(rect, side);
+            const collapsed = node?.properties?.mindmap?.collapsed === true;
+            const size = collapsed ? BTN_SIZE_COLLAPSED : BTN_SIZE;
+            // Кнопку всегда привязываем к ребру капсулы родителя (а не к середине
+            // соединительной линии до ребёнка) и отодвигаем наружу на EDGE_CLEARANCE,
+            // чтобы зазор между капсулой и кнопкой был ровно 10px.
+            const wp = anchorWorldPoint(getWorldRect(node), side);
             const screen = worldLayer.toGlobal(new PIXI.Point(wp.x, wp.y));
-            btn.style.left = `${Math.round(offX + screen.x)}px`;
-            btn.style.top  = `${Math.round(offY + screen.y)}px`;
+            let cx = offX + screen.x;
+            let cy = offY + screen.y;
+            const n = OUT_NORMAL[side];
+            if (n) {
+                const push = size / 2 + EDGE_CLEARANCE;
+                cx += n.x * push;
+                cy += n.y * push;
+            }
+            btn.style.left = `${Math.round(cx - size / 2)}px`;
+            btn.style.top  = `${Math.round(cy - size / 2)}px`;
             this._applyBtnStyle(btn, nodeId);
+            this._layoutBridge(btn, side, size);
         });
+    }
+
+    // Прозрачный мост, перекрывающий зазор между капсулой и кнопкой, чтобы
+    // hover не пропадал при движении курсора от капсулы к кнопке.
+    _layoutBridge(btn, side, size) {
+        const bridge = btn._bridge;
+        if (!bridge) return;
+        const OVERLAP = 2; // заход на несколько px внутрь капсулы — без «дыры» на стыке
+        const reach = EDGE_CLEARANCE + OVERLAP;
+        const s = bridge.style;
+        s.left = s.right = s.top = s.bottom = s.width = s.height = '';
+        if (side === 'right') {
+            s.top = '0px';
+            s.height = `${size}px`;
+            s.left = `${-reach}px`;
+            s.width = `${reach}px`;
+        } else if (side === 'left') {
+            s.top = '0px';
+            s.height = `${size}px`;
+            s.left = `${size}px`;
+            s.width = `${reach}px`;
+        } else { // bottom
+            s.left = '0px';
+            s.width = `${size}px`;
+            s.top = `${-reach}px`;
+            s.height = `${reach}px`;
+        }
     }
 
     _syncVisibility() {
@@ -322,14 +470,31 @@ export class MindmapCollapseLayer {
                 || this.hoveredObjectId === nodeId
                 || this._btnHoverKey === key;
 
-            if (shouldShow && !this._shown.has(key)) {
-                this._shown.add(key);
-                this._animIn(btn);
-            } else if (!shouldShow && this._shown.has(key)) {
-                this._shown.delete(key);
-                this._animOut(btn);
+            if (shouldShow) {
+                this._cancelHideTimer(key);
+                if (!this._shown.has(key)) {
+                    this._shown.add(key);
+                    this._animIn(btn);
+                }
+            } else if (this._shown.has(key) && !this._hideTimers.has(key)) {
+                // Не прячем сразу: держим кнопку видимой и интерактивной ещё
+                // HIDE_DELAY_MS, чтобы курсор успел перейти через зазор на кнопку.
+                const timer = setTimeout(() => {
+                    this._hideTimers.delete(key);
+                    this._shown.delete(key);
+                    this._animOut(btn);
+                }, HIDE_DELAY_MS);
+                this._hideTimers.set(key, timer);
             }
         });
+    }
+
+    _cancelHideTimer(key) {
+        const timer = this._hideTimers.get(key);
+        if (timer) {
+            clearTimeout(timer);
+            this._hideTimers.delete(key);
+        }
     }
 
     _animIn(btn) {

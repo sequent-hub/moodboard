@@ -77,6 +77,9 @@ export class PixiEngine {
                             mb.instance.updateCrispnessForZoom(s, res);
                         }
                         if (mb && mb.type === 'mindmap' && mb.instance && typeof mb.instance.redrawForZoom === 'function') {
+                            if (typeof mb.instance.setBoardBackground === 'function') {
+                                mb.instance.setBoardBackground(this._readBoardBackgroundColor());
+                            }
                             mb.instance.redrawForZoom(s);
                         }
                     }
@@ -86,6 +89,23 @@ export class PixiEngine {
             };
             this.eventBus.on(Events.UI.ZoomPercent, onZoom);
         }
+    }
+
+    // Текущий цвет фона холста числом (0xRRGGBB) — для непрозрачной подложки капсул.
+    _readBoardBackgroundColor() {
+        const bg = this.app?.renderer?.background;
+        const raw = (bg && bg.color != null) ? bg.color : this.app?.renderer?.backgroundColor;
+        if (typeof raw === 'number' && Number.isFinite(raw)) {
+            return (raw >>> 0) & 0xffffff;
+        }
+        if (raw && typeof raw.toNumber === 'function') {
+            return (raw.toNumber() >>> 0) & 0xffffff;
+        }
+        if (raw && typeof raw.value === 'number') {
+            return (raw.value >>> 0) & 0xffffff;
+        }
+        const opt = this.options?.backgroundColor;
+        return (typeof opt === 'number' ? (opt >>> 0) & 0xffffff : 0xffffff);
     }
 
     createObject(objectData) {
@@ -110,6 +130,9 @@ export class PixiEngine {
                     pixiObject._mb.instance.updateCrispnessForZoom(s, res);
                 }
                 if (pixiObject._mb.type === 'mindmap' && pixiObject._mb.instance && typeof pixiObject._mb.instance.redrawForZoom === 'function') {
+                    if (typeof pixiObject._mb.instance.setBoardBackground === 'function') {
+                        pixiObject._mb.instance.setBoardBackground(this._readBoardBackgroundColor());
+                    }
                     pixiObject._mb.instance.redrawForZoom(s);
                 }
                 if (pixiObject._mb.type === 'frame' && pixiObject._mb.instance && typeof pixiObject._mb.instance.applyWorldScale === 'function') {
