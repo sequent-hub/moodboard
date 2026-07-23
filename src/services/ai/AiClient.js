@@ -111,7 +111,7 @@ export class AiClient {
     /**
      * Генерация изображения через image-провайдера.
      * @param {object} args
-     * @param {string} [args.provider='yandex-art']
+     * @param {string} args.provider
      * @param {string} args.prompt
      * @param {string} [args.negativePrompt]
      * @param {number} [args.widthRatio]
@@ -123,7 +123,7 @@ export class AiClient {
      * @param {AbortSignal} [args.signal]
      * @returns {Promise<{operationId: string, imageBase64: string, mimeType: string}>}
      */
-    async generateImage({ provider = 'yandex-art', signal, referenceImages: files, ...payload }) {
+    async generateImage({ provider, signal, referenceImages: files, ...payload }) {
         const referenceImages = await filesToBase64(files);
         const body = referenceImages ? { ...payload, referenceImages } : payload;
         const res = await this._fetch(`${this._baseUrl}/${provider}/image`, {
@@ -220,7 +220,7 @@ export class AiClient {
     /**
      * Отправляет джоб генерации видео.
      * @param {object} args
-     * @param {string} [args.provider='gemini-video']
+     * @param {string} args.provider
      * @param {string} args.prompt
      * @param {string} [args.negativePrompt]
      * @param {string} [args.model]
@@ -232,7 +232,7 @@ export class AiClient {
      * @param {AbortSignal} [args.signal]
      * @returns {Promise<{jobId: string}>}
      */
-    async submitVideo({ provider = 'gemini-video', signal, referenceImages: files, ...payload }) {
+    async submitVideo({ provider, signal, referenceImages: files, ...payload }) {
         const referenceImages = await filesToBase64(files);
         const body = referenceImages ? { ...payload, referenceImages } : payload;
         const res = await this._fetch(`${this._baseUrl}/${provider}/video`, {
@@ -252,10 +252,10 @@ export class AiClient {
      * Опрашивает статус джоба генерации видео.
      * @param {string} jobId
      * @param {AbortSignal} [signal]
-     * @param {string} [provider='gemini-video']
+     * @param {string} provider
      * @returns {Promise<object>}
      */
-    async pollVideo(jobId, signal, provider = 'gemini-video') {
+    async pollVideo(jobId, signal, provider) {
         const res = await this._fetch(`${this._baseUrl}/${provider}/video/${jobId}`, {
             method: 'GET',
             headers: { 'Accept': 'application/json' },

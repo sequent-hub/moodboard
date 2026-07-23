@@ -51,7 +51,7 @@ export class VideoSessionController {
     /**
      * Запускает джоб генерации видео.
      * @param {object} args
-     * @param {string} [args.provider='gemini-video']
+     * @param {string} args.provider
      * @param {string} args.prompt
      * @param {string} [args.negativePrompt]
      * @param {string} [args.model]
@@ -63,7 +63,7 @@ export class VideoSessionController {
      * @param {AbortSignal} [args.signal]
      * @returns {Promise<void>}
      */
-    async start({ provider = 'gemini-video', signal: externalSignal, ...rest } = {}) {
+    async start({ provider, signal: externalSignal, ...rest } = {}) {
         if (this._abort) this.abort();
 
         const abort = new AbortController();

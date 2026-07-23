@@ -10,7 +10,7 @@ import { CHAT_PRESETS, DEFAULT_PRESET_ID, getPresetById } from './ChatPresets.js
  *
  * Состояние:
  *   - messages: список сообщений (с временным assistant-сообщением во время стриминга)
- *   - providerId: текущий провайдер (yandex-art/openai-image)
+ *   - providerId: текущий image-провайдер (gemini-image/...)
  *   - presetId: текущий пресет промпта
  *   - settings: { systemPrompt, temperature, maxTokens }
  *   - status: 'idle' | 'streaming' | 'error'
@@ -45,7 +45,7 @@ export class ChatSessionController {
 
         this._state = {
             messages: this._history.load().map((m) => (m.pending ? { ...m, pending: false, error: m.error || 'Прервано' } : m)),
-            providerId: 'yandex-art',
+            providerId: null,
             presetId: DEFAULT_PRESET_ID,
             settings: this._loadSettings(),
             status: 'idle',
@@ -120,7 +120,8 @@ export class ChatSessionController {
         const trimmed = (text || '').trim();
         if (!trimmed) return;
 
-        const provider = options.provider || 'yandex-art';
+        const provider = options.provider;
+        if (!provider) throw new Error('Provider is required for image generation');
         const imageCount = normalizeImageCount(options.imageCount);
         const batchId = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const userMsg = makeMessage('user', trimmed);

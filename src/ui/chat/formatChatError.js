@@ -42,32 +42,8 @@ const HTTP_STATUS_PHRASE_RU = {
 
 /** @type {Record<string, string>} */
 const EXACT_MESSAGES_RU = {
-    'YandexART provider does not support reference images':
-        'Провайдер YandexART не поддерживает опорные изображения',
-    'YandexART provider is not configured':
-        'Провайдер YandexART не настроен',
-    'YandexART response does not contain image data':
-        'В ответе YandexART нет данных изображения',
-    'YandexART returned non-JSON response':
-        'YandexART вернул ответ не в формате JSON',
-    'YandexART did not return operation id':
-        'YandexART не вернул идентификатор операции',
-    'YandexART operation failed':
-        'Операция YandexART завершилась с ошибкой',
-    'YandexART operation timed out':
-        'Превышено время ожидания операции YandexART',
-    'Yandex Operations API returned non-JSON response':
-        'API операций Yandex вернул ответ не в формате JSON',
-    'YandexART API error':
-        'Ошибка API YandexART',
-    'Yandex Operations API error':
-        'Ошибка API операций Yandex',
     'DeepSeek provider is not configured':
         'Провайдер DeepSeek не настроен',
-    'Yandex provider is not configured':
-        'Провайдер Yandex не настроен',
-    'Provider "yandex-art" is not configured':
-        'Провайдер «yandex-art» не настроен',
     'OpenAI image provider is not configured':
         'Провайдер OpenAI Images не настроен',
     'OpenAI image response does not contain image data':
@@ -95,28 +71,12 @@ const EXACT_MESSAGES_RU = {
 /** @type {Array<{ pattern: RegExp, format: (match: RegExpMatchArray) => string }>} */
 const PREFIX_MESSAGES_RU = [
     {
-        pattern: /^YandexART API unreachable: (.+)$/,
-        format: ([, detail]) => `API YandexART недоступен: ${detail}`
-    },
-    {
-        pattern: /^Yandex Operations API unreachable: (.+)$/,
-        format: ([, detail]) => `API операций Yandex недоступен: ${detail}`
-    },
-    {
-        pattern: /^YandexART API error \((\d+)\)$/,
-        format: ([, status]) => `Ошибка API YandexART (${status})`
-    },
-    {
         pattern: /^OpenAI image API unreachable: (.+)$/,
         format: ([, detail]) => `API OpenAI Images недоступен: ${detail}`
     },
     {
         pattern: /^OpenAI image API error \((\d+)\)$/,
         format: ([, status]) => `Ошибка API OpenAI Images (${status})`
-    },
-    {
-        pattern: /^Yandex Operations API error \((\d+)\)$/,
-        format: ([, status]) => `Ошибка API операций Yandex (${status})`
     },
     {
         pattern: /^Unknown provider: (.+)$/,

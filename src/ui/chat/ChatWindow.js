@@ -150,7 +150,6 @@ function _iconForVideoProvider(provider) {
 /** Маппинг провайдера → иконка пилла модели. */
 function _iconForProvider(provider) {
     switch (provider) {
-        case 'yandex-art':   return ICONS.modelAlice;
         case 'gemini-image': return ICONS.modelGoogle;
         case 'openai-image': return ICONS.modelGpt;
         case 'qwen-image':   return ICONS.modelQwen;
@@ -1285,9 +1284,10 @@ export class ChatWindow {
 
     _getVideoRequestOptions() {
         const cap = getVideoModelCapability(this._videoModelId);
+        if (!cap) throw new Error(`Video model not found: ${this._videoModelId}`);
         const opts = {
-            provider: cap?.provider ?? 'gemini-video',
-            model:    cap?.model,
+            provider: cap.provider,
+            model:    cap.model,
             ratio:    this._videoRatioId,
             duration: this._videoDurationId,
         };
@@ -1654,8 +1654,9 @@ export class ChatWindow {
     _getImageRequestOptions() {
         const [widthRatio, heightRatio] = parseFormatRatio(this._formatId);
         const cap = getImageModelCapability(this._modelId);
-        const provider = cap?.provider ?? 'yandex-art';
-        const model = cap?.model;
+        if (!cap) throw new Error(`Image model not found: ${this._modelId}`);
+        const provider = cap.provider;
+        const model = cap.model;
         const imageCount = parseImageCount(this._countId);
 
         const opts = { provider, widthRatio, heightRatio, model, imageCount };
