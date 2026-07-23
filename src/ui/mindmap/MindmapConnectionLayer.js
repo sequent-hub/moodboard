@@ -268,7 +268,7 @@ export class MindmapConnectionLayer {
             );
 
             const scale = this.core?.pixi?.worldLayer?.scale?.x || 1;
-            const width = 2 / scale;
+            const width = 1 / scale;
             drawRibbon(g, start, cp1, cp2, end, color, width);
             this._lastSegments.push({
                 parentId: parent.id,

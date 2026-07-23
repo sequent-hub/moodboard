@@ -288,7 +288,9 @@
 .text-properties-panel [id^="tpp-highlight-dropdown"],
 .text-properties-panel [id^="tpp-highlight-dropdown"] *,
 .text-properties-panel .tpp-more-dropdown,
-.text-properties-panel .tpp-more-dropdown * {
+.text-properties-panel .tpp-more-dropdown *,
+.text-properties-panel .mpp-color-picker,
+.text-properties-panel .mpp-color-picker * {
     max-height: none;
 }
 
@@ -550,6 +552,321 @@
 /* ═══════════════════════════════════════════════════════════════
    HSV colour picker
    ═══════════════════════════════════════════════════════════════ */
+
+.fpp-color-picker {
+    position: absolute;
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+    padding: 12px;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1002;
+    width: 236px;
+    box-sizing: border-box;
+}
+.fpp-color-picker.is-open { display: flex; }
+
+.fpp-color-picker__canvas-wrap {
+    position: relative;
+    width: 212px;
+    height: 148px;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: crosshair;
+    flex-shrink: 0;
+}
+.fpp-color-picker__canvas {
+    display: block;
+    width: 212px;
+    height: 148px;
+}
+.fpp-color-picker__cursor {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.30);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    top: 0;
+    left: 0;
+}
+
+.fpp-color-picker__hue-wrap { width: 100%; }
+
+.fpp-color-picker__hue-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(to right,
+        hsl(0,100%,50%), hsl(30,100%,50%), hsl(60,100%,50%), hsl(90,100%,50%),
+        hsl(120,100%,50%), hsl(150,100%,50%), hsl(180,100%,50%), hsl(210,100%,50%),
+        hsl(240,100%,50%), hsl(270,100%,50%), hsl(300,100%,50%), hsl(330,100%,50%),
+        hsl(360,100%,50%));
+    outline: none;
+    cursor: pointer;
+    border: none;
+}
+.fpp-color-picker__hue-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid rgba(0,0,0,0.28);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.20);
+    cursor: pointer;
+}
+.fpp-color-picker__hue-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid rgba(0,0,0,0.28);
+    cursor: pointer;
+}
+
+.fpp-color-picker__bottom {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.fpp-color-picker__eyedropper {
+    width: 30px;
+    height: 30px;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #6B7280;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background 0.12s, color 0.12s;
+}
+.fpp-color-picker__eyedropper:hover { background: #F3F4F6; color: #374151; }
+
+.fpp-color-picker__hex-input {
+    flex: 1;
+    height: 30px;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    padding: 0 8px;
+    font-size: 13px;
+    font-family: 'Roboto Mono', 'Courier New', monospace;
+    color: #374151;
+    outline: none;
+    background: #ffffff;
+}
+.fpp-color-picker__hex-input:focus { border-color: #9CA3AF; }
+
+.fpp-color-picker__apply {
+    width: 100%;
+    height: 30px;
+    border: none;
+    border-radius: 6px;
+    background: #374151;
+    color: #ffffff;
+    font-size: 13px;
+    font-family: 'Roboto', Arial, sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+.fpp-color-picker__apply:hover { background: #1F2937; }
+
+/* ═══════════════════════════════════════════════════════════════
+   MPP HSV colour picker
+   ═══════════════════════════════════════════════════════════════ */
+
+.mpp-color-picker {
+    position: absolute;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+    display: none;
+    flex-direction: column;
+    z-index: 1002;
+    width: 240px; /* 240px width to match the canvas without padding */
+    box-sizing: border-box;
+    overflow: hidden; /* For top border radius */
+    border: 1px solid #E5E7EB;
+}
+
+.mpp-color-picker.is-open { display: flex; }
+
+.mpp-color-picker__canvas-wrap {
+    position: relative;
+    width: 240px;
+    height: 138px;
+    cursor: crosshair;
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.mpp-color-picker__canvas {
+    display: block;
+    width: 240px;
+    height: 138px;
+    margin: 0;
+    padding: 0;
+}
+
+.mpp-color-picker__cursor {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.30);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    top: 0;
+    left: 0;
+}
+
+.mpp-color-picker__controls {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    gap: 12px;
+}
+
+.mpp-color-picker__sliders-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 40px;
+}
+
+.mpp-color-picker__sliders-col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+}
+
+.mpp-color-picker__eyedropper {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #111827;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background 0.12s;
+}
+
+.mpp-color-picker__eyedropper svg {
+    width: 32px;
+    height: 32px;
+}
+
+.mpp-color-picker__eyedropper:hover { background: #F3F4F6; }
+
+.mpp-color-picker__hue-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 12px;
+    border-radius: 6px;
+    background: linear-gradient(to right,
+        hsl(0,100%,50%), hsl(30,100%,50%), hsl(60,100%,50%), hsl(90,100%,50%),
+        hsl(120,100%,50%), hsl(150,100%,50%), hsl(180,100%,50%), hsl(210,100%,50%),
+        hsl(240,100%,50%), hsl(270,100%,50%), hsl(300,100%,50%), hsl(330,100%,50%),
+        hsl(360,100%,50%));
+    outline: none;
+    cursor: pointer;
+    border: none;
+    margin: 0;
+}
+
+.mpp-color-picker__hue-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid rgba(0,0,0,0.28);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.20);
+    cursor: pointer;
+}
+
+.mpp-color-picker__hue-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid rgba(0,0,0,0.28);
+    cursor: pointer;
+}
+
+.mpp-color-picker__alpha-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 12px;
+    border-radius: 6px;
+    background: 
+        linear-gradient(to right, transparent, var(--mpp-alpha-color, #000)) left top / 100% 100% no-repeat,
+        repeating-conic-gradient(#E5E7EB 0% 25%, #ffffff 0% 50%) 0 0 / 10px 10px;
+    outline: none;
+    cursor: pointer;
+    border: 1px solid #E5E7EB;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+.mpp-color-picker__alpha-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid rgba(0,0,0,0.28);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.20);
+    cursor: pointer;
+}
+
+.mpp-color-picker__alpha-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid rgba(0,0,0,0.28);
+    cursor: pointer;
+}
+
+.mpp-color-picker__hex-input {
+    width: 100%;
+    height: 36px;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    padding: 0 12px;
+    font-size: 14px;
+    font-family: 'Roboto Mono', 'Courier New', monospace;
+    color: #374151;
+    outline: none;
+    background: #ffffff;
+    box-sizing: border-box;
+    margin: 0;
+}
+
+.mpp-color-picker__hex-input:focus { border-color: #9CA3AF; }
 
 .fpp-color-picker {
     position: absolute;

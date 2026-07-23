@@ -2,6 +2,7 @@ import { Events } from '../core/events/Events.js';
 import { getObjectGeometry } from './text-properties/TextPropertiesPanelMapper.js';
 import { MINDMAP_BRANCH_COLOR_PALETTE } from '../mindmap/MindmapCompoundContract.js';
 import { applyMindmapOrientation } from './mindmap/MindmapOrientationLayout.js';
+import colorpickerSvg from '../assets/icons/colorpicker.svg?raw';
 import './styles/shape-properties-panel.css';
 import './styles/mindmap-properties-panel.css';
 import {
@@ -12,6 +13,13 @@ import {
 
 const DEFAULT_FILL_PIXI = 0x193042;
 
+const FRAME_BORDER_COLORS = [
+    0xab4aba, 0x72dbf8, 0x7fe1cc, 0xb0e64c,
+    0xf9da10, 0xffba1a, 0x46a758, 0x12a594,
+    0x05a2c2, 0x05a2c2, 0x3e63dd, 0x8e4ec6,
+    0xd6409f, 0xe93d82, 0xe54d2e, 0x8d8d8d,
+];
+
 function pixiToHex(pixi) {
     if (!Number.isFinite(pixi)) {
         return null;
@@ -19,9 +27,65 @@ function pixiToHex(pixi) {
     return `#${(pixi >>> 0).toString(16).padStart(6, '0')}`;
 }
 
+// Осветляет цвет, подмешивая белый (amount 0..1 — доля белого). Используется,
+// чтобы фон рамки был светлее её линии при выборе цвета в mpp-frame-border-colors.
+function lightenPixi(pixi, amount = 0.8) {
+    if (!Number.isFinite(pixi)) {
+        return pixi;
+    }
+    const r = (pixi >> 16) & 0xff;
+    const g = (pixi >> 8) & 0xff;
+    const b = pixi & 0xff;
+    const mix = (c) => Math.round(c + (255 - c) * amount);
+    return (mix(r) << 16) | (mix(g) << 8) | mix(b);
+}
+
 // Иконка «многоточие» — три точки, идентична кнопке «Ещё» панели Текста.
 const ICON_MORE = `<svg width="24" height="24" viewBox="0 0 22 22" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M16.2246 12.375C16.984 12.375 17.5996 11.7594 17.5996 11C17.5996 10.2406 16.984 9.625 16.2246 9.625C15.4652 9.625 14.8496 10.2406 14.8496 11C14.8496 11.7594 15.4652 12.375 16.2246 12.375Z"></path><path d="M11 12.375C11.7594 12.375 12.375 11.7594 12.375 11C12.375 10.2406 11.7594 9.625 11 9.625C10.2406 9.625 9.625 10.2406 9.625 11C9.625 11.7594 10.2406 12.375 11 12.375Z"></path><path d="M5.77539 12.375C6.53478 12.375 7.15039 11.7594 7.15039 11C7.15039 10.2406 6.53478 9.625 5.77539 9.625C5.016 9.625 4.40039 10.2406 4.40039 11C4.40039 11.7594 5.016 12.375 5.77539 12.375Z"></path></svg>`;
 const ICON_COMMENT = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
+
+function rgbToHsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0;
+    if (d !== 0) {
+        if (max === r) h = ((g - b) / d) % 6;
+        else if (max === g) h = (b - r) / d + 2;
+        else h = (r - g) / d + 4;
+        h *= 60;
+        if (h < 0) h += 360;
+    }
+    const s = max === 0 ? 0 : d / max;
+    return { h, s, v: max };
+}
+
+function hsvToHex(h, s, v) {
+    const c = v * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = v - c;
+    let r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; }
+    else if (h < 120) { r = x; g = c; }
+    else if (h < 180) { g = c; b = x; }
+    else if (h < 240) { g = x; b = c; }
+    else if (h < 300) { r = x; b = c; }
+    else { r = c; b = x; }
+    const f = (n) => Math.max(0, Math.min(255, Math.round((n + m) * 255))).toString(16).padStart(2, '0');
+    return '#' + f(r) + f(g) + f(b);
+}
+
+function hexToHsv(hex) {
+    let m = hex.replace('#', '').trim();
+    if (m.length === 3) {
+        m = m.split('').map(c => c + c).join('');
+    }
+    const r = parseInt(m.substring(0, 2), 16);
+    const g = parseInt(m.substring(2, 4), 16);
+    const b = parseInt(m.substring(4, 6), 16);
+    return rgbToHsv(r, g, b);
+}
 
 /**
  * MindmapPropertiesPanel — всплывающая панель инструментов над выделенной капсулой
@@ -44,6 +108,16 @@ export class MindmapPropertiesPanel {
         this._openPopoverEl = null;
         this._directionWrap = null;
         this._wholeBranch = false;
+        
+        this._sessionCustomColors = [];
+        this._colorSwatches = [];
+        
+        this._boundPickerMouseMove = this._pickerMouseMove.bind(this);
+        this._boundPickerMouseUp = this._pickerMouseUp.bind(this);
+        this._pickerDragging = false;
+        this._pickerHue = 0;
+        this._pickerSat = 0;
+        this._pickerVal = 1;
 
         this._onDocMouseDown = this._onDocMouseDown.bind(this);
     }
@@ -130,6 +204,7 @@ export class MindmapPropertiesPanel {
             this.panel.querySelectorAll('.ipp-btn.is-active').forEach((el) => el.classList.remove('is-active'));
         }
         this._closePopover();
+        this._closeColorPicker();
 
         if (this._docMouseDownAttached) {
             document.removeEventListener('mousedown', this._onDocMouseDown, true);
@@ -158,6 +233,11 @@ export class MindmapPropertiesPanel {
         panel.appendChild(divider);
 
         panel.appendChild(this._makeMoreWrapper());
+        
+        const pickerModal = this._buildColorPickerModal();
+        this._colorPickerModal = pickerModal;
+        panel.appendChild(pickerModal);
+
         return panel;
     }
 
@@ -186,7 +266,9 @@ export class MindmapPropertiesPanel {
         if (idBase) {
             popover.id = `${idBase}-popover`;
         }
-        Object.assign(popover.style, { top: '100%', left: '0', marginTop: '6px' });
+        // Панель стоит НАД капсулой майндмапа, поэтому однострочные поповеры
+        // раскрываем вверх (над панелью) — иначе они перекрывают карту снизу.
+        Object.assign(popover.style, { bottom: '100%', left: '0', marginBottom: '6px' });
 
         trigger.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -206,12 +288,14 @@ export class MindmapPropertiesPanel {
         this._closePopover();
         popoverEl.style.display = 'block';
         this._openPopoverEl = popoverEl;
+        this._closeColorPicker();
     }
 
     _closePopover() {
         if (this._openPopoverEl) {
             this._openPopoverEl.style.display = 'none';
             this._openPopoverEl = null;
+            this._closeColorPicker();
         }
     }
 
@@ -240,27 +324,37 @@ export class MindmapPropertiesPanel {
         return [row, slider, valLabel];
     }
 
-    _buildColorGrid(onPick, idPrefix) {
+    _buildColorGrid(onPick, idPrefix, palette = MINDMAP_BRANCH_COLOR_PALETTE) {
         const grid = document.createElement('div');
         grid.className = 'spp-color-grid';
         if (idPrefix) {
             grid.id = idPrefix;
         }
-        MINDMAP_BRANCH_COLOR_PALETTE.forEach((pixi, i) => {
-            const hex = `#${(pixi >>> 0).toString(16).padStart(6, '0')}`;
+        
+        // Reset swatches if building main border color grid
+        if (idPrefix === 'mpp-frame-border-colors') {
+            // Already reset in _buildFrameStyleControl
+        }
+        
+        palette.forEach((pixi, i) => {
+            const hex = typeof pixi === 'number' ? `#${(pixi >>> 0).toString(16).padStart(6, '0')}` : pixi;
+            const pixiVal = typeof pixi === 'number' ? pixi : parseInt(pixi.replace('#', ''), 16);
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'spp-color-swatch';
             btn.style.backgroundColor = hex;
-            btn.dataset.colorPixi = String(pixi);
+            btn.dataset.colorPixi = String(pixiVal);
             if (idPrefix) {
                 btn.id = `${idPrefix}-${i}`;
             }
             const tick = document.createElement('span');
             tick.className = 'spp-tick';
             btn.appendChild(tick);
-            btn.addEventListener('click', () => onPick(pixi));
+            btn.addEventListener('click', () => onPick(pixiVal));
             grid.appendChild(btn);
+            if (idPrefix === 'mpp-frame-border-colors') {
+                this._colorSwatches.push(btn);
+            }
         });
         return grid;
     }
@@ -272,12 +366,25 @@ export class MindmapPropertiesPanel {
         const lbl = document.createElement('span');
         lbl.className = 'spp-border-label';
         lbl.textContent = labelText;
+
         const input = document.createElement('input');
         input.type = 'checkbox';
-        input.style.cssText = 'width:16px;height:16px;cursor:pointer;accent-color:#2563EB;';
-        input.addEventListener('change', () => onChange(input.checked));
+        input.className = 'spp-switch-input';
+
+        const sw = document.createElement('span');
+        sw.className = 'spp-switch';
+        const thumb = document.createElement('span');
+        thumb.className = 'spp-switch-thumb';
+        sw.appendChild(thumb);
+
+        input.addEventListener('change', () => {
+            sw.classList.toggle('is-on', input.checked);
+            onChange(input.checked);
+        });
+
         row.appendChild(lbl);
         row.appendChild(input);
+        row.appendChild(sw);
         return { row, input };
     }
 
@@ -346,12 +453,173 @@ export class MindmapPropertiesPanel {
 
     // ── 3. Стиль рамки: тип линии, прозрачность, цвета, вся ветвь ────────────
 
+    _buildColorPickerModal() {
+        const modal = document.createElement('div');
+        modal.className = 'mpp-color-picker is-mpp-picker';
+        modal.id = 'mpp-color-picker-modal';
+
+        // SV Canvas
+        const canvasWrap = document.createElement('div');
+        canvasWrap.className = 'mpp-color-picker__canvas-wrap';
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 240;
+        canvas.height = 138;
+        canvas.className = 'mpp-color-picker__canvas';
+        canvas.id = 'mpp-hsv-canvas';
+        this._hsvCanvas = canvas;
+
+        const cursor = document.createElement('div');
+        cursor.className = 'mpp-color-picker__cursor';
+        this._hsvCursor = cursor;
+
+        canvasWrap.appendChild(canvas);
+        canvasWrap.appendChild(cursor);
+        modal.appendChild(canvasWrap);
+
+        canvas.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            this._pickerDragging = true;
+            this._updatePickerSV(e);
+            document.addEventListener('mousemove', this._boundPickerMouseMove);
+            document.addEventListener('mouseup', this._boundPickerMouseUp);
+        });
+
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'mpp-color-picker__controls';
+
+        // Sliders row (Eyedropper + Hue + Alpha)
+        const slidersRow = document.createElement('div');
+        slidersRow.className = 'mpp-color-picker__sliders-row';
+
+        const eyedropper = document.createElement('button');
+        eyedropper.className = 'mpp-color-picker__eyedropper';
+        eyedropper.id = 'mpp-eyedropper-btn';
+        eyedropper.title = 'Пипетка';
+        eyedropper.innerHTML = colorpickerSvg;
+        eyedropper.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof EyeDropper !== 'undefined') {
+                new EyeDropper().open().then(({ sRGBHex }) => {
+                    this._setPickerFromHex(sRGBHex);
+                    this._syncPickerHex();
+                    this._applyCurrentPickerColor();
+                }).catch(() => {});
+            }
+        });
+        slidersRow.appendChild(eyedropper);
+
+        const slidersCol = document.createElement('div');
+        slidersCol.className = 'mpp-color-picker__sliders-col';
+
+        const hueSlider = document.createElement('input');
+        hueSlider.type = 'range';
+        hueSlider.min = '0';
+        hueSlider.max = '360';
+        hueSlider.value = '0';
+        hueSlider.className = 'mpp-color-picker__hue-slider';
+        hueSlider.id = 'mpp-hue-slider';
+        this._hueSlider = hueSlider;
+
+        hueSlider.addEventListener('input', (e) => {
+            e.stopPropagation();
+            this._pickerHue = parseInt(e.target.value);
+            this._drawHsvCanvas();
+            this._syncPickerHex();
+            this._syncAlphaSliderBackground();
+            this._applyCurrentPickerColor();
+        });
+        slidersCol.appendChild(hueSlider);
+
+        const alphaSlider = document.createElement('input');
+        alphaSlider.type = 'range';
+        alphaSlider.min = '0';
+        alphaSlider.max = '100';
+        alphaSlider.value = '100';
+        alphaSlider.className = 'mpp-color-picker__alpha-slider';
+        alphaSlider.id = 'mpp-alpha-slider';
+        this._pickerAlphaSlider = alphaSlider;
+        this._pickerAlpha = 1;
+
+        alphaSlider.addEventListener('input', (e) => {
+            e.stopPropagation();
+            this._pickerAlpha = parseInt(e.target.value) / 100;
+            this._applyCurrentPickerColor();
+            if (this._opacitySlider) {
+                this._opacitySlider.value = String(Math.round(this._pickerAlpha * 100));
+                if (this._opacityVal) this._opacityVal.textContent = `${Math.round(this._pickerAlpha * 100)}%`;
+            }
+        });
+        slidersCol.appendChild(alphaSlider);
+        
+        slidersRow.appendChild(slidersCol);
+        controlsDiv.appendChild(slidersRow);
+
+        // Hex input
+        const hexInput = document.createElement('input');
+        hexInput.type = 'text';
+        hexInput.className = 'mpp-color-picker__hex-input';
+        hexInput.id = 'mpp-hex-input';
+        hexInput.value = '#ffffff';
+        hexInput.maxLength = 7;
+        hexInput.spellcheck = false;
+        this._hexInput = hexInput;
+
+        hexInput.addEventListener('click', (e) => e.stopPropagation());
+        hexInput.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') {
+                const hex = hexInput.value.trim();
+                if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+                    this._setPickerFromHex(hex);
+                    this._applyCurrentPickerColor();
+                }
+            }
+        });
+        hexInput.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const hex = hexInput.value.trim();
+            if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+                this._setPickerFromHex(hex);
+                this._applyCurrentPickerColor();
+            }
+        });
+
+        controlsDiv.appendChild(hexInput);
+        modal.appendChild(controlsDiv);
+
+        return modal;
+    }
+
+    _applyCurrentPickerColor() {
+        const hex = hsvToHex(this._pickerHue, this._pickerSat, this._pickerVal);
+        const pixi = parseInt(hex.replace('#', ''), 16);
+        this._applyBorderColor(pixi, true, this._pickerAlpha);
+    }
+
+    _syncAlphaSliderBackground() {
+        if (!this._pickerAlphaSlider) return;
+        const hex = hsvToHex(this._pickerHue, this._pickerSat, this._pickerVal);
+        this._pickerAlphaSlider.style.setProperty('--mpp-alpha-color', hex);
+    }
+
     _buildFrameStyleControl() {
         const { wrap, trigger, popover } = this._makeControl(frameFillIcon(), 'Стиль рамки', 'mpp-frame');
         this._frameTrigger = trigger;
 
+        // Высокий поповер «Стиль рамки» открываем слева от кнопки-триггера,
+        // чтобы он не перекрывал майндмап и умещался по вертикали.
+        Object.assign(popover.style, {
+            bottom: 'auto', top: '0', left: 'auto', right: '100%',
+            marginBottom: '0', marginRight: '6px',
+        });
+
         const group = document.createElement('div');
         group.className = 'spp-border-group';
+        
+        // Ensure arrays are reset so we don't duplicate on rebuild
+        this._colorSwatches = [];
+        this._customColorBtn = null;
 
         const styleBtns = document.createElement('div');
         styleBtns.className = 'spp-style-btns';
@@ -384,6 +652,30 @@ export class MindmapPropertiesPanel {
         });
         group.appendChild(opRow);
 
+        const randomRow = document.createElement('div');
+        randomRow.className = 'spp-border-row';
+        randomRow.style.cssText = 'display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:8px;';
+
+        const randomLbl = document.createElement('span');
+        randomLbl.className = 'spp-border-label';
+        randomLbl.textContent = 'Случайный цвет';
+
+        const randomBtn = document.createElement('button');
+        randomBtn.type = 'button';
+        randomBtn.title = 'Случайный цвет';
+        randomBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;cursor:pointer;background:transparent;border:none;padding:0;color:currentColor;flex:0 0 auto;';
+        randomBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shuffle-icon lucide-shuffle"><path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22"/><path d="M2 6h1.972a4 4 0 0 1 3.6 2.2"/><path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45"/></svg>`;
+
+        randomBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const randomPixi = FRAME_BORDER_COLORS[Math.floor(Math.random() * FRAME_BORDER_COLORS.length)];
+            this._applyBorderColor(randomPixi);
+        });
+
+        randomRow.appendChild(randomLbl);
+        randomRow.appendChild(randomBtn);
+        group.appendChild(randomRow);
+
         const toggle = this._buildToggleRow('Закрасить всю ветвь', (on) => { this._wholeBranch = on; });
         toggle.input.id = 'mpp-frame-whole-branch';
         this._wholeBranchInput = toggle.input;
@@ -394,14 +686,48 @@ export class MindmapPropertiesPanel {
         borderLbl.textContent = 'Цвет рамки';
         borderLbl.style.margin = '6px 0 2px';
         group.appendChild(borderLbl);
-        group.appendChild(this._buildColorGrid((pixi) => this._applyBorderColor(pixi), 'mpp-frame-border-colors'));
+        
+        this._borderColorGrid = this._buildColorGrid((pixi) => this._applyBorderColor(pixi), 'mpp-frame-border-colors', FRAME_BORDER_COLORS);
+        this._borderColorGrid.style.marginBottom = '6px';
+        group.appendChild(this._borderColorGrid);
 
-        const fillLbl = document.createElement('div');
-        fillLbl.className = 'spp-border-label';
-        fillLbl.textContent = 'Фон';
-        fillLbl.style.margin = '6px 0 2px';
-        group.appendChild(fillLbl);
-        group.appendChild(this._buildColorGrid((pixi) => this._applyFillColor(pixi), 'mpp-frame-fill-colors'));
+        // Custom colours section
+        const customSection = document.createElement('div');
+        customSection.className = 'fpp-section fpp-section--custom';
+        customSection.style.padding = '0';
+        customSection.style.borderTop = 'none';
+        customSection.style.marginTop = '4px';
+        this._customSection = customSection;
+
+        const customLabel = document.createElement('div');
+        customLabel.className = 'spp-border-label';
+        customLabel.textContent = 'Свои цвета';
+        customLabel.style.margin = '8px 0 2px';
+
+        const customRow = document.createElement('div');
+        customRow.className = 'fpp-custom-row';
+        this._customColorRow = customRow;
+
+        const addBtn = document.createElement('button');
+        addBtn.className = 'fpp-add-color-btn';
+        addBtn.id = 'mpp-add-color-btn';
+        addBtn.title = 'Добавить цвет';
+        addBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="7" y1="1" x2="7" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+        addBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._openColorPicker();
+        });
+        this._addColorBtn = addBtn;
+
+        customRow.appendChild(addBtn);
+        customSection.appendChild(customLabel);
+        customSection.appendChild(customRow);
+        // Избегаем дублирования при пересоздании _buildFrameStyleControl
+        this._sessionCustomColors.forEach((hex) => {
+            this._setCustomSwatch(hex);
+        });
+
+        group.appendChild(customSection);
 
         popover.appendChild(group);
         return wrap;
@@ -487,18 +813,6 @@ export class MindmapPropertiesPanel {
         }
     }
 
-    _applyFillColor(pixi) {
-        const node = this._getNodeData();
-        const alpha = node?.properties?.fillAlpha;
-        const patch = { fillColor: pixi };
-        if (!Number.isFinite(alpha) || alpha <= 0) {
-            patch.fillAlpha = 0.25;
-        }
-        this._emit(patch);
-        this._updateFrameIcon(pixi);
-        this._closePopover();
-    }
-
     _updateFrameIcon(pixi) {
         if (!this._frameTrigger) {
             return;
@@ -507,10 +821,10 @@ export class MindmapPropertiesPanel {
         this._frameTrigger.innerHTML = frameFillIcon(hex, 0.8);
     }
 
-    _applyBorderColor(pixi) {
+    _applyBorderColor(pixi, keepPickerOpen = false, alpha = null) {
         const root = this._getNodeData();
         if (!root) return;
-        this._setNodeBorderColor(root, pixi);
+        this._setNodeBorderColor(root, pixi, alpha);
 
         if (this._wholeBranch) {
             const compoundId = root.properties?.mindmap?.compoundId;
@@ -518,18 +832,50 @@ export class MindmapPropertiesPanel {
             objects.forEach((node) => {
                 if (!node || node.type !== 'mindmap' || node.id === root.id) return;
                 if (node.properties?.mindmap?.compoundId !== compoundId) return;
-                this._setNodeBorderColor(node, pixi);
+                this._setNodeBorderColor(node, pixi, alpha);
             });
         }
-        this._closePopover();
+        this._updateFrameIcon(lightenPixi(pixi));
+        this._syncBorderColorGrid(pixi);
+        // Не закрываем попап стилей при выборе цвета — только палитру, если открыта (и если не попросили оставить открытой)
+        if (!keepPickerOpen) {
+            this._closeColorPicker();
+        }
     }
 
-    _setNodeBorderColor(node, pixi) {
+    _syncBorderColorGrid(pixi) {
+        if (!this._borderColorGrid) return;
+        this._colorSwatches.forEach((btn) => btn.classList.remove('spp-color-swatch--active'));
+        
+        if (pixi === null || !Number.isFinite(pixi)) return;
+        
+        let colorMatch = this._colorSwatches.find((btn) => Number(btn.dataset.colorPixi) === Number(pixi) && btn !== this._customColorBtn);
+        
+        if (!colorMatch) {
+            const hex = pixiToHex(pixi);
+            if (hex) {
+                this._setCustomSwatch(hex.toUpperCase());
+                colorMatch = this._customColorBtn;
+            }
+        }
+        
+        if (colorMatch) {
+            colorMatch.classList.add('spp-color-swatch--active');
+        }
+    }
+
+    _setNodeBorderColor(node, pixi, alpha = null) {
         const meta = { ...(node.properties?.mindmap || {}) };
         if (Object.keys(meta).length > 0) {
             meta.branchColor = pixi;
         }
-        const properties = { strokeColor: pixi };
+        const properties = { strokeColor: pixi, fillColor: lightenPixi(pixi) };
+        if (alpha !== null) {
+            properties.fillAlpha = alpha;
+        } else {
+            // Keep default behavior: reset alpha to 1 when choosing a preset color
+            properties.fillAlpha = 1;
+        }
         if (Object.keys(meta).length > 0) {
             properties.mindmap = meta;
         }
@@ -612,6 +958,162 @@ export class MindmapPropertiesPanel {
         });
     }
 
+    _openColorPicker() {
+        if (!this._colorPickerModal || !this._openPopoverEl || !this._addColorBtn) { return; }
+
+        this._colorPickerModal.classList.add('is-open');
+
+        const popupRect = this._openPopoverEl.getBoundingClientRect();
+        const panelRect = this.panel.getBoundingClientRect();
+        const pickerW = this._colorPickerModal.offsetWidth || 240;
+
+        // Поповер «Стиль рамки» открыт слева от панели → палитру ставим слева от него.
+        // Если ушли бы за левый край окна — ставим справа от поповера.
+        let leftPx = popupRect.left - panelRect.left - pickerW - 6;
+        if (panelRect.left + leftPx < 8) {
+            leftPx = popupRect.right - panelRect.left + 6;
+        }
+        this._colorPickerModal.style.left = leftPx + 'px';
+        this._colorPickerModal.style.top = (popupRect.top - panelRect.top) + 'px';
+
+        const node = this._getNodeData();
+        const stroke = node?.properties?.strokeColor;
+        let hex = '#ffffff';
+        if (Number.isFinite(stroke)) {
+            hex = pixiToHex(stroke);
+            this._setPickerFromHex(hex);
+        } else {
+            this._pickerHue = 0;
+            this._pickerSat = 0;
+            this._pickerVal = 1;
+            if (this._hueSlider) { this._hueSlider.value = '0'; }
+            this._drawHsvCanvas();
+        }
+
+        const alpha = Number.isFinite(node?.properties?.fillAlpha) ? node.properties.fillAlpha : 0.25;
+        this._pickerAlpha = alpha;
+        if (this._pickerAlphaSlider) {
+            this._pickerAlphaSlider.value = String(Math.round(alpha * 100));
+        }
+
+        this._syncPickerHex();
+        this._syncAlphaSliderBackground();
+    }
+
+    _closeColorPicker() {
+        if (this._colorPickerModal) { this._colorPickerModal.classList.remove('is-open'); }
+        document.removeEventListener('mousemove', this._boundPickerMouseMove);
+        document.removeEventListener('mouseup', this._boundPickerMouseUp);
+        
+        if (this._pickerDragging) {
+             this._pickerDragging = false;
+        }
+    }
+
+    _drawHsvCanvas() {
+        const canvas = this._hsvCanvas;
+        if (!canvas) { return; }
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+
+        const hueColor = `hsl(${this._pickerHue}, 100%, 50%)`;
+
+        const satGrad = ctx.createLinearGradient(0, 0, w, 0);
+        satGrad.addColorStop(0, '#ffffff');
+        satGrad.addColorStop(1, hueColor);
+        ctx.fillStyle = satGrad;
+        ctx.fillRect(0, 0, w, h);
+
+        const darkGrad = ctx.createLinearGradient(0, 0, 0, h);
+        darkGrad.addColorStop(0, 'rgba(0,0,0,0)');
+        darkGrad.addColorStop(1, 'rgba(0,0,0,1)');
+        ctx.fillStyle = darkGrad;
+        ctx.fillRect(0, 0, w, h);
+
+        if (this._hsvCursor) {
+            const cx = Math.round(this._pickerSat * w);
+            const cy = Math.round((1 - this._pickerVal) * h);
+            this._hsvCursor.style.left = cx + 'px';
+            this._hsvCursor.style.top = cy + 'px';
+        }
+    }
+
+    _updatePickerSV(e) {
+        const canvas = this._hsvCanvas;
+        if (!canvas) { return; }
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+        const y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+        this._pickerSat = x / rect.width;
+        this._pickerVal = 1 - y / rect.height;
+        this._drawHsvCanvas();
+        this._syncPickerHex();
+        this._syncAlphaSliderBackground();
+        this._applyCurrentPickerColor();
+    }
+
+    _pickerMouseMove(e) {
+        if (!this._pickerDragging) { return; }
+        this._updatePickerSV(e);
+    }
+
+    _pickerMouseUp() {
+        this._pickerDragging = false;
+        document.removeEventListener('mousemove', this._boundPickerMouseMove);
+        document.removeEventListener('mouseup', this._boundPickerMouseUp);
+    }
+
+    _syncPickerHex() {
+        if (!this._hexInput) { return; }
+        const hex = hsvToHex(this._pickerHue, this._pickerSat, this._pickerVal);
+        this._hexInput.value = hex.toUpperCase();
+    }
+
+    _setPickerFromHex(hex) {
+        const { h, s, v } = hexToHsv(hex);
+        this._pickerHue = h;
+        this._pickerSat = s;
+        this._pickerVal = v;
+        if (this._hueSlider) { this._hueSlider.value = String(h); }
+        this._drawHsvCanvas();
+    }
+
+
+    _setCustomSwatch(hex) {
+        if (!this._customColorRow || !this._addColorBtn) return;
+        
+        const pixiVal = parseInt(hex.replace('#', ''), 16);
+        this._sessionCustomColors = [hex];
+        
+        if (!this._customColorBtn) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'spp-color-swatch spp-color-swatch--custom';
+            
+            const tick = document.createElement('span');
+            tick.className = 'spp-tick';
+            btn.appendChild(tick);
+            
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (this._customColorBtn) {
+                    this._applyBorderColor(Number(this._customColorBtn.dataset.colorPixi));
+                }
+            });
+
+            this._customColorRow.insertBefore(btn, this._addColorBtn);
+            this._colorSwatches.push(btn);
+            this._customColorBtn = btn;
+        }
+        
+        this._customColorBtn.title = hex;
+        this._customColorBtn.dataset.colorPixi = String(pixiVal);
+        this._customColorBtn.style.backgroundColor = hex;
+        // Make sure it's visible
+        this._customColorBtn.style.display = 'block';
+    }
+
     _syncControls() {
         const node = this._getNodeData();
         if (!node) return;
@@ -624,11 +1126,18 @@ export class MindmapPropertiesPanel {
         const line = (props.lineType === 'dashed' || props.lineType === 'dotted') ? props.lineType : 'solid';
         this._syncLineButtons(line);
 
-        const pct = Math.round((Number.isFinite(props.fillAlpha) ? props.fillAlpha : 0.25) * 100);
+        const alpha = Number.isFinite(props.fillAlpha) ? props.fillAlpha : 0.25;
+        const pct = Math.round(alpha * 100);
         if (this._opacitySlider) this._opacitySlider.value = String(pct);
         if (this._opacityVal) this._opacityVal.textContent = `${pct}%`;
+        
+        if (this._pickerAlphaSlider) {
+            this._pickerAlphaSlider.value = String(pct);
+            this._pickerAlpha = alpha;
+        }
 
         this._updateFrameIcon(Number.isFinite(props.fillColor) ? props.fillColor : DEFAULT_FILL_PIXI);
+        this._syncBorderColorGrid(Number.isFinite(props.strokeColor) ? props.strokeColor : null);
 
         const style = props.textStyle || {};
         if (this._textStyleButtons) {
@@ -886,6 +1395,10 @@ export class MindmapPropertiesPanel {
 
     _onDocMouseDown(event) {
         if (!this.panel || !event.target) {
+            return;
+        }
+
+        if (this._colorPickerModal && this._colorPickerModal.contains(event.target)) {
             return;
         }
 
