@@ -382,6 +382,30 @@ export class HoverLiftController {
         }
     }
 
+    /**
+     * Обновить hover-базу (rest-позицию) объекта после программного сдвига
+     * (mindmap-relayout, авто-фит по тексту) по авторитетному top-left из payload.
+     *
+     * Важно: НЕ зависит от isHovered. При создании ветки курсор стоит над нодой
+     * (кнопка «Вниз» вплотную), поэтому syncBase с `if (isHovered) return` пропускал
+     * обновление, baseY оставался на create-time позиции, и _onOut/snapback откатывал
+     * капсулу туда — она разъезжалась с текстом/коннектором (те живут от state.position).
+     * baseY = top-left + height/2 — тот же расчёт центра, что и в updateObjectPositionDirect.
+     */
+    _updateRestBaseById(objectId, topLeftY, height) {
+        if (objectId == null) return;
+        const id = String(objectId);
+        for (const [pixiObject, entry] of this._entries) {
+            if (String(pixiObject._mb?.objectId) !== id) continue;
+            if (typeof topLeftY === 'number') {
+                const h = (typeof height === 'number' ? height : (pixiObject.height || 0));
+                entry.baseY = topLeftY + h / 2;
+            } else if (!entry.isHovered) {
+                entry.baseY = pixiObject.y;
+            }
+        }
+    }
+
     _bindEvents() {
         const eb = this._eventBus;
         if (!eb) return;
@@ -406,10 +430,18 @@ export class HoverLiftController {
         };
         this._onSelectionClear = () => { this._selectedIds.clear(); };
 
+        this._onProgrammaticMove = (data) => {
+            const id = data?.object ?? data?.objectId ?? data?.id ?? data;
+            this._updateRestBaseById(id, data?.position?.y, data?.size?.height);
+        };
+
         this._onHoverAnimationToggle = (data) => {
             this.setEnabled(data?.enabled !== false);
         };
         eb.on(Events.UI.HoverAnimationToggle, this._onHoverAnimationToggle);
+
+        eb.on(Events.Tool.DragUpdate, this._onProgrammaticMove);
+        eb.on(Events.Tool.ResizeUpdate, this._onProgrammaticMove);
 
         eb.on(Events.Tool.DragStart, this._onDragStart);
         eb.on(Events.Tool.GroupDragStart, this._onDragStart);
@@ -453,6 +485,9 @@ export class HoverLiftController {
         eb.off(Events.Tool.SelectionAdd, this._onSelectionAdd);
         eb.off(Events.Tool.SelectionRemove, this._onSelectionRemove);
         eb.off(Events.Tool.SelectionClear, this._onSelectionClear);
+
+        eb.off(Events.Tool.DragUpdate, this._onProgrammaticMove);
+        eb.off(Events.Tool.ResizeUpdate, this._onProgrammaticMove);
 
         eb.off(Events.UI.HoverAnimationToggle, this._onHoverAnimationToggle);
     }

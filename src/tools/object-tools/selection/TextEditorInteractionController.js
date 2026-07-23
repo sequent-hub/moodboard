@@ -178,8 +178,9 @@ export function createTextEditorFinalize(controller, {
 }
 
 // Классы DOM-элементов, клики по которым не должны закрывать пустой текстовый редактор.
+// .moodboard-toolbar сюда не входит: клик по нему должен штатно переключать инструмент
+// (пустой новый объект корректно удаляется через deactivateSelectTool -> closeTextEditorFromState).
 const UI_BLOCK_SELECTOR = [
-    '.moodboard-toolbar',
     '.text-properties-layer',
     '.moodboard-topbar',
     '.moodboard-zoom-panel',
@@ -248,9 +249,9 @@ export function bindTextEditorInteractions(controller, {
         }, 0);
     };
 
-    // Перехватываем mousedown на тулбаре/панелях в capture-фазе, чтобы:
+    // Перехватываем mousedown на панелях (кроме основного тулбара) в capture-фазе, чтобы:
     // 1. Предотвратить потерю фокуса textarea (e.preventDefault()).
-    // 2. Заблокировать последующий click до ToolbarActionRouter (одноразовый capture-обработчик).
+    // 2. Заблокировать последующий click до соответствующего обработчика (одноразовый capture-обработчик).
     // Работает только пока поле ввода пусто и объект только что создан — если текст уже есть,
     // клик по другому инструменту отрабатывает штатно (commit + переключение).
     let _pendingClickBlocker = null;
