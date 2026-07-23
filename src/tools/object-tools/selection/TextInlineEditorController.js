@@ -663,7 +663,7 @@ export function openTextEditor(object, create = false) {
     }
     // Ручки скрыты в режиме input
     // Локальная CSS-настройка placeholder (меньше базового шрифта)
-    const styleEl = attachTextEditorPlaceholderStyle(textarea, {
+    const { styleEl, setFontPx: setPlaceholderFontPx } = attachTextEditorPlaceholderStyle(textarea, {
         effectiveFontPx,
         isNote,
     });
@@ -679,6 +679,7 @@ export function openTextEditor(object, create = false) {
         objectType,
         listType: properties.listType || 'none',
         _phStyle: styleEl,
+        _setPlaceholderFontPx: setPlaceholderFontPx,
         initialContent: content,
         isNewCreation: !!create,
     };

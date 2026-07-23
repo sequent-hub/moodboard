@@ -122,12 +122,14 @@ export function updateCustomCaret(textarea, caretEl) {
     // поэтому без этой компенсации каретка "прилипает" к верхнему левому углу капсулы.
     let offsetX = 0;
     let offsetY = 0;
+    let parentInnerH = 0;
     const caretParent = caretEl.parentElement;
     if (caretParent) {
         const parentRect = caretParent.getBoundingClientRect();
         const textareaRect = textarea.getBoundingClientRect();
         offsetX = textareaRect.left - parentRect.left;
         offsetY = textareaRect.top - parentRect.top;
+        parentInnerH = parentRect.height;
     }
 
     // Adjust for scroll
@@ -166,9 +168,32 @@ export function updateCustomCaret(textarea, caretEl) {
             : '#111';
     }
 
-    caretEl.style.top = `${top - 2}px`;
+    // Небольшой подъём каретки компенсирует верхний зазор line-box над глифами. Раньше
+    // это была фиксированная -2px: при нормальном шрифте незаметно, но на сильном
+    // отдалении (зум ≤30%, шрифт ~5px) 2px = треть строки, и каретка «вылезала» вверх из
+    // ряда. Масштабируем сдвиг от размера шрифта (≈8%, потолок 2px), чтобы на мелком
+    // шрифте он стремился к нулю и каретка стояла вровень с текстом.
+    const caretTopAdjust = Math.min(2, Math.round(fontSize * 0.08));
+    let caretTop = top - caretTopAdjust;
+    let caretHeight = coords.height;
+    // Каретка не должна вылезать за рамку поля: её высота = CSS line-height, а рамка
+    // (wrapper) плотно облегает глифы (scrollHeight + центр-дельта) и обычно на 1-2px
+    // ниже line-height, из-за чего каретка торчала снизу рамки. Ограничиваем высоту
+    // высотой рамки и держим каретку внутри её границ (актуально для однострочного
+    // текста; при многострочном рамка выше line-height и обрезка не срабатывает).
+    if (parentInnerH > 0) {
+        if (caretHeight > parentInnerH) {
+            caretHeight = parentInnerH;
+        }
+        if (caretTop < 0) {
+            caretTop = 0;
+        } else if (caretTop + caretHeight > parentInnerH) {
+            caretTop = parentInnerH - caretHeight;
+        }
+    }
+    caretEl.style.top = `${caretTop}px`;
     caretEl.style.left = `${left - Math.floor(caretWidth / 2) + caretGap}px`;
-    caretEl.style.height = `${coords.height}px`;
+    caretEl.style.height = `${caretHeight}px`;
     caretEl.style.width = `${caretWidth}px`;
     caretEl.style.backgroundColor = caretColor;
     

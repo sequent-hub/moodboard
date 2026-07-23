@@ -403,6 +403,12 @@ export function createRegularTextEditorUpdater(controller, {
             if (backdrop) {
                 backdrop.style.fontSize = `${fontSizePx}px`;
             }
+            // Placeholder стилизуется отдельным инъектированным <style> (фиксированный размер
+            // на момент открытия) — синхронизируем его с актуальным шрифтом поля, иначе при
+            // масштабировании он не подстраивается под рамку и вылезает за неё на пустом поле.
+            if (typeof controller.textEditor?._setPlaceholderFontPx === 'function') {
+                controller.textEditor._setPlaceholderFontPx(fontSizePx);
+            }
 
             // Пересчитываем min-height по текущему шрифту. applyEditorSizing проставляет
             // фиксированный min-height в px на момент открытия; без пересчёта при отдалении

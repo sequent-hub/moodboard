@@ -722,6 +722,11 @@
     z-index: 2;
     left: 0;
     top: 0;
+    /* Гасим baseline-gap inline-block: обёртка редактора имеет собственный line box
+       (унаследованный 16px/normal ~18px), и на мелком зуме, когда шрифт поля падает
+       до пары px, textarea выравнивалась по baseline этого струта и съезжала вниз
+       под рамку. Выравнивание по верху убирает смещение на любом зуме. */
+    vertical-align: top;
     border: none;
     padding: 0;
     font-family: Caveat, Arial, cursive;

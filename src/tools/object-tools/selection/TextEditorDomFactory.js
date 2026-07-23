@@ -50,6 +50,15 @@ export function applyInitialTextEditorTextareaStyles(textarea, {
         properties: properties || {},
     });
     applyEditorSizing(textarea, lineHeightPx);
+    // CSS .moodboard-text-input/.moodboard-text-backdrop задают transition: all 0.2s.
+    // Кастомная каретка позиционируется вручную по ЖИВЫМ метрикам textarea
+    // (getComputedStyle/getBoundingClientRect). При зуме обёртка редактора меняет размер
+    // мгновенно, а textarea/backdrop анимируются 0.2s; каретка же показывается по
+    // дебаунсу через 150 мс — раньше, чем доигрывает transition, поэтому считается по
+    // ещё анимируемой геометрии и «вылезает» за рамку, оставаясь там до следующего
+    // ввода. Отключаем анимацию геометрии поля (как уже сделано для фигур), чтобы
+    // размеры применялись сразу и каретка всегда совпадала с рамкой.
+    textarea.style.transition = 'none';
 }
 
 export function measureTextEditorPlaceholderWidth(textarea, placeholder = 'Напишите что-нибудь') {
@@ -73,8 +82,16 @@ export function attachTextEditorPlaceholderStyle(textarea, { effectiveFontPx, is
 
     const styleEl = document.createElement('style');
     const placeholderOpacity = isNote ? '0.4' : '0.6';
-    styleEl.textContent = `.${uid}::placeholder{font-size:${effectiveFontPx}px;opacity:${placeholderOpacity};line-height:${computeTextEditorLineHeightPx(effectiveFontPx)}px;white-space:nowrap;color:#111;-webkit-text-fill-color:#111;}`;
+    // Размер placeholder держим синхронным с текущим шрифтом поля: при зуме/масштабе
+    // редактор пересчитывает font-size textarea (createRegularTextEditorUpdater), и без
+    // обновления этого правила placeholder «замерзает» на размере момента открытия и
+    // вылезает за рамку при последующем уменьшении.
+    const setFontPx = (fontPx) => {
+        const px = Math.max(1, Math.round(fontPx));
+        styleEl.textContent = `.${uid}::placeholder{font-size:${px}px;opacity:${placeholderOpacity};line-height:${computeTextEditorLineHeightPx(px)}px;white-space:nowrap;color:#111;-webkit-text-fill-color:#111;}`;
+    };
+    setFontPx(effectiveFontPx);
     document.head.appendChild(styleEl);
 
-    return styleEl;
+    return { styleEl, setFontPx };
 }
