@@ -81,7 +81,7 @@ export function attachTextEditorPlaceholderStyle(textarea, { effectiveFontPx, is
     textarea.classList.add(uid);
 
     const styleEl = document.createElement('style');
-    const placeholderOpacity = isNote ? '0.4' : '0.6';
+    const placeholderOpacity = isNote ? '0.4' : '0.3';
     // Размер placeholder держим синхронным с текущим шрифтом поля: при зуме/масштабе
     // редактор пересчитывает font-size textarea (createRegularTextEditorUpdater), и без
     // обновления этого правила placeholder «замерзает» на размере момента открытия и

@@ -94,19 +94,8 @@ export class ToolbarActionRouter {
             this.toolbar.closeDrawPopup();
             this.toolbar.closeEmojiPopup();
             this.toolbar.closeReactionsPopup();
-            this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
-            this.toolbar.placeSelectedButtonId = 'note';
-            this.toolbar.setActiveToolbarButton('place');
-            this.toolbar.eventBus.emit(Events.Place.Set, {
-                type: 'note',
-                properties: {
-                    content: '',
-                    fontFamily: 'Caveat, Arial, cursive',
-                    fontSize: 32,
-                    width: 250,
-                    height: 250
-                }
-            });
+            this.toolbar.closeFramePopup();
+            this.toolbar.toggleNoteColorPopup(button);
             return true;
         }
 

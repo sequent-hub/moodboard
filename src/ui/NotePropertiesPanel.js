@@ -273,12 +273,18 @@ export class NotePropertiesPanel {
             'backgroundColorButton',
             'backgroundColorPalette',
             [
-                { name: 'Желтый', slug: 'yellow', hex: '#FFF9C4', pixi: 0xFFF9C4 },
-                { name: 'Розовый', slug: 'pink', hex: '#FCE4EC', pixi: 0xFCE4EC },
-                { name: 'Голубой', slug: 'blue', hex: '#E3F2FD', pixi: 0xE3F2FD },
-                { name: 'Зеленый', slug: 'green', hex: '#E8F5E8', pixi: 0xE8F5E8 },
-                { name: 'Оранжевый', slug: 'orange', hex: '#FFF3E0', pixi: 0xFFF3E0 },
-                { name: 'Сиреневый', slug: 'lilac', hex: '#F3E5F5', pixi: 0xF3E5F5 }
+                { name: 'Жёлтый', slug: 'yellow', hex: '#FCF3AF', pixi: 0xFCF3AF },
+                { name: 'Оранжевый', slug: 'orange', hex: '#FFC291', pixi: 0xFFC291 },
+                { name: 'Лососевый', slug: 'salmon', hex: '#F9C6C6', pixi: 0xF9C6C6 },
+                { name: 'Розовый', slug: 'pink', hex: '#F3C6E2', pixi: 0xF3C6E2 },
+                { name: 'Синий', slug: 'blue', hex: '#B7D9F8', pixi: 0xB7D9F8 },
+                { name: 'Фиолетовый', slug: 'purple', hex: '#E3CCF4', pixi: 0xE3CCF4 },
+                { name: 'Голубой', slug: 'cyan', hex: '#A5DCED', pixi: 0xA5DCED },
+                { name: 'Барвинок', slug: 'periwinkle', hex: '#C6D4F9', pixi: 0xC6D4F9 },
+                { name: 'Зелёный', slug: 'green', hex: '#C6DE99', pixi: 0xC6DE99 },
+                { name: 'Мятный', slug: 'mint', hex: '#B0E0CC', pixi: 0xB0E0CC },
+                { name: 'Белый', slug: 'white', hex: '#F1F1F1', pixi: 0xF1F1F1 },
+                { name: 'Серый', slug: 'gray', hex: '#DDDDDD', pixi: 0xDDDDDD }
             ],
             'backgroundColor'
         );

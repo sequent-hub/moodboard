@@ -55,6 +55,7 @@ export class ToolbarRenderer {
         this.toolbar.createEmojiPopup();
         this.toolbar.createReactionsPopup();
         this.toolbar.createFramePopup();
+        this.toolbar.createNoteColorPopup();
 
         this.toolbar.eventBus.on(Events.Tool.Activated, this.toolbar._toolActivatedHandler);
 

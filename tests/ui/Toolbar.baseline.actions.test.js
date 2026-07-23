@@ -86,9 +86,19 @@ describe('Toolbar baseline: action routing contracts', () => {
         expect(eventBus.emit).toHaveBeenCalledWith(Events.Keyboard.ToolSelect, { tool: 'pan' });
     });
 
-    it('note-add click emits place setup payload contract', () => {
+    it('note-add click opens color popup without placing, swatch click emits place payload with backgroundColor', () => {
         const button = container.querySelector('.moodboard-toolbar__button--note');
         button.click();
+
+        // Клик по кнопке открывает палитру цветов, но записку ещё не размещает
+        expect(getEmits(eventBus.emit, Events.Place.Set)).toHaveLength(0);
+        const popup = container.querySelector('.moodboard-toolbar__popup--note-color');
+        expect(popup).toBeTruthy();
+        expect(popup.style.display).not.toBe('none');
+
+        const swatch = popup.querySelector('button');
+        expect(swatch).toBeTruthy();
+        swatch.click();
 
         const placeCalls = getEmits(eventBus.emit, Events.Place.Set);
         expect(placeCalls).toHaveLength(1);
@@ -99,6 +109,7 @@ describe('Toolbar baseline: action routing contracts', () => {
                     content: expect.any(String),
                     width: expect.any(Number),
                     height: expect.any(Number),
+                    backgroundColor: expect.any(Number),
                 }),
             })
         );

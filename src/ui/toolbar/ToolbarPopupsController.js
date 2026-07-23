@@ -110,6 +110,104 @@ export class ToolbarPopupsController {
         if (this.toolbar.framePopupEl) this.toolbar.framePopupEl.style.display = 'none';
     }
 
+    createNoteColorPopup() {
+        const NOTE_COLORS = [
+            { name: 'Жёлтый', hex: '#FCF3AF', border: '#ECDD85' },
+            { name: 'Оранжевый', hex: '#FFC291', border: '#ED8A5C' },
+            { name: 'Лососевый', hex: '#F9C6C6', border: '#EB9091' },
+            { name: 'Розовый', hex: '#F3C6E2', border: '#E38EC3' },
+            { name: 'Синий', hex: '#B7D9F8', border: '#5E93EF' },
+            { name: 'Фиолетовый', hex: '#E3CCF4', border: '#BE93E4' },
+            { name: 'Голубой', hex: '#A5DCED', border: '#46B8D8' },
+            { name: 'Барвинок', hex: '#C6D4F9', border: '#8DA4EF' },
+            { name: 'Зелёный', hex: '#C6DE99', border: '#9AB654' },
+            { name: 'Мятный', hex: '#B0E0CC', border: '#56BA9F' },
+            { name: 'Белый', hex: '#F1F1F1', border: '#D4D4D4' },
+            { name: 'Серый', hex: '#DDDDDD', border: '#B3B3B3' },
+        ];
+
+        this.toolbar.noteColorPopupEl = document.createElement('div');
+        this.toolbar.noteColorPopupEl.className = 'moodboard-toolbar__popup moodboard-toolbar__popup--note-color';
+        this.toolbar.noteColorPopupEl.style.display = 'none';
+        this.toolbar.noteColorPopupEl.style.borderWidth = '0.5px';
+
+        const grid = document.createElement('div');
+        Object.assign(grid.style, {
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: '8px',
+        });
+
+        NOTE_COLORS.forEach((color) => {
+            const swatch = document.createElement('button');
+            swatch.type = 'button';
+            swatch.title = color.name;
+            Object.assign(swatch.style, {
+                width: '40px',
+                height: '40px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                padding: '0',
+                backgroundColor: color.hex,
+                border: `1px solid ${color.border}`,
+                transition: 'transform 0.1s',
+            });
+            swatch.addEventListener('mouseenter', () => { swatch.style.transform = 'scale(1.08)'; });
+            swatch.addEventListener('mouseleave', () => { swatch.style.transform = 'scale(1)'; });
+            swatch.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const pixi = parseInt(color.hex.replace('#', ''), 16);
+                this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+                this.toolbar.placeSelectedButtonId = 'note';
+                this.toolbar.setActiveToolbarButton('place');
+                this.toolbar.eventBus.emit(Events.Place.Set, {
+                    type: 'note',
+                    properties: {
+                        content: '',
+                        fontFamily: 'Caveat, Arial, cursive',
+                        fontSize: 32,
+                        width: 250,
+                        height: 250,
+                        backgroundColor: pixi,
+                    },
+                });
+                this.closeNoteColorPopup();
+            });
+            grid.appendChild(swatch);
+        });
+
+        this.toolbar.noteColorPopupEl.appendChild(grid);
+        this.toolbar.container.appendChild(this.toolbar.noteColorPopupEl);
+    }
+
+    toggleNoteColorPopup(anchorBtn) {
+        if (!this.toolbar.noteColorPopupEl) return;
+        if (this.toolbar.noteColorPopupEl.style.display === 'none') {
+            this.openNoteColorPopup(anchorBtn);
+        } else {
+            this.closeNoteColorPopup();
+        }
+    }
+
+    openNoteColorPopup(anchorBtn) {
+        if (!this.toolbar.noteColorPopupEl) return;
+        const toolbarRect = this.toolbar.container.getBoundingClientRect();
+        const buttonRect = anchorBtn.getBoundingClientRect();
+        this.toolbar.noteColorPopupEl.style.display = 'block';
+        this.toolbar.noteColorPopupEl.style.visibility = 'hidden';
+        const panelH = this.toolbar.noteColorPopupEl.offsetHeight || 120;
+        const targetLeft = this.toolbar.element.offsetWidth + 8;
+        const btnCenterY = buttonRect.top + buttonRect.height / 2;
+        const targetTop = Math.max(0, Math.round(btnCenterY - toolbarRect.top - panelH / 2 - 4));
+        this.toolbar.noteColorPopupEl.style.left = `${Math.round(targetLeft)}px`;
+        this.toolbar.noteColorPopupEl.style.top = `${targetTop}px`;
+        this.toolbar.noteColorPopupEl.style.visibility = '';
+    }
+
+    closeNoteColorPopup() {
+        if (this.toolbar.noteColorPopupEl) this.toolbar.noteColorPopupEl.style.display = 'none';
+    }
+
     createShapesPopup() {
         this.toolbar.shapesPopupEl = document.createElement('div');
         this.toolbar.shapesPopupEl.className = 'moodboard-toolbar__popup moodboard-toolbar__popup--shapes';

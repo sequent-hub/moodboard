@@ -80,6 +80,18 @@ export class Toolbar {
     closeFramePopup() {
         return this.popupsController.closeFramePopup();
     }
+
+    createNoteColorPopup() {
+        return this.popupsController.createNoteColorPopup();
+    }
+
+    toggleNoteColorPopup(anchorBtn) {
+        return this.popupsController.toggleNoteColorPopup(anchorBtn);
+    }
+
+    closeNoteColorPopup() {
+        return this.popupsController.closeNoteColorPopup();
+    }
     
     /**
      * Создает кнопку инструмента
@@ -127,6 +139,10 @@ export class Toolbar {
             const toolType = button.dataset.tool;
             const toolId = button.dataset.toolId;
 
+            if (toolType !== 'note-add') {
+                this.closeNoteColorPopup();
+            }
+
             this.actionRouter.routeToolbarAction(button, toolType, toolId);
         });
 
@@ -139,15 +155,17 @@ export class Toolbar {
             const isInsideDrawPopup = this.drawPopupEl && this.drawPopupEl.contains(e.target);
             const isInsideEmojiPopup = this.emojiPopupEl && this.emojiPopupEl.contains(e.target);
             const isInsideFramePopup = this.framePopupEl && this.framePopupEl.contains(e.target);
+            const isInsideNoteColorPopup = this.noteColorPopupEl && this.noteColorPopupEl.contains(e.target);
             const isInsideReactionsPopup = this.reactionsPopupEl && this.reactionsPopupEl.contains(e.target);
             const isShapesButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--shapes');
             const isDrawButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--pencil');
             const isEmojiButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--emoji');
             const isFrameButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--frame');
+            const isNoteButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--note');
             const isReactionsButton = e.target.closest && e.target.closest('.moodboard-toolbar__button--reactions');
             const isDrawActive = !!(this.element && this.element.querySelector('.moodboard-toolbar__button--pencil.moodboard-toolbar__button--active'));
 
-            if (!isInsideToolbar && !isInsideShapesPopup && !isShapesButton && !isInsideDrawPopup && !isDrawButton && !isInsideEmojiPopup && !isEmojiButton && !isInsideFramePopup && !isFrameButton && !isInsideReactionsPopup && !isReactionsButton) {
+            if (!isInsideToolbar && !isInsideShapesPopup && !isShapesButton && !isInsideDrawPopup && !isDrawButton && !isInsideEmojiPopup && !isEmojiButton && !isInsideFramePopup && !isFrameButton && !isInsideNoteColorPopup && !isNoteButton && !isInsideReactionsPopup && !isReactionsButton) {
                 this.closeShapesPopup();
                 if (!isDrawActive) {
                     this.closeDrawPopup();
@@ -155,6 +173,7 @@ export class Toolbar {
                 this.closeEmojiPopup();
                 this.closeReactionsPopup();
                 this.closeFramePopup();
+                this.closeNoteColorPopup();
             }
         };
         document.addEventListener('click', this._documentClickHandler);

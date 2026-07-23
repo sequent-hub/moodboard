@@ -118,6 +118,7 @@ describe('Toolbar baseline: lifecycle, events and tooltip contracts', () => {
         const firstButton = container.querySelector('.moodboard-toolbar__button--note');
         eventBus.emit.mockClear();
         firstButton.click();
+        container.querySelector('.moodboard-toolbar__popup--note-color button').click();
         const firstCount = eventBus.emit.mock.calls.filter(([event]) => event === Events.Place.Set).length;
         expect(firstCount).toBe(1);
 
@@ -130,6 +131,7 @@ describe('Toolbar baseline: lifecycle, events and tooltip contracts', () => {
 
         const secondButton = container.querySelector('.moodboard-toolbar__button--note');
         secondButton.click();
+        container.querySelector('.moodboard-toolbar__popup--note-color button').click();
         const secondCount = nextBus.emit.mock.calls.filter(([event]) => event === Events.Place.Set).length;
         expect(secondCount).toBe(1);
 
