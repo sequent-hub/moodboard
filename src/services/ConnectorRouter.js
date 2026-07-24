@@ -39,13 +39,23 @@ export function computeElbowWaypoints(start, end) {
  * @returns {Array<{x:number,y:number}>}
  */
 function computeElbowWithDirs(startPt, startDir, endPt, endDir) {
+    // Проекция вектора start→end на нормаль грани: >0 значит грань «смотрит» на другой конец.
+    // Используется и как клэмп стаба (не даём ему перехлестнуть середину зазора между
+    // встречными гранями), и как признак «навстречу/врозь» — если считать этот признак
+    // по уже клэмпнутым S/E, при коротком зазоре стабы совпадают и хвостовая эвристика
+    // ошибочно относит случай к «врозь», что даёт петлю (C-shape вокруг самого себя).
+    const projStart = (endPt.x - startPt.x) * startDir.x + (endPt.y - startPt.y) * startDir.y;
+    const projEnd   = (startPt.x - endPt.x) * endDir.x   + (startPt.y - endPt.y) * endDir.y;
+    const stubStart = projStart > 0 ? Math.min(ELBOW_STUB, projStart / 2) : ELBOW_STUB;
+    const stubEnd   = projEnd   > 0 ? Math.min(ELBOW_STUB, projEnd   / 2) : ELBOW_STUB;
+
     const S = {
-        x: Math.round(startPt.x + startDir.x * ELBOW_STUB),
-        y: Math.round(startPt.y + startDir.y * ELBOW_STUB),
+        x: Math.round(startPt.x + startDir.x * stubStart),
+        y: Math.round(startPt.y + startDir.y * stubStart),
     };
     const E = {
-        x: Math.round(endPt.x + endDir.x * ELBOW_STUB),
-        y: Math.round(endPt.y + endDir.y * ELBOW_STUB),
+        x: Math.round(endPt.x + endDir.x * stubEnd),
+        y: Math.round(endPt.y + endDir.y * stubEnd),
     };
 
     const startHoriz = Math.abs(startDir.x) >= Math.abs(startDir.y);
@@ -62,8 +72,8 @@ function computeElbowWithDirs(startPt, startDir, endPt, endDir) {
                 corners = [{ x: outerX, y: S.y }, { x: outerX, y: E.y }];
             } else {
                 // Смотрят противоположно по горизонтали — различаем навстречу и врозь.
-                // Навстречу: стабы сходятся, признак: (E.x - S.x) * startDir.x > 0.
-                const facingEachOther = (E.x - S.x) * startDir.x > 0;
+                // Навстречу: startDir указывает в сторону endPt (см. projStart выше).
+                const facingEachOther = projStart > 0;
                 if (facingEachOther) {
                     // Z-shape: одно вертикальное пересечение посередине (2 изгиба)
                     const midX = Math.round((S.x + E.x) / 2);
@@ -82,8 +92,8 @@ function computeElbowWithDirs(startPt, startDir, endPt, endDir) {
             corners = [{ x: S.x, y: outerY }, { x: E.x, y: outerY }];
         } else {
             // Смотрят противоположно по вертикали — различаем навстречу и врозь.
-            // Навстречу: (E.y - S.y) * startDir.y > 0.
-            const facingEachOther = (E.y - S.y) * startDir.y > 0;
+            // Навстречу: startDir указывает в сторону endPt (см. projStart выше).
+            const facingEachOther = projStart > 0;
             if (facingEachOther) {
                 const midY = Math.round((S.y + E.y) / 2);
                 corners = [{ x: S.x, y: midY }, { x: E.x, y: midY }];

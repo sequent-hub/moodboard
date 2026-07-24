@@ -1,6 +1,7 @@
 import { Events } from '../../core/events/Events.js';
 import { HandlesPositioningService } from '../handles/HandlesPositioningService.js';
 import { ConnectorDragController } from '../../tools/object-tools/connector/ConnectorDragController.js';
+import { AnchorHoverGhost } from '../../tools/object-tools/connector/AnchorHoverGhost.js';
 
 const ALLOWED_TYPES = new Set(['shape', 'note', 'image', 'text', 'simple-text', 'file']);
 
@@ -17,7 +18,10 @@ export class ConnectionAnchorsLayer {
         
         this.hoveredObjectId = null;
         this._dragController = null;
+        this._hoverGhost = null;
         this._onAnchorPointerDown = null;
+        this._onAnchorPointerOver = null;
+        this._onAnchorPointerOut = null;
         this._commentPopoverOpen = false;
     }
 
@@ -37,13 +41,31 @@ export class ConnectionAnchorsLayer {
             this.container.appendChild(this.layer);
 
             this._dragController = new ConnectorDragController(this.core, this.eventBus);
+            this._hoverGhost = new AnchorHoverGhost(this.core, this.eventBus, this.positioningService, this.container);
             this._onAnchorPointerDown = (e) => {
                 if (!e.target.dataset.connectorAnchor) return;
                 e.preventDefault();
                 e.stopPropagation();
+                this._hoverGhost.hide();
                 this._dragController.startFromAnchor(e);
             };
+            this._onAnchorPointerOver = (e) => {
+                if (!e.target.dataset.connectorAnchor) return;
+                const r = e.target.getBoundingClientRect();
+                this._hoverGhost.show({
+                    id: e.target.dataset.id,
+                    anchorX: e.target.dataset.anchorX,
+                    anchorY: e.target.dataset.anchorY,
+                    anchorClient: { x: r.left + r.width / 2, y: r.top + r.height / 2 },
+                });
+            };
+            this._onAnchorPointerOut = (e) => {
+                if (!e.target.dataset.connectorAnchor) return;
+                this._hoverGhost.hide();
+            };
             this.layer.addEventListener('pointerdown', this._onAnchorPointerDown);
+            this.layer.addEventListener('pointerover', this._onAnchorPointerOver);
+            this.layer.addEventListener('pointerout', this._onAnchorPointerOut);
         }
         
         this._attachEvents();
@@ -52,13 +74,21 @@ export class ConnectionAnchorsLayer {
 
     destroy() {
         this._detachEvents();
-        if (this._onAnchorPointerDown && this.layer) {
-            this.layer.removeEventListener('pointerdown', this._onAnchorPointerDown);
-            this._onAnchorPointerDown = null;
+        if (this.layer) {
+            if (this._onAnchorPointerDown) this.layer.removeEventListener('pointerdown', this._onAnchorPointerDown);
+            if (this._onAnchorPointerOver) this.layer.removeEventListener('pointerover', this._onAnchorPointerOver);
+            if (this._onAnchorPointerOut)  this.layer.removeEventListener('pointerout',  this._onAnchorPointerOut);
         }
+        this._onAnchorPointerDown = null;
+        this._onAnchorPointerOver = null;
+        this._onAnchorPointerOut  = null;
         if (this._dragController) {
             this._dragController.destroy();
             this._dragController = null;
+        }
+        if (this._hoverGhost) {
+            this._hoverGhost.destroy();
+            this._hoverGhost = null;
         }
         if (this.layer && this.layer.parentNode) {
             this.layer.parentNode.removeChild(this.layer);
@@ -96,8 +126,8 @@ export class ConnectionAnchorsLayer {
             [Events.UI.ZoomPercent, () => this.update()],
             [Events.History.Changed, () => this.update()],
             [Events.Board.Loaded, () => this.update()],
-            [Events.Comment.ThreadOpened, () => { this._commentPopoverOpen = true; this.layer.innerHTML = ''; }],
-            [Events.Comment.DraftOpened,  () => { this._commentPopoverOpen = true; this.layer.innerHTML = ''; }],
+            [Events.Comment.ThreadOpened, () => { this._commentPopoverOpen = true; this._hoverGhost?.hide(); this.layer.innerHTML = ''; }],
+            [Events.Comment.DraftOpened,  () => { this._commentPopoverOpen = true; this._hoverGhost?.hide(); this.layer.innerHTML = ''; }],
             [Events.Comment.DraftClosed,  () => { this._commentPopoverOpen = false; this.update(); }],
             [Events.Comment.ThreadDeleted, () => { this._commentPopoverOpen = false; this.update(); }],
             [Events.Comment.PopoverClosed, () => { this._commentPopoverOpen = false; this.update(); }],
@@ -188,7 +218,7 @@ export class ConnectionAnchorsLayer {
             boxSizing: 'border-box'
         });
         
-        const offset = 12;
+        const offset = mbType === 'note' ? 20 : 12;
         const radius = 5;
         const dotSize = radius * 2;
         
@@ -205,7 +235,8 @@ export class ConnectionAnchorsLayer {
                 borderRadius: '50%',
                 pointerEvents: 'auto',
                 boxSizing: 'border-box',
-                border: '2px solid #ffffff'
+                border: '2px solid #ffffff',
+                cursor: 'pointer'
             });
             
             dot.dataset.connectorAnchor = "1";

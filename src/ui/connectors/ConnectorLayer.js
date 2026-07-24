@@ -2,13 +2,14 @@ import * as PIXI from 'pixi.js';
 import { Events } from '../../core/events/Events.js';
 import { ConnectorBindingResolver, distanceToSegment } from '../../services/ConnectorBindingResolver.js';
 import { buildPath, bezierControlPoints, sampleBezier, BEZIER_SAMPLES } from '../../services/ConnectorRouter.js';
+import { routeElbowAvoiding } from '../../services/ConnectorObstacleRouter.js';
 
 const HIT_TEST_SCREEN_PX = 8;
 const ARROW_LEN      = 12;
 const ARROW_HALF     = 5;
 const DASH_LEN       = 8;
 const GAP_LEN        = 5;
-const ELBOW_RADIUS   = 8;
+const ELBOW_RADIUS   = 14;
 const CIRCLE_R       = 4;
 const DIAMOND_HALF   = 5;
 
@@ -369,7 +370,13 @@ export class ConnectorLayer {
                 g.lineStyle(width, color, 1, 0.5);
             }
 
-            const pts = buildPath({ x: sx, y: sy }, { x: ex, y: ey }, route, startDir, endDir);
+            let pts;
+            if (route === 'elbow' && startDir && endDir) {
+                const obstacles = this._collectObstacles(objects, [startTerm.boundId, endTerm.boundId]);
+                pts = routeElbowAvoiding({ x: sx, y: sy }, startDir, { x: ex, y: ey }, endDir, obstacles);
+            } else {
+                pts = buildPath({ x: sx, y: sy }, { x: ex, y: ey }, route, startDir, endDir);
+            }
 
             // Для рисования линии: укорачиваем концы ровно до основания маркера,
             // чтобы толстый stroke не заходил внутрь наконечника.
@@ -427,6 +434,30 @@ export class ConnectorLayer {
 
             this._lastSegments.push({ id: connector.id, points: pts });
         });
+    }
+
+    /**
+     * Собирает bbox-препятствия для обхода elbow-коннектором.
+     * Исключаются объекты-коннекторы и оба конца текущего коннектора.
+     *
+     * @param {Array<Object>} objects все объекты доски
+     * @param {Array<string|undefined>} excludeIds id объектов-концов
+     * @returns {Array<{x:number,y:number,width:number,height:number}>}
+     */
+    _collectObstacles(objects, excludeIds) {
+        const exclude = new Set((excludeIds || []).filter(Boolean));
+        const rects = [];
+        for (const o of objects) {
+            if (!o || o.type === 'connector') continue;
+            if (exclude.has(o.id)) continue;
+            const x = o.position?.x;
+            const y = o.position?.y;
+            const w = o.width ?? o.properties?.width;
+            const h = o.height ?? o.properties?.height;
+            if (!Number.isFinite(x) || !Number.isFinite(y) || !(w > 0) || !(h > 0)) continue;
+            rects.push({ x, y, width: w, height: h });
+        }
+        return rects;
     }
 
     /**

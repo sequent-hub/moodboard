@@ -5,6 +5,9 @@ import {
     computeAnchor,
     drawPreview,
     createConnectorFromTerminals,
+    objectBounds,
+    sideFromAnchor,
+    resolveFreePlacement,
 } from './connectorGesture.js';
 
 /** Минимальное смещение (px) для старта drag. */
@@ -13,12 +16,6 @@ const DRAG_THRESHOLD = 4;
 const EDGE_THRESHOLD_CSS = 10;
 /** Порог магнита к коннектору цели — строго больше EDGE_THRESHOLD_CSS, иначе грань перехватит. */
 const ANCHOR_SNAP_CSS = 16;
-/** Радиус поиска ближайшего объекта при клике по якорю (world-px). */
-const CLICK_FIND_RADIUS = 400;
-/** Зазор между дубликатом и источником при автосоздании (world-px). */
-const CLONE_GAP = 40;
-/** Типы объектов, к которым можно привязать коннектор (из ConnectionAnchorsLayer). */
-const ALLOWED_BIND_TYPES = new Set(['shape', 'note', 'image', 'text', 'simple-text', 'file']);
 /** Нормализованные якоря коннекторов: top, right, bottom, left. */
 const TARGET_ANCHORS = [
     { x: 0.5, y: 0 },
@@ -93,12 +90,7 @@ export class ConnectorDragController {
     }
 
     _objectBounds(objectId) {
-        const posData  = { objectId, position: null };
-        const sizeData = { objectId, size: null };
-        this.eventBus.emit(Events.Tool.GetObjectPosition, posData);
-        this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
-        if (!posData.position || !sizeData.size) return null;
-        return { x: posData.position.x, y: posData.position.y, ...sizeData.size };
+        return objectBounds(this.eventBus, objectId);
     }
 
     /**
@@ -244,76 +236,22 @@ export class ConnectorDragController {
 
     /** Определяет сторону объекта по нормализованному якорю [0,1]. */
     _sideFromAnchor(anchor) {
-        const ax = anchor?.x ?? 0.5;
-        const ay = anchor?.y ?? 0.5;
-        if (ax <= 0.1) return 'left';
-        if (ax >= 0.9) return 'right';
-        if (ay <= 0.1) return 'top';
-        if (ay >= 0.9) return 'bottom';
-        return 'right';
-    }
-
-    /**
-     * Ищет ближайший допустимый объект, чей центр лежит в полуплоскости
-     * от стороны side и в пределах radius world-px.
-     */
-    _findNearestInHalfplane(sourceId, sourceBounds, side, radius) {
-        const cx = sourceBounds.x + sourceBounds.width  / 2;
-        const cy = sourceBounds.y + sourceBounds.height / 2;
-        const objects = this.core?.state?.state?.objects;
-        if (!Array.isArray(objects)) return null;
-
-        let best = null, bestDist = Infinity;
-        for (const obj of objects) {
-            if (!obj || obj.id === sourceId) continue;
-            if (!ALLOWED_BIND_TYPES.has(obj.type)) continue;
-            const bounds = this._objectBounds(obj.id);
-            if (!bounds) continue;
-            const ocx = bounds.x + bounds.width  / 2;
-            const ocy = bounds.y + bounds.height / 2;
-            if (side === 'right'  && ocx <= cx) continue;
-            if (side === 'left'   && ocx >= cx) continue;
-            if (side === 'bottom' && ocy <= cy) continue;
-            if (side === 'top'    && ocy >= cy) continue;
-            const dist = Math.hypot(ocx - cx, ocy - cy);
-            if (dist > radius || dist >= bestDist) continue;
-            bestDist = dist;
-            best = obj;
-        }
-        return best;
-    }
-
-    /** Вычисляет top-left позицию дубликата со сдвигом в сторону side. */
-    _offsetPos(sourceBounds, side) {
-        const { x, y, width, height } = sourceBounds;
-        switch (side) {
-            case 'left':   return { x: x - width  - CLONE_GAP, y };
-            case 'top':    return { x, y: y - height - CLONE_GAP };
-            case 'bottom': return { x, y: y + height + CLONE_GAP };
-            default:       return { x: x + width  + CLONE_GAP, y };
-        }
+        return sideFromAnchor(anchor);
     }
 
     /**
      * Обрабатывает клик по точке подключения (pointerup без значимого drag).
-     * 1. Ищет ближайший объект в полуплоскости стороны → коннектор к нему.
-     * 2. Не нашёл → дублирует исходник со сдвигом → коннектор к дубликату.
+     * Всегда дублирует исходник в свободное место в сторону якоря (за ближайшими
+     * объектами, если они мешают) и соединяет коннектором. Коннектор огибает
+     * препятствия на стороне ConnectorLayer/ConnectorObstacleRouter.
      */
     _onAnchorClick(source) {
         const sourceBounds = this._objectBounds(source.boundId);
         if (!sourceBounds) return;
 
-        const side    = this._sideFromAnchor(source.anchor);
-        const nearest = this._findNearestInHalfplane(source.boundId, sourceBounds, side, CLICK_FIND_RADIUS);
-
-        if (nearest) {
-            const end = { boundId: nearest.id, anchor: { x: 0.5, y: 0.5 }, isPrecise: false, isExact: false };
-            createConnectorFromTerminals(this.core, this.eventBus, source, end);
-            return;
-        }
-
+        const side       = this._sideFromAnchor(source.anchor);
         const originalId = source.boundId;
-        const newPos     = this._offsetPos(sourceBounds, side);
+        const newPos     = resolveFreePlacement(this.eventBus, this.core, originalId, sourceBounds, side);
         const onReady    = (data) => {
             if (!data || data.originalId !== originalId) return;
             this._pendingDupListener = null;

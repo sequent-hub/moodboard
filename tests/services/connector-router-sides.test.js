@@ -227,6 +227,55 @@ describe('elbow buildPath — грани врозь (C-shape)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Регрессия: встречные грани БЛИЖЕ 2×ELBOW_STUB — раньше давало петлю
+// (стабы перехлёстывались, эвристика facingEachOther ошибочно детектила «врозь»)
+// ---------------------------------------------------------------------------
+describe('elbow buildPath — встречные грани в узком зазоре (без петли)', () => {
+    /** Путь не должен возвращаться назад по оси, перпендикулярной общему направлению. */
+    function maxDeviation(pts, axis) {
+        return Math.max(...pts.map(p => p[axis])) - Math.min(...pts.map(p => p[axis]));
+    }
+
+    it('горизонтальный зазор 40px < 2×ELBOW_STUB(24): путь почти прямой, без выброса по Y', () => {
+        const startPt  = { x: 100, y: 50 };
+        const endPt    = { x: 60,  y: 50 };
+        const startDir = { x: -1, y: 0 }; // левая грань правого объекта, смотрит навстречу
+        const endDir   = { x: 1,  y: 0 }; // правая грань левого объекта, смотрит навстречу
+
+        const pts = buildPath(startPt, endPt, 'elbow', startDir, endDir);
+
+        expect(pts[0]).toEqual(startPt);
+        expect(pts[pts.length - 1]).toEqual(endPt);
+        // Раньше здесь появлялся вертикальный выброс (петля) на ELBOW_STUB (24px).
+        expect(maxDeviation(pts, 'y')).toBeLessThan(1);
+    });
+
+    it('вертикальный зазор 40px < 2×ELBOW_STUB(24): путь почти прямой, без выброса по X', () => {
+        const startPt  = { x: 50, y: 100 };
+        const endPt    = { x: 50, y: 60 };
+        const startDir = { x: 0, y: -1 };
+        const endDir   = { x: 0, y: 1 };
+
+        const pts = buildPath(startPt, endPt, 'elbow', startDir, endDir);
+
+        expect(pts[0]).toEqual(startPt);
+        expect(pts[pts.length - 1]).toEqual(endPt);
+        expect(maxDeviation(pts, 'x')).toBeLessThan(1);
+    });
+
+    it('широкий зазор (200px) — поведение стаба не изменилось, длина стаба = ELBOW_STUB', () => {
+        const startPt  = { x: 300, y: 50 };
+        const endPt    = { x: 100, y: 50 };
+        const startDir = { x: -1, y: 0 };
+        const endDir   = { x: 1,  y: 0 };
+
+        const pts = buildPath(startPt, endPt, 'elbow', startDir, endDir);
+        const firstLen = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        expect(firstLen).toBeCloseTo(ELBOW_STUB, 0);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // 4. bezier: контрольная точка смещена вдоль dir
 // ---------------------------------------------------------------------------
 describe('bezierControlPoints — смещение вдоль dir', () => {
