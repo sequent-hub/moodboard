@@ -97,6 +97,12 @@ function buildActionsRow(collect) {
     contentTypeWrapper.pill.title = 'Тип генерируемого контента';
     contentTypeWrapper.pill.setAttribute('aria-label', 'Тип генерируемого контента');
 
+    const contentTypeCaret = document.createElement('span');
+    contentTypeCaret.className = 'moodboard-chat__pill-caret';
+    contentTypeCaret.setAttribute('aria-hidden', 'true');
+    contentTypeCaret.innerHTML = ICONS.chevronDown;
+    contentTypeWrapper.pill.appendChild(contentTypeCaret);
+
     const modelWrapper = pillWithMenu('Nano Banana Pro', ICONS.model, 'chat-menu-model');
     modelWrapper.pill.title = 'Модель ИИ';
     modelWrapper.pill.setAttribute('aria-label', 'Модель ИИ');
