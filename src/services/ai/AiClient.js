@@ -145,24 +145,21 @@ export class AiClient {
     /**
      * Отправляет джоб генерации 3D-модели.
      * @param {object} args
-     * @param {string} [args.provider='hunyuan-3d']
+     * @param {string} [args.provider] - провайдер для бэкенда (tencentcloud)
      * @param {string} [args.mode='image'] 'text'|'image'|'multi'
      * @param {string} [args.prompt]
      * @param {File} [args.image]
      * @param {Array<{file: File, viewType: string}>} [args.multiViewImages]
-     * @param {string} [args.model='3.1']
-     * @param {string} [args.generateType]
-     * @param {number} [args.faceCount]
-     * @param {boolean} [args.pbr]
-     * @param {string} [args.downloadFormat]
+     * @param {string} [args.model] - slug модели (hunyuan-3d-pro | hunyuan-3d-rapid)
+     * @param {object} [args.options] - provider-native опции (Model/EnablePBR/FaceCount/...)
      * @param {AbortSignal} [args.signal]
      * @returns {Promise<{jobId: string}>}
      */
-    async submit3dModel({ provider = 'hunyuan-3d', mode = 'image', prompt, image, multiViewImages, model = '3.1', generateType, faceCount, pbr, downloadFormat, signal }) {
-        const body = { mode, model, downloadFormat };
-        if (generateType !== undefined) body.generateType = generateType;
-        if (faceCount !== undefined) body.faceCount = faceCount;
-        if (pbr !== undefined) body.pbr = pbr;
+    async submit3dModel({ provider, mode = 'image', prompt, image, multiViewImages, model, options, signal }) {
+        if (!provider) throw new Error('AiClient.submit3dModel: provider is required');
+        if (!model) throw new Error('AiClient.submit3dModel: model is required');
+
+        const body = { mode, model, ...(options || {}) };
 
         if (mode === 'text') {
             body.prompt = prompt;
@@ -199,11 +196,12 @@ export class AiClient {
      * Опрашивает статус джоба 3D-модели.
      * @param {string} jobId
      * @param {AbortSignal} [signal]
-     * @param {string} [provider='hunyuan-3d']
+     * @param {string} [provider] - провайдер для бэкенда (tencentcloud)
      * @param {string} [format]
      * @returns {Promise<object>}
      */
-    async poll3dModel(jobId, signal, provider = 'hunyuan-3d', format) {
+    async poll3dModel(jobId, signal, provider, format) {
+        if (!provider) throw new Error('AiClient.poll3dModel: provider is required');
         const url = `${this._baseUrl}/${provider}/model3d/${jobId}${format ? `?format=${format}` : ''}`;
         const res = await this._fetch(url, {
             method: 'GET',

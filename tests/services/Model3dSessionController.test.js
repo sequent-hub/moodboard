@@ -46,7 +46,7 @@ describe('Model3dSessionController', () => {
             const client = makeClient();
             const ctrl = new Model3dSessionController({ aiClient: client });
 
-            const p = ctrl.start({ mode: 'text', prompt: 'a robot', downloadFormat: 'glb' });
+            const p = ctrl.start({ mode: 'text', prompt: 'a robot', pollFormat: 'glb' });
             await vi.advanceTimersByTimeAsync(POLL_MS + 100);
             await p;
 
@@ -60,18 +60,18 @@ describe('Model3dSessionController', () => {
             });
         });
 
-        it('poll3dModel вызывается с (jobId, signal, undefined, format)', async () => {
+        it('poll3dModel вызывается с (jobId, signal, provider, format)', async () => {
             const client = makeClient();
             const ctrl = new Model3dSessionController({ aiClient: client });
 
-            const p = ctrl.start({ mode: 'text', prompt: 'x', downloadFormat: 'glb' });
+            const p = ctrl.start({ mode: 'text', prompt: 'x', pollFormat: 'glb', provider: 'tencentcloud' });
             await vi.advanceTimersByTimeAsync(POLL_MS + 100);
             await p;
 
             expect(client.poll3dModel).toHaveBeenCalledWith(
                 'gen-1',
                 expect.anything(),
-                undefined,
+                'tencentcloud',
                 'glb'
             );
         });
@@ -82,7 +82,7 @@ describe('Model3dSessionController', () => {
             const statuses = [];
             ctrl.subscribe(s => statuses.push(s.status));
 
-            const p = ctrl.start({ mode: 'text', prompt: 'x', downloadFormat: 'glb' });
+            const p = ctrl.start({ mode: 'text', prompt: 'x', pollFormat: 'glb' });
             await vi.advanceTimersByTimeAsync(POLL_MS + 100);
             await p;
 
@@ -109,7 +109,7 @@ describe('Model3dSessionController', () => {
             const client = makeFbxClient();
             const ctrl = new Model3dSessionController({ aiClient: client });
 
-            const p = ctrl.start({ mode: 'image', downloadFormat: 'fbx' });
+            const p = ctrl.start({ mode: 'image', pollFormat: 'fbx' });
             await vi.advanceTimersByTimeAsync(POLL_MS + 100); // ждём poll генерации
             await vi.advanceTimersByTimeAsync(POLL_MS + 100); // ждём poll конвертации
             await p;
@@ -123,7 +123,7 @@ describe('Model3dSessionController', () => {
             const client = makeFbxClient();
             const ctrl = new Model3dSessionController({ aiClient: client });
 
-            const p = ctrl.start({ mode: 'image', downloadFormat: 'fbx' });
+            const p = ctrl.start({ mode: 'image', pollFormat: 'fbx' });
             await vi.advanceTimersByTimeAsync(POLL_MS + 100);
             await vi.advanceTimersByTimeAsync(POLL_MS + 100);
             await p;
@@ -140,7 +140,7 @@ describe('Model3dSessionController', () => {
             const client = makeFbxClient();
             const ctrl = new Model3dSessionController({ aiClient: client });
 
-            const p = ctrl.start({ mode: 'image', downloadFormat: 'fbx' });
+            const p = ctrl.start({ mode: 'image', pollFormat: 'fbx' });
             await vi.advanceTimersByTimeAsync(POLL_MS + 100);
             await vi.advanceTimersByTimeAsync(POLL_MS + 100);
             await p;
@@ -165,7 +165,7 @@ describe('Model3dSessionController', () => {
             });
             const ctrl = new Model3dSessionController({ aiClient: client });
 
-            const p = ctrl.start({ downloadFormat: 'glb' });
+            const p = ctrl.start({ pollFormat: 'glb' });
             ctrl.abort();
             resolveSubmit({ jobId: 'gen-1' }); // submit разрешается после abort → start возвращает early
 
@@ -191,7 +191,7 @@ describe('Model3dSessionController', () => {
             });
             const ctrl = new Model3dSessionController({ aiClient: client });
 
-            const p = ctrl.start({ downloadFormat: 'fbx' });
+            const p = ctrl.start({ pollFormat: 'fbx' });
             await vi.advanceTimersByTimeAsync(POLL_MS + 100); // gen poll завершён, submitConvert3d pending
 
             ctrl.abort();
@@ -213,7 +213,7 @@ describe('Model3dSessionController', () => {
             });
             const ctrl = new Model3dSessionController({ aiClient: client });
 
-            const p = ctrl.start({ downloadFormat: 'glb' });
+            const p = ctrl.start({ pollFormat: 'glb' });
             await vi.advanceTimersByTimeAsync(POLL_MS + 100);
             await p;
 
@@ -227,7 +227,7 @@ describe('Model3dSessionController', () => {
             });
             const ctrl = new Model3dSessionController({ aiClient: client });
 
-            await ctrl.start({ downloadFormat: 'glb' });
+            await ctrl.start({ pollFormat: 'glb' });
 
             expect(ctrl.getState().status).toBe('error');
             expect(ctrl.getState().error).toContain('submit failed');

@@ -4,6 +4,7 @@ import { ChatSessionController } from '../../services/ai/ChatSessionController.j
 import { Model3dSessionController } from '../../services/ai/Model3dSessionController.js';
 import { IMAGE_MODELS, getImageModelCapability } from '../../services/ai/imageModelCapabilities.js';
 import { VIDEO_MODELS, getVideoModelCapability } from '../../services/ai/videoModelCapabilities.js';
+import { MODEL_3D_MODELS, getModel3dCapability, find3dOptionByPill } from '../../services/ai/model3dModelCapabilities.js';
 import { VideoSessionController } from '../../services/ai/VideoSessionController.js';
 import { Events } from '../../core/events/Events.js';
 
@@ -40,19 +41,17 @@ const CONTENT_TYPE_OPTIONS = [
     }
 ];
 
-const FACE_COUNT_OPTIONS_3D = [
-    { id: '1.5m', label: '1.5M' },
-    { id: '1m',   label: '1M'   },
-    { id: '500k', label: '500k' },
-    { id: '50k',  label: '50k'  },
-];
-
-const FACE_COUNT_MAP_3D = { '1.5m': 1500000, '1m': 1000000, '500k': 500000, '50k': 50000 };
-
-const TYPE_3D_OPTIONS = [
-    { id: 'geo_tex', label: 'Геометрия + Текстура' },
-    { id: 'geo',     label: 'Только геометрия'     },
-];
+/**
+ * Опции пилюли 3D-генерации по spec'у выбранной модели.
+ * @param {import('../../services/ai/model3dModelCapabilities.js').Model3dOptionSpec|null} spec
+ * @returns {Array<{id: string, label: string}>}
+ */
+function _3dPillOptions(spec) {
+    return (spec?.values ?? []).map((v) => ({
+        id: String(v),
+        label: spec.valueLabels?.[v] ?? String(v),
+    }));
+}
 
 const MODE_3D_OPTIONS = [
     { id: 'image', label: 'Изображение'           },
@@ -77,13 +76,6 @@ const TEXTURE_STYLE_SUFFIX_3D = {
     cartoon:              ', cartoon style',
     cyberpunk:            ', cyberpunk style',
 };
-
-const RESULT_FORMAT_OPTIONS_3D = [
-    { id: 'glb', label: 'GLB' },
-    { id: 'obj', label: 'OBJ' },
-    { id: 'fbx', label: 'FBX' },
-    { id: 'stl', label: 'STL' },
-];
 
 // ViewType для мультивью: 2-е..8-е вложение (1-е = фронт, без ViewType)
 const VIEW_ORDER_3D  = ['left', 'right', 'back', 'top', 'bottom', 'left_front', 'right_front'];
@@ -157,6 +149,14 @@ function _iconForProvider(provider) {
     }
 }
 
+/** Маппинг провайдера 3D → иконка пилла модели. */
+function _iconFor3dProvider(provider) {
+    switch (provider) {
+        case 'tencentcloud': return ICONS.cube;
+        default:            return ICONS.cube;
+    }
+}
+
 /**
  * Корневой контейнер чата ИИ-ассистента.
  *
@@ -214,15 +214,23 @@ export class ChatWindow {
         this._imageWatermark = false;
         this._unsubscribe = null;
         this._attached = false;
-        this._3dFaceCountId = '1m';
-        this._3dTypeId = 'geo_tex';
+        this._3dModelId = 'hunyuan-3d-pro';
+        this._3dFaceCountId = '500000';
+        this._3dTypeId = 'Normal';
+        this._3dEnablePbrId = 'false';
+        this._3dEnableGeometryId = 'false';
+        this._3dResultFormatId = 'OBJ';
+        this._3dModelMenu = null;
         this._3dFaceCountMenu = null;
         this._3dTypeMenu = null;
         this._3dFaceCountWrapper = null;
         this._3dTypeWrapper = null;
+        this._3dEnablePbrMenu = null;
+        this._3dEnablePbrWrapper = null;
+        this._3dEnableGeometryMenu = null;
+        this._3dEnableGeometryWrapper = null;
         this._3dMode = 'image';
         this._3dTextureStyleId = 'general';
-        this._3dResultFormatId = 'glb';
         this._3dModeMenu = null;
         this._3dModeWrapper = null;
         this._3dTextureStyleMenu = null;
@@ -354,18 +362,30 @@ export class ChatWindow {
                     if (this._contentTypeId === 'video') {
                         return VIDEO_MODELS.map((m) => ({ id: m.id, label: m.label, description: m.description, icon: _iconForVideoProvider(m.provider) }));
                     }
+                    if (this._contentTypeId === '3d') {
+                        return MODEL_3D_MODELS.map((m) => ({ id: m.id, label: m.label, description: m.description, icon: _iconFor3dProvider(m.provider) }));
+                    }
                     return IMAGE_MODELS.map((m) => ({ id: m.id, label: m.label, description: m.description, icon: _iconForProvider(m.provider) }));
                 },
-                getActiveId: () => this._contentTypeId === 'video' ? this._videoModelId : this._modelId,
+                getActiveId: () => {
+                    if (this._contentTypeId === 'video') return this._videoModelId;
+                    if (this._contentTypeId === '3d') return this._3dModelId;
+                    return this._modelId;
+                },
                 onSelect: (id) => {
                     if (this._contentTypeId === 'video') {
                         this._videoModelId = id;
                         this._clampVideoSettingsToModel();
+                    } else if (this._contentTypeId === '3d') {
+                        this._3dModelId = id;
+                        this._clamp3dSettingsToModel();
+                        this._refresh3dOptionMenus();
                     } else {
                         this._modelId = id;
                         this._clampSettingsToModel();
                     }
                     this._modelMenu.refresh();
+                    this._update3dPillVisibility();
                     this._updateResolutionPillVisibility();
                     this._settingsPopupCtrl?.refresh();
                 }
@@ -483,6 +503,8 @@ export class ChatWindow {
         this._attach3dPills();
         this._attachVideoPills();
         this._attachVideoToolbarPills();
+        this._clamp3dSettingsToModel();
+        this._refresh3dOptionMenus();
         this._update3dPillVisibility();
 
         const initialState = this._session.getState();
@@ -536,6 +558,14 @@ export class ChatWindow {
         this._3dResultFormatMenu = null;
         this._3dResultFormatWrapper?.remove();
         this._3dResultFormatWrapper = null;
+        this._3dEnablePbrMenu?.destroy();
+        this._3dEnablePbrMenu = null;
+        this._3dEnablePbrWrapper?.remove();
+        this._3dEnablePbrWrapper = null;
+        this._3dEnableGeometryMenu?.destroy();
+        this._3dEnableGeometryMenu = null;
+        this._3dEnableGeometryWrapper?.remove();
+        this._3dEnableGeometryWrapper = null;
         if (this._videoUnsubscribe) { this._videoUnsubscribe(); this._videoUnsubscribe = null; }
         this._videoSession?.abort?.();
         this._videoSession = null;
@@ -602,31 +632,28 @@ export class ChatWindow {
             return { wrapper, pill, menu, labelEl, iconEl: iconSpan };
         };
 
-        const fc = mk3dPill('1M', ICONS.sliders);
-        pillsContainer.appendChild(fc.wrapper);
-        this._3dFaceCountWrapper = fc.wrapper;
-        this._3dFaceCountMenu = new ChatPillMenu(
-            { trigger: fc.pill, menu: fc.menu, label: fc.labelEl, icon: fc.iconEl },
-            {
-                getOptions: () => FACE_COUNT_OPTIONS_3D,
-                getActiveId: () => this._3dFaceCountId,
-                onSelect: (id) => { this._3dFaceCountId = id; this._3dFaceCountMenu.refresh(); }
-            }
-        );
-        this._3dFaceCountMenu.attach();
-
-        const tp = mk3dPill('Геометрия + Текстура', ICONS.cube);
-        pillsContainer.appendChild(tp.wrapper);
-        this._3dTypeWrapper = tp.wrapper;
-        this._3dTypeMenu = new ChatPillMenu(
-            { trigger: tp.pill, menu: tp.menu, label: tp.labelEl, icon: tp.iconEl },
-            {
-                getOptions: () => TYPE_3D_OPTIONS,
-                getActiveId: () => this._3dTypeId,
-                onSelect: (id) => { this._3dTypeId = id; this._3dTypeMenu.refresh(); }
-            }
-        );
-        this._3dTypeMenu.attach();
+        const optionPills = [
+            { pill: 'faceCount',      stateKey: '_3dFaceCountId',      menuKey: '_3dFaceCountMenu',      wrapperKey: '_3dFaceCountWrapper',      label: '500k',    icon: ICONS.sliders },
+            { pill: 'generateType',   stateKey: '_3dTypeId',           menuKey: '_3dTypeMenu',           wrapperKey: '_3dTypeWrapper',            label: 'Норма',    icon: ICONS.cube },
+            { pill: 'enablePbr',      stateKey: '_3dEnablePbrId',      menuKey: '_3dEnablePbrMenu',      wrapperKey: '_3dEnablePbrWrapper',      label: 'PBR выкл', icon: ICONS.palette },
+            { pill: 'enableGeometry', stateKey: '_3dEnableGeometryId', menuKey: '_3dEnableGeometryMenu', wrapperKey: '_3dEnableGeometryWrapper', label: 'Геом выкл', icon: ICONS.cube },
+            { pill: 'resultFormat',   stateKey: '_3dResultFormatId',   menuKey: '_3dResultFormatMenu',   wrapperKey: '_3dResultFormatWrapper',    label: 'OBJ',     icon: ICONS.sliders },
+        ];
+        for (const cfg of optionPills) {
+            const p = mk3dPill(cfg.label, cfg.icon);
+            pillsContainer.appendChild(p.wrapper);
+            this[cfg.wrapperKey] = p.wrapper;
+            const menu = new ChatPillMenu(
+                { trigger: p.pill, menu: p.menu, label: p.labelEl, icon: p.iconEl },
+                {
+                    getOptions: () => _3dPillOptions(find3dOptionByPill(getModel3dCapability(this._3dModelId), cfg.pill)),
+                    getActiveId: () => this[cfg.stateKey],
+                    onSelect: (id) => { this[cfg.stateKey] = id; this[cfg.menuKey].refresh(); }
+                }
+            );
+            menu.attach();
+            this[cfg.menuKey] = menu;
+        }
 
         const md = mk3dPill('Изображение', ICONS.image);
         pillsContainer.appendChild(md.wrapper);
@@ -653,19 +680,34 @@ export class ChatWindow {
             }
         );
         this._3dTextureStyleMenu.attach();
+    }
 
-        const rf = mk3dPill('GLB', ICONS.sliders);
-        pillsContainer.appendChild(rf.wrapper);
-        this._3dResultFormatWrapper = rf.wrapper;
-        this._3dResultFormatMenu = new ChatPillMenu(
-            { trigger: rf.pill, menu: rf.menu, label: rf.labelEl, icon: rf.iconEl },
-            {
-                getOptions: () => RESULT_FORMAT_OPTIONS_3D,
-                getActiveId: () => this._3dResultFormatId,
-                onSelect: (id) => { this._3dResultFormatId = id; this._3dResultFormatMenu.refresh(); }
+    /** Пересобирает меню опций 3D после смены модели (списки значений меняются). */
+    _refresh3dOptionMenus() {
+        this._3dFaceCountMenu?.refresh();
+        this._3dTypeMenu?.refresh();
+        this._3dEnablePbrMenu?.refresh();
+        this._3dEnableGeometryMenu?.refresh();
+        this._3dResultFormatMenu?.refresh();
+    }
+
+    /** Сбрасывает id опций 3D к дефолтам выбранной модели, если текущее значение не валидно. */
+    _clamp3dSettingsToModel() {
+        const cap = getModel3dCapability(this._3dModelId);
+        if (!cap) return;
+        const clamp = (pill, stateKey) => {
+            const spec = find3dOptionByPill(cap, pill);
+            if (!spec) { this[stateKey] = null; return; }
+            const allowed = spec.values.map(String);
+            if (this[stateKey] == null || !allowed.includes(String(this[stateKey]))) {
+                this[stateKey] = String(spec.default);
             }
-        );
-        this._3dResultFormatMenu.attach();
+        };
+        clamp('faceCount', '_3dFaceCountId');
+        clamp('generateType', '_3dTypeId');
+        clamp('enablePbr', '_3dEnablePbrId');
+        clamp('enableGeometry', '_3dEnableGeometryId');
+        clamp('resultFormat', '_3dResultFormatId');
     }
 
     _update3dPillVisibility() {
@@ -677,17 +719,23 @@ export class ChatWindow {
         if (formatWrapper) formatWrapper.style.display = is3d ? 'none' : '';
         // В видео-режиме счётчик не нужен: у всех видео-моделей maxCount=1
         if (countWrapper) countWrapper.style.display = (is3d || isVideo) ? 'none' : '';
-        if (modelWrapper) modelWrapper.style.display = is3d ? 'none' : '';
+        // Пилл модели в 3D-режиме показывает выбор Hunyuan 3D Pro / Rapid
+        if (modelWrapper) modelWrapper.style.display = '';
         // Разрешение — скрываем в 3D-режиме; при возврате — восстанавливаем по capability
         if (is3d) {
             if (this._refs?.resolutionWrapper) this._refs.resolutionWrapper.style.display = 'none';
         } else {
             this._updateResolutionPillVisibility();
         }
-        if (this._3dFaceCountWrapper) this._3dFaceCountWrapper.style.display = is3d ? '' : 'none';
-        if (this._3dTypeWrapper) this._3dTypeWrapper.style.display = is3d ? '' : 'none';
+        // Опции 3D показываем только если они есть у выбранной модели
+        const cap = getModel3dCapability(this._3dModelId);
+        const has = (pill) => is3d && !!find3dOptionByPill(cap, pill);
+        if (this._3dFaceCountWrapper) this._3dFaceCountWrapper.style.display = has('faceCount') ? '' : 'none';
+        if (this._3dTypeWrapper) this._3dTypeWrapper.style.display = has('generateType') ? '' : 'none';
+        if (this._3dEnablePbrWrapper) this._3dEnablePbrWrapper.style.display = has('enablePbr') ? '' : 'none';
+        if (this._3dEnableGeometryWrapper) this._3dEnableGeometryWrapper.style.display = has('enableGeometry') ? '' : 'none';
+        if (this._3dResultFormatWrapper) this._3dResultFormatWrapper.style.display = has('resultFormat') ? '' : 'none';
         if (this._3dModeWrapper) this._3dModeWrapper.style.display = is3d ? '' : 'none';
-        if (this._3dResultFormatWrapper) this._3dResultFormatWrapper.style.display = is3d ? '' : 'none';
         // Стиль текстуры — только в text-режиме
         if (this._3dTextureStyleWrapper) {
             this._3dTextureStyleWrapper.style.display = (is3d && this._3dMode === 'text') ? '' : 'none';
@@ -774,6 +822,35 @@ export class ChatWindow {
         const suffix = TEXTURE_STYLE_SUFFIX_3D[this._3dTextureStyleId] ?? '';
         const prompt = mode === 'text' ? (text + suffix) : undefined;
 
+        const cap = getModel3dCapability(this._3dModelId);
+        if (!cap) {
+            console.warn('[ChatWindow] _submit3d: unknown 3D model', this._3dModelId);
+            return;
+        }
+
+        const options = {};
+        for (const spec of cap.options) {
+            if (spec.fixed) {
+                options[spec.key] = spec.default;
+                continue;
+            }
+            let val;
+            switch (spec.pill) {
+                case 'faceCount':      val = this._3dFaceCountId; break;
+                case 'generateType':   val = this._3dTypeId; break;
+                case 'enablePbr':      val = this._3dEnablePbrId; break;
+                case 'enableGeometry': val = this._3dEnableGeometryId; break;
+                case 'resultFormat':   val = this._3dResultFormatId; break;
+                default: continue;
+            }
+            if (val == null || val === '') continue;
+            options[spec.key] = spec.type === 'int' ? Number(val) : val;
+        }
+
+        // Формат для опроса артефакта: ResultFormat если есть у модели, иначе GLB.
+        const resultFormatSpec = find3dOptionByPill(cap, 'resultFormat');
+        const pollFormat = resultFormatSpec ? this._3dResultFormatId : 'GLB';
+
         void this._model3dSession.start({
             mode,
             prompt,
@@ -781,11 +858,10 @@ export class ChatWindow {
             multiViewImages: mode === 'multi'
                 ? attachments.slice(1).map((file, i) => ({ file, viewType: VIEW_ORDER_3D[i] }))
                 : undefined,
-            model: '3.1',
-            generateType: this._3dTypeId === 'geo' ? 'Geometry' : 'Normal',
-            faceCount: FACE_COUNT_MAP_3D[this._3dFaceCountId] ?? 1000000,
-            pbr: false,
-            downloadFormat: this._3dResultFormatId,
+            model: this._3dModelId,
+            provider: cap.provider,
+            options,
+            pollFormat,
         });
     }
 

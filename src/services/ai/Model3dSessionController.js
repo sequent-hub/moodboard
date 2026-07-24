@@ -57,15 +57,14 @@ export class Model3dSessionController {
      * @param {string} [args.prompt]
      * @param {File} [args.image]
      * @param {Array<{file: File, viewType: string}>} [args.multiViewImages]
-     * @param {string} [args.model='3.1']
-     * @param {string} [args.generateType]
-     * @param {number} [args.faceCount]
-     * @param {boolean} [args.pbr]
-     * @param {string} [args.downloadFormat='glb']
+     * @param {string} [args.model] - slug модели (hunyuan-3d-pro | hunyuan-3d-rapid)
+     * @param {string} [args.provider] - провайдер для бэкенда (tencentcloud)
+     * @param {object} [args.options] - provider-native опции (Model/EnablePBR/FaceCount/...)
+     * @param {string} [args.pollFormat='GLB'] - формат для выбора артефакта при опросе
      * @param {AbortSignal} [args.signal]
      * @returns {Promise<void>}
      */
-    async start({ mode = 'image', prompt, image, multiViewImages, model = '3.1', generateType, faceCount, pbr, downloadFormat = 'glb', signal: externalSignal } = {}) {
+    async start({ mode = 'image', prompt, image, multiViewImages, model, provider, options, pollFormat = 'GLB', signal: externalSignal } = {}) {
         if (this._abort) this.abort();
 
         const abort = new AbortController();
@@ -88,13 +87,13 @@ export class Model3dSessionController {
 
         try {
             const { jobId } = await this._client.submit3dModel({
-                mode, prompt, image, multiViewImages, model, generateType, faceCount, pbr, downloadFormat, signal
+                mode, prompt, image, multiViewImages, model, provider, options, signal
             });
             if (signal.aborted) return;
 
             this._setState({ status: 'polling', jobId });
 
-            const genResult = await this._pollLoop(jobId, signal, downloadFormat);
+            const genResult = await this._pollLoop(jobId, signal, pollFormat, provider);
             if (!genResult || signal.aborted) return;
 
             if (!genResult.needsConvert) {
@@ -108,13 +107,13 @@ export class Model3dSessionController {
             this._setState({ stage: 'convert', progress: 0 });
 
             const { jobId: convertJobId } = await this._client.submitConvert3d({
-                glbUrl: sourceGlbUrl, format: downloadFormat, signal
+                glbUrl: sourceGlbUrl, format: pollFormat, signal
             });
             if (signal.aborted) return;
 
             this._setState({ jobId: convertJobId });
 
-            const convResult = await this._pollConvertLoop(convertJobId, signal, downloadFormat);
+            const convResult = await this._pollConvertLoop(convertJobId, signal, pollFormat);
             if (!convResult || signal.aborted) return;
 
             this._setState({
@@ -140,14 +139,14 @@ export class Model3dSessionController {
         }
     }
 
-    async _pollLoop(jobId, signal, format) {
+    async _pollLoop(jobId, signal, format, provider) {
         while (!signal.aborted) {
             await sleep(POLL_INTERVAL_MS, signal);
             if (signal.aborted) return null;
 
             let data;
             try {
-                data = await this._client.poll3dModel(jobId, signal, undefined, format);
+                data = await this._client.poll3dModel(jobId, signal, provider, format);
             } catch (err) {
                 if (err?.name === 'AbortError' || signal.aborted) return null;
                 this._setState({ status: 'error', error: err?.message || 'Ошибка поллинга' });

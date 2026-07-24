@@ -31,6 +31,8 @@ function errResponse(status = 422, body = '{"error":"bad input"}') {
     };
 }
 
+const PRO = { provider: 'tencentcloud', model: 'hunyuan-3d-pro' };
+
 describe('AiClient — методы 3D-модели', () => {
     let mockFetch;
     let client;
@@ -50,14 +52,15 @@ describe('AiClient — методы 3D-модели', () => {
         it('mode="text" — body содержит prompt, нет image/multiViewImages', async () => {
             mockFetch.mockResolvedValueOnce(okResponse({ jobId: 'j1' }));
 
-            await client.submit3dModel({ mode: 'text', prompt: 'a robot', downloadFormat: 'glb' });
+            await client.submit3dModel({ ...PRO, mode: 'text', prompt: 'a robot' });
 
             const [url, opts] = mockFetch.mock.calls[0];
             const body = JSON.parse(opts.body);
 
-            expect(url).toContain('/model3d');
+            expect(url).toContain('/tencentcloud/model3d');
             expect(opts.method).toBe('POST');
             expect(body.mode).toBe('text');
+            expect(body.model).toBe('hunyuan-3d-pro');
             expect(body.prompt).toBe('a robot');
             expect(body.image).toBeUndefined();
             expect(body.multiViewImages).toBeUndefined();
@@ -67,7 +70,7 @@ describe('AiClient — методы 3D-модели', () => {
             mockFetch.mockResolvedValueOnce(okResponse({ jobId: 'j2' }));
             const file = makeFakeFile('imgbytes', 'image/jpeg');
 
-            await client.submit3dModel({ mode: 'image', image: file, downloadFormat: 'glb' });
+            await client.submit3dModel({ ...PRO, mode: 'image', image: file });
 
             const [, opts] = mockFetch.mock.calls[0];
             const body = JSON.parse(opts.body);
@@ -81,14 +84,14 @@ describe('AiClient — методы 3D-модели', () => {
             expect(body.multiViewImages).toBeUndefined();
         });
 
-        it('mode="multi" — body содержит multiViewImages[{mimeType,data,viewType}], нет prompt/image', async () => {
+        it('mode="multi" — body содержит multiViewImages[{mimeType,data,viewType}]', async () => {
             mockFetch.mockResolvedValueOnce(okResponse({ jobId: 'j3' }));
             const file = makeFakeFile('frontbytes', 'image/png');
 
             await client.submit3dModel({
+                ...PRO,
                 mode: 'multi',
                 multiViewImages: [{ file, viewType: 'front' }],
-                downloadFormat: 'fbx',
             });
 
             const [, opts] = mockFetch.mock.calls[0];
@@ -104,29 +107,38 @@ describe('AiClient — методы 3D-модели', () => {
             expect(body.prompt).toBeUndefined();
         });
 
-        it('downloadFormat всегда присутствует в body', async () => {
+        it('provider-native options раскрываются в body как есть', async () => {
             mockFetch.mockResolvedValueOnce(okResponse({ jobId: 'j4' }));
 
-            await client.submit3dModel({ mode: 'text', prompt: 'x', downloadFormat: 'stl' });
+            await client.submit3dModel({
+                ...PRO,
+                mode: 'text',
+                prompt: 'x',
+                options: { Model: '3.0', EnablePBR: 'false', FaceCount: 500000, GenerateType: 'Normal' },
+            });
 
             const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-            expect(body.downloadFormat).toBe('stl');
+            expect(body.Model).toBe('3.0');
+            expect(body.EnablePBR).toBe('false');
+            expect(body.FaceCount).toBe(500000);
+            expect(body.GenerateType).toBe('Normal');
         });
 
-        it('model по умолчанию "3.1"', async () => {
-            mockFetch.mockResolvedValueOnce(okResponse({ jobId: 'j5' }));
+        it('model и provider обязательны', async () => {
+            await expect(
+                client.submit3dModel({ mode: 'text', prompt: 'x' })
+            ).rejects.toThrow('provider is required');
 
-            await client.submit3dModel({ mode: 'text', prompt: 'x', downloadFormat: 'glb' });
-
-            const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-            expect(body.model).toBe('3.1');
+            await expect(
+                client.submit3dModel({ provider: 'tencentcloud', mode: 'text', prompt: 'x' })
+            ).rejects.toThrow('model is required');
         });
 
         it('HTTP-ошибка — выбрасывает с кодом статуса', async () => {
             mockFetch.mockResolvedValueOnce(errResponse(422));
 
             await expect(
-                client.submit3dModel({ mode: 'text', prompt: 'x', downloadFormat: 'glb' })
+                client.submit3dModel({ ...PRO, mode: 'text', prompt: 'x' })
             ).rejects.toThrow('422');
         });
     });
@@ -137,27 +149,33 @@ describe('AiClient — методы 3D-модели', () => {
         it('добавляет ?format= в URL если format передан', async () => {
             mockFetch.mockResolvedValueOnce(okResponse({ status: 'running' }));
 
-            await client.poll3dModel('job-123', undefined, 'hunyuan-3d', 'fbx');
+            await client.poll3dModel('job-123', undefined, 'tencentcloud', 'fbx');
 
             const [url] = mockFetch.mock.calls[0];
-            expect(url).toContain('/model3d/job-123?format=fbx');
+            expect(url).toContain('/tencentcloud/model3d/job-123?format=fbx');
         });
 
         it('не добавляет ?format= если format не передан', async () => {
             mockFetch.mockResolvedValueOnce(okResponse({ status: 'running' }));
 
-            await client.poll3dModel('job-123', undefined, 'hunyuan-3d');
+            await client.poll3dModel('job-123', undefined, 'tencentcloud');
 
             const [url] = mockFetch.mock.calls[0];
-            expect(url).toContain('/model3d/job-123');
+            expect(url).toContain('/tencentcloud/model3d/job-123');
             expect(url).not.toContain('?format=');
+        });
+
+        it('provider обязателен', async () => {
+            await expect(
+                client.poll3dModel('job-123', undefined, undefined, 'glb')
+            ).rejects.toThrow('provider is required');
         });
 
         it('HTTP-ошибка — выбрасывает', async () => {
             mockFetch.mockResolvedValueOnce(errResponse(500, '{}'));
 
             await expect(
-                client.poll3dModel('job-123', undefined, 'hunyuan-3d', 'glb')
+                client.poll3dModel('job-123', undefined, 'tencentcloud', 'glb')
             ).rejects.toThrow('500');
         });
     });
@@ -220,10 +238,10 @@ describe('AiClient — методы 3D-модели', () => {
             const file = makeFakeFile();
 
             await client.submit3dModel({
+                ...PRO,
                 mode: 'image',
                 prompt: 'ignored',
                 image: file,
-                downloadFormat: 'glb',
             });
 
             const body = JSON.parse(mockFetch.mock.calls[0][1].body);
@@ -237,10 +255,10 @@ describe('AiClient — методы 3D-модели', () => {
             const file = makeFakeFile();
 
             await client.submit3dModel({
+                ...PRO,
                 mode: 'text',
                 prompt: 'a cat',
                 image: file,
-                downloadFormat: 'glb',
             });
 
             const body = JSON.parse(mockFetch.mock.calls[0][1].body);
