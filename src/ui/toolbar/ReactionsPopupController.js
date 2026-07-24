@@ -1,8 +1,25 @@
 import { Events } from '../../core/events/Events.js';
 
+const DEFAULT_REACTION_NAME = '1f44d';
+
 export class ReactionsPopupController {
     constructor(toolbar) {
         this.toolbar = toolbar;
+        this.defaultReactionSrc = null;
+    }
+
+    emitReaction(src) {
+        this.toolbar.eventBus.emit(Events.Place.Set, {
+            type: 'image',
+            properties: { src, width: 64, height: 64, isEmojiIcon: true, isReaction: true },
+            size: { width: 64, height: 64 }
+        });
+    }
+
+    selectDefaultReaction() {
+        if (this.defaultReactionSrc) {
+            this.emitReaction(this.defaultReactionSrc);
+        }
     }
 
     createReactionsPopup() {
@@ -29,6 +46,10 @@ export class ReactionsPopupController {
                 const fileName = path.split('/').pop().replace(/\.[^.]+$/, '');
                 btn.title = fileName;
 
+                if (fileName === DEFAULT_REACTION_NAME) {
+                    this.defaultReactionSrc = src;
+                }
+
                 const img = document.createElement('img');
                 img.className = 'moodboard-reactions__img';
                 img.src = src;
@@ -37,11 +58,7 @@ export class ReactionsPopupController {
 
                 btn.addEventListener('click', () => {
                     this.toolbar.animateButton(btn);
-                    this.toolbar.eventBus.emit(Events.Place.Set, {
-                        type: 'image',
-                        properties: { src, width: 64, height: 64, isEmojiIcon: true, isReaction: true },
-                        size: { width: 64, height: 64 }
-                    });
+                    this.emitReaction(src);
                     this.closeReactionsPopup();
                 });
 

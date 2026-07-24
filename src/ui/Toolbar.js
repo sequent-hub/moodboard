@@ -296,6 +296,10 @@ export class Toolbar {
         return this.reactionsController.closeReactionsPopup();
     }
 
+    selectDefaultReaction() {
+        return this.reactionsController.selectDefaultReaction();
+    }
+
     /**
      * Показывает диалог подтверждения очистки холста
      */

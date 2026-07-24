@@ -263,6 +263,7 @@ export class ToolbarActionRouter {
             this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
             this.toolbar.placeSelectedButtonId = 'reactions';
             this.toolbar.setActiveToolbarButton('place');
+            this.toolbar.selectDefaultReaction();
             return true;
         }
 
