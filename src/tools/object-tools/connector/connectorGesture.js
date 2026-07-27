@@ -1,6 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { Events } from '../../../core/events/Events.js';
 import { buildPath } from '../../../services/ConnectorRouter.js';
+import { drawHead, getLineTrim, trimPolylineEnd } from '../../../ui/connectors/connectorHeadGeometry.js';
 
 /**
  * Переиспользуемые хелперы жеста коннектора.
@@ -17,6 +18,9 @@ export const CLONE_GAP = 60;
 export const PLACEMENT_CLEARANCE = 12;
 /** Радиус скругления углов превью-линии (world-px); совпадает с ELBOW_RADIUS в ConnectorLayer. */
 export const PREVIEW_CORNER_RADIUS = 14;
+/** Цвет и прозрачность превью-линии: тот же синий, что у готового коннектора, но светлее. */
+const PREVIEW_COLOR = 0x2563EB;
+const PREVIEW_ALPHA = 0.7;
 
 /** Возвращает мировые bounds объекта как {x, y, width, height} (top-left). */
 export function objectBounds(eventBus, objectId) {
@@ -200,14 +204,18 @@ export function drawPreview(graphics, fromWorldPt, toWorldPt, route = 'elbow', p
     const pts = (points && points.length >= 2) ? points : buildPath(fromWorldPt, toWorldPt, route);
     if (pts.length < 2) return;
 
-    graphics.lineStyle({ width: 2, color: 0x2563EB, alpha: 0.7, cap: 'round', join: 'round' });
-    graphics.moveTo(pts[0].x, pts[0].y);
+    // Линия обрывается у основания наконечника плюс просвет — та же геометрия,
+    // что у готового коннектора, иначе превью выглядит иначе, чем итог.
+    const linePts = trimPolylineEnd(pts, getLineTrim('arrow'));
+
+    graphics.lineStyle({ width: 2, color: PREVIEW_COLOR, alpha: PREVIEW_ALPHA, cap: 'round', join: 'round' });
+    graphics.moveTo(linePts[0].x, linePts[0].y);
     // Скругляем углы дугой — тем же радиусом, что финальный коннектор
     // (ConnectorLayer.drawPolylineSolid), чтобы превью и итог выглядели одинаково.
-    for (let i = 1; i < pts.length - 1; i++) {
-        const prev = pts[i - 1];
-        const curr = pts[i];
-        const next = pts[i + 1];
+    for (let i = 1; i < linePts.length - 1; i++) {
+        const prev = linePts[i - 1];
+        const curr = linePts[i];
+        const next = linePts[i + 1];
         const dxIn = curr.x - prev.x;
         const dyIn = curr.y - prev.y;
         const lenIn = Math.hypot(dxIn, dyIn);
@@ -222,29 +230,9 @@ export function drawPreview(graphics, fromWorldPt, toWorldPt, route = 'elbow', p
         graphics.lineTo(curr.x - (dxIn / lenIn) * r, curr.y - (dyIn / lenIn) * r);
         graphics.quadraticCurveTo(curr.x, curr.y, curr.x + (dxOut / lenOut) * r, curr.y + (dyOut / lenOut) * r);
     }
-    graphics.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+    graphics.lineTo(linePts[linePts.length - 1].x, linePts[linePts.length - 1].y);
 
-    // Наконечник по направлению последнего сегмента — открытый chevron,
-    // как у финального коннектора (ConnectorLayer.drawHead, kind='arrow').
-    const tip  = pts[pts.length - 1];
-    const prev = pts[pts.length - 2];
-    const dx = tip.x - prev.x;
-    const dy = tip.y - prev.y;
-    const len = Math.hypot(dx, dy);
-    if (len > 10) {
-        const ux = dx / len;
-        const uy = dy / len;
-        const px = -uy;
-        const py =  ux;
-        const aLen  = 12;
-        const aHalf = 5;
-        const bx = tip.x - ux * aLen;
-        const by = tip.y - uy * aLen;
-        graphics.lineStyle({ width: 2, color: 0x2563EB, alpha: 0.7, cap: 'round', join: 'round' });
-        graphics.moveTo(bx + px * aHalf, by + py * aHalf);
-        graphics.lineTo(tip.x, tip.y);
-        graphics.lineTo(bx - px * aHalf, by - py * aHalf);
-    }
+    drawHead(graphics, pts[pts.length - 2], pts[pts.length - 1], PREVIEW_COLOR, 'arrow', 2, PREVIEW_ALPHA);
 }
 
 /**

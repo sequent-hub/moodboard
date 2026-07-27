@@ -1,6 +1,7 @@
 import { Events } from '../../core/events/Events.js';
 import { MINDMAP_LAYOUT } from '../mindmap/MindmapLayoutConfig.js';
 import { createRootMindmapIntentMetadata } from '../../mindmap/MindmapCompoundContract.js';
+import { DEFAULT_NOTE_BACKGROUND_COLOR } from './NotePlacementConfig.js';
 
 export class ToolbarActionRouter {
     constructor(toolbar) {
@@ -95,6 +96,7 @@ export class ToolbarActionRouter {
             this.toolbar.closeEmojiPopup();
             this.toolbar.closeReactionsPopup();
             this.toolbar.closeFramePopup();
+            this.toolbar.startNotePlacement(DEFAULT_NOTE_BACKGROUND_COLOR);
             this.toolbar.toggleNoteColorPopup(button);
             return true;
         }

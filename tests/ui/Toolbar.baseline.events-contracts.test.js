@@ -119,8 +119,9 @@ describe('Toolbar baseline: lifecycle, events and tooltip contracts', () => {
         eventBus.emit.mockClear();
         firstButton.click();
         container.querySelector('.moodboard-toolbar__popup--note-color button').click();
+        // 2 emit: цвет по умолчанию по клику кнопки + переопределение цвета образцом
         const firstCount = eventBus.emit.mock.calls.filter(([event]) => event === Events.Place.Set).length;
-        expect(firstCount).toBe(1);
+        expect(firstCount).toBe(2);
 
         toolbar.destroy();
         container.innerHTML = '';
@@ -133,7 +134,7 @@ describe('Toolbar baseline: lifecycle, events and tooltip contracts', () => {
         secondButton.click();
         container.querySelector('.moodboard-toolbar__popup--note-color button').click();
         const secondCount = nextBus.emit.mock.calls.filter(([event]) => event === Events.Place.Set).length;
-        expect(secondCount).toBe(1);
+        expect(secondCount).toBe(2);
 
         nextToolbar.destroy();
     });

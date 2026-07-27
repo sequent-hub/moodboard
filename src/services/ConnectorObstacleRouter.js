@@ -9,7 +9,7 @@
  * не задевает — возвращается он же (быстрый типовой путь).
  */
 
-import { buildPath } from './ConnectorRouter.js';
+import { buildPath, ELBOW_STUB } from './ConnectorRouter.js';
 
 const DEFAULT_CLEARANCE = 12;
 const TURN_PENALTY = 24;
@@ -84,16 +84,20 @@ function simplify(pts) {
 }
 
 /** A*-маршрут в обход препятствий между стабами S и E. Возвращает точки S..E или null. */
-function astarRoute(start, startDir, end, endDir, rects, clearance) {
+function astarRoute(start, startDir, end, endDir, rects, stub, validateStubs = false) {
     const S = {
-        x: Math.round(start.x + startDir.x * clearance),
-        y: Math.round(start.y + startDir.y * clearance),
+        x: Math.round(start.x + startDir.x * stub),
+        y: Math.round(start.y + startDir.y * stub),
     };
     const E = {
-        x: Math.round(end.x + endDir.x * clearance),
-        y: Math.round(end.y + endDir.y * clearance),
+        x: Math.round(end.x + endDir.x * stub),
+        y: Math.round(end.y + endDir.y * stub),
     };
     if (rects.some((r) => insideStrict(S.x, S.y, r)) || rects.some((r) => insideStrict(E.x, E.y, r))) {
+        return null;
+    }
+    // Удлинённый стаб может проколоть соседа: сами отрезки start→S и E→end A* не проверяет.
+    if (validateStubs && (pathHitsAny([start, S], rects) || pathHitsAny([E, end], rects))) {
         return null;
     }
 
@@ -234,11 +238,16 @@ export function routeElbowAvoiding(start, startDir, end, endDir, obstacles = [],
     for (const c of [clearance, Math.round(clearance / 2), Math.round(clearance / 4), 2, 1]) {
         if (c >= 1 && !steps.includes(c)) steps.push(c);
     }
-    for (const c of steps) {
-        const rects = validObstacles.map((r) => inflate(r, c));
-        const grid = astarRoute(start, startDir, end, endDir, rects, c);
-        if (grid && grid.length > 0) {
-            return simplify([start, ...grid, end]);
+    // Финальное звено маршрута обязано быть длиннее наконечника, иначе стрелка ложится
+    // на угол колена (стаб = clearance давал 12px и меньше). Сначала пробуем стаб
+    // ELBOW_STUB, как у дефолтного elbow; если A* не проходит — откат к стабу = clearance.
+    for (const stub of [ELBOW_STUB, null]) {
+        for (const c of steps) {
+            const rects = validObstacles.map((r) => inflate(r, c));
+            const grid = astarRoute(start, startDir, end, endDir, rects, stub ?? c, stub !== null);
+            if (grid && grid.length > 0) {
+                return simplify([start, ...grid, end]);
+            }
         }
     }
 

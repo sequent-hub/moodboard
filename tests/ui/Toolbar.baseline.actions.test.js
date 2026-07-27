@@ -23,6 +23,7 @@ vi.mock('../../src/utils/inlinePngEmojis.js', () => ({
 }));
 
 import { Toolbar } from '../../src/ui/Toolbar.js';
+import { NOTE_COLORS, DEFAULT_NOTE_BACKGROUND_COLOR } from '../../src/ui/toolbar/NotePlacementConfig.js';
 
 function createEventBus() {
     const handlers = new Map();
@@ -86,30 +87,43 @@ describe('Toolbar baseline: action routing contracts', () => {
         expect(eventBus.emit).toHaveBeenCalledWith(Events.Keyboard.ToolSelect, { tool: 'pan' });
     });
 
-    it('note-add click opens color popup without placing, swatch click emits place payload with backgroundColor', () => {
+    it('note-add click opens color popup and already places with default color, swatch click overrides color', () => {
         const button = container.querySelector('.moodboard-toolbar__button--note');
         button.click();
 
-        // Клик по кнопке открывает палитру цветов, но записку ещё не размещает
-        expect(getEmits(eventBus.emit, Events.Place.Set)).toHaveLength(0);
+        // Клик по кнопке открывает палитру и сразу включает размещение цветом по умолчанию
         const popup = container.querySelector('.moodboard-toolbar__popup--note-color');
         expect(popup).toBeTruthy();
         expect(popup.style.display).not.toBe('none');
 
-        const swatch = popup.querySelector('button');
-        expect(swatch).toBeTruthy();
-        swatch.click();
-
-        const placeCalls = getEmits(eventBus.emit, Events.Place.Set);
-        expect(placeCalls).toHaveLength(1);
-        expect(placeCalls[0]).toEqual(
+        const defaultPlaceCalls = getEmits(eventBus.emit, Events.Place.Set);
+        expect(defaultPlaceCalls).toHaveLength(1);
+        expect(defaultPlaceCalls[0]).toEqual(
             expect.objectContaining({
                 type: 'note',
                 properties: expect.objectContaining({
                     content: expect.any(String),
                     width: expect.any(Number),
                     height: expect.any(Number),
-                    backgroundColor: expect.any(Number),
+                    backgroundColor: DEFAULT_NOTE_BACKGROUND_COLOR,
+                }),
+            })
+        );
+
+        const swatch = popup.querySelectorAll('button')[4];
+        expect(swatch).toBeTruthy();
+        swatch.click();
+
+        const placeCalls = getEmits(eventBus.emit, Events.Place.Set);
+        expect(placeCalls).toHaveLength(2);
+        expect(placeCalls[1]).toEqual(
+            expect.objectContaining({
+                type: 'note',
+                properties: expect.objectContaining({
+                    content: expect.any(String),
+                    width: expect.any(Number),
+                    height: expect.any(Number),
+                    backgroundColor: parseInt(NOTE_COLORS[4].hex.slice(1), 16),
                 }),
             })
         );

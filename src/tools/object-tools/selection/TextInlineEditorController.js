@@ -24,6 +24,7 @@ import {
     measureTextEditorPlaceholderWidth,
 } from './TextEditorDomFactory.js';
 import { setupNoteInlineEditor } from './NoteInlineEditorController.js';
+import { gateTextEditorOnFontLoad } from './TextEditorFontGate.js';
 import {
     createRegularTextAutoSize,
     createRegularTextEditorUpdater,
@@ -237,6 +238,15 @@ export function openTextEditor(object, create = false) {
         textarea.placeholder = '';
         if (backdrop) backdrop.style.textAlign = 'center';
     }
+
+    // Гейт до вставки в DOM: первый кадр не должен показать fallback-глифы,
+    // пока лениво грузится web-шрифт объекта.
+    gateTextEditorOnFontLoad({
+        textarea,
+        backdrop,
+        fontFamily: resolvedFontFamily,
+        fontSizePx: fontSize,
+    });
 
     wrapper.appendChild(textarea);
     // Убрана зелёная рамка вокруг поля ввода по требованию

@@ -89,6 +89,10 @@ export class Toolbar {
         return this.popupsController.toggleNoteColorPopup(anchorBtn);
     }
 
+    startNotePlacement(backgroundColor) {
+        return this.popupsController.startNotePlacement(backgroundColor);
+    }
+
     closeNoteColorPopup() {
         return this.popupsController.closeNoteColorPopup();
     }

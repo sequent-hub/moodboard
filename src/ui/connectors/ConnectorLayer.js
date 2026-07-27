@@ -3,24 +3,12 @@ import { Events } from '../../core/events/Events.js';
 import { ConnectorBindingResolver, distanceToSegment } from '../../services/ConnectorBindingResolver.js';
 import { buildPath, bezierControlPoints, sampleBezier, BEZIER_SAMPLES } from '../../services/ConnectorRouter.js';
 import { routeElbowAvoiding } from '../../services/ConnectorObstacleRouter.js';
+import { drawHead, getLineTrim, trimPolylineEnd } from './connectorHeadGeometry.js';
 
 const HIT_TEST_SCREEN_PX = 8;
-const ARROW_LEN      = 12;
-const ARROW_HALF     = 5;
 const DASH_LEN       = 8;
 const GAP_LEN        = 5;
 const ELBOW_RADIUS   = 14;
-const CIRCLE_R       = 4;
-const DIAMOND_HALF   = 5;
-
-/** Сколько пикселей отступить от кончика маркера, чтобы линия не заходила внутрь него. */
-function getHeadSetback(kind) {
-    if (kind === 'arrow')    return ARROW_LEN;
-    if (kind === 'triangle') return ARROW_LEN;
-    if (kind === 'circle')   return CIRCLE_R * 2;
-    if (kind === 'diamond')  return DIAMOND_HALF * 2;
-    return 0;
-}
 
 function asArray(value) {
     return Array.isArray(value) ? value : [];
@@ -82,76 +70,6 @@ function drawDashedLine(g, x1, y1, x2, y2) {
         drawing = !drawing;
     }
 }
-
-/**
- * Рисует наконечник стрелки в tipPt, направление fromPt→tipPt.
- *
- * @param {PIXI.Graphics} g
- * @param {{ x:number, y:number }} fromPt  предпоследняя точка
- * @param {{ x:number, y:number }} tipPt   кончик
- * @param {number} color   PIXI-цвет
- * @param {string} kind    HeadKind: 'none'|'arrow'|'triangle'|'circle'|'diamond'
- * @param {number} lineWidth  толщина линии коннектора (для согласованной толщины наконечника)
- */
-function drawHead(g, fromPt, tipPt, color, kind, lineWidth = 2) {
-    if (kind === 'none') return;
-    const dx  = tipPt.x - fromPt.x;
-    const dy  = tipPt.y - fromPt.y;
-    const len = Math.hypot(dx, dy);
-    if (len < 1e-6) return;
-    const ux = dx / len;
-    const uy = dy / len;
-    const px = -uy;
-    const py =  ux;
-
-    g.lineStyle(0);
-
-    if (kind === 'arrow') {
-        // Единый штрих крыло→кончик→крыло: round-join даёт чистый острый кончик,
-        // round-cap — аккуратные концы крыльев. Толщина = толщине линии.
-        const bx = tipPt.x - ux * ARROW_LEN;
-        const by = tipPt.y - uy * ARROW_LEN;
-        const w  = Math.max(2, lineWidth + 0.5);
-        try {
-            g.lineStyle({ width: w, color, alpha: 1, cap: 'round', join: 'round' });
-        } catch (_) {
-            g.lineStyle(w, color, 1);
-        }
-        g.moveTo(Math.round(bx + px * ARROW_HALF), Math.round(by + py * ARROW_HALF));
-        g.lineTo(Math.round(tipPt.x), Math.round(tipPt.y));
-        g.lineTo(Math.round(bx - px * ARROW_HALF), Math.round(by - py * ARROW_HALF));
-        g.lineStyle(0);
-    } else if (kind === 'triangle') {
-        const bx = tipPt.x - ux * ARROW_LEN;
-        const by = tipPt.y - uy * ARROW_LEN;
-        g.beginFill(color, 1);
-        g.drawPolygon([
-            Math.round(tipPt.x),               Math.round(tipPt.y),
-            Math.round(bx + px * ARROW_HALF),  Math.round(by + py * ARROW_HALF),
-            Math.round(bx - px * ARROW_HALF),  Math.round(by - py * ARROW_HALF),
-        ]);
-        g.endFill();
-    } else if (kind === 'circle') {
-        const cx = Math.round(tipPt.x - ux * CIRCLE_R);
-        const cy = Math.round(tipPt.y - uy * CIRCLE_R);
-        g.beginFill(color, 1);
-        g.drawCircle(cx, cy, CIRCLE_R);
-        g.endFill();
-    } else if (kind === 'diamond') {
-        // Ромб: вершина в tipPt, тыл на расстоянии 2×DIAMOND_HALF
-        const mx = tipPt.x - ux * DIAMOND_HALF;
-        const my = tipPt.y - uy * DIAMOND_HALF;
-        g.beginFill(color, 1);
-        g.drawPolygon([
-            Math.round(tipPt.x),                          Math.round(tipPt.y),
-            Math.round(mx + px * DIAMOND_HALF),            Math.round(my + py * DIAMOND_HALF),
-            Math.round(tipPt.x - ux * 2 * DIAMOND_HALF),  Math.round(tipPt.y - uy * 2 * DIAMOND_HALF),
-            Math.round(mx - px * DIAMOND_HALF),            Math.round(my - py * DIAMOND_HALF),
-        ]);
-        g.endFill();
-    }
-}
-
 
 /**
  * Сплошная ломаная; для elbow скругляет углы дугой quadraticCurveTo.
@@ -378,40 +296,15 @@ export class ConnectorLayer {
                 pts = buildPath({ x: sx, y: sy }, { x: ex, y: ey }, route, startDir, endDir);
             }
 
-            // Для рисования линии: укорачиваем концы ровно до основания маркера,
-            // чтобы толстый stroke не заходил внутрь наконечника.
+            // Для рисования линии: укорачиваем концы на длину маркера плюс просвет,
+            // чтобы stroke не заходил внутрь наконечника и не сливался с его крыльями.
             // Оригинальный pts используется только для drawHead (кончик остаётся точным).
-            const drawPts = pts.slice();
-            if (drawPts.length >= 2) {
-                if (head.end !== 'none') {
-                    const n   = drawPts.length;
-                    const tp  = drawPts[n - 1];
-                    const fp  = drawPts[n - 2];
-                    const sb  = getHeadSetback(head.end);
-                    const dx  = tp.x - fp.x;
-                    const dy  = tp.y - fp.y;
-                    const len = Math.hypot(dx, dy);
-                    if (sb > 0 && len > sb) {
-                        drawPts[n - 1] = {
-                            x: Math.round(tp.x - (dx / len) * sb),
-                            y: Math.round(tp.y - (dy / len) * sb),
-                        };
-                    }
-                }
-                if (head.start !== 'none') {
-                    const tp  = drawPts[0];
-                    const fp  = drawPts[1];
-                    const sb  = getHeadSetback(head.start);
-                    const dx  = tp.x - fp.x;
-                    const dy  = tp.y - fp.y;
-                    const len = Math.hypot(dx, dy);
-                    if (sb > 0 && len > sb) {
-                        drawPts[0] = {
-                            x: Math.round(tp.x - (dx / len) * sb),
-                            y: Math.round(tp.y - (dy / len) * sb),
-                        };
-                    }
-                }
+            let drawPts = pts.slice();
+            if (head.end !== 'none') {
+                drawPts = trimPolylineEnd(drawPts, getLineTrim(head.end));
+            }
+            if (head.start !== 'none') {
+                drawPts = trimPolylineEnd(drawPts.slice().reverse(), getLineTrim(head.start)).reverse();
             }
 
             const drawStart = drawPts[0];
