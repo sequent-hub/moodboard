@@ -1,7 +1,3 @@
-import 'katex/dist/katex.min.css';
-import katex from 'katex';
-import { renderMarkdown } from './markdown.js';
-
 // Рендер «богатого» текста = markdown + LaTeX-формулы KaTeX.
 //
 // Почему отдельный слой над renderMarkdown: marked/DOMPurify портят TeX
@@ -12,6 +8,45 @@ import { renderMarkdown } from './markdown.js';
 // KaTeX-вывод НЕ пропускается через DOMPurify: это доверенный вывод самой
 // библиотеки (см. docs/security.md — injection-safe), а sanitize вырезал бы
 // нужные KaTeX span/inline-style. Тот же контракт, что в Futurello.
+//
+// katex, marked и DOMPurify грузятся динамически: вместе они дают ~410 КБ,
+// а нужны только объектам с markdown или формулами. Статический импорт держал
+// их в главном чанке и на пустой доске. До загрузки renderRichText отдаёт
+// экранированный исходный текст — см. isRichTextReady/ensureRichText.
+
+let katexRef = null;
+let renderMarkdownRef = null;
+let loadPromise = null;
+
+/** Загружает движки богатого рендера. Повторные вызовы отдают тот же промис. */
+export function ensureRichText() {
+    if (!loadPromise) {
+        loadPromise = Promise.all([
+            import('katex'),
+            import('./markdown.js'),
+            // Стили KaTeX не критичны для текста формулы: без них она читается,
+            // просто без правильных отступов. Ошибку загрузки не роняем.
+            import('katex/dist/katex.min.css').catch(() => null),
+        ]).then(([katexModule, markdownModule]) => {
+            katexRef = katexModule.default || katexModule;
+            renderMarkdownRef = markdownModule.renderMarkdown;
+        });
+    }
+    return loadPromise;
+}
+
+/** Готовы ли движки: renderRichText отдаёт полноценный HTML только после этого. */
+export function isRichTextReady() {
+    return katexRef !== null && renderMarkdownRef !== null;
+}
+
+function escapeHtml(src) {
+    return src
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
 
 // Плейсхолдеры — только заглавные буквы и цифры: marked/DOMPurify не трогают
 // такие токены и не интерпретируют их как разметку.
@@ -98,7 +133,7 @@ function restoreMath(html, placeholders) {
     for (const { key, tex, display } of placeholders) {
         let rendered;
         try {
-            rendered = katex.renderToString(tex, {
+            rendered = katexRef.renderToString(tex, {
                 throwOnError: false,
                 output: 'html', // без MathML: дублирующее поддерево не нужно и тяжелее
                 displayMode: display,
@@ -115,11 +150,18 @@ function restoreMath(html, placeholders) {
 /**
  * Рендерит markdown с LaTeX-формулами в безопасный HTML.
  * Результат вставляется через innerHTML.
+ *
+ * Пока движки не загружены (ensureRichText), возвращает экранированный исходный
+ * текст — вызывающий код должен перерисовать элемент после загрузки.
  */
 export function renderRichText(src) {
     if (typeof src !== 'string' || !src) return '';
+    if (!isRichTextReady()) {
+        ensureRichText();
+        return escapeHtml(src);
+    }
     const { text, placeholders } = extractMath(src);
-    const html = renderMarkdown(text);
+    const html = renderMarkdownRef(text);
     if (placeholders.length === 0) return html;
     return restoreMath(html, placeholders);
 }

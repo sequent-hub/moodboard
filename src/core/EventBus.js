@@ -1,6 +1,23 @@
 export class EventBus {
     constructor() {
         this.events = new Map();
+        this.emitObservers = new Set();
+    }
+
+    /**
+     * Подписка на факт любого emit. Нужна рендер-циклу: событие ядра означает
+     * возможное изменение сцены, а перечислять сотни имён событий по одному
+     * хрупко — новое событие легко забыть и получить незакрашенный кадр.
+     * @param {(event: string, data: unknown) => void} observer
+     */
+    addEmitObserver(observer) {
+        if (typeof observer === 'function') {
+            this.emitObservers.add(observer);
+        }
+    }
+
+    removeEmitObserver(observer) {
+        this.emitObservers.delete(observer);
     }
 
     on(event, callback) {
@@ -23,6 +40,14 @@ export class EventBus {
     }
 
     emit(event, data) {
+        this.emitObservers.forEach((observer) => {
+            try {
+                observer(event, data);
+            } catch (error) {
+                console.error(`Error in emit observer for '${event}':`, error);
+            }
+        });
+
         const callbacks = this.events.get(event);
         if (callbacks) {
             callbacks.forEach(callback => {

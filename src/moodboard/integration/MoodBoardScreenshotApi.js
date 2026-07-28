@@ -13,6 +13,10 @@ export function createCombinedScreenshot(board, format = 'image/jpeg', quality =
         throw new Error('Canvas не найден');
     }
 
+    // Кадр рисуется по требованию, поэтому буфер canvas перед чтением пикселей
+    // нужно освежить принудительно — иначе в снимок попадёт пустое полотно.
+    board.coreMoodboard.pixi.renderNow?.();
+
     try {
         const pixiCanvas = getPixiCanvas(board);
         const { canvas, ctx } = createCompositionCanvas(pixiCanvas);

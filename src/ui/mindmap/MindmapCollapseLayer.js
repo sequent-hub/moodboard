@@ -151,6 +151,9 @@ export class MindmapCollapseLayer {
         if (!e || !this.layer) return;
         // Курсор над самой кнопкой — состояние держит btnHover, ничего не пересчитываем.
         if (this.layer.contains(e.target)) return;
+        // Нечего показывать или прятать: hoveredObjectId читает только _syncVisibility,
+        // который ходит по кнопкам. Без кнопок чтение геометрии и HitTest — чистая трата.
+        if (this._buttons.size === 0) return;
 
         const view = this.core?.pixi?.app?.view;
         if (!view) return;
@@ -216,6 +219,15 @@ export class MindmapCollapseLayer {
 
     _objects() {
         return this.core?.state?.state?.objects || [];
+    }
+
+    /** Индекс mindmap-узлов на один проход: кнопок бывает больше, чем узлов. */
+    _mindmapNodesById() {
+        const nodesById = new Map();
+        for (const node of this._objects()) {
+            if (node?.id && node.type === MINDMAP_TYPE) nodesById.set(node.id, node);
+        }
+        return nodesById;
     }
 
     // Цвет фона холста (hex) — непрозрачная подложка кнопки, чтобы под ней
@@ -403,12 +415,12 @@ export class MindmapCollapseLayer {
         const viewRect = view.getBoundingClientRect();
         const offX = viewRect.left - containerRect.left;
         const offY = viewRect.top - containerRect.top;
-        const objects = this._objects();
+        const nodesById = this._mindmapNodesById();
 
         this._buttons.forEach((btn, key) => {
             const nodeId = btn.dataset.nodeId;
             const side = btn.dataset.side;
-            const node = objects.find((o) => o?.id === nodeId && o?.type === MINDMAP_TYPE);
+            const node = nodesById.get(nodeId);
             if (!node) return;
 
             const collapsed = node?.properties?.mindmap?.collapsed === true;
@@ -461,10 +473,10 @@ export class MindmapCollapseLayer {
     }
 
     _syncVisibility() {
-        const objects = this._objects();
+        const nodesById = this._mindmapNodesById();
         this._buttons.forEach((btn, key) => {
             const nodeId = btn.dataset.nodeId;
-            const node = objects.find((o) => o?.id === nodeId);
+            const node = nodesById.get(nodeId);
             const collapsed = node?.properties?.mindmap?.collapsed === true;
             const shouldShow = collapsed
                 || this.hoveredObjectId === nodeId

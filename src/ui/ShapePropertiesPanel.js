@@ -34,7 +34,6 @@ export class ShapePropertiesPanel {
         this._boundDocClick = this._onDocumentClick.bind(this);
 
         this._attachEvents();
-        this._createPanel();
     }
 
     // ── Публичное API ──────────────────────────────────────────────────────────
@@ -57,6 +56,7 @@ export class ShapePropertiesPanel {
 
     showFor(objectId) {
         this.currentId = objectId;
+        this._ensurePanel();
         if (this.panel) {
             this.panel.style.display = 'flex';
             this.reposition();
@@ -214,6 +214,16 @@ export class ShapePropertiesPanel {
     }
 
     // ── Построение DOM ─────────────────────────────────────────────────────────
+
+    /**
+     * Разметка строится при первом показе: панель весит около 300 узлов, а на
+     * доске без выделенной фигуры не нужна ни разу.
+     */
+    _ensurePanel() {
+        if (!this.panel) {
+            this._createPanel();
+        }
+    }
 
     _createPanel() {
         const panel = document.createElement('div');

@@ -51,6 +51,8 @@ export class MindmapHtmlTextLayer {
         this._transformActive = false;
         // Пользовательский тумблер hover-анимации (persist, общий с HoverLiftController)
         this._hoverAnimationEnabled = readHoverAnimationEnabled();
+        this._offsetCache = null;
+        this._offsetCacheRaf = null;
     }
 
     attach() {
@@ -134,15 +136,9 @@ export class MindmapHtmlTextLayer {
         this.eventBus.on(Events.Tool.DragUpdate, ({ object }) => this.updateOne(object));
         this.eventBus.on(Events.Tool.ResizeUpdate, ({ object }) => this.updateOne(object));
         this.eventBus.on(Events.Tool.RotateUpdate, ({ object }) => this.updateOne(object));
-        this.eventBus.on(Events.Tool.GroupDragUpdate, ({ objects }) => {
-            (Array.isArray(objects) ? objects : []).forEach((id) => this.updateOne(id));
-        });
-        this.eventBus.on(Events.Tool.GroupResizeUpdate, ({ objects }) => {
-            (Array.isArray(objects) ? objects : []).forEach((id) => this.updateOne(id));
-        });
-        this.eventBus.on(Events.Tool.GroupRotateUpdate, ({ objects }) => {
-            (Array.isArray(objects) ? objects : []).forEach((id) => this.updateOne(id));
-        });
+        this.eventBus.on(Events.Tool.GroupDragUpdate, ({ objects }) => this._updateMany(objects));
+        this.eventBus.on(Events.Tool.GroupResizeUpdate, ({ objects }) => this._updateMany(objects));
+        this.eventBus.on(Events.Tool.GroupRotateUpdate, ({ objects }) => this._updateMany(objects));
 
         // Блокировка hover во время drag/resize/rotate (канон HtmlTextLayer)
         this._onTransformStart = () => {
@@ -197,6 +193,7 @@ export class MindmapHtmlTextLayer {
     }
 
     destroy() {
+        this._invalidateOffsetCache();
         if (this._onViewportChanged && this.eventBus) {
             this.eventBus.off(Events.Viewport.Changed, this._onViewportChanged);
             this._onViewportChanged = null;
@@ -308,16 +305,86 @@ export class MindmapHtmlTextLayer {
 
     updateAll() {
         if (!this.core?.pixi) return;
-        for (const id of this.idToEl.keys()) this.updateOne(id);
+        const batch = this._createUpdateBatch();
+        for (const id of this.idToEl.keys()) this.updateOne(id, batch);
     }
 
-    updateOne(objectId) {
+    /**
+     * Общий контекст для пакетного обновления узлов.
+     * Смещение canvas и индекс объектов одинаковы для всех узлов прохода,
+     * поэтому читаются один раз: иначе каждый updateOne после записи стилей
+     * заставляет браузер синхронно пересчитать вёрстку (forced reflow).
+     */
+    _createUpdateBatch() {
+        const objectsById = new Map();
+        for (const objectData of (this.core?.state?.state?.objects || [])) {
+            if (objectData?.id) objectsById.set(objectData.id, objectData);
+        }
+        return { objectsById, offset: this._readCanvasOffset() };
+    }
+
+    /** Смещение canvas внутри контейнера. Единственная точка чтения геометрии в слое. */
+    _readCanvasOffset() {
+        const worldLayer = this.core?.pixi?.worldLayer || this.core?.pixi?.app?.stage;
+        const view = this.core?.pixi?.app?.view;
+        if (!worldLayer || !view || !view.parentElement) return null;
+
+        if (this._offsetCache) {
+            return { worldLayer, left: this._offsetCache.left, top: this._offsetCache.top };
+        }
+
+        const containerRect = view.parentElement.getBoundingClientRect();
+        const viewRect = view.getBoundingClientRect();
+        const offset = {
+            left: viewRect.left - containerRect.left,
+            top: viewRect.top - containerRect.top,
+        };
+        this._cacheOffsetForCurrentFrame(offset);
+        return { worldLayer, ...offset };
+    }
+
+    /**
+     * Кеш живёт до следующего кадра. Pan/Zoom/Viewport за один кадр приходят
+     * вместе и дают несколько updateAll подряд — смещение canvas между ними
+     * измениться не может. Скролл страницы кеш не портит: оба прямоугольника
+     * сдвигаются одинаково, разница сохраняется.
+     */
+    _cacheOffsetForCurrentFrame(offset) {
+        this._offsetCache = offset;
+        if (this._offsetCacheRaf != null) return;
+        const schedule = (typeof requestAnimationFrame !== 'undefined')
+            ? requestAnimationFrame
+            : (cb) => setTimeout(cb, 0);
+        this._offsetCacheRaf = schedule(() => {
+            this._offsetCacheRaf = null;
+            this._offsetCache = null;
+        });
+    }
+
+    _invalidateOffsetCache() {
+        this._offsetCache = null;
+        if (this._offsetCacheRaf == null) return;
+        if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(this._offsetCacheRaf);
+        else clearTimeout(this._offsetCacheRaf);
+        this._offsetCacheRaf = null;
+    }
+
+    _updateMany(objects, batch = null) {
+        const ids = Array.isArray(objects) ? objects : [];
+        if (ids.length === 0) return;
+        const shared = batch || this._createUpdateBatch();
+        ids.forEach((id) => this.updateOne(id, shared));
+    }
+
+    updateOne(objectId, batch = null) {
         const el = this.idToEl.get(objectId);
         if (!el || !this.core) return;
 
         const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
         const res = (this.core?.pixi?.app?.renderer?.resolution) || 1;
-        const objectData = (this.core.state.state.objects || []).find((o) => o.id === objectId);
+        const objectData = batch
+            ? batch.objectsById.get(objectId)
+            : (this.core.state.state.objects || []).find((o) => o.id === objectId);
         if (!objectData || objectData.type !== 'mindmap') return;
 
         const x = objectData.position?.x || 0;
@@ -351,17 +418,12 @@ export class MindmapHtmlTextLayer {
         el.style.paddingLeft = `${paddingXCss}px`;
         el.style.paddingRight = `${paddingXCss}px`;
 
-        const worldLayer = this.core.pixi.worldLayer || this.core.pixi.app.stage;
-        const view = this.core.pixi.app.view;
-        if (worldLayer && view && view.parentElement) {
-            const containerRect = view.parentElement.getBoundingClientRect();
-            const viewRect = view.getBoundingClientRect();
-            const offsetLeft = viewRect.left - containerRect.left;
-            const offsetTop = viewRect.top - containerRect.top;
-            const tl = worldLayer.toGlobal(new PIXI.Point(x, y));
-            const br = worldLayer.toGlobal(new PIXI.Point(x + w, y + h));
-            el.style.left = `${offsetLeft + tl.x}px`;
-            el.style.top = `${offsetTop + tl.y}px`;
+        const offset = batch ? batch.offset : this._readCanvasOffset();
+        if (offset) {
+            const tl = offset.worldLayer.toGlobal(new PIXI.Point(x, y));
+            const br = offset.worldLayer.toGlobal(new PIXI.Point(x + w, y + h));
+            el.style.left = `${offset.left + tl.x}px`;
+            el.style.top = `${offset.top + tl.y}px`;
             el.style.width = `${Math.max(1, br.x - tl.x)}px`;
             el.style.height = `${Math.max(1, br.y - tl.y)}px`;
         }
@@ -507,8 +569,18 @@ export class MindmapHtmlTextLayer {
         );
         const actual = normalizeMindmapLineLength((typeof rawContent === 'string') ? rawContent : '', maxLineChars);
         const isPlaceholder = actual.trim().length === 0;
+        const expectedText = isPlaceholder ? MINDMAP_PLACEHOLDER : actual;
+
+        // updateOne вызывается на каждом кадре pan, а содержимое узла при панорамировании
+        // не меняется. Запись в textContent инвалидирует вёрстку, и чтение геометрии в том же
+        // кадре превращается в forced reflow на каждый узел. Сравнение строк вёрстку не трогает.
+        const sameContent = containerEl.dataset.mbContent === actual
+            && contentEl.textContent === expectedText
+            && contentEl.classList.contains('is-placeholder') === isPlaceholder;
+        if (sameContent) return;
+
         containerEl.dataset.mbContent = actual;
-        contentEl.textContent = isPlaceholder ? MINDMAP_PLACEHOLDER : actual;
+        contentEl.textContent = expectedText;
         contentEl.classList.toggle('is-placeholder', isPlaceholder);
     }
 
@@ -522,7 +594,7 @@ export class MindmapHtmlTextLayer {
     }
 
     _scheduleAutoFitAll() {
-        const doFit = () => { for (const id of this.idToEl.keys()) this._autoFitNodeWidth(id); };
+        const doFit = () => this._autoFitAllNodes();
         if (typeof document !== 'undefined' && document.fonts?.ready) {
             document.fonts.ready.then(doFit);
         } else {
@@ -530,57 +602,110 @@ export class MindmapHtmlTextLayer {
         }
     }
 
+    /**
+     * Подгонка всех узлов фазами «только чтения» / «только записи».
+     * Поузловая подгонка чередует запись ширины и чтение высоты, что на N узлах
+     * даёт N принудительных пересчётов вёрстки вместо двух.
+     */
+    _autoFitAllNodes() {
+        const objectsById = this._createUpdateBatch().objectsById;
+        const plans = [];
+        for (const objectId of this.idToEl.keys()) {
+            const plan = this._planNodeFit(objectId, objectsById.get(objectId));
+            if (plan) plans.push(plan);
+        }
+        if (plans.length === 0) return;
+
+        for (const plan of plans) {
+            plan.prevW = plan.el.style.width;
+            plan.prevH = plan.el.style.height;
+            plan.el.style.width = `${plan.cssFitW}px`;
+            plan.el.style.height = 'auto';
+        }
+        for (const plan of plans) {
+            plan.scrollHeightCss = Math.max(1, Math.round(plan.el.scrollHeight));
+        }
+        for (const plan of plans) {
+            plan.el.style.width = plan.prevW;
+            plan.el.style.height = plan.prevH;
+        }
+        for (const plan of plans) this._commitNodeFit(plan);
+    }
+
     _autoFitNodeWidth(objectId) {
+        try {
+            const objectData = (this.core?.state?.state?.objects || []).find(o => o.id === objectId);
+            const plan = this._planNodeFit(objectId, objectData);
+            if (!plan) return;
+
+            const prevW = plan.el.style.width;
+            const prevH = plan.el.style.height;
+            plan.el.style.width = `${plan.cssFitW}px`;
+            plan.el.style.height = 'auto';
+            plan.scrollHeightCss = Math.max(1, Math.round(plan.el.scrollHeight));
+            plan.el.style.width = prevW;
+            plan.el.style.height = prevH;
+
+            this._commitNodeFit(plan);
+        } catch (_) {}
+    }
+
+    /** Фаза чтения: ширина контента узла и целевая мировая ширина. */
+    _planNodeFit(objectId, objectData) {
         const el = this.idToEl.get(objectId);
         const contentEl = this.idToContentEl.get(objectId);
-        if (!el || !contentEl || !this.core) return;
+        if (!el || !contentEl || !this.core) return null;
         // Skip while the static element is hidden during inline editing.
-        if (el.style.visibility === 'hidden') return;
-        try {
-            const objectData = (this.core.state.state.objects || []).find(o => o.id === objectId);
-            if (!objectData || !objectData.position) return;
+        if (el.style.visibility === 'hidden') return null;
+        if (!objectData || !objectData.position) return null;
 
-            const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
-            const res = (this.core?.pixi?.app?.renderer?.resolution) || 1;
-            const worldScale = world?.scale?.x || 1;
+        const world = this.core.pixi.worldLayer || this.core.pixi.app.stage;
+        const res = (this.core?.pixi?.app?.renderer?.resolution) || 1;
+        const worldScale = world?.scale?.x || 1;
 
-            // Measure rendered text width via scrollWidth of the <span> (forces layout reflow).
-            const scrollWidthCss = contentEl.scrollWidth;
-            if (scrollWidthCss <= 0) return;
+        // Measure rendered text width via scrollWidth of the <span> (forces layout reflow).
+        const scrollWidthCss = contentEl.scrollWidth;
+        if (scrollWidthCss <= 0) return null;
 
-            const paddingX = Math.max(0, Math.round(
-                objectData.properties?.paddingX ?? MINDMAP_LAYOUT.paddingX
-            ));
-            // css → world: same formula as _autoFitTextHeight in HtmlTextLayer.js
-            const contentWorldW = (scrollWidthCss * res) / worldScale;
-            const rawWorldW = contentWorldW + 2 * paddingX;
+        const paddingX = Math.max(0, Math.round(
+            objectData.properties?.paddingX ?? MINDMAP_LAYOUT.paddingX
+        ));
+        // css → world: same formula as _autoFitTextHeight in HtmlTextLayer.js
+        const contentWorldW = (scrollWidthCss * res) / worldScale;
+        const rawWorldW = contentWorldW + 2 * paddingX;
 
-            const level = objectData.properties?.mindmap?.level ?? 0;
-            const isRoot = level === 0;
-            const minW = isRoot ? MINDMAP_AUTOFIT.ROOT_MIN_WIDTH : MINDMAP_AUTOFIT.CHILD_MIN_WIDTH;
-            const maxW = isRoot ? MINDMAP_AUTOFIT.ROOT_MAX_WIDTH : MINDMAP_AUTOFIT.CHILD_MAX_WIDTH;
-            const newWorldW = Math.max(minW, Math.min(maxW, Math.round(rawWorldW)));
+        const level = objectData.properties?.mindmap?.level ?? 0;
+        const isRoot = level === 0;
+        const minW = isRoot ? MINDMAP_AUTOFIT.ROOT_MIN_WIDTH : MINDMAP_AUTOFIT.CHILD_MIN_WIDTH;
+        const maxW = isRoot ? MINDMAP_AUTOFIT.ROOT_MAX_WIDTH : MINDMAP_AUTOFIT.CHILD_MAX_WIDTH;
+        const newWorldW = Math.max(minW, Math.min(maxW, Math.round(rawWorldW)));
 
+        return {
+            objectId,
+            el,
+            objectData,
+            res,
+            worldScale,
+            newWorldW,
             // Measure natural height at the fitted width to handle multi-line wrapping.
-            const cssFitW = Math.max(1, Math.round(newWorldW * worldScale / res));
-            const prevW = el.style.width;
-            const prevH = el.style.height;
-            el.style.width = `${cssFitW}px`;
-            el.style.height = 'auto';
-            const scrollHeightCss = Math.max(1, Math.round(el.scrollHeight));
-            el.style.width = prevW;
-            el.style.height = prevH;
-            const newWorldH = Math.max(1, Math.round((scrollHeightCss * res) / worldScale));
+            cssFitW: Math.max(1, Math.round(newWorldW * worldScale / res)),
+            scrollHeightCss: 0,
+        };
+    }
 
-            const currentW = Math.round(objectData.width || objectData.properties?.width || MINDMAP_LAYOUT.width);
-            const currentH = Math.round(objectData.height || objectData.properties?.height || MINDMAP_LAYOUT.height);
-            if (newWorldW === currentW && newWorldH === currentH) return;
+    /** Фаза синхронизации: мировые размеры узла по измеренной высоте. */
+    _commitNodeFit(plan) {
+        const { objectId, objectData, res, worldScale, newWorldW, scrollHeightCss } = plan;
+        const newWorldH = Math.max(1, Math.round((scrollHeightCss * res) / worldScale));
 
-            this.core.eventBus.emit(Events.Tool.ResizeUpdate, {
-                object: objectId,
-                size: { width: newWorldW, height: newWorldH },
-                position: objectData.position,
-            });
-        } catch (_) {}
+        const currentW = Math.round(objectData.width || objectData.properties?.width || MINDMAP_LAYOUT.width);
+        const currentH = Math.round(objectData.height || objectData.properties?.height || MINDMAP_LAYOUT.height);
+        if (newWorldW === currentW && newWorldH === currentH) return;
+
+        this.core.eventBus.emit(Events.Tool.ResizeUpdate, {
+            object: objectId,
+            size: { width: newWorldW, height: newWorldH },
+            position: objectData.position,
+        });
     }
 }

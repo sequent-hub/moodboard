@@ -112,8 +112,9 @@ export class FramePropertiesPanel {
         this._pickerSat = 0;
         this._pickerVal = 1;
 
+        // Разметка строится при первом показе: панель весит около 180 узлов, а без
+        // выделенного фрейма не нужна ни разу.
         this._attachEvents();
-        this._createPanel();
     }
 
     _attachEvents() {
@@ -200,6 +201,9 @@ export class FramePropertiesPanel {
 
     showFor(objectId) {
         this.currentId = objectId;
+        if (!this.panel) {
+            this._createPanel();
+        }
         if (this.panel) {
             this.panel.style.display = 'flex';
             this.reposition();

@@ -91,6 +91,9 @@ describe('NotePropertiesPanel', () => {
         container = createMockContainer();
         core = createMockCore();
         panel = new NotePropertiesPanel(eventBus, container, core);
+        // Разметка строится лениво, при первом показе. Тестам структуры и контролов
+        // она нужна сразу — строим явно. Саму ленивость проверяет отдельный блок ниже.
+        panel._createPanel();
     });
 
     afterEach(() => {
@@ -111,19 +114,6 @@ describe('NotePropertiesPanel', () => {
             expect(panel.currentId).toBeNull();
         });
 
-        it('должен создать DOM-элемент панели', () => {
-            expect(panel.panel).toBeDefined();
-            expect(panel.panel).toBeInstanceOf(HTMLElement);
-        });
-
-        it('должен добавить панель в контейнер', () => {
-            expect(container.contains(panel.panel)).toBe(true);
-        });
-
-        it('должен создать панель скрытой по умолчанию', () => {
-            expect(panel.panel.style.display).toBe('none');
-        });
-
         it('должен подписаться на события EventBus', () => {
             expect(eventBus.on).toHaveBeenCalled();
 
@@ -142,6 +132,53 @@ describe('NotePropertiesPanel', () => {
                 const p = new NotePropertiesPanel(eventBus, container, null);
                 p.destroy();
             }).not.toThrow();
+        });
+    });
+
+    // ═══════════════════════════════════════════
+    // Ленивое построение DOM
+    // ═══════════════════════════════════════════
+    describe('Ленивое построение DOM', () => {
+        let lazyPanel;
+
+        beforeEach(() => {
+            lazyPanel = new NotePropertiesPanel(createMockEventBus(), createMockContainer(), createMockCore());
+        });
+
+        afterEach(() => {
+            lazyPanel.destroy();
+        });
+
+        it('не строит разметку в конструкторе', () => {
+            expect(lazyPanel.panel).toBeNull();
+            expect(lazyPanel.container.children.length).toBe(0);
+        });
+
+        it('строит разметку и добавляет её в контейнер при первом показе', () => {
+            lazyPanel.showFor('note-1');
+
+            expect(lazyPanel.panel).toBeInstanceOf(HTMLElement);
+            expect(lazyPanel.container.contains(lazyPanel.panel)).toBe(true);
+        });
+
+        it('повторный показ не создаёт вторую панель', () => {
+            lazyPanel.showFor('note-1');
+            const first = lazyPanel.panel;
+            lazyPanel.showFor('note-2');
+
+            expect(lazyPanel.panel).toBe(first);
+            expect(lazyPanel.container.children.length).toBe(1);
+        });
+
+        it('скрытие до первого показа ничего не строит и не падает', () => {
+            expect(() => lazyPanel.hide()).not.toThrow();
+            expect(lazyPanel.panel).toBeNull();
+        });
+
+        it('созданная разметка скрыта до показа', () => {
+            lazyPanel._createPanel();
+
+            expect(lazyPanel.panel.style.display).toBe('none');
         });
     });
 

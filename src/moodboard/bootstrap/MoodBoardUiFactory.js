@@ -24,6 +24,7 @@ import { ShapePropertiesPanel } from '../../ui/ShapePropertiesPanel.js';
 import { DrawingPropertiesPanel } from '../../ui/DrawingPropertiesPanel.js';
 import { ChatWindow } from '../../ui/chat/ChatWindow.js';
 import { bindToolbarEvents, bindTopbarEvents } from '../integration/MoodBoardEventBindings.js';
+import { LAYER_GLOBAL_REFS } from './layerGlobalRefs.js';
 
 function initToolbar(board) {
     board.toolbar = new Toolbar(
@@ -37,7 +38,11 @@ function initToolbar(board) {
     board.toolbar.enableComments = !!board.options.enableComments;
 
     if (typeof window !== 'undefined') {
-        window.reloadIcon = (iconName) => board.toolbar.reloadToolbarIcon(iconName);
+        // Ссылка на функцию хранится и на доске: destroy снимает window.reloadIcon
+        // только если там лежит именно этот экземпляр. Без снятия замыкание держит
+        // board, а через него — ядро, PixiEngine и всю сцену до перезагрузки страницы.
+        board._reloadIconGlobal = (iconName) => board.toolbar?.reloadToolbarIcon(iconName);
+        window.reloadIcon = board._reloadIconGlobal;
     }
 
     bindToolbarEvents(board);
@@ -130,15 +135,9 @@ function initHtmlLayersAndPanels(board) {
     board.htmlHandlesLayer.attach();
 
     if (typeof window !== 'undefined') {
-        window.moodboardHtmlTextLayer = board.htmlTextLayer;
-        window.moodboardMindmapHtmlTextLayer = board.mindmapHtmlTextLayer;
-        window.moodboardMindmapConnectionLayer = board.mindmapConnectionLayer;
-        window.moodboardMindmapCollapseLayer = board.mindmapCollapseLayer;
-        window.moodboardConnectorLayer = board.connectorLayer;
-        window.moodboardConnectorLabelLayer = board.connectorLabelLayer;
-        window.moodboardConnectionAnchorsLayer = board.connectionAnchorsLayer;
-        window.moodboardConnectorHandlesLayer = board.connectorHandlesLayer;
-        window.moodboardHtmlHandlesLayer = board.htmlHandlesLayer;
+        LAYER_GLOBAL_REFS.forEach(([globalKey, field]) => {
+            window[globalKey] = board[field];
+        });
     }
 
     board.textPropertiesPanel = new TextPropertiesPanel(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);

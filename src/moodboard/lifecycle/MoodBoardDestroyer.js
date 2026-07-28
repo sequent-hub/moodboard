@@ -1,3 +1,5 @@
+import { LAYER_GLOBAL_REFS } from '../bootstrap/layerGlobalRefs.js';
+
 export function safeDestroy(obj, name) {
     if (obj) {
         try {
@@ -19,6 +21,16 @@ export function destroyMoodBoard(board) {
     }
 
     board.destroyed = true;
+
+    // Список window-ключей этого экземпляра фиксируем ДО уничтожения слоёв:
+    // ниже поля board обнуляются, и сравнение window[key] === board[field]
+    // сравнивало бы с null. Тогда ссылка оставалась бы висеть, удерживая
+    // открепленный DOM, слушателей и ядро до перезагрузки страницы.
+    const ownedGlobals = typeof window !== 'undefined'
+        ? [...LAYER_GLOBAL_REFS, ['reloadIcon', '_reloadIconGlobal']]
+            .filter(([globalKey, field]) => board[field] && window[globalKey] === board[field])
+            .map(([globalKey]) => globalKey)
+        : [];
 
     safeDestroy(board.toolbar, 'toolbar');
     board.toolbar = null;
@@ -44,6 +56,15 @@ export function destroyMoodBoard(board) {
     safeDestroy(board.filePropertiesPanel, 'filePropertiesPanel');
     board.filePropertiesPanel = null;
 
+    safeDestroy(board.imagePropertiesPanel, 'imagePropertiesPanel');
+    board.imagePropertiesPanel = null;
+
+    safeDestroy(board.connectorPropertiesPanel, 'connectorPropertiesPanel');
+    board.connectorPropertiesPanel = null;
+
+    safeDestroy(board.shapePropertiesPanel, 'shapePropertiesPanel');
+    board.shapePropertiesPanel = null;
+
     safeDestroy(board.drawingPropertiesPanel, 'drawingPropertiesPanel');
     board.drawingPropertiesPanel = null;
 
@@ -66,6 +87,9 @@ export function destroyMoodBoard(board) {
 
     safeDestroy(board.connectorLayer, 'connectorLayer');
     board.connectorLayer = null;
+
+    safeDestroy(board.connectorLabelLayer, 'connectorLabelLayer');
+    board.connectorLabelLayer = null;
 
     safeDestroy(board.connectionAnchorsLayer, 'connectionAnchorsLayer');
     board.connectionAnchorsLayer = null;
@@ -111,32 +135,10 @@ export function destroyMoodBoard(board) {
     }
     board.container = null;
 
-    if (typeof window !== 'undefined') {
-        if (window.moodboardHtmlTextLayer === board.htmlTextLayer) {
-            window.moodboardHtmlTextLayer = null;
-        }
-        if (window.moodboardMindmapHtmlTextLayer === board.mindmapHtmlTextLayer) {
-            window.moodboardMindmapHtmlTextLayer = null;
-        }
-        if (window.moodboardMindmapConnectionLayer === board.mindmapConnectionLayer) {
-            window.moodboardMindmapConnectionLayer = null;
-        }
-        if (window.moodboardMindmapCollapseLayer === board.mindmapCollapseLayer) {
-            window.moodboardMindmapCollapseLayer = null;
-        }
-        if (window.moodboardConnectorLayer === board.connectorLayer) {
-            window.moodboardConnectorLayer = null;
-        }
-        if (window.moodboardConnectionAnchorsLayer === board.connectionAnchorsLayer) {
-            window.moodboardConnectionAnchorsLayer = null;
-        }
-        if (window.moodboardConnectorHandlesLayer === board.connectorHandlesLayer) {
-            window.moodboardConnectorHandlesLayer = null;
-        }
-        if (window.moodboardHtmlHandlesLayer === board.htmlHandlesLayer) {
-            window.moodboardHtmlHandlesLayer = null;
-        }
-    }
+    ownedGlobals.forEach((globalKey) => {
+        window[globalKey] = null;
+    });
+    board._reloadIconGlobal = null;
 
     if (typeof board.options.onDestroy === 'function') {
         try {

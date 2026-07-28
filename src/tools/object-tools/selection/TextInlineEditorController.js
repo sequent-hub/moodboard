@@ -684,6 +684,11 @@ export function openTextEditor(object, create = false) {
         wrapper,
         caret,
         world: this.textEditor.world,
+        // Записка регистрирует синхронизацию до этой пересборки состояния (setupNoteInlineEditor),
+        // поэтому ссылки на её подписки и таймер каретки нужно перенести: иначе закрытие редактора
+        // не найдёт их и обработчики pan/zoom останутся жить до перезагрузки страницы.
+        _listeners: this.textEditor._listeners,
+        _caretHideTimer: this.textEditor._caretHideTimer,
         position,
         properties: { fontSize, highlightColor: properties.highlightColor },
         objectType,

@@ -123,7 +123,9 @@ describe('TextInlineEditorController baseline: lifecycle', () => {
         expect(ctx.textEditor.objectId).toBe('text-repeat-2');
     });
 
-    it('note close does not call eventBus.off for reactive listeners (current baseline)', () => {
+    // Раньше baseline фиксировал утечку: закрытие записки не снимало подписки, потому что
+    // openTextEditor пересобирал состояние редактора и терял ссылку на них.
+    it('note close unsubscribes reactive listeners', () => {
         setupNoteResponders(eventBus, {
             objectId: 'note-lifecycle-1',
             position: { x: 50, y: 50 },
@@ -148,10 +150,15 @@ describe('TextInlineEditorController baseline: lifecycle', () => {
 
         ctx.textEditor.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
-        expect(eventBus.off).not.toHaveBeenCalled();
+        const offEvents = eventBus.off.mock.calls.map(([eventName]) => eventName);
+        expect(offEvents).toContain(Events.Tool.PanUpdate);
+        expect(offEvents).toContain(Events.Viewport.Changed);
+        expect(offEvents).toContain(Events.UI.ZoomPercent);
     });
 
-    it('close then reopen note duplicates reactive update handler calls (current baseline)', () => {
+    // Раньше baseline фиксировал удвоение обработчиков после переоткрытия записки —
+    // именно это накопление роняло pan при работе в одном сеансе.
+    it('close then reopen note keeps a single reactive update handler', () => {
         const refs = setupNoteResponders(eventBus, {
             objectId: 'note-lifecycle-2',
             position: { x: 100, y: 100 },
@@ -197,6 +204,6 @@ describe('TextInlineEditorController baseline: lifecycle', () => {
         const getPositionCalls = eventBus.emit.mock.calls.filter(
             ([eventName]) => eventName === Events.Tool.GetObjectPosition
         );
-        expect(getPositionCalls).toHaveLength(2);
+        expect(getPositionCalls).toHaveLength(1);
     });
 });

@@ -1,6 +1,25 @@
 import { Events } from '../../core/events/Events.js';
-import { getInlinePngEmojiUrl } from '../../utils/inlinePngEmojis.js';
 import { NOTE_COLORS, createNotePlacementPayload } from './NotePlacementConfig.js';
+
+// Встроенные PNG эмодзи — 226 КБ base64 в одном модуле. Статический импорт держал
+// их в главном чанке пакета, хотя попап эмодзи открывают редко. Грузим модуль при
+// первом открытии попапа: createEmojiPopup ждёт loadInlineEmojiApi.
+let inlineEmojiApi = null;
+let inlineEmojiPromise = null;
+
+function loadInlineEmojiApi() {
+    if (!inlineEmojiPromise) {
+        inlineEmojiPromise = import('../../utils/inlinePngEmojis.js').then((module) => {
+            inlineEmojiApi = module;
+            return module;
+        });
+    }
+    return inlineEmojiPromise;
+}
+
+function getInlinePngEmojiUrl(emojiCode) {
+    return inlineEmojiApi ? inlineEmojiApi.getInlinePngEmojiUrl(emojiCode) : null;
+}
 
 export class ToolbarPopupsController {
     constructor(toolbar) {
@@ -455,7 +474,8 @@ export class ToolbarPopupsController {
         }
     }
 
-    createEmojiPopup() {
+    async createEmojiPopup() {
+        await loadInlineEmojiApi();
         this.toolbar.emojiPopupEl = document.createElement('div');
         this.toolbar.emojiPopupEl.className = 'moodboard-toolbar__popup moodboard-toolbar__popup--emoji';
         this.toolbar.emojiPopupEl.style.display = 'none';
@@ -739,8 +759,14 @@ export class ToolbarPopupsController {
         return '/emodji/';
     }
 
-    toggleEmojiPopup(anchorButton) {
-        if (!this.toolbar.emojiPopupEl) return;
+    async toggleEmojiPopup(anchorButton) {
+        if (!this.toolbar.emojiPopupEl) {
+            await this.createEmojiPopup();
+            // Тулбар мог быть уничтожен, пока грузился модуль эмодзи.
+            if (!this.toolbar.emojiPopupEl || !this.toolbar.element) return;
+            this.openEmojiPopup(anchorButton);
+            return;
+        }
         if (this.toolbar.emojiPopupEl.style.display === 'none') {
             this.openEmojiPopup(anchorButton);
         } else {

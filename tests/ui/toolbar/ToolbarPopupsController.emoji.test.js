@@ -50,6 +50,17 @@ async function flushToolbarInit() {
   await Promise.resolve();
 }
 
+/**
+ * Попап эмоджи строится при первом клике: модуль встроенных PNG (226 КБ base64)
+ * грузится динамическим import, поэтому DOM появляется на следующих микротасках.
+ */
+async function openEmojiPopup(container) {
+  container.querySelector('.moodboard-toolbar__button--emoji').click();
+  await vi.waitFor(() => {
+    expect(container.querySelector('.moodboard-emoji__btn')).toBeTruthy();
+  });
+}
+
 describe('ToolbarPopupsController emoji', () => {
   let container;
   let toolbar;
@@ -71,8 +82,8 @@ describe('ToolbarPopupsController emoji', () => {
     vi.restoreAllMocks();
   });
 
-  it('клик по эмоджи в popup эмитит Place.Set с type image, isEmojiIcon true', () => {
-    container.querySelector('.moodboard-toolbar__button--emoji').click();
+  it('клик по эмоджи в popup эмитит Place.Set с type image, isEmojiIcon true', async () => {
+    await openEmojiPopup(container);
     const popup = container.querySelector('.moodboard-toolbar__popup--emoji');
     expect(popup).toBeTruthy();
     const firstBtn = popup?.querySelector('.moodboard-emoji__btn');
@@ -95,8 +106,8 @@ describe('ToolbarPopupsController emoji', () => {
     );
   });
 
-  it('popup содержит несколько эмоджи-кнопок с валидным src', () => {
-    container.querySelector('.moodboard-toolbar__button--emoji').click();
+  it('popup содержит несколько эмоджи-кнопок с валидным src', async () => {
+    await openEmojiPopup(container);
     const btns = container.querySelectorAll('.moodboard-toolbar__popup--emoji .moodboard-emoji__btn');
     const imgs = container.querySelectorAll('.moodboard-toolbar__popup--emoji .moodboard-emoji__img');
     expect(btns.length).toBeGreaterThan(1);
@@ -106,8 +117,8 @@ describe('ToolbarPopupsController emoji', () => {
     });
   });
 
-  it('Place.Set payload содержит size для ghost (64x64)', () => {
-    container.querySelector('.moodboard-toolbar__button--emoji').click();
+  it('Place.Set payload содержит size для ghost (64x64)', async () => {
+    await openEmojiPopup(container);
     const btn = container.querySelector('.moodboard-toolbar__popup--emoji .moodboard-emoji__btn');
     btn?.click();
 
@@ -123,7 +134,7 @@ describe('ToolbarPopupsController emoji', () => {
     toolbar = new Toolbar(container, eventBus, 'light', { emojiBasePath: '/emoji-assets' });
     await flushToolbarInit();
 
-    container.querySelector('.moodboard-toolbar__button--emoji').click();
+    await openEmojiPopup(container);
     const btn = container.querySelector('.moodboard-toolbar__popup--emoji .moodboard-emoji__btn');
     btn?.click();
 

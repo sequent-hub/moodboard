@@ -2,7 +2,7 @@ import gsap from 'gsap';
 import { CustomEase } from 'gsap/CustomEase';
 import { Events } from '../core/events/Events.js';
 import * as PIXI from 'pixi.js';
-import { renderRichText, hasMath } from '../utils/richText.js';
+import { renderRichText, hasMath, isRichTextReady, ensureRichText } from '../utils/richText.js';
 import { renderTextList } from './text-properties/TextListRenderer.js';
 import { getShapeTextSafeArea, getShapeTextClipPath } from '../objects/shape/shapeTextArea.js';
 import { readHoverAnimationEnabled } from './animation/HoverLiftController.js';
@@ -191,6 +191,8 @@ export class HtmlTextLayer {
         // objectId -> { rect, onOver, onOut } — слушатели PIXI pointer на хит-rect текста
         this._pixiHoverHandlers = new Map();
         this._transformActive = false;
+        this._offsetCache = null;
+        this._offsetCacheRaf = null;
     }
 
     attach() {
@@ -368,18 +370,9 @@ export class HtmlTextLayer {
                 this.eventBus.emit(Events.Object.TransformUpdated, { objectId: object });
             }
         });
-        this.eventBus.on(Events.Tool.GroupDragUpdate, ({ objects }) => {
-            const ids = Array.isArray(objects) ? objects : [];
-            ids.forEach(id => this.updateOne(id));
-        });
-        this.eventBus.on(Events.Tool.GroupResizeUpdate, ({ objects }) => {
-            const ids = Array.isArray(objects) ? objects : [];
-            ids.forEach(id => this.updateOne(id));
-        });
-        this.eventBus.on(Events.Tool.GroupRotateUpdate, ({ objects }) => {
-            const ids = Array.isArray(objects) ? objects : [];
-            ids.forEach(id => this.updateOne(id));
-        });
+        this.eventBus.on(Events.Tool.GroupDragUpdate, ({ objects }) => this._updateMany(objects));
+        this.eventBus.on(Events.Tool.GroupResizeUpdate, ({ objects }) => this._updateMany(objects));
+        this.eventBus.on(Events.Tool.GroupRotateUpdate, ({ objects }) => this._updateMany(objects));
 
         // Hover-lift текста управляется PIXI pointerover/pointerout прямо на хит-rect
         // текста (см. _ensurePixiHover). Events.Object.Hover для текста ненадёжен:
@@ -475,6 +468,7 @@ export class HtmlTextLayer {
     }
 
     destroy() {
+        this._invalidateOffsetCache();
         if (this._onFontsLoadingDone
             && typeof document !== 'undefined'
             && document.fonts
@@ -632,15 +626,83 @@ export class HtmlTextLayer {
 
     updateAll() {
         if (!this.core?.pixi) return;
-        for (const id of this.idToEl.keys()) this.updateOne(id);
+        const batch = this._createUpdateBatch();
+        for (const id of this.idToEl.keys()) this.updateOne(id, batch);
     }
 
-    updateOne(objectId) {
+    /**
+     * Общий контекст прохода: смещение canvas и индекс объектов одинаковы для всех
+     * элементов, поэтому читаются один раз. Иначе каждый updateOne после записи
+     * стилей заставляет браузер синхронно пересчитать вёрстку (forced reflow).
+     */
+    _createUpdateBatch() {
+        const objectsById = new Map();
+        for (const obj of (this.core?.state?.state?.objects || [])) {
+            if (obj?.id) objectsById.set(obj.id, obj);
+        }
+        return { objectsById, offset: this._readCanvasOffset() };
+    }
+
+    /** Смещение canvas внутри контейнера. Единственная точка чтения геометрии в слое. */
+    _readCanvasOffset() {
+        const worldLayer = this.core?.pixi?.worldLayer || this.core?.pixi?.app?.stage;
+        const view = this.core?.pixi?.app?.view;
+        if (!worldLayer || !view || !view.parentElement) return null;
+
+        if (this._offsetCache) {
+            return { worldLayer, left: this._offsetCache.left, top: this._offsetCache.top };
+        }
+
+        const containerRect = view.parentElement.getBoundingClientRect();
+        const viewRect = view.getBoundingClientRect();
+        const offset = {
+            left: viewRect.left - containerRect.left,
+            top: viewRect.top - containerRect.top,
+        };
+        this._cacheOffsetForCurrentFrame(offset);
+        return { worldLayer, ...offset };
+    }
+
+    /**
+     * Кеш живёт до следующего кадра: Pan/Zoom/Viewport за кадр приходят вместе и
+     * дают несколько updateAll подряд. Скролл страницы кеш не портит — оба
+     * прямоугольника сдвигаются одинаково, разница сохраняется.
+     */
+    _cacheOffsetForCurrentFrame(offset) {
+        this._offsetCache = offset;
+        if (this._offsetCacheRaf != null) return;
+        const schedule = (typeof requestAnimationFrame !== 'undefined')
+            ? requestAnimationFrame
+            : (cb) => setTimeout(cb, 0);
+        this._offsetCacheRaf = schedule(() => {
+            this._offsetCacheRaf = null;
+            this._offsetCache = null;
+        });
+    }
+
+    _invalidateOffsetCache() {
+        this._offsetCache = null;
+        if (this._offsetCacheRaf == null) return;
+        if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(this._offsetCacheRaf);
+        else clearTimeout(this._offsetCacheRaf);
+        this._offsetCacheRaf = null;
+    }
+
+    _updateMany(objects, batch = null) {
+        const ids = Array.isArray(objects) ? objects : [];
+        if (ids.length === 0) return;
+        const shared = batch || this._createUpdateBatch();
+        ids.forEach((id) => this.updateOne(id, shared));
+    }
+
+    updateOne(objectId, batch = null) {
         const el = this.idToEl.get(objectId);
         if (!el || !this.core) return;
 
         // obj нужен раньше, чтобы охранять hover-lift и shape-специфичные пути
-        const obj = (this.core.state.state.objects || []).find(o => o.id === objectId);
+        const obj = batch
+            ? batch.objectsById.get(objectId)
+            : (this.core.state.state.objects || []).find(o => o.id === objectId);
         if (!obj) return;
 
         // Hover-lift только для text/simple-text (shape использует собственный PIXI-hover)
@@ -691,23 +753,20 @@ export class HtmlTextLayer {
         }
 
         // Позиция и габариты в CSS координатах - используем тот же подход что в HtmlHandlesLayer
-        const worldLayer = this.core.pixi.worldLayer || this.core.pixi.app.stage;
-        const view = this.core.pixi.app.view;
+        const offset = batch ? batch.offset : this._readCanvasOffset();
         // Эти переменные нужны и для лога ниже, поэтому задаём их тут
         let logLeft = 0;
         let logTop = 0;
         let logWidth = 0;
         let logHeight = 0;
 
-        if (worldLayer && view && view.parentElement) {
-            const containerRect = view.parentElement.getBoundingClientRect();
-            const viewRect = view.getBoundingClientRect();
-            const offsetLeft = viewRect.left - containerRect.left;
-            const offsetTop = viewRect.top - containerRect.top;
-            
+        if (offset) {
+            const offsetLeft = offset.left;
+            const offsetTop = offset.top;
+
             // Преобразуем мировые координаты в экранные через toGlobal
-            const tl = worldLayer.toGlobal(new PIXI.Point(x, y));
-            const br = worldLayer.toGlobal(new PIXI.Point(x + w, y + h));
+            const tl = offset.worldLayer.toGlobal(new PIXI.Point(x, y));
+            const br = offset.worldLayer.toGlobal(new PIXI.Point(x + w, y + h));
 
             // ВАЖНО: toGlobal() уже возвращает координаты в логических экранных пикселях
             // (как и для HtmlHandlesLayer), поэтому делить их на renderer.resolution
@@ -949,15 +1008,27 @@ export class HtmlTextLayer {
         if (
             el.dataset.renderedContent === content &&
             el.dataset.renderedMd === mdFlag &&
+            !el.dataset.renderedRichPending &&
             (el.dataset.renderedLinks || '') === linksKey &&
             (el.dataset.renderedHighlights || '') === highlightsKey &&
             (el.dataset.renderedFormats || '') === formatsKey
         ) return false;
         if (isMarkdown) {
             el.innerHTML = renderRichText(content);
+            // Движки markdown/KaTeX грузятся лениво. Первый кадр показывает
+            // исходный текст, поэтому помечаем элемент и перерисовываем его,
+            // когда движки придут.
+            if (isRichTextReady()) {
+                delete el.dataset.renderedRichPending;
+            } else {
+                el.dataset.renderedRichPending = '1';
+                this._scheduleRichTextRerender();
+            }
         } else if (linksKey || highlightsKey || formatsKey) {
+            delete el.dataset.renderedRichPending;
             el.innerHTML = buildHtmlWithRanges(content, links, highlights, formats);
         } else {
+            delete el.dataset.renderedRichPending;
             el.textContent = content;
         }
         el.dataset.renderedContent = content;
@@ -966,6 +1037,26 @@ export class HtmlTextLayer {
         el.dataset.renderedHighlights = highlightsKey;
         el.dataset.renderedFormats = formatsKey;
         return true;
+    }
+
+    /**
+     * Догружает движки богатого рендера и перерисовывает элементы, отданные
+     * первым кадром как обычный текст. Высота меняется после подстановки
+     * markdown-разметки, поэтому идём через updateOne, а не через innerHTML.
+     */
+    _scheduleRichTextRerender() {
+        if (this._richTextRerenderScheduled) return;
+        this._richTextRerenderScheduled = true;
+        const done = () => {
+            this._richTextRerenderScheduled = false;
+            if (!this.layer || !this.idToEl) return;
+            for (const [objectId, el] of this.idToEl) {
+                if (el?.dataset?.renderedRichPending) {
+                    this.updateOne(objectId);
+                }
+            }
+        };
+        ensureRichText().then(done, done);
     }
 
     /** Только hover-transform + поворот, без пересчёта позиции/размеров/контента */

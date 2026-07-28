@@ -13,8 +13,8 @@ export class NotePropertiesPanel {
         this.panel = null;
         this.currentId = null;
         
+        // Разметка строится при первом показе: без выделенной записки она не нужна.
         this._attachEvents();
-        this._createPanel();
     }
 
     _attachEvents() {
@@ -95,6 +95,9 @@ export class NotePropertiesPanel {
 
     showFor(objectId) {
         this.currentId = objectId;
+        if (!this.panel) {
+            this._createPanel();
+        }
         if (this.panel) {
             this.panel.style.display = 'flex';
             this.reposition();

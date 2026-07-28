@@ -42,8 +42,9 @@ export class ImagePropertiesPanel {
         this._cropController = new CropController({ core, eventBus, container });
         this._cropController._onActivate = (active) => this._onCropActivate(active);
 
+        // Разметка строится при первом показе: панель весит около 200 узлов, а без
+        // выделенного изображения не нужна ни разу.
         this._attachEvents();
-        this._createPanel();
     }
 
     _attachEvents() {
@@ -133,6 +134,7 @@ export class ImagePropertiesPanel {
             this._cropController?.cancel();
         }
         this.currentId = objectId;
+        this._createPanel();
         if (this.panel) {
             this.panel.style.display = 'flex';
             this._updateFileName();

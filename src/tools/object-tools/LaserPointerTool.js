@@ -108,6 +108,9 @@ export class LaserPointerTool extends BaseTool {
                 }
                 this.points = [];
             }
+            // Затухание идёт по таймеру, без событий и ввода: кадр нужно просить
+            // самим, иначе рендер по требованию покажет след ступенями.
+            this.app?.render?.();
         }, FADE_INTERVAL_MS);
     }
 

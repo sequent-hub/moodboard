@@ -3,6 +3,7 @@ import { ObjectFactory } from '../objects/ObjectFactory.js';
 import { ObjectRenderer } from './rendering/ObjectRenderer.js';
 import { Events } from './events/Events.js';
 import { HoverLiftController } from '../ui/animation/HoverLiftController.js';
+import { RenderLoopController } from './rendering/RenderLoopController.js';
 
 export class PixiEngine {
     constructor(container, eventBus, options) {
@@ -38,7 +39,10 @@ export class PixiEngine {
             backgroundColor: this.options.backgroundColor,
             antialias: true,
             resolution: (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1,
-            autoDensity: true
+            autoDensity: true,
+            // Такты даёт RenderLoopController: собственный тикер Application рендерил
+            // 60 кадров в секунду и на неподвижной доске.
+            autoStart: false
         });
 
         this.container.appendChild(this.app.view);
@@ -63,6 +67,11 @@ export class PixiEngine {
 
         // Hover-lift анимация для всех объектов
         this.hoverLift = new HoverLiftController(this.eventBus, this.app);
+
+        this.renderLoop = new RenderLoopController(this.app, {
+            isBusy: () => this._hasPlayingVideo(),
+        });
+        this.renderLoop.attach(this.container, this.eventBus);
 
         // Поддержка чёткости текстов записок при зуме: подписка на событие зума
         if (this.eventBus) {
@@ -221,7 +230,10 @@ export class PixiEngine {
                 // baseScale в attach зафиксирован как 1. Синхронизируем после загрузки.
                 const bt = pixiObject.texture?.baseTexture;
                 if (bt && !bt.valid) {
-                    bt.once('loaded', () => { this.hoverLift?.syncBase(pixiObject); });
+                    bt.once('loaded', () => {
+                        this.hoverLift?.syncBase(pixiObject);
+                        this.requestRender();
+                    });
                 }
             }
 
@@ -650,7 +662,35 @@ export class PixiEngine {
         return null;
     }
 
+    /** Играющее видео обновляет свою текстуру по такту тикера — нужен полный fps. */
+    _hasPlayingVideo() {
+        for (const [, pixiObject] of this.objects) {
+            const videoEl = pixiObject?._mb?.instance?.videoEl;
+            if (videoEl && !videoEl.paused && !videoEl.ended) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Просит кадр вне обычных каналов активности (например, после догрузки текстуры). */
+    requestRender() {
+        this.renderLoop?.wake();
+    }
+
+    /**
+     * Синхронный кадр. Обязателен перед чтением пикселей из canvas (скриншот
+     * доски): WebGL не сохраняет содержимое буфера между кадрами, а при рендере
+     * по требованию последний кадр может быть уже далеко позади.
+     */
+    renderNow() {
+        this.renderLoop?.wake();
+        this.app?.render();
+    }
+
     destroy() {
+        this.renderLoop?.destroy();
+        this.renderLoop = null;
         this.app.destroy(true);
     }
 }

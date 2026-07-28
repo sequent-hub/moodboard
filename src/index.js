@@ -22,8 +22,7 @@ autoSetupEmojiPaths();
 // Дополнительные экспорты (только для специальных случаев)
 export { initMoodBoardNoBundler } from './initNoBundler.js';
 
-// Основные утилиты для эмоджи (если нужны)
-export { 
-    getInlinePngEmojiUrl,
-    getAvailableInlinePngEmojis 
-} from './utils/inlinePngEmojis.js';
+// Утилиты эмоджи (getInlinePngEmojiUrl, getAvailableInlinePngEmojis) сознательно
+// НЕ реэкспортируются: модуль весит 226 КБ base64 и через корневой экспорт попадал
+// в главный чанк потребителя. Внутри пакета он грузится динамически при открытии
+// попапа эмодзи (ToolbarPopupsController).

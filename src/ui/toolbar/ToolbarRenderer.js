@@ -52,7 +52,8 @@ export class ToolbarRenderer {
         this.toolbar.container.appendChild(this.toolbar.element);
         this.toolbar.createShapesPopup();
         this.toolbar.createDrawPopup();
-        this.toolbar.createEmojiPopup();
+        // Попап эмодзи создаётся при первом открытии: он тянет 226 КБ base64
+        // и ~106 узлов img, которые не нужны до клика по кнопке.
         this.toolbar.createReactionsPopup();
         this.toolbar.createFramePopup();
         this.toolbar.createNoteColorPopup();

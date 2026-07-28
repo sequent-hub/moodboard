@@ -792,6 +792,20 @@ export class CoreMoodBoard {
             this.keyboard.destroy();
             this.keyboard = null;
         }
+
+        // До уничтожения pixi: ToolManager снимает слушатели с canvas и возвращает
+        // курсоры PIXI. Без этого вызова слушатели wheel/keydown на window и
+        // pointermove на document остаются жить, а их замыкания держат сам
+        // ToolManager, а через него — ядро, PixiEngine и всю сцену: каждый цикл
+        // открытия холста добавлял в память ещё один экземпляр.
+        if (this.toolManager) {
+            try {
+                this.toolManager.destroy();
+            } catch (error) {
+                console.error('Ошибка при уничтожении toolManager:', error);
+            }
+        }
+
         
         if (this.history) {
             this.history.destroy();

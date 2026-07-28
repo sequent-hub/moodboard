@@ -47,6 +47,17 @@ async function flushToolbarInit() {
     await Promise.resolve();
 }
 
+/**
+ * Попап эмоджи строится при первом клике (модуль встроенных PNG грузится
+ * динамическим import), поэтому после клика нужно дать отработать микротаскам.
+ */
+async function clickEmojiButton(container) {
+    container.querySelector('.moodboard-toolbar__button--emoji').click();
+    await vi.waitFor(() => {
+        expect(container.querySelector('.moodboard-toolbar__popup--emoji')).toBeTruthy();
+    });
+}
+
 describe('Toolbar baseline: popup contracts', () => {
     let container;
     let toolbar;
@@ -125,14 +136,13 @@ describe('Toolbar baseline: popup contracts', () => {
         expect(countVisibleActive()).toBe(1);
     });
 
-    it('emoji popup toggles on repeated button clicks', () => {
-        const button = container.querySelector('.moodboard-toolbar__button--emoji');
-        expect(toolbar.emojiPopupEl.style.display).toBe('none');
+    it('emoji popup toggles on repeated button clicks', async () => {
+        expect(toolbar.emojiPopupEl).toBeUndefined();
 
-        button.click();
+        await clickEmojiButton(container);
         expect(toolbar.emojiPopupEl.style.display).toBe('block');
 
-        button.click();
+        await clickEmojiButton(container);
         expect(toolbar.emojiPopupEl.style.display).toBe('none');
     });
 
@@ -147,10 +157,9 @@ describe('Toolbar baseline: popup contracts', () => {
         expect(toolbar.framePopupEl.style.display).toBe('none');
     });
 
-    it('opening a popup closes other popups', () => {
+    it('opening a popup closes other popups', async () => {
         const shapes = container.querySelector('.moodboard-toolbar__button--shapes');
         const draw = container.querySelector('.moodboard-toolbar__button--pencil');
-        const emoji = container.querySelector('.moodboard-toolbar__button--emoji');
         const frame = container.querySelector('.moodboard-toolbar__button--frame');
 
         shapes.click();
@@ -160,7 +169,7 @@ describe('Toolbar baseline: popup contracts', () => {
         expect(toolbar.drawPopupEl.style.display).toBe('block');
         expect(toolbar.shapesPopupEl.style.display).toBe('none');
 
-        emoji.click();
+        await clickEmojiButton(container);
         expect(toolbar.emojiPopupEl.style.display).toBe('block');
         expect(toolbar.drawPopupEl.style.display).toBe('none');
 
@@ -169,10 +178,10 @@ describe('Toolbar baseline: popup contracts', () => {
         expect(toolbar.emojiPopupEl.style.display).toBe('none');
     });
 
-    it('outside click closes all open popups', () => {
+    it('outside click closes all open popups', async () => {
         container.querySelector('.moodboard-toolbar__button--shapes').click();
         container.querySelector('.moodboard-toolbar__button--pencil').click();
-        container.querySelector('.moodboard-toolbar__button--emoji').click();
+        await clickEmojiButton(container);
         container.querySelector('.moodboard-toolbar__button--frame').click();
 
         document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));

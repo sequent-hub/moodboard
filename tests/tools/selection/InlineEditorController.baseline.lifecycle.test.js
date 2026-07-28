@@ -35,7 +35,10 @@ describe('InlineEditorController baseline: lifecycle and cleanup contracts', () 
         dom.cleanup();
     });
 
-    it('note close does not call EventBus.off for reactive listeners (current baseline)', () => {
+    // Раньше baseline фиксировал утечку: закрытие записки не снимало подписки, потому что
+    // openTextEditor пересобирал состояние редактора и терял ссылку на них. Теперь ссылка
+    // переносится, и закрытие обязано снять ровно свои обработчики.
+    it('note close unsubscribes reactive listeners', () => {
         setupNoteResponders(eventBus, {
             objectId: 'note-lifecycle-1',
             position: { x: 50, y: 50 },
@@ -60,7 +63,10 @@ describe('InlineEditorController baseline: lifecycle and cleanup contracts', () 
 
         ctx.textEditor.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
-        expect(eventBus.off).not.toHaveBeenCalled();
+        const offEvents = eventBus.off.mock.calls.map(([eventName]) => eventName);
+        expect(offEvents).toContain(Events.Tool.PanUpdate);
+        expect(offEvents).toContain(Events.Viewport.Changed);
+        expect(offEvents).toContain(Events.UI.ZoomPercent);
     });
 
     it('close then reopen keeps a single active editor wrapper in DOM', () => {
@@ -91,7 +97,9 @@ describe('InlineEditorController baseline: lifecycle and cleanup contracts', () 
         expect(document.querySelectorAll('.moodboard-text-editor')).toHaveLength(1);
     });
 
-    it('close then reopen note duplicates reactive update handler calls (current baseline)', () => {
+    // Раньше baseline фиксировал удвоение: после переоткрытия записки на ZoomPercent отвечали
+    // два набора обработчиков. Именно это накопление роняло pan при работе в одном сеансе.
+    it('close then reopen note keeps a single reactive update handler', () => {
         const refs = setupNoteResponders(eventBus, {
             objectId: 'note-lifecycle-2',
             position: { x: 100, y: 100 },
@@ -137,6 +145,6 @@ describe('InlineEditorController baseline: lifecycle and cleanup contracts', () 
         const getPositionCalls = eventBus.emit.mock.calls.filter(
             ([eventName]) => eventName === Events.Tool.GetObjectPosition
         );
-        expect(getPositionCalls).toHaveLength(2);
+        expect(getPositionCalls).toHaveLength(1);
     });
 });

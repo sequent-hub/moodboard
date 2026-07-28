@@ -141,7 +141,7 @@ export function registerSelectToolCoreSubscriptions(instance) {
 
 export function unregisterSelectToolCoreSubscriptions(instance) {
     if (!instance.eventBus || !instance._coreHandlers) return;
-    const { onDuplicateReady, onGroupDuplicateReady, onObjectEdit, onObjectDeleted } = instance._coreHandlers;
+    const { onDuplicateReady, onGroupDuplicateReady, onObjectEdit, onObjectDeleted, onLassoModeSet } = instance._coreHandlers;
     instance.eventBus.off(Events.Tool.DuplicateReady, onDuplicateReady);
     instance.eventBus.off(Events.Tool.GroupDuplicateReady, onGroupDuplicateReady);
     instance.eventBus.off(Events.Tool.ObjectEdit, onObjectEdit);
