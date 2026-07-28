@@ -2,6 +2,7 @@
  * Управляет загрузкой и сохранением данных MoodBoard
  */
 import { logMindmapCompoundDebug } from '../mindmap/MindmapCompoundContract.js';
+import { Events } from '../core/events/Events.js';
 export class DataManager {
     constructor(coreMoodboard) {
         this.coreMoodboard = coreMoodboard;
@@ -142,6 +143,15 @@ export class DataManager {
             }
         }, 100);
 
+        // Снапшот применён: с этого момента дописывать объекты в state безопасно —
+        // загрузка больше не перезатрёт их через clearBoard().
+        this.coreMoodboard.boardDataLoading = false;
+        this.coreMoodboard.boardDataLoaded = true;
+        try {
+            this.coreMoodboard.eventBus?.emit(Events.Board.DataLoaded, {
+                objectCount: Array.isArray(data.objects) ? data.objects.length : 0,
+            });
+        } catch (_) {}
     }
 
     /**

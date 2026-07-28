@@ -114,6 +114,11 @@ export async function initializeMoodBoard(board) {
         // loadExistingBoard падают на чтении свойств null и оставляют пустой контейнер.
         if (board.destroyed) return;
         createMoodBoardManagers(board);
+        // UI создаётся до загрузки снапшота. Флаг позволяет UI отложить запись
+        // объектов в state: loadData начинается с clearBoard() и стёр бы их.
+        if (board.options.autoLoad) {
+            board.coreMoodboard.boardDataLoading = true;
+        }
         createMoodBoardUi(board);
         await wireCommentsSubsystem(board);
         if (board.destroyed) return;

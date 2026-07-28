@@ -140,6 +140,9 @@ export const Events = {
 
 	Board: {
 		Loaded: 'board:loaded',
+		// board:loaded эмитится при инициализации ядра на пустой доске, до прихода
+		// снапшота с сервера. DataLoaded означает, что объекты снапшота уже в state.
+		DataLoaded: 'board:data:loaded',
 	},
 
 	Place: {

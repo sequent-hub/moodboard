@@ -28,27 +28,41 @@ export const DEFAULT_SETTINGS = {
 
 const SETTINGS_STORAGE_KEY = 'moodboard.ai.chat.settings.v1';
 
+/** Пауза между опросами статуса генерации изображения. */
+const IMAGE_POLL_INTERVAL_MS = 4000;
+
+/** Предохранитель клиента: серверный дедлайн короче, но ждать бесконечно нельзя. */
+const IMAGE_POLL_LIMIT_MS = 20 * 60 * 1000;
+
 export class ChatSessionController {
     /**
      * @param {object} deps
      * @param {import('./AiClient.js').AiClient} deps.aiClient
      * @param {import('./ChatHistoryStore.js').ChatHistoryStore} deps.historyStore
      * @param {Storage} [deps.settingsStorage]
+     * @param {string} [deps.moodboardId]
      */
-    constructor({ aiClient, historyStore, settingsStorage }) {
+    constructor({ aiClient, historyStore, settingsStorage, moodboardId }) {
         this._client = aiClient;
         this._history = historyStore;
         this._settingsStorage = settingsStorage || (typeof localStorage !== 'undefined' ? localStorage : null);
         this._listeners = new Set();
         this._abort = null;
         this._aborts = new Map();
+        this._moodboardId = moodboardId || null;
+        this._pollingJobIds = new Set();
+        this._resumeAbort = null;
+
+        const messages = this._history.load().map(restoreLoadedMessage);
 
         this._state = {
-            messages: this._history.load().map((m) => (m.pending ? { ...m, pending: false, error: m.error || 'Прервано' } : m)),
+            messages,
             providerId: null,
             presetId: DEFAULT_PRESET_ID,
             settings: this._loadSettings(),
-            status: 'idle',
+            // Незавершённые генерации живут на сервере, поэтому чат сразу
+            // возвращается в состояние ожидания, а не показывает «Прервано».
+            status: messages.some((m) => m.pending) ? 'streaming' : 'idle',
             error: null,
             availableProviders: []
         };
@@ -56,6 +70,14 @@ export class ChatSessionController {
 
     getState() {
         return this._state;
+    }
+
+    /**
+     * Привязка генераций к мудборду: по нему сервер отдаёт список задач,
+     * когда локальной истории чата нет (другой браузер или устройство).
+     */
+    setMoodboardId(moodboardId) {
+        this._moodboardId = moodboardId || null;
     }
 
     subscribe(listener) {
@@ -97,7 +119,7 @@ export class ChatSessionController {
     }
 
     clearHistory() {
-        if (this._abort) this.abort();
+        this.abort();
         this._state = { ...this._state, messages: [], status: 'idle', error: null };
         this._history.save([]);
         this._emit();
@@ -109,6 +131,38 @@ export class ChatSessionController {
         }
         this._aborts.clear();
         this._abort = null;
+        try { this._resumeAbort?.abort(); } catch { /* noop */ }
+        this._resumeAbort = null;
+    }
+
+    /**
+     * Помечает изображение как размещённое на холсте.
+     *
+     * Без этой отметки картинка, полученная при закрытом холсте, либо не попала
+     * бы на доску вовсе, либо легла бы туда второй раз при каждом открытии.
+     */
+    markPlacedOnBoard(id) {
+        this._patchMessage(id, { placedOnBoard: true }, { silent: true });
+    }
+
+    /**
+     * Подхватывает генерации, запущенные раньше: из локальной истории (холст
+     * закрыли и открыли снова) и из списка задач на сервере (перезагрузка
+     * страницы, другой браузер).
+     */
+    async resumeActiveJobs() {
+        for (const message of this._state.messages) {
+            if (message.pending && message.jobId) {
+                this._watchImageJob({
+                    messageId: message.id,
+                    jobId: message.jobId,
+                    provider: message.provider,
+                    doneContent: ''
+                });
+            }
+        }
+
+        await this._pullServerJobs();
     }
 
     /**
@@ -146,40 +200,20 @@ export class ChatSessionController {
         let lastError = null;
 
         try {
-            await Promise.all(
-                assistantMsgs.map((assistantMsg, index) => {
-                    if (abort.signal.aborted) {
-                        lastError = 'Отменено';
-                        this._updateAssistant(assistantMsg.id, { error: lastError });
-                        return Promise.resolve();
-                    }
-
-                    return this._client
-                        .generateImage({
-                            provider,
-                            prompt: trimmed,
-                            widthRatio: options.widthRatio,
-                            heightRatio: options.heightRatio,
-                            model: options.model,
-                            referenceImages: options.referenceImages,
-                            signal: abort.signal
-                        })
-                        .then((result) => {
-                            this._updateAssistant(assistantMsg.id, {
-                                error: null,
-                                imageBase64: result.imageBase64,
-                                mimeType: result.mimeType,
-                                operationId: result.operationId,
-                                content: imageCount > 1 ? `Изображение ${index + 1} из ${imageCount} добавлено на доску.` : ''
-                            });
-                        })
-                        .catch((err) => {
-                            const msg = err?.name === 'AbortError' ? 'Отменено' : (err?.message || 'Ошибка запроса');
-                            lastError = msg;
-                            this._updateAssistant(assistantMsg.id, { error: msg });
-                        });
-                })
+            const errors = await Promise.all(
+                assistantMsgs.map((assistantMsg, index) => this._generateImage({
+                    assistantMsg,
+                    provider,
+                    prompt: trimmed,
+                    widthRatio: options.widthRatio,
+                    heightRatio: options.heightRatio,
+                    model: options.model,
+                    referenceImages: options.referenceImages,
+                    signal: abort.signal,
+                    doneContent: imageCount > 1 ? `Изображение ${index + 1} из ${imageCount} добавлено на доску.` : ''
+                }))
             );
+            lastError = errors.filter(Boolean).pop() || null;
         } finally {
             this._aborts.delete(batchId);
             this._abort = this._aborts.size > 0 ? [...this._aborts.values()][this._aborts.size - 1] : null;
@@ -194,7 +228,181 @@ export class ChatSessionController {
         }
     }
 
-    _updateAssistant(id, { error, imageBase64, mimeType, operationId, content }) {
+    /**
+     * Ставит задачу генерации и ждёт её результат опросом статуса.
+     *
+     * @returns {Promise<string|null>} текст ошибки или null при успехе
+     */
+    async _generateImage({ assistantMsg, provider, prompt, widthRatio, heightRatio, model, referenceImages, signal, doneContent }) {
+        try {
+            if (signal?.aborted) throw makeAbortError();
+
+            const submitted = await this._client.submitImage({
+                provider,
+                prompt,
+                widthRatio,
+                heightRatio,
+                model,
+                moodboardId: this._moodboardId || undefined,
+                referenceImages,
+                signal
+            });
+
+            const jobId = submitted?.jobId;
+            if (!jobId) throw new Error('Сервис генерации не вернул идентификатор задачи');
+
+            // jobId попадает в историю до первого опроса: только по нему генерацию
+            // можно подобрать после закрытия холста или перезагрузки страницы.
+            this._patchMessage(assistantMsg.id, { jobId, provider }, { silent: true });
+
+            await this._pollImageJob({ messageId: assistantMsg.id, jobId, provider, signal, doneContent });
+            return null;
+        } catch (err) {
+            const message = err?.name === 'AbortError' ? 'Отменено' : (err?.message || 'Ошибка запроса');
+            this._updateAssistant(assistantMsg.id, { error: message });
+            return message;
+        }
+    }
+
+    /**
+     * Опрашивает задачу до результата. Ошибки уходят наверх — вызывающий решает,
+     * писать их в сообщение (новая генерация) или молча пометить (возобновление).
+     */
+    async _pollImageJob({ messageId, jobId, provider, signal, doneContent }) {
+        if (this._pollingJobIds.has(jobId)) return;
+        this._pollingJobIds.add(jobId);
+        const startedAt = Date.now();
+
+        try {
+            for (;;) {
+                if (signal?.aborted) throw makeAbortError();
+
+                const result = await this._client.pollImage(jobId, signal, provider);
+
+                if (result?.status === 'done') {
+                    this._updateAssistant(messageId, {
+                        error: null,
+                        imageUrl: result.imageUrl,
+                        mimeType: result.mimeType,
+                        operationId: jobId,
+                        placedOnBoard: false,
+                        content: doneContent ?? ''
+                    });
+                    return;
+                }
+
+                if (result?.status === 'error') {
+                    throw new Error(result?.error || 'Генерация не удалась');
+                }
+
+                if (Date.now() - startedAt > IMAGE_POLL_LIMIT_MS) {
+                    throw new Error('Генерация не завершилась за отведённое время');
+                }
+
+                await sleep(IMAGE_POLL_INTERVAL_MS, signal);
+            }
+        } finally {
+            this._pollingJobIds.delete(jobId);
+        }
+    }
+
+    /**
+     * Возобновляет опрос уже поставленной задачи (собственного submit здесь нет).
+     */
+    _watchImageJob({ messageId, jobId, provider, doneContent }) {
+        if (!jobId || this._pollingJobIds.has(jobId)) return;
+        if (!this._resumeAbort) this._resumeAbort = new AbortController();
+        const signal = this._resumeAbort.signal;
+
+        void this._pollImageJob({ messageId, jobId, provider, signal, doneContent })
+            .catch((err) => {
+                const message = err?.name === 'AbortError' ? 'Отменено' : (err?.message || 'Ошибка запроса');
+                this._updateAssistant(messageId, { error: message });
+            })
+            .finally(() => this._syncStreamingStatus());
+    }
+
+    /**
+     * Добирает задачи, которых нет в локальной истории: она могла не сохраниться
+     * (перезагрузка на другом устройстве) или быть очищенной.
+     */
+    async _pullServerJobs() {
+        if (typeof this._client.listImageJobs !== 'function') return;
+
+        let jobs = [];
+        try {
+            jobs = await this._client.listImageJobs({ moodboardId: this._moodboardId || undefined });
+        } catch {
+            // Недоступность серверной синхронизации не должна ломать чат.
+            return;
+        }
+
+        const knownJobIds = new Set(this._state.messages.map((m) => m.jobId).filter(Boolean));
+        const restored = [];
+
+        for (const job of jobs) {
+            if (!job?.jobId || knownJobIds.has(job.jobId)) continue;
+
+            const isFinished = job.status === 'done' || job.status === 'error';
+            restored.push(makeMessage('user', job.prompt || ''));
+            restored.push(makeMessage('assistant', '', {
+                provider: job.provider,
+                kind: 'image',
+                batchId: `job_${job.jobId}`,
+                jobId: job.jobId,
+                pending: !isFinished,
+                ...(job.status === 'done'
+                    ? { imageUrl: job.imageUrl, mimeType: job.mimeType, placedOnBoard: false }
+                    : {}),
+                ...(job.status === 'error'
+                    ? { error: job.error || 'Генерация не удалась' }
+                    : {})
+            }));
+        }
+
+        if (restored.length === 0) return;
+
+        const messages = [...this._state.messages, ...restored];
+        this._state = { ...this._state, messages };
+        this._history.save(messages);
+        this._emit();
+
+        for (const message of restored) {
+            if (message.pending && message.jobId) {
+                this._watchImageJob({
+                    messageId: message.id,
+                    jobId: message.jobId,
+                    provider: message.provider,
+                    doneContent: ''
+                });
+            }
+        }
+
+        this._syncStreamingStatus();
+    }
+
+    _syncStreamingStatus() {
+        const streaming = this._state.messages.some((m) => m.pending);
+        if (streaming === (this._state.status === 'streaming')) return;
+        this._state = { ...this._state, status: streaming ? 'streaming' : 'idle' };
+        this._emit();
+    }
+
+    _patchMessage(id, patch, { silent = false } = {}) {
+        let changed = false;
+        const messages = this._state.messages.map((m) => {
+            if (m.id !== id) return m;
+            changed = true;
+            return { ...m, ...patch };
+        });
+        if (!changed) return;
+
+        this._state = { ...this._state, messages };
+        this._history.save(messages);
+        if (!silent) this._emit();
+    }
+
+    _updateAssistant(id, { error, imageBase64, imageUrl, mimeType, operationId, content, placedOnBoard }) {
         const messages = this._state.messages.map((m) =>
             m.id === id
                 ? {
@@ -202,9 +410,11 @@ export class ChatSessionController {
                     pending: false,
                     error: error || undefined,
                     imageBase64: imageBase64 || m.imageBase64,
+                    imageUrl: imageUrl || m.imageUrl,
                     mimeType: mimeType || m.mimeType,
                     operationId: operationId || m.operationId,
-                    content: content ?? m.content
+                    content: content ?? m.content,
+                    ...(placedOnBoard === undefined ? {} : { placedOnBoard })
                 }
                 : m
         );
@@ -244,6 +454,75 @@ export class ChatSessionController {
     _isPresetSystemPrompt(text) {
         return CHAT_PRESETS.some((p) => p.systemPrompt === text);
     }
+}
+
+/**
+ * Общий экземпляр сессии на страницу.
+ *
+ * Холст можно закрыть и открыть заново — ChatWindow при этом создаётся с нуля.
+ * Если бы сессия жила внутри него, опрос генерации умирал бы вместе с окном, а
+ * два экземпляра писали бы историю в один ключ localStorage, затирая друг друга.
+ */
+let sharedSession = null;
+
+export function getSharedChatSession(deps) {
+    if (!sharedSession) {
+        sharedSession = new ChatSessionController(deps);
+    }
+    return sharedSession;
+}
+
+export function resetSharedChatSession() {
+    sharedSession = null;
+}
+
+/**
+ * Восстанавливает сообщение из localStorage.
+ *
+ * @param {object} message
+ */
+function restoreLoadedMessage(message) {
+    const restored = { ...message };
+    const hasImage = Boolean(restored.imageUrl || restored.imageBase64);
+
+    // Сообщения, записанные до появления флага, уже лежат на доске. Без этой
+    // подстановки вся история хлынула бы на холст при первом же открытии.
+    if (hasImage && restored.placedOnBoard === undefined) {
+        restored.placedOnBoard = true;
+    }
+
+    // Незавершённую генерацию без jobId возобновить нечем: она жила только
+    // внутри закрытой вкладки.
+    if (restored.pending && !restored.jobId) {
+        restored.pending = false;
+        restored.error = restored.error || 'Прервано';
+    }
+
+    return restored;
+}
+
+function makeAbortError() {
+    const error = new Error('Отменено');
+    error.name = 'AbortError';
+    return error;
+}
+
+function sleep(ms, signal) {
+    return new Promise((resolve, reject) => {
+        if (signal?.aborted) {
+            reject(makeAbortError());
+            return;
+        }
+        const onAbort = () => {
+            clearTimeout(timer);
+            reject(makeAbortError());
+        };
+        const timer = setTimeout(() => {
+            signal?.removeEventListener('abort', onAbort);
+            resolve();
+        }, ms);
+        signal?.addEventListener('abort', onAbort, { once: true });
+    });
 }
 
 function makeMessage(role, content, extra = {}) {

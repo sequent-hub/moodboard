@@ -143,6 +143,91 @@ export class AiClient {
     }
 
     /**
+     * Ставит задачу генерации изображения и сразу возвращает её идентификатор.
+     *
+     * В отличие от generateImage, который держал один долгий запрос и потому
+     * терял генерацию вместе с закрытым холстом, здесь генерация живёт на
+     * сервере: её можно опросить позже, в том числе в новом окне мудборда.
+     *
+     * @param {object} args
+     * @param {string} args.provider
+     * @param {string} args.prompt
+     * @param {string} [args.model]
+     * @param {string} [args.mimeType]
+     * @param {string} [args.moodboardId]
+     * @param {File[]} [args.referenceImages]
+     * @param {AbortSignal} [args.signal]
+     * @returns {Promise<{jobId: string, status: string}>}
+     */
+    async submitImage({ provider, signal, referenceImages: files, ...payload }) {
+        if (!provider) throw new Error('AiClient.submitImage: provider is required');
+        const referenceImages = await filesToBase64(files);
+        const body = referenceImages ? { ...payload, referenceImages } : payload;
+        const res = await this._fetch(`${this._baseUrl}/${provider}/image/jobs`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(body),
+            signal
+        });
+        if (!res.ok) {
+            const detail = await safeReadError(res);
+            throw new Error(`AiClient.submitImage (${res.status}): ${detail}`);
+        }
+        return res.json();
+    }
+
+    /**
+     * Опрашивает статус задачи генерации изображения.
+     *
+     * @param {string} jobId
+     * @param {AbortSignal} [signal]
+     * @param {string} provider
+     * @returns {Promise<{status: string, imageUrl?: string, mimeType?: string, error?: string}>}
+     */
+    async pollImage(jobId, signal, provider) {
+        if (!provider) throw new Error('AiClient.pollImage: provider is required');
+        const res = await this._fetch(`${this._baseUrl}/${provider}/image/jobs/${jobId}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            signal
+        });
+        if (!res.ok) {
+            const detail = await safeReadError(res);
+            throw new Error(`AiClient.pollImage (${res.status}): ${detail}`);
+        }
+        return res.json();
+    }
+
+    /**
+     * Незавершённые и недавно завершённые задачи генерации изображений.
+     *
+     * Источник правды при возобновлении: истории чата в localStorage может не
+     * быть вовсе (другой браузер или устройство), а задачи на сервере есть.
+     *
+     * @param {object} [args]
+     * @param {string} [args.moodboardId]
+     * @param {AbortSignal} [args.signal]
+     * @returns {Promise<Array<object>>}
+     */
+    async listImageJobs({ moodboardId, signal } = {}) {
+        const query = moodboardId ? `?moodboardId=${encodeURIComponent(moodboardId)}` : '';
+        const res = await this._fetch(`${this._baseUrl}/image/jobs${query}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            signal
+        });
+        if (!res.ok) {
+            const detail = await safeReadError(res);
+            throw new Error(`AiClient.listImageJobs (${res.status}): ${detail}`);
+        }
+        const json = await res.json();
+        return Array.isArray(json?.jobs) ? json.jobs : [];
+    }
+
+    /**
      * Отправляет джоб генерации 3D-модели.
      * @param {object} args
      * @param {string} [args.provider] - провайдер для бэкенда (tencentcloud)

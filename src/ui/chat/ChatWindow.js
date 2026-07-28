@@ -1,6 +1,6 @@
 import { AiClient } from '../../services/ai/AiClient.js';
 import { ChatHistoryStore } from '../../services/ai/ChatHistoryStore.js';
-import { ChatSessionController } from '../../services/ai/ChatSessionController.js';
+import { getSharedChatSession } from '../../services/ai/ChatSessionController.js';
 import { Model3dSessionController } from '../../services/ai/Model3dSessionController.js';
 import { IMAGE_MODELS, getImageModelCapability } from '../../services/ai/imageModelCapabilities.js';
 import { VIDEO_MODELS, getVideoModelCapability } from '../../services/ai/videoModelCapabilities.js';
@@ -126,6 +126,8 @@ const BOARD_IMAGE_PENDING_STAGGER_MS = 90;
 const BOARD_IMAGE_LANE_REFERENCE_RATIO = [2, 3];
 const BOARD_IMAGE_LANE_CENTER_OFFSET = 250;
 const BOARD_IMAGE_LANE_UI_GAP = 16;
+/** Сколько ждём снапшот доски, прежде чем размещать готовые изображения без него. */
+const BOARD_DATA_WAIT_FALLBACK_MS = 5000;
 
 /** Маппинг провайдера видео → иконка пилла модели. */
 function _iconForVideoProvider(provider) {
@@ -181,7 +183,8 @@ export class ChatWindow {
 
         this._aiClient = options.aiClient || new AiClient();
         this._historyStore = options.historyStore || new ChatHistoryStore();
-        this._session = options.sessionController || new ChatSessionController({
+        // Сессия общая на страницу: закрытие холста не должно обрывать генерацию.
+        this._session = options.sessionController || getSharedChatSession({
             aiClient: this._aiClient,
             historyStore: this._historyStore
         });
@@ -247,6 +250,10 @@ export class ChatWindow {
         this._videoSkeleton = null;
         this._videoSkeletonWorld = null;
         this._boardImageMessageIds = new Set();
+        // Ожидание снапшота доски перед доливкой готовых изображений.
+        this._boardDataWaitHandler = null;
+        this._boardDataWaitTimer = null;
+        this._boardDataWaitExpired = false;
         this._shiftedForImageBatchKeys = new Set();
         this._boardImageShiftHistory = new Map();
         this._pendingOverlays = new Map();
@@ -514,6 +521,7 @@ export class ChatWindow {
         this._render(initialState);
 
         this._loadProviders();
+        this._resumeImageGenerations();
 
         this._attached = true;
     }
@@ -522,6 +530,7 @@ export class ChatWindow {
         if (!this._attached) return;
         this._clearPendingOverlays();
         this._cancelBoardImageShiftAnimations();
+        this._stopWaitingForBoardData();
         if (this._unsubscribe) { this._unsubscribe(); this._unsubscribe = null; }
         this._detachSelectionEvents();
         this._detachViewportSync();
@@ -1125,6 +1134,21 @@ export class ChatWindow {
             this._providers = [];
             this._session.setAvailableProviders([]);
         }
+    }
+
+    /**
+     * Подхватывает генерации, начатые до открытия этого холста: заглушки на
+     * доске и готовые изображения, доехавшие пока мудборд был закрыт.
+     */
+    _resumeImageGenerations() {
+        const boardId = this._boardCore?.options?.boardId
+            ?? this._boardCore?.state?.state?.board?.id
+            ?? null;
+        this._session.setMoodboardId?.(boardId == null ? null : String(boardId));
+
+        Promise.resolve(this._session.resumeActiveJobs?.()).catch((err) => {
+            console.warn('[ChatWindow] cannot resume image generations:', err?.message || err);
+        });
     }
 
     /**
@@ -2348,7 +2372,7 @@ export class ChatWindow {
             if (batchMessages.length === 0) continue;
 
             const allResolved = batchMessages.every((m) => !m.pending);
-            const anyImage = batchMessages.some((m) => Boolean(m.imageBase64));
+            const anyImage = batchMessages.some((m) => hasGeneratedImage(m));
 
             if (allResolved && !anyImage) {
                 this._revertBoardImageShiftForBatch(batchKey);
@@ -2641,7 +2665,9 @@ export class ChatWindow {
 
     _addImageToBoard(msg) {
         if (!this._boardCore?.eventBus) return;
-        const dataUrl = `data:${msg.mimeType || 'image/jpeg'};base64,${msg.imageBase64}`;
+        // Асинхронная генерация возвращает ссылку на медиа-диск; base64 остаётся
+        // для сообщений, записанных синхронным мостом.
+        const src = msg.imageUrl || `data:${msg.mimeType || 'image/jpeg'};base64,${msg.imageBase64}`;
         const world = this._boardCore.pixi?.worldLayer || this._boardCore.pixi?.app?.stage;
         const s = world?.scale?.x || 1;
         const messages = this._session.getState().messages;
@@ -2670,16 +2696,20 @@ export class ChatWindow {
         this._boardCore.eventBus.emit(Events.UI.PasteImageAt, {
             x: insertPoint.x,
             y: insertPoint.y,
-            src: dataUrl,
+            src,
             name: 'ai-generated.jpg',
             aiMessageId: msg.id,
             skipUpload: true
         });
+
+        this._session.markPlacedOnBoard?.(msg.id);
     }
 
     _markExistingBoardImages(messages) {
         for (const msg of messages || []) {
-            if (msg?.imageBase64) {
+            // Изображение, полученное при закрытом холсте, ещё не размещено —
+            // его нужно донести на доску, а не считать частью старой истории.
+            if (hasGeneratedImage(msg) && msg.placedOnBoard !== false) {
                 this._boardImageMessageIds.add(msg.id);
             }
         }
@@ -2688,8 +2718,15 @@ export class ChatWindow {
     _syncGeneratedImagesToBoard(messages) {
         if (!this._boardCore?.eventBus) return;
 
+        // Снапшот доски приходит асинхронно и стартует с clearBoard(): объект,
+        // добавленный до его применения, будет потерян. Ждём Board.DataLoaded.
+        if (!this._isBoardDataReady()) {
+            this._waitForBoardDataThenSync();
+            return;
+        }
+
         for (const msg of messages || []) {
-            if (!msg?.imageBase64 || msg.pending || this._boardImageMessageIds.has(msg.id)) {
+            if (!hasGeneratedImage(msg) || msg.pending || this._boardImageMessageIds.has(msg.id)) {
                 continue;
             }
 
@@ -2697,6 +2734,48 @@ export class ChatWindow {
             this._addImageToBoard(msg);
         }
     }
+
+    _isBoardDataReady() {
+        if (this._boardDataWaitExpired === true) return true;
+        return this._boardCore?.boardDataLoading !== true;
+    }
+
+    _waitForBoardDataThenSync() {
+        if (this._boardDataWaitHandler) return;
+
+        const eventBus = this._boardCore?.eventBus;
+        if (!eventBus) return;
+
+        const run = (expired = false) => {
+            if (expired) {
+                this._boardDataWaitExpired = true;
+            }
+            this._stopWaitingForBoardData();
+            if (!this._attached) return;
+            this._syncGeneratedImagesToBoard(this._session.getState().messages);
+        };
+
+        this._boardDataWaitHandler = () => run(false);
+        eventBus.on(Events.Board.DataLoaded, this._boardDataWaitHandler);
+        // Страховка на случай встраивания без DataManager.loadData:
+        // без неё готовое изображение не попало бы на доску вообще.
+        this._boardDataWaitTimer = setTimeout(() => run(true), BOARD_DATA_WAIT_FALLBACK_MS);
+    }
+
+    _stopWaitingForBoardData() {
+        if (this._boardDataWaitTimer) {
+            clearTimeout(this._boardDataWaitTimer);
+            this._boardDataWaitTimer = null;
+        }
+        if (this._boardDataWaitHandler) {
+            this._boardCore?.eventBus?.off?.(Events.Board.DataLoaded, this._boardDataWaitHandler);
+            this._boardDataWaitHandler = null;
+        }
+    }
+}
+
+function hasGeneratedImage(msg) {
+    return Boolean(msg?.imageUrl || msg?.imageBase64);
 }
 
 function getBoardImageReferenceHeight() {
@@ -2772,7 +2851,7 @@ function getImageGenerationBatchKey(batch) {
 
 function isImageGenerationMessage(message) {
     return message?.role === 'assistant'
-        && (message.kind === 'image' || message.pending || Boolean(message.imageBase64));
+        && (message.kind === 'image' || message.pending || hasGeneratedImage(message));
 }
 
 function isBoardAiImageObject(object) {
