@@ -923,11 +923,12 @@ export class ChatWindow {
 
         // Центр будущей модели в экранных координатах: над композером (как при размещении).
         const composerRect = this._refs?.composer?.getBoundingClientRect?.();
+        const { left: offsetLeft, top: offsetTop } = this._getContainerOffset();
         const screenCenterX = composerRect
-            ? Math.round(composerRect.left + composerRect.width / 2)
+            ? Math.round(composerRect.left - offsetLeft + composerRect.width / 2)
             : 400;
         const screenCenterY = composerRect
-            ? Math.round(composerRect.top - 200)
+            ? Math.round(composerRect.top - offsetTop - 200)
             : 200;
 
         // _clear3dSkeleton() обнуляет _model3dSkeletonWorld — присваиваем ПОСЛЕ него.
@@ -986,11 +987,12 @@ export class ChatWindow {
         const s = world?.scale?.x || 1;
 
         const composerRect = this._refs?.composer?.getBoundingClientRect?.();
+        const { left: offsetLeft, top: offsetTop } = this._getContainerOffset();
         const screenCenterX = composerRect
-            ? Math.round(composerRect.left + composerRect.width / 2)
+            ? Math.round(composerRect.left - offsetLeft + composerRect.width / 2)
             : 400;
         const screenCenterY = composerRect
-            ? Math.round(composerRect.top - 200)
+            ? Math.round(composerRect.top - offsetTop - 200)
             : 200;
 
         this._clearVideoSkeleton();
@@ -1040,8 +1042,9 @@ export class ChatWindow {
             y = Math.round(this._model3dSkeletonWorld.y * s + (world?.y || 0));
         } else {
             const composerRect = this._refs?.composer?.getBoundingClientRect?.();
-            x = composerRect ? Math.round(composerRect.left + composerRect.width / 2) : 400;
-            y = composerRect ? Math.round(composerRect.top - 200) : 200;
+            const { left: offsetLeft, top: offsetTop } = this._getContainerOffset();
+            x = composerRect ? Math.round(composerRect.left - offsetLeft + composerRect.width / 2) : 400;
+            y = composerRect ? Math.round(composerRect.top - offsetTop - 200) : 200;
         }
 
         this._boardCore.eventBus.emit(Events.UI.PasteImageAt, {
@@ -1079,8 +1082,9 @@ export class ChatWindow {
             y = Math.round(skeletonWorld.y * s + (world?.y || 0));
         } else {
             const composerRect = this._refs?.composer?.getBoundingClientRect?.();
-            x = composerRect ? Math.round(composerRect.left + composerRect.width / 2) : 400;
-            y = composerRect ? Math.round(composerRect.top - 200) : 200;
+            const { left: offsetLeft, top: offsetTop } = this._getContainerOffset();
+            x = composerRect ? Math.round(composerRect.left - offsetLeft + composerRect.width / 2) : 400;
+            y = composerRect ? Math.round(composerRect.top - offsetTop - 200) : 200;
         }
 
         this._boardCore.eventBus.emit(Events.UI.PasteVideoAt, {
@@ -1882,8 +1886,13 @@ export class ChatWindow {
             this._sync3dSkeletonToViewport({ disableTransition: true });
             this._syncVideoSkeletonToViewport({ disableTransition: true });
         };
-        const onViewportChange = () => {
-            this._syncPendingOverlaysToViewport({ disableTransition: true, recomputeWorld: false });
+        const onViewportChange = (payload) => {
+            // Пан и зум не должны сдвигать точку приземления картинки, поэтому мировые
+            // координаты заглушки фиксированы. Смена размера контейнера — другой случай:
+            // прежний якорь считался от старого центра кадра, после ресайза он уже не в
+            // центре, поэтому пересчитываем его заново.
+            const isResize = payload?.reason === 'resize';
+            this._syncPendingOverlaysToViewport({ disableTransition: true, recomputeWorld: isResize });
             this._sync3dSkeletonToViewport({ disableTransition: true });
             this._syncVideoSkeletonToViewport({ disableTransition: true });
             // Зум меняет проекцию композера в мир: после него существующее изображение может
@@ -2164,12 +2173,13 @@ export class ChatWindow {
 
     _clampImageGroupAnchorY(y, referenceHeight, reserveY = 0) {
         const clearance = Math.round(referenceHeight / 2) + BOARD_IMAGE_LANE_UI_GAP + reserveY;
+        const offsetTop = this._getContainerOffset().top;
 
         const errorBlock = this._refs?.errorBlock;
         if (errorBlock && errorBlock.classList.contains('is-visible')) {
             const errorRect = errorBlock.getBoundingClientRect();
             if (errorRect.height > 0) {
-                const minY = errorRect.top - clearance;
+                const minY = errorRect.top - offsetTop - clearance;
                 if (y > minY) {
                     y = minY;
                 }
@@ -2181,7 +2191,7 @@ export class ChatWindow {
             const statusRect = statusBar.getBoundingClientRect();
             // jsdom отдаёт нулевой rect — без реальной геометрии не сдвигаем ряд.
             if (statusRect.height > 0 && statusRect.top > 0) {
-                const minY = statusRect.top - clearance;
+                const minY = statusRect.top - offsetTop - clearance;
                 if (y > minY) {
                     y = minY;
                 }
@@ -2191,12 +2201,27 @@ export class ChatWindow {
         return y;
     }
 
+    // Смещение контейнера холста относительно страницы. getBoundingClientRect()
+    // DOM-элементов чата отдаёт координаты страницы, а объекты холста и оверлеи
+    // живут в системе координат канвы: её начало — левый верхний угол контейнера
+    // (.moodboard-workspace), канва растянута по нему inset:0. Пока workspace
+    // занимал весь вьюпорт (position:fixed), обе системы совпадали. Во встроенном
+    // режиме (панель внутри доски) контейнер смещён, и без этого перевода
+    // изображение приземляется мимо центра видимой области ровно на left/top.
+    _getContainerOffset() {
+        const rect = this._container?.getBoundingClientRect?.();
+        return {
+            left: rect?.left || 0,
+            top: rect?.top || 0
+        };
+    }
+
     _getViewportCenter() {
         const rect = this._container?.getBoundingClientRect?.();
         if (rect && rect.width > 0 && rect.height > 0) {
             return {
-                x: Math.round(rect.left + rect.width / 2),
-                y: Math.round(rect.top + rect.height / 2)
+                x: Math.round(rect.width / 2),
+                y: Math.round(rect.height / 2)
             };
         }
         return null;
@@ -2225,6 +2250,7 @@ export class ChatWindow {
 
         const composerRect = this._refs?.composer?.getBoundingClientRect?.();
         if (composerRect) {
+            const { left: offsetLeft, top: offsetTop } = this._getContainerOffset();
             const existingCenterY = this._getAiImageLaneCenterScreenY();
             const [wr, hr] = parseFormatRatio(this._formatId);
             const actualHeight = Math.round(BOARD_IMAGE_WIDTH / (wr / hr));
@@ -2234,23 +2260,24 @@ export class ChatWindow {
                 reserveY = 74; // Резервируем место под ряд вложений (60px + padding)
             }
 
-            let y = existingCenterY ?? (composerRect.top - reserveY - Math.round(actualHeight / 2) - BOARD_IMAGE_LANE_UI_GAP);
+            let y = existingCenterY ?? (composerRect.top - offsetTop - reserveY - Math.round(actualHeight / 2) - BOARD_IMAGE_LANE_UI_GAP);
 
             if (existingCenterY == null) {
                 y = this._clampImageGroupAnchorY(y, actualHeight, reserveY);
             }
 
             return {
-                x: Math.round(composerRect.left + composerRect.width / 2),
+                x: Math.round(composerRect.left - offsetLeft + composerRect.width / 2),
                 y: Math.round(y)
             };
         }
 
         const chatRect = this._refs?.root?.getBoundingClientRect?.();
         if (chatRect) {
+            const { left: offsetLeft, top: offsetTop } = this._getContainerOffset();
             return {
-                x: Math.round(chatRect.left + chatRect.width / 2),
-                y: Math.round(chatRect.top - 150)
+                x: Math.round(chatRect.left - offsetLeft + chatRect.width / 2),
+                y: Math.round(chatRect.top - offsetTop - 150)
             };
         }
 
@@ -2384,6 +2411,7 @@ export class ChatWindow {
         const errorBlock = this._refs.errorBlock;
         if (!errorBlock) return;
         const errorRect = errorBlock.getBoundingClientRect();
+        const errorTop = errorRect.top - this._getContainerOffset().top;
         
         const aiObjects = this._getBoardAiImageObjects();
         if (aiObjects.length === 0) return;
@@ -2398,7 +2426,7 @@ export class ChatWindow {
             const bottomWorld = obj.position.y + height;
             const bottomScreen = bottomWorld * s + (world?.y || 0);
 
-            const overlap = bottomScreen - (errorRect.top - 16);
+            const overlap = bottomScreen - (errorTop - 16);
             if (overlap > maxOverlap) {
                 maxOverlap = overlap;
             }

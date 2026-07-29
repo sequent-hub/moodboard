@@ -61,7 +61,10 @@ function setupViewportResize(core) {
         // Пересобираем screen-space сетку под новый размер и репозиционируем
         // её вместе с оверлеями через существующий viewport-флоу.
         core.boardService?.resize?.();
-        core.eventBus.emit(Events.Viewport.Changed);
+        // reason нужен подписчикам, которые держат свою геометрию в мировых
+        // координатах и на обычном пане/зуме её не пересчитывают (заглушки чата),
+        // а при смене размера контейнера обязаны вернуться к центру кадра.
+        core.eventBus.emit(Events.Viewport.Changed, { reason: 'resize' });
     };
 
     core.resizeObserver = new ResizeObserver(() => {

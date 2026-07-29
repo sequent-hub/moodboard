@@ -258,7 +258,25 @@ export class PixiEngine {
         if (renderer.resolution !== dpr) {
             renderer.resolution = dpr;
         }
+        const previousSize = this._appliedViewportSize;
         renderer.resize(w, h);
+
+        // Сохраняем видимый центр. PIXI при resize держит мировой слой привязанным
+        // к левому верхнему углу канвы, поэтому когда контейнер расширяется влево
+        // (панель холста в хост-приложении растёт, правый край стоит на месте),
+        // весь контент визуально уезжает влево от нового центра — вместе с
+        // заглушкой генерируемого изображения. Сдвиг на половину дельты оставляет
+        // точку, которая была в середине кадра, в середине кадра.
+        if (previousSize && this.worldLayer) {
+            const dx = (w - previousSize.width) / 2;
+            const dy = (h - previousSize.height) / 2;
+            if (dx !== 0 || dy !== 0) {
+                this.worldLayer.x = Math.round(this.worldLayer.x + dx);
+                this.worldLayer.y = Math.round(this.worldLayer.y + dy);
+            }
+        }
+        this._appliedViewportSize = { width: w, height: h };
+
         // Немедленный перерендер — иначе до следующего тика PIXI буфер
         // отображается очищенным (чёрный кадр) на время resize.
         if (this.app?.stage) {
