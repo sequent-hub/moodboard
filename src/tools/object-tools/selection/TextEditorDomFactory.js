@@ -76,19 +76,26 @@ export function measureTextEditorPlaceholderWidth(textarea, placeholder = 'На�
     return width;
 }
 
-export function attachTextEditorPlaceholderStyle(textarea, { effectiveFontPx, isNote }) {
+export function attachTextEditorPlaceholderStyle(textarea, { effectiveFontPx, isNote, isShape }) {
     const uid = 'mbti-' + Math.random().toString(36).slice(2);
     textarea.classList.add(uid);
 
     const styleEl = document.createElement('style');
     const placeholderOpacity = isNote ? '0.4' : '0.3';
+    // Записка и фигура: ширина поля жёстко равна внутреннему боксу объекта (overflow: hidden),
+    // поэтому nowrap обрезал бы placeholder по краю объекта. Переносим его так же, как
+    // реальный текст (applyNoteEditorBox / ветка isShape ставят pre-wrap на textarea).
+    // Обычный текст растёт в ширину под содержимое, там перенос placeholder не нужен.
+    const wrapRule = (isNote || isShape)
+        ? 'white-space:pre-wrap;overflow-wrap:anywhere;'
+        : 'white-space:nowrap;';
     // Размер placeholder держим синхронным с текущим шрифтом поля: при зуме/масштабе
     // редактор пересчитывает font-size textarea (createRegularTextEditorUpdater), и без
     // обновления этого правила placeholder «замерзает» на размере момента открытия и
     // вылезает за рамку при последующем уменьшении.
     const setFontPx = (fontPx) => {
         const px = Math.max(1, Math.round(fontPx));
-        styleEl.textContent = `.${uid}::placeholder{font-size:${px}px;opacity:${placeholderOpacity};line-height:${computeTextEditorLineHeightPx(px)}px;white-space:nowrap;color:#111;-webkit-text-fill-color:#111;}`;
+        styleEl.textContent = `.${uid}::placeholder{font-size:${px}px;opacity:${placeholderOpacity};line-height:${computeTextEditorLineHeightPx(px)}px;${wrapRule}color:#111;-webkit-text-fill-color:#111;}`;
     };
     setFontPx(effectiveFontPx);
     document.head.appendChild(styleEl);

@@ -79,7 +79,11 @@ function countNoteVisualLines(text, boxW, fontPx, fontFamily) {
 // NoteObject._fitTextToBounds: текст переносится по фиксированной ширине блока (boxW),
 // размер шрифта уменьшается, пока высота контента не влезет в innerH (без нижнего предела).
 // Число строк (для лимита) меряется отдельно по естественному шрифту effectiveFontPx.
-export function applyNoteEditorBox(textarea, backdrop, { boxW, innerH, effectiveFontPx }) {
+export function applyNoteEditorBox(textarea, backdrop, { boxW, innerH, effectiveFontPx, textAlign }) {
+    // Выравнивание берём у объекта (NoteObject.textAlign), а не хардкодом: иначе при
+    // выборе «влево» в панели свойств статичный текст стоял слева, а режим правки
+    // показывал центр. Fallback совпадает с дефолтом NoteObject.
+    const align = textAlign || 'center';
     // line-height задаём коэффициентом по текущему размеру (как NoteObject), чтобы
     // высота строки совпадала с отрисованной запиской.
     const setWrapStyles = (el, fontPx) => {
@@ -87,7 +91,7 @@ export function applyNoteEditorBox(textarea, backdrop, { boxW, innerH, effective
         el.style.whiteSpace = 'pre-wrap';
         el.style.wordBreak = 'break-word';
         el.style.overflowWrap = 'anywhere';
-        el.style.textAlign = 'center';
+        el.style.textAlign = align;
         el.style.boxSizing = 'content-box';
         el.style.padding = '0';
         el.style.overflow = 'hidden';
@@ -102,6 +106,11 @@ export function applyNoteEditorBox(textarea, backdrop, { boxW, innerH, effective
     const naturalFont = Math.max(NOTE_MIN_FONT_PX, Math.round(effectiveFontPx));
     const value = textarea.value || '';
     const lineCount = countNoteVisualLines(value, boxW, naturalFont, fontFamily);
+    // Пустая записка: высоту блока меряем по плейсхолдеру, а не по пустой строке. Иначе
+    // бокс высотой в одну строку обрезает (overflow: hidden) перенесённый плейсхолдер —
+    // «Напишите что-нибудь» в Caveat 32 не влезает в ширину записки по умолчанию.
+    // Лимит строк (lineCount) остаётся по value: плейсхолдер не должен блокировать ввод.
+    const measuredText = value.length ? value : (textarea.placeholder || '');
 
     // Подбор шрифта детерминированный — высоту блока меряем скрытым div
     // (measureNoteBlockHeight), а НЕ textarea.scrollHeight. Chromium при быстрых
@@ -110,13 +119,13 @@ export function applyNoteEditorBox(textarea, backdrop, { boxW, innerH, effective
     // дёргал каретку. Скрытый div пересоздаётся на каждом замере и стейл-значения
     // не накапливает. Тот же подход уже применён в createRegularTextAutoSize.
     let fitFont = naturalFont;
-    let measuredH = measureNoteBlockHeight(value, boxW, fitFont, fontFamily, resolveLineHeightRatio(fitFont));
+    let measuredH = measureNoteBlockHeight(measuredText, boxW, fitFont, fontFamily, resolveLineHeightRatio(fitFont));
     // measuredH === 0 → layout недоступен (jsdom): сжимать нечем, оставляем естественный шрифт.
     if (measuredH > 0) {
         for (let safety = 0; safety < 256; safety++) {
             if (measuredH <= innerH || fitFont <= NOTE_MIN_FONT_PX) break;
             fitFont = Math.max(NOTE_MIN_FONT_PX, fitFont - 1);
-            measuredH = measureNoteBlockHeight(value, boxW, fitFont, fontFamily, resolveLineHeightRatio(fitFont));
+            measuredH = measureNoteBlockHeight(measuredText, boxW, fitFont, fontFamily, resolveLineHeightRatio(fitFont));
         }
     }
 
@@ -294,6 +303,7 @@ export function createNoteEditorUpdater(controller, {
     computeLineHeightPx,
     effectiveFontPx,
     toScreen,
+    textAlign,
 }) {
     const minNoteEditorHeightPx = Math.max(1, computeLineHeightPx(effectiveFontPx));
 
@@ -326,6 +336,7 @@ export function createNoteEditorUpdater(controller, {
                 boxW,
                 innerH,
                 effectiveFontPx,
+                textAlign,
             });
             const contentH = result.contentH;
 

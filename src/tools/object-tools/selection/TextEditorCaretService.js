@@ -48,6 +48,54 @@ function measureGlyphRightOverflow(computed, ch) {
     }
 }
 
+// Левый край первого глифа плейсхолдера в CSS-px от левой границы контента поля.
+// Нужен для пустой записки: текст в ней центрирован, поэтому mirror-замер по пустому
+// значению даёт геометрический центр строки, и каретка «висит» в середине подсказки,
+// а не там, где появится первая буква. Возвращает null, если замер невозможен.
+function measurePlaceholderFirstGlyphLeft(textarea, computed) {
+    const placeholder = textarea.placeholder || '';
+    if (!placeholder) {
+        return null;
+    }
+    try {
+        if (typeof document === 'undefined' || !document.body || !document.createRange) {
+            return null;
+        }
+        const m = document.createElement('div');
+        m.style.cssText = 'position:absolute;visibility:hidden;top:-9999px;left:-9999px;padding:0;margin:0;border:0;';
+        m.style.width = `${Math.max(1, textarea.clientWidth)}px`;
+        m.style.whiteSpace = 'pre-wrap';
+        m.style.wordBreak = computed.wordBreak || 'break-word';
+        m.style.overflowWrap = computed.overflowWrap || 'anywhere';
+        m.style.textAlign = computed.textAlign || 'center';
+        m.style.font = computed.font || '';
+        m.style.fontFamily = computed.fontFamily || '';
+        m.style.fontSize = computed.fontSize || '';
+        m.style.fontStyle = computed.fontStyle || '';
+        m.style.fontWeight = computed.fontWeight || '';
+        m.style.lineHeight = computed.lineHeight || '';
+        m.style.letterSpacing = computed.letterSpacing || '';
+        m.textContent = placeholder;
+        document.body.appendChild(m);
+
+        const node = m.firstChild;
+        let glyphLeft = null;
+        if (node) {
+            const range = document.createRange();
+            range.setStart(node, 0);
+            range.setEnd(node, 1);
+            const rect = range.getClientRects()[0] || range.getBoundingClientRect();
+            if (rect && Number.isFinite(rect.left)) {
+                glyphLeft = rect.left - m.getBoundingClientRect().left;
+            }
+        }
+        m.remove();
+        return (glyphLeft !== null && Number.isFinite(glyphLeft)) ? glyphLeft : null;
+    } catch (_) {
+        return null;
+    }
+}
+
 export function getCaretCoordinates(element, position) {
     if (!mirrorDiv) {
         mirrorDiv = document.createElement('div');
@@ -134,11 +182,21 @@ export function updateCustomCaret(textarea, caretEl) {
 
     // Adjust for scroll
     const top = offsetY + coords.top - textarea.scrollTop;
-    const left = offsetX + coords.left - textarea.scrollLeft;
-    
+    let left = offsetX + coords.left - textarea.scrollLeft;
+
     // Calculate width based on font size to match stroke thickness
     const computed = window.getComputedStyle(textarea);
     const fontSize = parseFloat(computed.fontSize) || 16;
+
+    // Пустая записка: каретку ставим к первому глифу плейсхолдера (см.
+    // measurePlaceholderFirstGlyphLeft). Флаг ставит инлайн-редактор записки — у фигуры
+    // плейсхолдер не отображается, там каретка остаётся в центре.
+    if (!textarea.value && textarea.dataset.mbCaretAtPlaceholder === '1') {
+        const placeholderLeft = measurePlaceholderFirstGlyphLeft(textarea, computed);
+        if (placeholderLeft !== null) {
+            left = offsetX + placeholderLeft - textarea.scrollLeft;
+        }
+    }
 
     // Сдвиг каретки вправо складывается из выступа чернил последней буквы (у рукописных/
     // наклонных шрифтов глиф вылазит за advance width) и межбуквенного интервала текста.

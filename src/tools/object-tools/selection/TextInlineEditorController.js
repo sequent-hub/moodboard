@@ -14,6 +14,7 @@ import {
     updateGlobalTextEditorHandlesLayer,
     hideNotePixiText,
     hideStaticTextDuringEditing,
+    releaseHandlesSuppression,
 } from './TextEditorLifecycleRegistry.js';
 import {
     applyInitialTextEditorTextareaStyles,
@@ -107,6 +108,25 @@ export function openTextEditor(object, create = false) {
         // widthMode берём из живого состояния: без него редактор не узнает, что ширина
         // зафиксирована боковой ручкой, и при вводе сбросил бы её на ширину контента.
         if (meta.widthMode !== undefined) properties.widthMode = meta.widthMode;
+        // Выравнивание записки в payload обычно не приходит: без него редактор открылся бы
+        // с дефолтным центром, хотя статичный текст выровнен иначе (панель свойств).
+        if (typeof meta.textAlign === 'string' && !properties.textAlign) {
+            properties.textAlign = meta.textAlign;
+        }
+        // Пустой стикер ведёт себя как новый: ввод начинается от левого края, а не от
+        // центра. Выравнивание сразу пишем в объект — иначе после закрытия редактора
+        // статичный текст встал бы по сохранённому центру и «прыгнул» относительно
+        // только что набранного. У стикера с текстом выравнивание не трогаем.
+        if (objectType === 'note') {
+            const liveContent = (typeof meta.content === 'string' ? meta.content : (properties.content || content)) || '';
+            if (!liveContent.trim() && properties.textAlign !== 'left') {
+                properties.textAlign = 'left';
+                this.eventBus.emit(Events.Object.StateChanged, {
+                    objectId,
+                    updates: { properties: { textAlign: 'left' } },
+                });
+            }
+        }
     }
 
     // Уведомляем о начале редактирования (для разных типов отдельно)
@@ -351,6 +371,7 @@ export function openTextEditor(object, create = false) {
             computeLineHeightPx: computeTextEditorLineHeightPx,
             effectiveFontPx,
             toScreen,
+            properties,
         });
         updateNoteEditor = noteSetup.updateNoteEditor;
         setNoteBanVisible = noteSetup.setBanVisible;
@@ -676,6 +697,7 @@ export function openTextEditor(object, create = false) {
     const { styleEl, setFontPx: setPlaceholderFontPx } = attachTextEditorPlaceholderStyle(textarea, {
         effectiveFontPx,
         isNote,
+        isShape,
     });
     this.textEditor = {
         active: true,
@@ -771,10 +793,6 @@ export function closeTextEditor(commit) {
     // Снимаем подавление ручек до вызова closeTextEditorFromState,
     // т.к. тот в конце вызывает updateGlobalTextEditorHandlesLayer() → update() → showBounds,
     // и ручки должны пересоздаться нормально.
-    try {
-        if (typeof window !== 'undefined' && window.moodboardHtmlHandlesLayer) {
-            window.moodboardHtmlHandlesLayer._handlesSuppressed = false;
-        }
-    } catch (_) {}
+    releaseHandlesSuppression();
     return closeTextEditorFromState(this, commit);
 }

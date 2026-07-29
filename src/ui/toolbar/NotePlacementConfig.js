@@ -33,6 +33,9 @@ export function createNotePlacementPayload(backgroundColor = DEFAULT_NOTE_BACKGR
             width: 250,
             height: 250,
             backgroundColor,
+            // Явный left только для новых записок: NoteObject по умолчанию центрирует,
+            // поэтому ранее созданные записки без сохранённого textAlign не меняют вид.
+            textAlign: 'left',
         },
     };
 }

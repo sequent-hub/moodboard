@@ -17,6 +17,16 @@ export function updateGlobalTextEditorHandlesLayer() {
     } catch (_) {}
 }
 
+// Редактор поднимает _handlesSuppressed при открытии; без сброса объект остаётся
+// выделенным логически, но без рамки — выделение выглядит нерабочим.
+export function releaseHandlesSuppression() {
+    try {
+        if (typeof window !== 'undefined' && window.moodboardHtmlHandlesLayer) {
+            window.moodboardHtmlHandlesLayer._handlesSuppressed = false;
+        }
+    } catch (_) {}
+}
+
 export function hideStaticTextDuringEditing(controller, objectId) {
     if (!objectId) return;
 
@@ -78,6 +88,8 @@ export function cleanupActiveTextEditor(controller, wrapper) {
         }
         if (controller.textEditor) controller.textEditor._caretSuppressed = false;
     } catch (_) {}
+
+    releaseHandlesSuppression();
 
     wrapper.remove();
     controller.textEditor = {

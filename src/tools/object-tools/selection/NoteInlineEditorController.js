@@ -40,7 +40,10 @@ export function setupNoteInlineEditor(controller, params) {
         computeLineHeightPx,
         effectiveFontPx,
         toScreen,
+        properties,
     } = params;
+
+    const textAlign = properties?.textAlign || 'center';
 
     // Получаем актуальные размеры записки
     let noteWidth = 160;
@@ -72,6 +75,11 @@ export function setupNoteInlineEditor(controller, params) {
 
     const backdrop = wrapper.querySelector('.moodboard-text-backdrop');
 
+    // Текст записки центрирован, поэтому у пустого поля каретка по умолчанию встаёт в
+    // геометрический центр строки — посреди плейсхолдера. Флаг просит updateCustomCaret
+    // поставить её к первому глифу подсказки, где появится первая буква.
+    textarea.dataset.mbCaretAtPlaceholder = '1';
+
     // Оверлей запрета ввода: показывается по центру записки, когда достигнут лимит
     // строк (NOTE_MAX_LINES). Иконка — assets/icons/ban.svg (stroke=currentColor).
     const setBanVisible = ensureNoteLimitBan(wrapper);
@@ -89,6 +97,7 @@ export function setupNoteInlineEditor(controller, params) {
             boxW,
             innerH,
             effectiveFontPx,
+            textAlign,
         });
         wrapper.style.width = `${boxW}px`;
         wrapper.style.height = `${result.contentH}px`;
@@ -117,6 +126,7 @@ export function setupNoteInlineEditor(controller, params) {
         computeLineHeightPx,
         effectiveFontPx,
         toScreen,
+        textAlign,
     });
     registerNoteEditorSync(controller, { objectId, updateNoteEditor });
 
