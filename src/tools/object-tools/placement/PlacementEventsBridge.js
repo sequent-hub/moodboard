@@ -1,4 +1,5 @@
 import { Events } from '../../../core/events/Events.js';
+import { applyMindmapPlaceholderCapsuleSize } from '../../../ui/mindmap/MindmapCapsuleMetrics.js';
 
 export class PlacementEventsBridge {
     constructor(host) {
@@ -33,6 +34,10 @@ export class PlacementEventsBridge {
                 } else if (this.host.pending.type === 'shape') {
                     this.host.showShapeGhost();
                 } else if (this.host.pending.type === 'mindmap') {
+                    applyMindmapPlaceholderCapsuleSize(this.host.pending, {
+                        worldScale: this.host.world?.scale?.x,
+                        resolution: this.host.app?.renderer?.resolution,
+                    });
                     this.host.showMindmapGhost();
                 }
                 if (this.host.pending.placeOnMouseUp && this.host.app && this.host.app.view) {

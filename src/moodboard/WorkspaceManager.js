@@ -9,6 +9,12 @@ export class WorkspaceManager {
         this.toolbarContainer = null;
         this.canvasContainer = null;
         this.topbarContainer = null;
+        this._resetCanvasScroll = (event) => {
+            const el = event?.currentTarget;
+            if (!el) return;
+            if (el.scrollLeft !== 0) el.scrollLeft = 0;
+            if (el.scrollTop !== 0) el.scrollTop = 0;
+        };
     }
     
     /**
@@ -30,6 +36,10 @@ export class WorkspaceManager {
         this.canvasContainer = document.createElement('div');
         this.canvasContainer.className = 'moodboard-workspace__canvas';
         this.canvasContainer.id = 'moodboard-canvas-' + Date.now();
+        // Страховка для браузеров без overflow: clip (Safari < 16): там контейнер остаётся
+        // прокручиваемым, и прокрутка к каретке редактора сдвигает canvas относительно
+        // HTML-оверлеев.
+        this.canvasContainer.addEventListener('scroll', this._resetCanvasScroll, { passive: true });
 
         // Создаем контейнер для верхней панели
         this.topbarContainer = document.createElement('div');
@@ -93,6 +103,9 @@ export class WorkspaceManager {
      * Очистка ресурсов
      */
     destroy() {
+        if (this.canvasContainer) {
+            this.canvasContainer.removeEventListener('scroll', this._resetCanvasScroll);
+        }
         if (this.workspaceElement) {
             this.workspaceElement.remove();
             this.workspaceElement = null;

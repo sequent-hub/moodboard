@@ -1,5 +1,9 @@
 import * as PIXI from 'pixi.js';
 import { MINDMAP_LAYOUT } from '../../../ui/mindmap/MindmapLayoutConfig.js';
+import {
+    MINDMAP_PLACEHOLDER,
+    getMindmapStrokeWorldWidth,
+} from '../../../ui/mindmap/MindmapCapsuleMetrics.js';
 
 export class GhostController {
     constructor(host) {
@@ -523,14 +527,16 @@ export class GhostController {
         const fillAlpha = (typeof host.pending.properties?.fillAlpha === 'number')
             ? host.pending.properties.fillAlpha
             : 0.25;
-        // Толщина обводки согласована с MindmapObject и ветками: 3 экранных пикселя.
         const worldScale = Math.max(0.01, host.world?.scale?.x || 1);
-        const strokeWidth = 3 / worldScale;
+        const strokeWidth = getMindmapStrokeWorldWidth({
+            strokeWidth: host.pending.properties?.strokeWidth,
+            worldScale,
+        });
         const fontSize = Math.max(1, Math.round(host.pending.properties?.fontSize || MINDMAP_LAYOUT.fontSize));
         const fontFamily = host.pending.properties?.fontFamily || 'Roboto, Arial, sans-serif';
         const textColor = host.pending.properties?.textColor || 0x212121;
         const paddingX = Math.max(0, Math.round(host.pending.properties?.paddingX ?? MINDMAP_LAYOUT.paddingX));
-        const placeholderText = 'Напишите что-нибудь';
+        const placeholderText = MINDMAP_PLACEHOLDER;
         const dynamicRadius = Math.max(0, Math.floor(Math.min(width, height) / 2));
         const baseHeight = Math.max(
             1,

@@ -1,8 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { MINDMAP_LAYOUT } from '../ui/mindmap/MindmapLayoutConfig.js';
-
-// Толщина обводки в экранных пикселях — совпадает с толщиной веток MindmapConnectionLayer.
-const STROKE_SCREEN_PX = 1;
+import { getMindmapStrokeWorldWidth } from '../ui/mindmap/MindmapCapsuleMetrics.js';
 
 /**
  * Простой объект mindmap: прямоугольник с синей обводкой и полупрозрачной синей заливкой.
@@ -155,7 +153,10 @@ export class MindmapObject {
         const capsuleRadius = this._resolveRadius();
 
         // Толщина в мировых единицах: экранные пиксели ÷ масштаб — совпадает с ветками.
-        const strokeW = Math.max(1, this.strokeWidth) * STROKE_SCREEN_PX / this._worldScale;
+        const strokeW = getMindmapStrokeWorldWidth({
+            strokeWidth: this.strokeWidth,
+            worldScale: this._worldScale,
+        });
 
         // Непрозрачная подложка цветом фона холста: перекрывает ветки/объекты под
         // капсулой (иначе сквозь полупрозрачную заливку видна линия коннектора).

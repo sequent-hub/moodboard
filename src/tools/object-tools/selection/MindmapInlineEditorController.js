@@ -16,6 +16,11 @@ import {
     updateGlobalTextEditorHandlesLayer,
 } from './TextEditorLifecycleRegistry.js';
 import { MINDMAP_LAYOUT, MINDMAP_AUTOFIT } from '../../../ui/mindmap/MindmapLayoutConfig.js';
+import {
+    buildMindmapWrapFont,
+    getMindmapMaxTextWidth,
+    wrapMindmapText,
+} from '../../../ui/mindmap/MindmapTextWrap.js';
 
 function applyMindmapCaretFromClick({ create, objectId, object, textarea }) {
     try {
@@ -114,23 +119,42 @@ function measureMindmapTextWidthPx(textarea, measureEl, valueOverride = null) {
     return Math.max(0, Math.ceil(maxWidth));
 }
 
-function normalizeMindmapLineLength(value, maxLineChars = MINDMAP_LAYOUT.maxLineChars) {
-    const text = (typeof value === 'string')
-        ? value.replace(/\r/g, '').replace(/\n/g, '')
-        : '';
-    const chunks = [];
-    if (text.length === 0) return '';
-    for (let i = 0; i < text.length; i += maxLineChars) {
-        chunks.push(text.slice(i, i + maxLineChars));
-    }
-    return chunks.join('\n');
+/**
+ * Переносит на редактор типографику статического слоя: шрифт, интерлиньяж и горизонтальные
+ * паддинги. MindmapHtmlTextLayer пересчитывает их под текущий масштаб на каждом кадре зума,
+ * поэтому скрытый статический элемент — единственный источник правды о масштабе текста.
+ * @returns {boolean} true, если изменились метрики строки (размер шрифта или интерлиньяж)
+ */
+function applyMindmapStaticTypography(staticEl, textarea, backdrop) {
+    if (!staticEl || !textarea) return false;
+    if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return false;
+    const staticStyle = window.getComputedStyle(staticEl);
+    if (!staticStyle) return false;
+
+    const prevFontSize = textarea.style.fontSize;
+    const prevLineHeight = textarea.style.lineHeight;
+
+    const apply = (prop, value) => {
+        if (!value) return;
+        textarea.style[prop] = value;
+        if (backdrop) backdrop.style[prop] = value;
+    };
+    apply('fontFamily', staticStyle.fontFamily);
+    apply('fontSize', staticStyle.fontSize);
+    apply('lineHeight', staticStyle.lineHeight);
+    apply('paddingLeft', staticStyle.paddingLeft);
+    apply('paddingRight', staticStyle.paddingRight);
+    if (backdrop && staticStyle.color) backdrop.style.color = staticStyle.color;
+
+    return textarea.style.fontSize !== prevFontSize
+        || textarea.style.lineHeight !== prevLineHeight;
 }
 
-function normalizeMindmapValueAndCaret(value, caretPos, maxLineChars = MINDMAP_LAYOUT.maxLineChars) {
+function normalizeMindmapValueAndCaret(value, caretPos, wrapOptions) {
     const safeValue = (typeof value === 'string') ? value : '';
     const safeCaret = Number.isFinite(caretPos) ? Math.max(0, Math.min(safeValue.length, caretPos)) : safeValue.length;
-    const normalizedValue = normalizeMindmapLineLength(safeValue, maxLineChars);
-    const normalizedCaret = normalizeMindmapLineLength(safeValue.slice(0, safeCaret), maxLineChars).length;
+    const normalizedValue = wrapMindmapText(safeValue, wrapOptions);
+    const normalizedCaret = wrapMindmapText(safeValue.slice(0, safeCaret), wrapOptions).length;
     return { normalizedValue, normalizedCaret };
 }
 
@@ -189,6 +213,35 @@ export function openMindmapEditor(object, create = false) {
     let objectWidth = properties.width || MINDMAP_LAYOUT.width;
     let objectHeight = properties.height || MINDMAP_LAYOUT.height;
     const maxLineChars = Math.max(1, Math.round(properties.maxLineChars || MINDMAP_LAYOUT.maxLineChars));
+    /**
+     * Опции переноса берутся у статического слоя, когда он есть: там лежит и мировой размер
+     * шрифта (dataset.baseFontSize), и фактические жирность/курсив. Совпадение опций с слоем
+     * обязательно — иначе редактор сохранит текст с одними точками переноса, а капсула
+     * покажет другие.
+     */
+    const getMindmapWrapOptions = () => {
+        const layer = (typeof window !== 'undefined') ? window.moodboardMindmapHtmlTextLayer : null;
+        const staticEl = objectId ? layer?.idToEl?.get?.(objectId) : null;
+        const staticContentEl = objectId ? layer?.idToContentEl?.get?.(objectId) : null;
+        const style = (staticContentEl && typeof window !== 'undefined' && typeof window.getComputedStyle === 'function')
+            ? window.getComputedStyle(staticContentEl)
+            : null;
+        const weight = style ? parseInt(style.fontWeight, 10) : NaN;
+        return {
+            maxLineChars,
+            maxTextWidth: parseFloat(staticEl?.dataset?.maxTextWidth || '') || getMindmapMaxTextWidth({
+                level: properties.mindmap?.level ?? 0,
+                paddingX: properties.paddingX ?? MINDMAP_LAYOUT.paddingX,
+                resolution: this.app?.renderer?.resolution,
+            }),
+            font: buildMindmapWrapFont({
+                fontSize: parseFloat(staticEl?.dataset?.baseFontSize || '') || properties.fontSize,
+                fontFamily: staticEl?.style?.fontFamily || properties.fontFamily,
+                bold: Number.isFinite(weight) ? weight >= 600 : Boolean(properties.textStyle?.bold),
+                italic: style ? style.fontStyle === 'italic' : Boolean(properties.textStyle?.italic),
+            }),
+        };
+    };
     if (objectId) {
         const sizeData = { objectId, size: null };
         this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
@@ -265,32 +318,7 @@ export function openMindmapEditor(object, create = false) {
         if (isFinite(cssWidth) && cssWidth > 0) targetWidth = Math.max(1, Math.round(cssWidth));
         if (isFinite(cssHeight) && cssHeight > 0) targetHeight = Math.max(1, Math.round(cssHeight));
 
-        if (typeof window.getComputedStyle === 'function') {
-            const staticStyle = window.getComputedStyle(staticTextEl);
-            if (staticStyle?.fontFamily) {
-                textarea.style.fontFamily = staticStyle.fontFamily;
-                if (backdrop) backdrop.style.fontFamily = staticStyle.fontFamily;
-            }
-            if (staticStyle?.fontSize) {
-                textarea.style.fontSize = staticStyle.fontSize;
-                if (backdrop) backdrop.style.fontSize = staticStyle.fontSize;
-            }
-            if (staticStyle?.lineHeight) {
-                textarea.style.lineHeight = staticStyle.lineHeight;
-                if (backdrop) backdrop.style.lineHeight = staticStyle.lineHeight;
-            }
-            if (staticStyle?.color) {
-                if (backdrop) backdrop.style.color = staticStyle.color;
-            }
-            if (staticStyle?.paddingLeft) {
-                textarea.style.paddingLeft = staticStyle.paddingLeft;
-                if (backdrop) backdrop.style.paddingLeft = staticStyle.paddingLeft;
-            }
-            if (staticStyle?.paddingRight) {
-                textarea.style.paddingRight = staticStyle.paddingRight;
-                if (backdrop) backdrop.style.paddingRight = staticStyle.paddingRight;
-            }
-        }
+        applyMindmapStaticTypography(staticTextEl, textarea, backdrop);
     } else if (properties.fontSize) {
         textarea.style.fontSize = `${properties.fontSize}px`;
         if (backdrop) backdrop.style.fontSize = `${properties.fontSize}px`;
@@ -425,6 +453,16 @@ export function openMindmapEditor(object, create = false) {
         return 1 / cssToWorld;
     };
 
+    /**
+     * Масштаб проекции мировых координат в css у самой капсулы: world.toGlobal, то есть
+     * только worldScale, без resolution. getWorldToCssScale делит ещё и на res и годится
+     * лишь для паддингов, которые слой рисует в том же уменьшенном масштабе.
+     */
+    const getWorldToCapsuleCssScale = () => {
+        const worldScale = world?.scale?.x;
+        return (Number.isFinite(worldScale) && worldScale > 0) ? worldScale : 1;
+    };
+
     const getEditorLineCount = () => {
         const value = String(textarea.value || '');
         return Math.max(1, value.split('\n').length);
@@ -447,7 +485,11 @@ export function openMindmapEditor(object, create = false) {
         const textWidth = hasText ? measureMindmapTextWidthPx(textarea, measureEl) : 0;
         const padding = getEditorHorizontalPaddingPx();
         const placeholderWidth = measureMindmapTextWidthPx(textarea, measureEl, textarea.placeholder || '');
-        const baseCssWidth = Math.max(1, Math.round(stableBaseWorldWidth * getWorldToCssScale()));
+        // Мировые ширины (база, min, max) переводятся в css проекцией капсулы — worldScale
+        // без res. Через getWorldToCssScale они выходили на res меньше настоящей ширины
+        // капсулы, поэтому и потолок срабатывал раньше слоя, и база пустого состояния была
+        // уже реальной.
+        const baseCssWidth = Math.max(1, Math.round(stableBaseWorldWidth * getWorldToCapsuleCssScale()));
         const placeholderCssWidth = Math.max(1, Math.ceil(placeholderWidth + padding.left + padding.right));
         // Ширина пустого состояния (плейсхолдер/база) — нижняя граница и при вводе,
         // чтобы капсула не схлопывалась на первой букве, а росла только когда текст длиннее.
@@ -458,10 +500,10 @@ export function openMindmapEditor(object, create = false) {
         const level = properties?.mindmap?.level ?? 0;
         const isRoot = level === 0;
         const minCssW = Math.max(1, Math.round(
-            (isRoot ? MINDMAP_AUTOFIT.ROOT_MIN_WIDTH : MINDMAP_AUTOFIT.CHILD_MIN_WIDTH) * getWorldToCssScale()
+            (isRoot ? MINDMAP_AUTOFIT.ROOT_MIN_WIDTH : MINDMAP_AUTOFIT.CHILD_MIN_WIDTH) * getWorldToCapsuleCssScale()
         ));
         const maxCssW = Math.max(1, Math.round(
-            (isRoot ? MINDMAP_AUTOFIT.ROOT_MAX_WIDTH : MINDMAP_AUTOFIT.CHILD_MAX_WIDTH) * getWorldToCssScale()
+            (isRoot ? MINDMAP_AUTOFIT.ROOT_MAX_WIDTH : MINDMAP_AUTOFIT.CHILD_MAX_WIDTH) * getWorldToCapsuleCssScale()
         ));
         const nextCssWidth = Math.max(minCssW, Math.min(maxCssW, rawNextCssWidth));
         const lineCount = getEditorLineCount();
@@ -475,10 +517,23 @@ export function openMindmapEditor(object, create = false) {
         const baseCssHeight = Math.max(1, 2 * paddingYCss + lineHeightPx);
         const nextCssHeight = Math.max(1, Math.ceil(baseCssHeight + (Math.max(1, lineCount) - 1) * lineHeightPx));
 
+        const cssToWorld = getCssToWorldScale();
+        // Ширину капсулы css задаёт world.toGlobal (css = мировая * worldScale), поэтому
+        // измеренный текст переводится в мировые единицы делением на worldScale — так же,
+        // как это делает статический слой в _planNodeFit. С множителем res редактор просил
+        // мировую ширину на res меньше нужной, капсула возвращалась на ~10% уже текста, и
+        // самая широкая строка вылезала за неё до самого коммита.
+        const nextWorldWidth = Math.max(1, Math.round(nextCssWidth / getWorldToCapsuleCssScale()));
+        const nextWorldHeight = Math.max(1, Math.round(nextCssHeight * cssToWorld));
+        // Рамку редактора задаёт капсула, а не собственная формула «2 * paddingY + строка»:
+        // при resolution ≠ 1 та формула даёт рамку выше капсулы, верх у них общий, и весь
+        // излишек уходит вниз — строка при вводе съезжает ниже вертикального центра.
+        const nextWrapperCssHeight = Math.max(1, Math.round(nextWorldHeight * getWorldToCapsuleCssScale()));
+
         const currentCssWidth = Math.max(1, Math.round(parseFloat(wrapper.style.width || `${initialCssWidth}`)));
         const currentCssHeight = Math.max(1, Math.round(parseFloat(wrapper.style.height || `${initialCssHeight}`)));
         const widthChangedCss = nextCssWidth !== currentCssWidth;
-        const heightChangedCss = nextCssHeight !== currentCssHeight;
+        const heightChangedCss = nextWrapperCssHeight !== currentCssHeight;
         if (!widthChangedCss && !heightChangedCss) return;
 
         const currentCssLeft = Math.round(parseFloat(wrapper.style.left || '0'));
@@ -492,11 +547,7 @@ export function openMindmapEditor(object, create = false) {
                 wrapper.style.left = `${nextCssLeft}px`;
             }
         }
-        if (heightChangedCss) wrapper.style.height = `${nextCssHeight}px`;
-
-        const cssToWorld = getCssToWorldScale();
-        const nextWorldWidth = Math.max(1, Math.round(nextCssWidth * cssToWorld));
-        const nextWorldHeight = Math.max(1, Math.round(nextCssHeight * cssToWorld));
+        if (heightChangedCss) wrapper.style.height = `${nextWrapperCssHeight}px`;
 
         const sizeData = { objectId, size: null };
         this.eventBus.emit(Events.Tool.GetObjectSize, sizeData);
@@ -534,7 +585,7 @@ export function openMindmapEditor(object, create = false) {
         const { normalizedValue, normalizedCaret } = normalizeMindmapValueAndCaret(
             textarea.value,
             textarea.selectionStart,
-            maxLineChars
+            getMindmapWrapOptions()
         );
         if (normalizedValue !== textarea.value) {
             textarea.value = normalizedValue;
@@ -605,7 +656,23 @@ export function openMindmapEditor(object, create = false) {
             if (Number.isFinite(cssTop)) wrapper.style.top = `${Math.round(cssTop)}px`;
             if (Number.isFinite(cssWidth) && cssWidth > 0) wrapper.style.width = `${Math.max(1, Math.round(cssWidth))}px`;
             if (Number.isFinite(cssHeight) && cssHeight > 0) wrapper.style.height = `${Math.max(1, Math.round(cssHeight))}px`;
+            // Зум меняет только css-масштаб капсулы, поэтому шрифт и паддинги редактора
+            // нужно подхватывать со статического слоя на каждый апдейт: иначе текст и
+            // плейсхолдер остаются в масштабе момента открытия редактора — при отдалении
+            // вылезают за капсулу, при приближении остаются мелкими в разросшейся капсуле.
+            if (applyMindmapStaticTypography(staticEl, textarea, backdrop)) {
+                // Инсет строки внутри капсулы измерен в px при прежнем размере шрифта —
+                // на новом масштабе он даёт неверный сдвиг, поэтому база сбрасывается.
+                baselineLineInset = null;
+            }
             syncTextareaHeight();
+            // Каретку syncTextareaHeight пересчитывает в requestAnimationFrame, то есть
+            // кадром позже. На непрерывном зуме этого кадра хватает, чтобы она встала по
+            // прежнему размеру шрифта и разъехалась с буквами, поэтому повторяем расчёт
+            // сразу по свежим метрикам.
+            if (this.textEditor?.caret && this.textEditor.textarea === textarea) {
+                updateCustomCaret(textarea, this.textEditor.caret);
+            }
             return;
         }
 
@@ -670,7 +737,7 @@ export function openMindmapEditor(object, create = false) {
         textarea.removeEventListener('keydown', onKeyDown);
         textarea.removeEventListener('input', onInput);
 
-        const value = normalizeMindmapLineLength(textarea.value, maxLineChars).trim();
+        const value = wrapMindmapText(textarea.value, getMindmapWrapOptions()).trim();
         const commitValue = commit;
 
         if (objectId && resizeSession.started && resizeSession.oldSize && resizeSession.newSize) {

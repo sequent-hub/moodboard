@@ -1020,7 +1020,12 @@
 .moodboard-workspace__canvas {
     position: absolute;
     inset: 0;
+    /* clip, а не только hidden: блок с hidden остаётся контейнером прокрутки, и когда
+       редактор объекта у края окна выходит за контейнер, браузер прокручивает его к
+       каретке. Тогда canvas уезжает вбок, а смещение оверлеев (viewRect - containerRect)
+       перестаёт совпадать с ним, и HTML-текст расходится с фигурой PIXI. */
     overflow: hidden;
+    overflow: clip;
     touch-action: none;
     /* Цвет совпадает с дефолтным фоном PIXI (0xF5F5F5),
        чтобы при очистке WebGL-буфера во время resize не мелькал чёрный. */
@@ -1725,6 +1730,37 @@
 .moodboard-text-backdrop {
     padding-top: 1px;
     padding-bottom: 1px;
+}
+
+/*
+ * У textarea майндмапа вертикальных паддингов нет, а box-sizing у backdrop —
+ * content-box, поэтому 1px сверху и снизу делает его на 2px выше рамки и опускает
+ * видимый текст на 1px ниже строки textarea, каретки и центра капсулы.
+ */
+.moodboard-text-editor--mindmap-debug .moodboard-text-backdrop {
+    padding-top: 0;
+    padding-bottom: 0;
+    /*
+     * Видимый текст рисует backdrop, а строки в майндмапе задаёт перенос в самом значении
+     * (wrapMindmapText), как и в статическом слое (.mb-text: white-space: pre). С унаследованным
+     * pre-wrap + break-word подложка переносила хвост строки сама: textarea (wrap="off") и
+     * каретка оставались на одной строке, счёт строк для высоты рамки — тоже, и лишний
+     * визуальный ряд свисал за дно капсулы.
+     */
+    white-space: pre;
+    word-break: normal;
+    overflow-wrap: normal;
+}
+
+/*
+ * Шрифт, паддинги и ширину этого textarea слой пересчитывает под масштаб на каждом
+ * кадре зума, поэтому transition: all у .moodboard-text-input их анимирует: капсула и
+ * backdrop меняются мгновенно, а поле ввода отстаёт до 0.2s. Плейсхолдер (его рисует
+ * сам textarea) уезжает от центра капсулы, а каретка, считающая позицию по метрикам
+ * textarea, прыгает относительно уже перерисованных букв.
+ */
+.moodboard-text-input--mindmap-debug {
+    transition: none;
 }
 
 .moodboard-text-input:focus {

@@ -2,11 +2,19 @@ import { Events } from '../../core/events/Events.js';
 import gsap from 'gsap';
 import * as PIXI from 'pixi.js';
 import { MindmapTextOverlayAdapter } from './MindmapTextOverlayAdapter.js';
-import { MINDMAP_LAYOUT, MINDMAP_AUTOFIT } from './MindmapLayoutConfig.js';
+import { MINDMAP_LAYOUT } from './MindmapLayoutConfig.js';
+import {
+    buildMindmapWrapFont,
+    getMindmapMaxTextWidth,
+    wrapMindmapText,
+} from './MindmapTextWrap.js';
+import {
+    MINDMAP_PLACEHOLDER,
+    getMindmapCapsuleCssMetrics,
+    toMindmapCapsuleWorldHeight,
+    toMindmapCapsuleWorldWidth,
+} from './MindmapCapsuleMetrics.js';
 import { readHoverAnimationEnabled } from '../animation/HoverLiftController.js';
-
-const MINDMAP_PLACEHOLDER = 'Напишите что-нибудь';
-const MINDMAP_MAX_LINE_CHARS = MINDMAP_LAYOUT.maxLineChars;
 
 // Hover-lift канон «маленькие» — идентичен HtmlTextLayer.js
 const MM_HOVER_TY  = -2;
@@ -16,18 +24,6 @@ const MM_BACK_DUR  = 0.18;
 const mmPrefersReducedMotion =
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-
-function normalizeMindmapLineLength(value, maxLineChars = MINDMAP_MAX_LINE_CHARS) {
-    const text = (typeof value === 'string')
-        ? value.replace(/\r/g, '').replace(/\n/g, '')
-        : '';
-    const chunks = [];
-    if (text.length === 0) return '';
-    for (let i = 0; i < text.length; i += maxLineChars) {
-        chunks.push(text.slice(i, i + maxLineChars));
-    }
-    return chunks.join('\n');
-}
 
 /**
  * Отдельный HTML-слой только для текста mindmap-объектов.
@@ -49,6 +45,9 @@ export class MindmapHtmlTextLayer {
         this._selectedIds = new Set();
         this._pixiHoverHandlers = new Map();
         this._transformActive = false;
+        // objectId → { key, wrapped }: updateOne зовёт _applyContentValue на каждом кадре pan,
+        // а перенос зависит только от текста, шрифта и предельной ширины.
+        this._wrapCache = new Map();
         // Пользовательский тумблер hover-анимации (persist, общий с HoverLiftController)
         this._hoverAnimationEnabled = readHoverAnimationEnabled();
         this._offsetCache = null;
@@ -263,15 +262,23 @@ export class MindmapHtmlTextLayer {
 
         this.overlayAdapter.applyElementStyles(el);
 
-        const initialContent = objectData.content || objectData.properties?.content || '';
-        this._applyContentValue(el, contentEl, initialContent);
-        this._applyTextStyle(el, contentEl, objectData);
         el.dataset.baseFontSize = String(baseFontSize);
         el.dataset.baseW = String(Math.max(1, objectData.width || objectData.properties?.width || MINDMAP_LAYOUT.width));
         el.dataset.baseH = String(Math.max(1, objectData.height || objectData.properties?.height || MINDMAP_LAYOUT.height));
         el.dataset.basePaddingX = String(paddingX);
         el.dataset.basePaddingY = String(paddingY);
         el.dataset.maxLineChars = String(maxLineChars);
+        el.dataset.maxTextWidth = String(getMindmapMaxTextWidth({
+            level: objectData.properties?.mindmap?.level ?? 0,
+            paddingX,
+            resolution: this.core?.pixi?.app?.renderer?.resolution,
+        }));
+
+        // Стиль и метрики шрифта ставятся до контента: перенос строк измеряется этим шрифтом,
+        // поэтому жирность/курсив и baseFontSize должны быть уже на элементе.
+        this._applyTextStyle(el, contentEl, objectData);
+        const initialContent = objectData.content || objectData.properties?.content || '';
+        this._applyContentValue(el, contentEl, initialContent);
 
         const cleanup = this.overlayAdapter.attachEditOnClick({
             el,
@@ -298,6 +305,7 @@ export class MindmapHtmlTextLayer {
         const state = this._hoverStates.get(objectId);
         if (state) gsap.killTweensOf(state);
         this._hoverStates.delete(objectId);
+        this._wrapCache.delete(objectId);
         this.idToEl.delete(objectId);
         this.idToCleanup.delete(objectId);
         this.idToContentEl.delete(objectId);
@@ -399,10 +407,6 @@ export class MindmapHtmlTextLayer {
 
         const baseFS = parseFloat(el.dataset.baseFontSize || `${MINDMAP_LAYOUT.fontSize}`) || MINDMAP_LAYOUT.fontSize;
         const worldScale = world?.scale?.x || 1;
-        const sCss = worldScale / res;
-        const fontSizePx = Math.max(1, baseFS * sCss);
-        el.style.fontSize = `${fontSizePx}px`;
-        el.style.lineHeight = `${Math.round(fontSizePx * 1.24)}px`;
         const basePaddingX = Math.max(
             0,
             Math.round(objectData.properties?.paddingX ?? parseFloat(el.dataset.basePaddingX || `${MINDMAP_LAYOUT.paddingX}`))
@@ -411,12 +415,31 @@ export class MindmapHtmlTextLayer {
             0,
             Math.round(objectData.properties?.paddingY ?? parseFloat(el.dataset.basePaddingY || `${MINDMAP_LAYOUT.paddingY}`))
         );
-        const paddingXCss = Math.max(0, Math.round(basePaddingX * sCss));
-        const paddingYCss = Math.max(0, Math.round(basePaddingY * sCss));
-        el.style.paddingTop = `${paddingYCss}px`;
-        el.style.paddingBottom = `${paddingYCss}px`;
-        el.style.paddingLeft = `${paddingXCss}px`;
-        el.style.paddingRight = `${paddingXCss}px`;
+        const cssMetrics = getMindmapCapsuleCssMetrics({
+            fontSize: baseFS,
+            paddingX: basePaddingX,
+            paddingY: basePaddingY,
+            worldScale,
+            resolution: res,
+        });
+        el.style.fontSize = `${cssMetrics.fontSizePx}px`;
+        el.style.lineHeight = `${cssMetrics.lineHeightPx}px`;
+        // Предел переноса зависит от паддинга и уровня узла, а их можно поменять из панели
+        // свойств. Пишем только при изменении: атрибут на каждом кадре pan — лишняя
+        // инвалидация вёрстки.
+        const nextMaxTextWidth = String(getMindmapMaxTextWidth({
+            level: objectData.properties?.mindmap?.level ?? 0,
+            paddingX: basePaddingX,
+            resolution: res,
+        }));
+        if (el.dataset.maxTextWidth !== nextMaxTextWidth) {
+            el.dataset.maxTextWidth = nextMaxTextWidth;
+        }
+
+        el.style.paddingTop = `${cssMetrics.paddingYCss}px`;
+        el.style.paddingBottom = `${cssMetrics.paddingYCss}px`;
+        el.style.paddingLeft = `${cssMetrics.paddingXCss}px`;
+        el.style.paddingRight = `${cssMetrics.paddingXCss}px`;
 
         const offset = batch ? batch.offset : this._readCanvasOffset();
         if (offset) {
@@ -562,12 +585,38 @@ export class MindmapHtmlTextLayer {
         }
     }
 
-    _applyContentValue(containerEl, contentEl, rawContent) {
+    /** Опции переноса узла: предельная ширина в мировых единицах и шрифт для измерения. */
+    _readWrapOptions(containerEl, contentEl) {
         const maxLineChars = Math.max(
             1,
             parseInt(containerEl?.dataset?.maxLineChars || `${MINDMAP_LAYOUT.maxLineChars}`, 10) || MINDMAP_LAYOUT.maxLineChars
         );
-        const actual = normalizeMindmapLineLength((typeof rawContent === 'string') ? rawContent : '', maxLineChars);
+        const maxTextWidth = parseFloat(containerEl?.dataset?.maxTextWidth || '')
+            || getMindmapMaxTextWidth({
+                paddingX: parseFloat(containerEl?.dataset?.basePaddingX || ''),
+                resolution: this.core?.pixi?.app?.renderer?.resolution,
+            });
+        const font = buildMindmapWrapFont({
+            fontSize: parseFloat(containerEl?.dataset?.baseFontSize || ''),
+            fontFamily: containerEl?.style?.fontFamily,
+            bold: contentEl?.style?.fontWeight === '700',
+            italic: contentEl?.style?.fontStyle === 'italic',
+        });
+        return { maxLineChars, maxTextWidth, font };
+    }
+
+    _applyContentValue(containerEl, contentEl, rawContent) {
+        const raw = (typeof rawContent === 'string') ? rawContent : '';
+        const { maxLineChars, maxTextWidth, font } = this._readWrapOptions(containerEl, contentEl);
+        const objectId = containerEl?.dataset?.id || null;
+        const wrapKey = `${maxLineChars}|${maxTextWidth}|${font}|${raw}`;
+        const cached = objectId ? this._wrapCache.get(objectId) : null;
+        const actual = (cached && cached.key === wrapKey)
+            ? cached.wrapped
+            : wrapMindmapText(raw, { maxLineChars, maxTextWidth, font });
+        if (objectId && (!cached || cached.key !== wrapKey)) {
+            this._wrapCache.set(objectId, { key: wrapKey, wrapped: actual });
+        }
         const isPlaceholder = actual.trim().length === 0;
         const expectedText = isPlaceholder ? MINDMAP_PLACEHOLDER : actual;
 
@@ -667,18 +716,23 @@ export class MindmapHtmlTextLayer {
         const scrollWidthCss = contentEl.scrollWidth;
         if (scrollWidthCss <= 0) return null;
 
-        const paddingX = Math.max(0, Math.round(
-            objectData.properties?.paddingX ?? MINDMAP_LAYOUT.paddingX
-        ));
-        // css → world: same formula as _autoFitTextHeight in HtmlTextLayer.js
-        const contentWorldW = (scrollWidthCss * res) / worldScale;
-        const rawWorldW = contentWorldW + 2 * paddingX;
-
+        // Ширину капсулы в css задаёт toGlobal (updateOne): css = world * worldScale, без res.
+        // Паддинги при этом рисуются в масштабе worldScale / res, поэтому обратный пересчёт
+        // измеренного текста в world идёт по фактическим css-паддингам и делится на worldScale.
+        // Формула с res давала при devicePixelRatio ≠ 1 капсулу уже, чем «текст + 2 паддинга»:
+        // левое поле оставалось равным паддингу, правое съедалось, текст обрезался overflow.
+        const { paddingXCss } = getMindmapCapsuleCssMetrics({
+            paddingX: objectData.properties?.paddingX,
+            worldScale,
+            resolution: res,
+        });
         const level = objectData.properties?.mindmap?.level ?? 0;
-        const isRoot = level === 0;
-        const minW = isRoot ? MINDMAP_AUTOFIT.ROOT_MIN_WIDTH : MINDMAP_AUTOFIT.CHILD_MIN_WIDTH;
-        const maxW = isRoot ? MINDMAP_AUTOFIT.ROOT_MAX_WIDTH : MINDMAP_AUTOFIT.CHILD_MAX_WIDTH;
-        const newWorldW = Math.max(minW, Math.min(maxW, Math.round(rawWorldW)));
+        const newWorldW = toMindmapCapsuleWorldWidth({
+            textWidthCss: scrollWidthCss,
+            paddingXCss,
+            worldScale,
+            level,
+        });
 
         return {
             objectId,
@@ -688,7 +742,7 @@ export class MindmapHtmlTextLayer {
             worldScale,
             newWorldW,
             // Measure natural height at the fitted width to handle multi-line wrapping.
-            cssFitW: Math.max(1, Math.round(newWorldW * worldScale / res)),
+            cssFitW: Math.max(1, Math.round(newWorldW * worldScale)),
             scrollHeightCss: 0,
         };
     }
@@ -696,7 +750,11 @@ export class MindmapHtmlTextLayer {
     /** Фаза синхронизации: мировые размеры узла по измеренной высоте. */
     _commitNodeFit(plan) {
         const { objectId, objectData, res, worldScale, newWorldW, scrollHeightCss } = plan;
-        const newWorldH = Math.max(1, Math.round((scrollHeightCss * res) / worldScale));
+        const newWorldH = toMindmapCapsuleWorldHeight({
+            contentHeightCss: scrollHeightCss,
+            resolution: res,
+            worldScale,
+        });
 
         const currentW = Math.round(objectData.width || objectData.properties?.width || MINDMAP_LAYOUT.width);
         const currentH = Math.round(objectData.height || objectData.properties?.height || MINDMAP_LAYOUT.height);
