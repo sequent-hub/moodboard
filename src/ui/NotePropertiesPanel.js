@@ -12,6 +12,11 @@ export class NotePropertiesPanel {
         this.core = core;
         this.panel = null;
         this.currentId = null;
+        // id записки, для которой уже проигрывалась анимация появления.
+        // Нужен, чтобы возврат панели после перетаскивания и трансформаций
+        // был мгновенным, а анимация играла только на новом выделении.
+        this._appearAnimatedId = null;
+        this._appearResetRaf = null;
         
         // Разметка строится при первом показе: без выделенной записки она не нужна.
         this._attachEvents();
@@ -29,11 +34,11 @@ export class NotePropertiesPanel {
         });
 
         // Обновляем позицию / скрываем во время перетаскивания
-        this.eventBus.on(Events.Tool.DragStart, () => this.hide());
+        this.eventBus.on(Events.Tool.DragStart, () => this.hide({ preserveAppearState: true }));
         this.eventBus.on(Events.Tool.DragUpdate, () => this.reposition());
         this.eventBus.on(Events.Tool.DragEnd, () => this.updateFromSelection());
         this.eventBus.on(Events.Tool.GroupDragUpdate, () => this.reposition());
-        this.eventBus.on(Events.Tool.GroupDragStart, () => this.hide());
+        this.eventBus.on(Events.Tool.GroupDragStart, () => this.hide({ preserveAppearState: true }));
         this.eventBus.on(Events.Tool.GroupDragEnd, () => this.updateFromSelection());
         this.eventBus.on(Events.Tool.ResizeUpdate, () => this.reposition());
         this.eventBus.on(Events.Tool.RotateUpdate, () => this.reposition());
@@ -94,12 +99,17 @@ export class NotePropertiesPanel {
     }
 
     showFor(objectId) {
+        const isNewSelection = this._appearAnimatedId !== objectId;
         this.currentId = objectId;
         if (!this.panel) {
             this._createPanel();
         }
         if (this.panel) {
             this.panel.style.display = 'flex';
+            if (isNewSelection) {
+                this._playAppearAnimation();
+            }
+            this._appearAnimatedId = objectId;
             this.reposition();
         }
         
@@ -107,10 +117,47 @@ export class NotePropertiesPanel {
         this._updateControlsFromObject();
     }
 
-    hide() {
+    _playAppearAnimation() {
+        const panel = this.panel;
+        if (!panel) return;
+        panel.classList.remove('note-properties-panel--appear');
+        // Принудительный reflow: без него повторное добавление класса
+        // не перезапускает CSS-анимацию.
+        void panel.offsetWidth;
+        panel.classList.add('note-properties-panel--appear');
+    }
+
+    /**
+     * Клик по уже выделенной записке даёт пару selection:clear → selection:add,
+     * поэтому память сбрасывается не сразу, а следующим кадром и только если
+     * выделение действительно осталось пустым.
+     */
+    _scheduleAppearStateReset() {
+        if (typeof requestAnimationFrame !== 'function') {
+            this._appearAnimatedId = null;
+            return;
+        }
+        if (this._appearResetRaf !== null) {
+            cancelAnimationFrame(this._appearResetRaf);
+        }
+        this._appearResetRaf = requestAnimationFrame(() => {
+            this._appearResetRaf = null;
+            const selected = this.core?.selectTool?.selectedObjects;
+            const ids = selected ? Array.from(selected) : [];
+            if (ids.length === 0) {
+                this._appearAnimatedId = null;
+            }
+        });
+    }
+
+    hide(options = {}) {
         this.currentId = null;
+        if (!options.preserveAppearState) {
+            this._scheduleAppearStateReset();
+        }
         if (this.panel) {
             this.panel.style.display = 'none';
+            this.panel.classList.remove('note-properties-panel--appear');
         }
         // Скрываем все палитры цветов
         if (this.backgroundColorPalette) this.backgroundColorPalette.style.display = 'none';

@@ -116,6 +116,7 @@ export class HtmlHandlesLayer {
         if (!this.layer) return;
         this.layer.innerHTML = '';
         this.visible = false;
+        this.domRenderer.scheduleAppearAnimationReset();
     }
 
     _setHandlesVisibility(show) {

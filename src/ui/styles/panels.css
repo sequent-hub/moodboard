@@ -1390,6 +1390,30 @@
     background: #f3f4f6;
 }
 
+/* Появление панели записки: всплывает снизу с небольшой задержкой.
+   fill-mode backwards держит начальный кадр во время задержки и не блокирует
+   инлайновый transform после окончания анимации. */
+@keyframes note-properties-panel-appear {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.note-properties-panel--appear {
+    animation: note-properties-panel-appear 182ms ease-out 84ms backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .note-properties-panel--appear {
+        animation: none;
+    }
+}
+
 /* Контрол выравнивания текста в панели записки — те же стили, что и в текстовой панели */
 .note-properties-panel .tpp-format-btn {
     height: 28px;

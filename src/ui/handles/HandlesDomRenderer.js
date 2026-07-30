@@ -835,6 +835,33 @@ export class HandlesDomRenderer {
     constructor(host, rotateIconSvg) {
         this.host = host;
         this.rotateIconSvg = rotateIconSvg;
+        // Слой ручек пересобирается на каждый рендер (пан, зум, драг, ресайз).
+        // Без этой памяти анимация появления рамки переигрывалась бы на каждом кадре.
+        this._lastBoundsId = null;
+        this._appearResetRaf = null;
+    }
+
+    /**
+     * Клик по уже выделенному объекту даёт пару selection:clear → selection:add,
+     * поэтому память сбрасывается не сразу, а следующим кадром и только если
+     * выделение действительно осталось пустым.
+     */
+    scheduleAppearAnimationReset() {
+        if (typeof requestAnimationFrame !== 'function') {
+            this._lastBoundsId = null;
+            return;
+        }
+        if (this._appearResetRaf !== null) {
+            cancelAnimationFrame(this._appearResetRaf);
+        }
+        this._appearResetRaf = requestAnimationFrame(() => {
+            this._appearResetRaf = null;
+            const selected = this.host.core?.selectTool?.selectedObjects;
+            const ids = selected ? Array.from(selected) : [];
+            if (ids.length === 0) {
+                this._lastBoundsId = null;
+            }
+        });
     }
 
     captureMindmapSnapshot() {
@@ -1262,6 +1289,12 @@ export class HandlesDomRenderer {
         box.id = `mb-handles-box-${id}`;
         box.dataset.objectId = id;
 
+        const shouldAnimateAppear = mbType === 'note' && this._lastBoundsId !== id;
+        this._lastBoundsId = id;
+        if (shouldAnimateAppear) {
+            box.classList.add('mb-handles-box--appear');
+        }
+
         let rotation = options.rotation ?? 0;
         if (id !== '__group__') {
             const rotationData = { objectId: id, rotation: 0 };
@@ -1278,6 +1311,9 @@ export class HandlesDomRenderer {
         });
         box.style.setProperty('--box-w', `${width}px`);
         box.style.setProperty('--box-h', `${height}px`);
+        // Ключевые кадры появления перезаписывают transform целиком,
+        // поэтому поворот должен быть доступен им как переменная.
+        box.style.setProperty('--mb-box-rotate', `${rotation}deg`);
         this.host.layer.appendChild(box);
         if (this.host._handlesSuppressed) {
             this.host.visible = true;

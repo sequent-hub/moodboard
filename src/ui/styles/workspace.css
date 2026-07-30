@@ -511,6 +511,30 @@
     transform-origin: center center;
 }
 
+/* Появление рамки выделения записки: всплывает снизу вместе с ручками
+   (они лежат внутри .mb-handles-box). Поворот берётся из --mb-box-rotate,
+   иначе ключевые кадры затёрли бы инлайновый rotate. */
+@keyframes mb-handles-box-appear {
+    from {
+        opacity: 0;
+        transform: translateY(6px) rotate(var(--mb-box-rotate, 0deg));
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) rotate(var(--mb-box-rotate, 0deg));
+    }
+}
+
+.mb-handles-box--appear {
+    animation: mb-handles-box-appear 182ms ease-out 84ms backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mb-handles-box--appear {
+        animation: none;
+    }
+}
+
 .mb-handle {
     position: absolute;
     width: 12px;
