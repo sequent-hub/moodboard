@@ -9,7 +9,7 @@ import { drawHead, getLineTrim, trimPolylineEnd } from '../../../ui/connectors/c
  */
 
 /** Типы объектов, к которым можно привязать коннектор (из ConnectionAnchorsLayer). */
-export const ALLOWED_BIND_TYPES = new Set(['shape', 'note', 'image', 'text', 'simple-text', 'file']);
+export const ALLOWED_BIND_TYPES = new Set(['shape', 'note', 'image', 'text', 'simple-text', 'file', 'image-generator']);
 /** Радиус поиска ближайшего объекта при клике по якорю (world-px). */
 export const CLICK_FIND_RADIUS = 400;
 /** Зазор между дубликатом и источником при автосоздании (world-px). */
@@ -190,15 +190,19 @@ export function computeAnchor(eventBus, objectId, worldPt) {
 
 /**
  * Рисует превью коннектора со стрелкой в PIXI-графику (PIXI 7 API).
- * Маршрут совпадает с тем, что будет создан при отпускании (по умолчанию 'elbow'),
+ * Маршрут совпадает с тем, что будет создан при отпускании (по умолчанию 'bezier'),
  * поэтому «резинка» во время перетаскивания выглядит как итоговый коннектор.
  * graphics — PIXI.Graphics, уже добавленный в worldLayer.
  *
  * @param {string} route 'straight'|'elbow'|'bezier' — должен совпадать с дефолтом createConnectorFromTerminals
  * @param {Array<{x:number,y:number}>|null} points готовый маршрут (напр. с обходом препятствий); иначе строится buildPath
+ * @param {{ head?: string, endTrim?: number }} [options] head='none' — без наконечника,
+ *        endTrim — свой отступ конца линии вместо просвета под наконечник
  */
-export function drawPreview(graphics, fromWorldPt, toWorldPt, route = 'elbow', points = null) {
+export function drawPreview(graphics, fromWorldPt, toWorldPt, route = 'bezier', points = null, options = {}) {
     graphics.clear();
+    const head    = options.head ?? 'arrow';
+    const endTrim = Number.isFinite(options.endTrim) ? options.endTrim : getLineTrim(head);
 
     // Без привязанной грани dir-векторы неизвестны → buildPath даёт H-V-H/V-H-V излом
     const pts = (points && points.length >= 2) ? points : buildPath(fromWorldPt, toWorldPt, route);
@@ -206,7 +210,7 @@ export function drawPreview(graphics, fromWorldPt, toWorldPt, route = 'elbow', p
 
     // Линия обрывается у основания наконечника плюс просвет — та же геометрия,
     // что у готового коннектора, иначе превью выглядит иначе, чем итог.
-    const linePts = trimPolylineEnd(pts, getLineTrim('arrow'));
+    const linePts = trimPolylineEnd(pts, endTrim);
 
     graphics.lineStyle({ width: 2, color: PREVIEW_COLOR, alpha: PREVIEW_ALPHA, cap: 'round', join: 'round' });
     graphics.moveTo(linePts[0].x, linePts[0].y);
@@ -232,7 +236,9 @@ export function drawPreview(graphics, fromWorldPt, toWorldPt, route = 'elbow', p
     }
     graphics.lineTo(linePts[linePts.length - 1].x, linePts[linePts.length - 1].y);
 
-    drawHead(graphics, pts[pts.length - 2], pts[pts.length - 1], PREVIEW_COLOR, 'arrow', 2, PREVIEW_ALPHA);
+    if (head !== 'none') {
+        drawHead(graphics, pts[pts.length - 2], pts[pts.length - 1], PREVIEW_COLOR, head, 2, PREVIEW_ALPHA);
+    }
 }
 
 /**
@@ -254,7 +260,7 @@ export function createConnectorFromTerminals(core, eventBus, sourceTerminal, end
             width: 2,
             dash: false,
             head: { start: false, end: true },
-            route: 'elbow',
+            route: 'bezier',
         },
     });
 }

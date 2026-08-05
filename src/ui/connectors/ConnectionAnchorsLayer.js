@@ -2,8 +2,37 @@ import { Events } from '../../core/events/Events.js';
 import { HandlesPositioningService } from '../handles/HandlesPositioningService.js';
 import { ConnectorDragController } from '../../tools/object-tools/connector/ConnectorDragController.js';
 import { AnchorHoverGhost } from '../../tools/object-tools/connector/AnchorHoverGhost.js';
+import { getPortsFromPixi, portDomId } from '../../services/ConnectorPortRegistry.js';
+import { IMAGE_GENERATOR_TYPE, PORT_CHIP_SIZE } from '../../services/ai/imageGeneratorContract.js';
+import { findIncomingConnections } from '../../services/ai/imageGeneratorInputs.js';
 
-const ALLOWED_TYPES = new Set(['shape', 'note', 'image', 'text', 'simple-text', 'file']);
+const ALLOWED_TYPES = new Set(['shape', 'note', 'image', 'text', 'simple-text', 'file', 'image-generator']);
+
+/** Разделитель в ключе подсветки: в id объектов и портов не встречается. */
+const PORT_KEY_SEPARATOR = '::';
+
+/**
+ * @param {string} objectId
+ * @param {string} portId
+ * @returns {string}
+ */
+export function portHighlightKey(objectId, portId) {
+    return `${objectId}${PORT_KEY_SEPARATOR}${portId}`;
+}
+
+/**
+ * @param {string} key
+ * @returns {{objectId: string, portId: string|null}}
+ */
+export function parsePortHighlightKey(key) {
+    const index = String(key).lastIndexOf(PORT_KEY_SEPARATOR);
+    if (index === -1) return { objectId: String(key), portId: null };
+
+    return {
+        objectId: String(key).slice(0, index),
+        portId: String(key).slice(index + PORT_KEY_SEPARATOR.length) || null,
+    };
+}
 
 export class ConnectionAnchorsLayer {
     constructor(container, eventBus, core) {
@@ -17,6 +46,7 @@ export class ConnectionAnchorsLayer {
         this._eventsAttached = false;
         
         this.hoveredObjectId = null;
+        this._highlightedPorts = new Set();
         this._dragController = null;
         this._hoverGhost = null;
         this._onAnchorPointerDown = null;
@@ -74,6 +104,7 @@ export class ConnectionAnchorsLayer {
 
     destroy() {
         this._detachEvents();
+        this._syncPortHighlights(new Set());
         if (this.layer) {
             if (this._onAnchorPointerDown) this.layer.removeEventListener('pointerdown', this._onAnchorPointerDown);
             if (this._onAnchorPointerOver) this.layer.removeEventListener('pointerover', this._onAnchorPointerOver);
@@ -156,9 +187,13 @@ export class ConnectionAnchorsLayer {
 
     update() {
         if (!this.layer) return;
-        if (this._commentPopoverOpen) return;
+        if (this._commentPopoverOpen) {
+            this._syncPortHighlights(new Set());
+            return;
+        }
         if (typeof window !== 'undefined' && window.moodboardHtmlHandlesLayer?._cropMode) {
             this.layer.innerHTML = '';
+            this._syncPortHighlights(new Set());
             return;
         }
         this.layer.innerHTML = '';
@@ -176,6 +211,82 @@ export class ConnectionAnchorsLayer {
         targets.forEach(id => {
             this._renderAnchorsFor(id);
         });
+
+        // Подложка порта — только у генераторов с реально подключённым
+        // коннектором. Выделение и hover сами по себе её не зажигают.
+        this._syncPortHighlights(this._collectConnectedPortTargets());
+    }
+
+    /**
+     * Входные порты генераторов, в которые приходит коннектор.
+     *
+     * Ключ — пара «объект + порт»: у узла входов несколько, и связь в один из них
+     * не должна зажигать подложку у соседнего.
+     *
+     * @returns {Set<string>}
+     */
+    _collectConnectedPortTargets() {
+        const objects = this.core?.state?.getObjects?.() || [];
+        const connected = new Set();
+
+        objects.forEach((obj) => {
+            if (obj?.type !== IMAGE_GENERATOR_TYPE || !obj.id) return;
+
+            findIncomingConnections(objects, obj.id).forEach((link) => {
+                connected.add(portHighlightKey(obj.id, link.portId));
+            });
+        });
+
+        return connected;
+    }
+
+    /**
+     * Держит подсветку портов в объектах в соответствии с набором целей.
+     *
+     * Сравнением с предыдущим набором, а не переустановкой: update() зовётся на
+     * каждом кадре зума и перетаскивания, и безусловный вызов перезапускал бы
+     * анимацию подложки каждый кадр.
+     *
+     * @param {Set<string>} keys порты (ключ «объект + порт»), которые должны гореть
+     */
+    _syncPortHighlights(keys) {
+        const next = keys instanceof Set ? new Set(keys) : new Set(keys || []);
+
+        this._highlightedPorts.forEach((key) => {
+            if (!next.has(key)) this._setPortHighlight(key, false);
+        });
+        next.forEach((key) => {
+            if (!this._highlightedPorts.has(key)) this._setPortHighlight(key, true);
+        });
+
+        this._highlightedPorts = next;
+    }
+
+    /**
+     * @param {string} key ключ «объект + порт»
+     * @param {boolean} active
+     */
+    _setPortHighlight(key, active) {
+        const { objectId, portId } = parsePortHighlightKey(key);
+        const req = { objectId, pixiObject: null };
+        this.eventBus?.emit(Events.Tool.GetObjectPixi, req);
+
+        const instance = req.pixiObject?._mb?.instance;
+        if (typeof instance?.setPortHighlight === 'function') {
+            instance.setPortHighlight(active, 'connected', portId);
+        }
+    }
+
+    /**
+     * Масштаб холста. Нужен для хит-зон, заданных в мировых единицах.
+     * @returns {number}
+     */
+    _worldScale() {
+        try {
+            return this.positioningService.getWorldTransform().s || 1;
+        } catch (_) {
+            return 1;
+        }
     }
 
     _renderAnchorsFor(id) {
@@ -222,7 +333,7 @@ export class ConnectionAnchorsLayer {
         const radius = 5;
         const dotSize = radius * 2;
         
-        const createDot = (side, x, y, ax, ay) => {
+        const createDot = (side, x, y, ax, ay, portId = null) => {
             const dot = document.createElement('div');
             dot.className = 'mb-connection-anchor';
             Object.assign(dot.style, {
@@ -244,12 +355,51 @@ export class ConnectionAnchorsLayer {
             dot.dataset.side = side;
             dot.dataset.anchorX = ax;
             dot.dataset.anchorY = ay;
+            if (portId) {
+                dot.dataset.portId = portId;
+                dot.id = portDomId(id, portId);
+                dot.classList.add('mb-connection-anchor--port');
+
+                // Визуал порта рисует сам объект в PIXI (иконка на круглой
+                // подложке) — только так он масштабируется вместе с узлом.
+                // DOM-точке остаётся роль хит-зоны под старт коннектора,
+                // размером с подложку.
+                const hit = Math.max(dotSize, Math.round(PORT_CHIP_SIZE * this._worldScale()));
+                Object.assign(dot.style, {
+                    left: `${Math.round(x - hit / 2)}px`,
+                    top: `${Math.round(y - hit / 2)}px`,
+                    width: `${hit}px`,
+                    height: `${hit}px`,
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    borderRadius: '50%',
+                });
+            }
             
             wrapper.appendChild(dot);
         };
         
         const cx = Math.round(width / 2);
         const cy = Math.round(height / 2);
+
+        // Объект с именованными портами (узел-генератор) сам определяет точки
+        // привязки: середины граней для него не имеют смысла.
+        const ports = getPortsFromPixi(req.pixiObject);
+        if (ports.length > 0) {
+            ports.forEach((port) => {
+                if (!port?.anchor || port.enabled === false) return;
+                createDot(
+                    port.id,
+                    Math.round(port.anchor.x * width),
+                    Math.round(port.anchor.y * height),
+                    port.anchor.x,
+                    port.anchor.y,
+                    port.id
+                );
+            });
+            this.layer.appendChild(wrapper);
+            return;
+        }
         
         createDot('top', cx, -offset, 0.5, 0);
         createDot('right', width + offset, cy, 1, 0.5);

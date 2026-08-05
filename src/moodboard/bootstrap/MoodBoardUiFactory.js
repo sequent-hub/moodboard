@@ -13,6 +13,8 @@ import { ConnectorLabelLayer } from '../../ui/connectors/ConnectorLabelLayer.js'
 import { ConnectionAnchorsLayer } from '../../ui/connectors/ConnectionAnchorsLayer.js';
 import { ConnectorHandlesLayer } from '../../ui/connectors/ConnectorHandlesLayer.js';
 import { HtmlHandlesLayer } from '../../ui/HtmlHandlesLayer.js';
+import { ImageGeneratorControlsLayer } from '../../ui/generator/ImageGeneratorControlsLayer.js';
+import { ImageGeneratorRunner } from '../../services/ai/ImageGeneratorRunner.js';
 import { TextPropertiesPanel } from '../../ui/TextPropertiesPanel.js';
 import { MindmapPropertiesPanel } from '../../ui/MindmapPropertiesPanel.js';
 import { FramePropertiesPanel } from '../../ui/FramePropertiesPanel.js';
@@ -130,6 +132,12 @@ function initHtmlLayersAndPanels(board) {
 
     board.connectorHandlesLayer = new ConnectorHandlesLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
     board.connectorHandlesLayer.attach();
+
+    board.imageGeneratorControlsLayer = new ImageGeneratorControlsLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
+    board.imageGeneratorControlsLayer.attach();
+
+    board.imageGeneratorRunner = new ImageGeneratorRunner({ core: board.coreMoodboard });
+    board.imageGeneratorRunner.attach();
 
     board.htmlHandlesLayer = new HtmlHandlesLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
     board.htmlHandlesLayer.attach();

@@ -30,7 +30,7 @@ export class ConnectorObject {
             width:  2,
             dash:   false,
             head: { start: 'none', end: 'arrow' },
-            route: 'elbow',
+            route: 'bezier',
             ...(props.style || {}),
         };
 

@@ -468,6 +468,10 @@ export function setupObjectLifecycleFlow(core) {
             if (object.type === 'mindmap' && updates.properties && typeof instance.setStyle === 'function') {
                 instance.setStyle(updates.properties);
             }
+
+            if (object.type === 'image-generator' && updates.properties && typeof instance.applyProperties === 'function') {
+                instance.applyProperties(object.properties);
+            }
         }
 
         core.state.markDirty();

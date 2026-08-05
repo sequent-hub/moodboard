@@ -6,7 +6,10 @@ import {
     computeAnchor,
     drawPreview,
     createConnectorFromTerminals,
+    objectBounds,
 } from './connector/connectorGesture.js';
+import { getObjectPorts, findNearestPort, terminalForPort } from '../../services/ConnectorPortRegistry.js';
+import { CONNECTOR_Z_INDEX } from '../../ui/connectors/ConnectorLayer.js';
 
 /**
  * ConnectorTool — инструмент рисования универсальных коннекторов.
@@ -65,14 +68,14 @@ export class ConnectorTool extends BaseTool {
 
         if (hitData.result && hitData.result.object) {
             const objectId = hitData.result.object;
-            const anchor = computeAnchor(this.eventBus, objectId, worldPt);
-            this._sourceTerminal = { boundId: objectId, anchor, isPrecise: true, isExact: false };
+            this._sourceTerminal = this._terminalForObject(objectId, worldPt);
         } else {
             this._sourceTerminal = { point: worldPt };
         }
 
         this._isDragging = true;
         this._previewGraphics = new PIXI.Graphics();
+        this._previewGraphics.zIndex = CONNECTOR_Z_INDEX;
         this.world.addChild(this._previewGraphics);
     }
 
@@ -94,9 +97,7 @@ export class ConnectorTool extends BaseTool {
 
         let endTerminal;
         if (hitData.result && hitData.result.object) {
-            const objectId = hitData.result.object;
-            const anchor = computeAnchor(this.eventBus, objectId, worldPt);
-            endTerminal = { boundId: objectId, anchor, isPrecise: true, isExact: false };
+            endTerminal = this._terminalForObject(hitData.result.object, worldPt);
         } else {
             endTerminal = { point: worldPt };
         }
@@ -109,6 +110,31 @@ export class ConnectorTool extends BaseTool {
         }
 
         this._sourceTerminal = null;
+    }
+
+    /**
+     * Терминал для объекта под курсором: у объектов с именованными портами
+     * связь примагничивается к ближайшему порту, у остальных — как раньше,
+     * к произвольной точке внутри bbox.
+     *
+     * @param {string} objectId
+     * @param {{x: number, y: number}} worldPt
+     * @returns {object}
+     */
+    _terminalForObject(objectId, worldPt) {
+        const ports = getObjectPorts(this.eventBus, objectId);
+        if (ports.length > 0) {
+            const bounds = objectBounds(this.eventBus, objectId);
+            const port = findNearestPort(ports, bounds, worldPt, this.world?.scale?.x || 1);
+            if (port) return terminalForPort(objectId, port);
+        }
+
+        return {
+            boundId: objectId,
+            anchor: computeAnchor(this.eventBus, objectId, worldPt),
+            isPrecise: true,
+            isExact: false,
+        };
     }
 
     // ─── Превью ─────────────────────────────────────────────────────────────

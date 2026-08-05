@@ -2,6 +2,14 @@ import { Events } from '../../core/events/Events.js';
 import { MINDMAP_LAYOUT } from '../mindmap/MindmapLayoutConfig.js';
 import { createRootMindmapIntentMetadata } from '../../mindmap/MindmapCompoundContract.js';
 import { DEFAULT_NOTE_BACKGROUND_COLOR } from './NotePlacementConfig.js';
+import {
+    IMAGE_GENERATOR_TYPE,
+    GENERATOR_DEFAULT_WIDTH,
+    createDefaultGeneratorProperties,
+} from '../../services/ai/imageGeneratorContract.js';
+
+/** Стартовая карточка квадратная: кадр занимает узел целиком. */
+const GENERATOR_DEFAULT_HEIGHT = GENERATOR_DEFAULT_WIDTH;
 
 export class ToolbarActionRouter {
     constructor(toolbar) {
@@ -130,6 +138,28 @@ export class ToolbarActionRouter {
                     fillColor: 0x3B82F6,
                     fillAlpha: 0.25,
                     strokeWidth: 1
+                }
+            });
+            return true;
+        }
+
+        if (toolType === 'image-generator-add') {
+            this.toolbar.animateButton(button);
+            this.toolbar.closeShapesPopup();
+            this.toolbar.closeDrawPopup();
+            this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
+            this.toolbar.closeFramePopup();
+            this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+            this.toolbar.placeSelectedButtonId = 'image-generator';
+            this.toolbar.setActiveToolbarButton('place');
+            this.toolbar.eventBus.emit(Events.Place.Set, {
+                type: IMAGE_GENERATOR_TYPE,
+                size: { width: GENERATOR_DEFAULT_WIDTH, height: GENERATOR_DEFAULT_HEIGHT },
+                properties: {
+                    ...createDefaultGeneratorProperties(),
+                    width: GENERATOR_DEFAULT_WIDTH,
+                    height: GENERATOR_DEFAULT_HEIGHT,
                 }
             });
             return true;

@@ -33,14 +33,16 @@ export class IconLoader {
                 import('../assets/icons/mindmap.svg?raw'),
                 import('../assets/icons/lasso.svg?raw'),
                 import('../assets/icons/laser.svg?raw'),
-                import('../assets/icons/reactions.svg?raw')
+                import('../assets/icons/reactions.svg?raw'),
+                import('../assets/icons/image-generator.svg?raw')
             ]);
 
             // Сохраняем иконки в кэш
             const iconNames = [
                 'select', 'pan', 'text-add', 'note', 'image', 'shapes',
                 'pencil', 'connector', 'comments', 'attachments', 'emoji', 'frame',
-                'clear', 'undo', 'redo', 'mindmap', 'lasso', 'laser', 'reactions'
+                'clear', 'undo', 'redo', 'mindmap', 'lasso', 'laser', 'reactions',
+                'image-generator'
             ];
 
             iconNames.forEach((name, index) => {

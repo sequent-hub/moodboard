@@ -124,7 +124,7 @@ export class AiClient {
      * @returns {Promise<{operationId: string, imageBase64: string, mimeType: string}>}
      */
     async generateImage({ provider, signal, referenceImages: files, ...payload }) {
-        const referenceImages = await filesToBase64(files);
+        const referenceImages = await filesToBase64(await shrinkReferenceImages(files));
         const body = referenceImages ? { ...payload, referenceImages } : payload;
         const res = await this._fetch(`${this._baseUrl}/${provider}/image`, {
             method: 'POST',
@@ -161,7 +161,7 @@ export class AiClient {
      */
     async submitImage({ provider, signal, referenceImages: files, ...payload }) {
         if (!provider) throw new Error('AiClient.submitImage: provider is required');
-        const referenceImages = await filesToBase64(files);
+        const referenceImages = await filesToBase64(await shrinkReferenceImages(files));
         const body = referenceImages ? { ...payload, referenceImages } : payload;
         const res = await this._fetch(`${this._baseUrl}/${provider}/image/jobs`, {
             method: 'POST',
@@ -490,6 +490,81 @@ async function safeReadError(res) {
     } catch {
         return fallback;
     }
+}
+
+const REFERENCE_MAX_SIDE = 1536;
+const REFERENCE_JPEG_QUALITY = 0.85;
+const REFERENCE_SKIP_BYTES = 700 * 1024;
+
+/**
+ * Ужимает картинки-референсы перед base64-кодированием.
+ *
+ * base64 раздувает файл на треть, а на пути до генератора стоит nginx
+ * ai-сервиса с client_max_body_size 1 МБ: исходное фото отдаёт 413 ещё
+ * до модели. Референсу хватает 1536 px по длинной стороне.
+ *
+ * @param {File[]|undefined} files
+ * @returns {Promise<File[]|undefined>}
+ */
+async function shrinkReferenceImages(files) {
+    if (!Array.isArray(files) || files.length === 0) return files;
+    return Promise.all(files.map((file) => shrinkReferenceImage(file)));
+}
+
+/**
+ * @param {File} file
+ * @returns {Promise<File|Blob>} исходный файл, если сжатие невозможно или бессмысленно
+ */
+async function shrinkReferenceImage(file) {
+    const type = String(file?.type ?? '');
+    if (!type.startsWith('image/') || type === 'image/svg+xml') return file;
+    if (typeof createImageBitmap !== 'function') return file;
+
+    let bitmap = null;
+    try {
+        bitmap = await createImageBitmap(file);
+        const scale = Math.min(1, REFERENCE_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+        if (scale === 1 && file.size <= REFERENCE_SKIP_BYTES) return file;
+
+        const width = Math.max(1, Math.round(bitmap.width * scale));
+        const height = Math.max(1, Math.round(bitmap.height * scale));
+        const blob = await drawToJpegBlob(bitmap, width, height);
+        if (!blob || blob.size >= file.size) return file;
+
+        const name = `${String(file.name ?? 'reference').replace(/\.[^.]+$/, '')}.jpg`;
+        return typeof File === 'function' ? new File([blob], name, { type: 'image/jpeg' }) : blob;
+    } catch {
+        return file;
+    } finally {
+        bitmap?.close?.();
+    }
+}
+
+/**
+ * @param {ImageBitmap} bitmap
+ * @param {number} width
+ * @param {number} height
+ * @returns {Promise<Blob|null>}
+ */
+async function drawToJpegBlob(bitmap, width, height) {
+    const canvas = typeof OffscreenCanvas === 'function'
+        ? new OffscreenCanvas(width, height)
+        : (typeof document !== 'undefined' ? document.createElement('canvas') : null);
+    if (!canvas) return null;
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    // JPEG не хранит альфу — без подложки прозрачные зоны PNG почернеют.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(bitmap, 0, 0, width, height);
+
+    if (typeof canvas.convertToBlob === 'function') {
+        return canvas.convertToBlob({ type: 'image/jpeg', quality: REFERENCE_JPEG_QUALITY });
+    }
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', REFERENCE_JPEG_QUALITY));
 }
 
 /**

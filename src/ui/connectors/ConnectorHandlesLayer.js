@@ -2,6 +2,12 @@ import * as PIXI from 'pixi.js';
 import { Events } from '../../core/events/Events.js';
 import { HandlesPositioningService } from '../handles/HandlesPositioningService.js';
 import { UpdateConnectorCommand } from '../../core/commands/UpdateConnectorCommand.js';
+import {
+    getObjectPorts,
+    findNearestPort,
+    findPortTargetNear,
+    terminalForPort,
+} from '../../services/ConnectorPortRegistry.js';
 
 const HANDLE_SIZE   = 12;
 const ANCHOR_SNAP   = 16; // CSS px до магнита к середине грани
@@ -34,6 +40,7 @@ export class ConnectorHandlesLayer {
         this._drag        = null; // { endKey:'start'|'end', el }
         this._boundMove   = null;
         this._boundUp     = null;
+        this._portHighlightId = null;
     }
 
     attach() {
@@ -211,6 +218,44 @@ export class ConnectorHandlesLayer {
         const y    = Math.round(e.clientY - rect.top  - r);
         this._drag.el.style.left = `${x}px`;
         this._drag.el.style.top  = `${y}px`;
+        this._setPortHighlight(this._findPortTarget(e.clientX, e.clientY)?.boundId || null);
+    }
+
+    /**
+     * Порт-цель рядом с курсором, минуя hit-test: порт вынесен за габарит карточки.
+     * @param {number} clientX
+     * @param {number} clientY
+     */
+    _findPortTarget(clientX, clientY) {
+        const view = this.core?.pixi?.app?.view;
+        const world = this.core?.pixi?.worldLayer || this.core?.pixi?.app?.stage;
+        if (!view || !world) return null;
+
+        const viewRect = view.getBoundingClientRect();
+        const worldPt = world.toLocal(new PIXI.Point(clientX - viewRect.left, clientY - viewRect.top));
+        const objects = this.core?.state?.getObjects ? this.core.state.getObjects() : [];
+
+        return findPortTargetNear(this.eventBus, objects, worldPt, world?.scale?.x || 1);
+    }
+
+    /**
+     * Держит подсветку порта у объекта под курсором на время перепривязки конца.
+     * @param {string|null} objectId
+     */
+    _setPortHighlight(objectId) {
+        if (this._portHighlightId === objectId) return;
+
+        [this._portHighlightId, objectId].forEach((id, index) => {
+            if (!id) return;
+            const req = { objectId: id, pixiObject: null };
+            this.eventBus?.emit(Events.Tool.GetObjectPixi, req);
+            const instance = req.pixiObject?._mb?.instance;
+            if (typeof instance?.setPortHighlight === 'function') {
+                instance.setPortHighlight(index === 1, 'connector');
+            }
+        });
+
+        this._portHighlightId = objectId;
     }
 
     _onDragUp(e) {
@@ -222,6 +267,7 @@ export class ConnectorHandlesLayer {
         if (!this._drag) return;
         const { endKey } = this._drag;
         this._drag = null;
+        this._setPortHighlight(null);
 
         const connectorId = this._activeConnectorId;
         if (!connectorId) { this._render(); return; }
@@ -248,6 +294,12 @@ export class ConnectorHandlesLayer {
         const world    = this.core.pixi.worldLayer || this.core.pixi.app.stage;
         const worldPt  = world.toLocal(new PIXI.Point(clientX - viewRect.left, clientY - viewRect.top));
 
+        // Приоритет -1: порт под курсором, даже если он вынесен за габарит карточки
+        const portTarget = this._findPortTarget(clientX, clientY);
+        if (portTarget) {
+            return terminalForPort(portTarget.boundId, portTarget);
+        }
+
         const hitData = {
             x: clientX - viewRect.left,
             y: clientY - viewRect.top,
@@ -266,6 +318,17 @@ export class ConnectorHandlesLayer {
                 const { x, y } = posData.position;
                 const { width, height } = sizeData.size;
                 const scale = world?.scale?.x || 1;
+
+                // Приоритет 0: именованный порт объекта — он важнее середин граней
+                const port = findNearestPort(
+                    getObjectPorts(this.eventBus, objectId),
+                    { x, y, width, height },
+                    worldPt,
+                    scale
+                );
+                if (port) {
+                    return terminalForPort(objectId, port);
+                }
 
                 // Приоритет 1: магнит к середине грани (≤ANCHOR_SNAP CSS px)
                 const snapThr = ANCHOR_SNAP / scale;
@@ -316,6 +379,7 @@ export class ConnectorHandlesLayer {
             document.removeEventListener('pointerup', this._boundUp);
             this._boundUp = null;
         }
+        this._setPortHighlight(null);
         this._drag = null;
     }
 }

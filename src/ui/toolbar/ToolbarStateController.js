@@ -35,6 +35,7 @@ export class ToolbarStateController {
                 shapes: 'shapes',
                 emoji: 'emoji',
                 mindmap: 'mindmap',
+                'image-generator': 'image-generator',
                 null: 'image'
             };
             btnId = placeButtonMap[this.toolbar.placeSelectedButtonId] || 'shapes';

@@ -6,7 +6,8 @@ import {
     resolveFreePlacement,
     drawPreview,
 } from './connectorGesture.js';
-import { routeElbowAvoiding } from '../../../services/ConnectorObstacleRouter.js';
+import { buildPath } from '../../../services/ConnectorRouter.js';
+import { CONNECTOR_Z_INDEX } from '../../../ui/connectors/ConnectorLayer.js';
 
 /** Внешние нормали граней старта/конца превью по стороне размещения дубликата. */
 const DIRS_BY_SIDE = {
@@ -69,25 +70,6 @@ export class AnchorHoverGhost {
             backgroundColor: colorToCss(instance?.fillColor, 0xffffff),
             borderRadius: kind === 'circle' ? '50%' : `${Math.max(0, Math.round(cornerRadius))}px`,
         };
-    }
-
-    /**
-     * Собирает bbox-препятствия для превью-линии: все объекты, кроме источника
-     * и объектов-коннекторов. Призрак-дубликат целью не считается (его ещё нет).
-     *
-     * @param {string} sourceId id объекта-источника
-     * @returns {Array<{x:number,y:number,width:number,height:number}>}
-     */
-    _collectObstacles(sourceId) {
-        const objects = this.core?.state?.state?.objects;
-        if (!Array.isArray(objects)) return [];
-        const rects = [];
-        for (const obj of objects) {
-            if (!obj || obj.id === sourceId || obj.type === 'connector') continue;
-            const bounds = objectBounds(this.eventBus, obj.id);
-            if (bounds && bounds.width > 0 && bounds.height > 0) rects.push(bounds);
-        }
-        return rects;
     }
 
     /**
@@ -172,11 +154,13 @@ export class AnchorHoverGhost {
                 if (d < bestD) { bestD = d; nearest = e; }
             }
             const toPt = nearest.pt;
-            const obstacles = this._collectObstacles(id);
-            const pts = routeElbowAvoiding(fromPt, startDir, toPt, nearest.dir, obstacles);
+            // Дуга строится по нормалям граней — так же, как ConnectorLayer считает
+            // готовый bezier-коннектор, иначе превью и итог расходятся по кривизне.
+            const pts = buildPath(fromPt, toPt, 'bezier', startDir, nearest.dir);
             const graphics = new PIXI.Graphics();
+            graphics.zIndex = CONNECTOR_Z_INDEX;
             world.addChild(graphics);
-            drawPreview(graphics, fromPt, toPt, 'elbow', pts);
+            drawPreview(graphics, fromPt, toPt, 'bezier', pts);
             this._previewGraphics = graphics;
         }
     }

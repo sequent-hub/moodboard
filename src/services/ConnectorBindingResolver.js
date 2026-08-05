@@ -9,8 +9,13 @@
  *  4. isExact=true     → точная world-точка без отсечения
  *  5. Свободный терминал { point } → возвращается как есть
  *
+ * Терминал с portId — особый случай: его якорь берётся у объекта заново
+ * (см. withCurrentPortAnchor), сохранённый в связи anchor считается снимком.
+ *
  * Нет зависимостей от PIXI; только чистые математические операции.
  */
+
+import { withCurrentPortAnchor } from './ConnectorPortRegistry.js';
 
 // ---------------------------------------------------------------------------
 // Вспомогательные функции
@@ -78,11 +83,27 @@ function clipRayToAABB(from, to, hw, hh) {
  * Возвращает локальные координаты (центр объекта = 0,0): на какой кромке сидит якорь
  * и куда смотрит нормаль. Координата вдоль кромки сохраняется из якоря.
  *
+ * Якорь вне диапазона 0..1 означает порт, вынесенный наружу от габарита
+ * (узел-генератор): точка выхода остаётся снаружи, иначе связь оборвалась бы
+ * на рамке, не дойдя до кружка порта.
+ *
  * @returns {{ dir: {x:number,y:number}, point: {x:number,y:number} }}
  */
 function faceFromAnchor(anchor, width, height, hw, hh) {
-    const ax  = Math.max(0, Math.min(1, anchor?.x ?? 0.5));
-    const ay  = Math.max(0, Math.min(1, anchor?.y ?? 0.5));
+    const rawX = anchor?.x ?? 0.5;
+    const rawY = anchor?.y ?? 0.5;
+
+    if (rawX < 0 || rawX > 1 || rawY < 0 || rawY > 1) {
+        const point = { x: rawX * width - hw, y: rawY * height - hh };
+        if (rawX < 0)  return { dir: { x: -1, y: 0 }, point };
+        if (rawX > 1)  return { dir: { x: 1,  y: 0 }, point };
+        return rawY < 0
+            ? { dir: { x: 0, y: -1 }, point }
+            : { dir: { x: 0, y: 1  }, point };
+    }
+
+    const ax  = Math.max(0, Math.min(1, rawX));
+    const ay  = Math.max(0, Math.min(1, rawY));
     const lax = ax * width  - hw;
     const lay = ay * height - hh;
     const dTop = ay, dBottom = 1 - ay, dLeft = ax, dRight = 1 - ax;
@@ -110,15 +131,17 @@ export class ConnectorBindingResolver {
      *   Если null — отсечение не производится, возвращается precisePoint.
      * @returns {{ x: number, y: number }}
      */
-    static resolve(terminal, target, otherTerminalWorld = null) {
+    static resolve(rawTerminal, target, otherTerminalWorld = null) {
         // --- Свободный терминал ---
-        if (!terminal?.boundId) {
-            return { x: terminal?.point?.x ?? 0, y: terminal?.point?.y ?? 0 };
+        if (!rawTerminal?.boundId) {
+            return { x: rawTerminal?.point?.x ?? 0, y: rawTerminal?.point?.y ?? 0 };
         }
 
         if (!target) {
             return { x: 0, y: 0 };
         }
+
+        const terminal = withCurrentPortAnchor(rawTerminal, target);
 
         const left   = target.position?.x ?? 0;
         const top    = target.position?.y ?? 0;
@@ -204,10 +227,10 @@ export class ConnectorBindingResolver {
      *   Центр другого объекта (или свободная точка другого конца) для выбора стороны.
      * @returns {{ point: {x:number,y:number}, dir: {x:number,y:number} }}
      */
-    static resolveWithSide(terminal, target, otherCenter = null) {
+    static resolveWithSide(rawTerminal, target, otherCenter = null) {
         // Свободный терминал: точка как есть, dir — к другому концу
-        if (!terminal?.boundId) {
-            const pt = { x: terminal?.point?.x ?? 0, y: terminal?.point?.y ?? 0 };
+        if (!rawTerminal?.boundId) {
+            const pt = { x: rawTerminal?.point?.x ?? 0, y: rawTerminal?.point?.y ?? 0 };
             const dx = otherCenter ? otherCenter.x - pt.x : 0;
             const dy = otherCenter ? otherCenter.y - pt.y : 0;
             const len = Math.hypot(dx, dy);
@@ -218,6 +241,8 @@ export class ConnectorBindingResolver {
         if (!target) {
             return { point: { x: 0, y: 0 }, dir: { x: 1, y: 0 } };
         }
+
+        const terminal = withCurrentPortAnchor(rawTerminal, target);
 
         const left   = target.position?.x ?? 0;
         const top    = target.position?.y ?? 0;

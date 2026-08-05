@@ -9,6 +9,14 @@ import {
     sideFromAnchor,
     resolveFreePlacement,
 } from './connectorGesture.js';
+import {
+    getObjectPorts,
+    findNearestPort,
+    findPortTargetNear,
+    terminalForPort,
+} from '../../../services/ConnectorPortRegistry.js';
+import { PORT_LINE_STOP } from '../../../services/ai/imageGeneratorContract.js';
+import { CONNECTOR_Z_INDEX } from '../../../ui/connectors/ConnectorLayer.js';
 
 /** Минимальное смещение (px) для старта drag. */
 const DRAG_THRESHOLD = 4;
@@ -39,6 +47,7 @@ export class ConnectorDragController {
         this._pendingDupListener = null;
         this._startX = 0;
         this._startY = 0;
+        this._portHighlightId = null;
         this._boundMove = this._onMove.bind(this);
         this._boundUp   = this._onUp.bind(this);
     }
@@ -49,11 +58,14 @@ export class ConnectorDragController {
      */
     startFromAnchor(domEvent) {
         const el = domEvent.target;
+        const portId = el.dataset.portId || null;
         this._sourceTerminal = {
             boundId: el.dataset.id,
+            ...(portId ? { portId } : {}),
             anchor: { x: parseFloat(el.dataset.anchorX), y: parseFloat(el.dataset.anchorY) },
             isPrecise: true,
-            isExact: false,
+            // Порт вынесен за габарит объекта — связь должна приходить ровно в него.
+            isExact: Boolean(portId),
         };
         this._startX   = domEvent.clientX;
         this._startY   = domEvent.clientY;
@@ -94,6 +106,46 @@ export class ConnectorDragController {
     }
 
     /**
+     * Порт-цель рядом с точкой мира, минуя hit-test.
+     *
+     * Порт вынесен наружу от грани карточки, поэтому над самим портом hit-test
+     * объекта пустой — без отдельного поиска связь приземлялась в пустоту.
+     *
+     * @param {{x: number, y: number}} worldPt
+     * @param {string|null} excludeBoundId
+     */
+    _findPortTarget(worldPt, excludeBoundId) {
+        const objects = this.core?.state?.getObjects ? this.core.state.getObjects() : [];
+        return findPortTargetNear(
+            this.eventBus,
+            objects,
+            worldPt,
+            this._world()?.scale?.x || 1,
+            excludeBoundId || null,
+        );
+    }
+
+    /**
+     * Держит подсветку порта у объекта под курсором на время протягивания.
+     * @param {string|null} objectId
+     */
+    _setPortHighlight(objectId) {
+        if (this._portHighlightId === objectId) return;
+
+        [this._portHighlightId, objectId].forEach((id, index) => {
+            if (!id) return;
+            const req = { objectId: id, pixiObject: null };
+            this.eventBus?.emit(Events.Tool.GetObjectPixi, req);
+            const instance = req.pixiObject?._mb?.instance;
+            if (typeof instance?.setPortHighlight === 'function') {
+                instance.setPortHighlight(index === 1, 'connector');
+            }
+        });
+
+        this._portHighlightId = objectId;
+    }
+
+    /**
      * Возвращает ближайший якорь из TARGET_ANCHORS в пределах ANCHOR_SNAP_CSS от worldPt,
      * иначе null. Приоритет выше грани — вызывать в _resolveEnd первым.
      */
@@ -129,11 +181,28 @@ export class ConnectorDragController {
      */
     _resolveEnd(clientX, clientY, sourceBoundId) {
         const worldPt  = this._toWorld(clientX, clientY);
+
+        // ПРИОРИТЕТ -1: порт под курсором, даже если он вынесен за габарит карточки
+        const portTarget = this._findPortTarget(worldPt, sourceBoundId);
+        if (portTarget) {
+            return terminalForPort(portTarget.boundId, portTarget);
+        }
+
         const objectId = this._hitTest(clientX, clientY);
 
         if (objectId && objectId !== sourceBoundId) {
             const bounds = this._objectBounds(objectId);
             if (bounds) {
+                // ПРИОРИТЕТ 0: именованный порт объекта, если он их объявляет
+                const port = findNearestPort(
+                    getObjectPorts(this.eventBus, objectId),
+                    bounds,
+                    worldPt,
+                    this._world()?.scale?.x || 1
+                );
+                if (port) {
+                    return terminalForPort(objectId, port);
+                }
                 // ПРИОРИТЕТ 1: магнит к коннектору (середина грани)
                 const snapAnchor = this._snapToAnchor(bounds, worldPt);
                 if (snapAnchor) {
@@ -171,6 +240,7 @@ export class ConnectorDragController {
             if (world) {
                 this._previewGraphics   = new PIXI.Graphics();
                 this._highlightGraphics = new PIXI.Graphics();
+                this._previewGraphics.zIndex = CONNECTOR_Z_INDEX;
                 world.addChild(this._previewGraphics);
                 world.addChild(this._highlightGraphics);
             }
@@ -182,9 +252,26 @@ export class ConnectorDragController {
         const fromPt   = terminalWorldPoint(this.eventBus, this._sourceTerminal);
 
         this._highlightGraphics.clear();
-        const objectId = this._hitTest(e.clientX, e.clientY);
+        const sourceBoundId = this._sourceTerminal?.boundId;
+        const portTarget = this._findPortTarget(worldPt, sourceBoundId);
+        this._setPortHighlight(portTarget?.boundId || null);
+
         let previewEnd = worldPt;
-        if (objectId && objectId !== this._sourceTerminal?.boundId) {
+        if (portTarget) {
+            // Сам порт подсвечивает объект (подложка под иконкой), рамка показывает цель.
+            previewEnd = portTarget.point;
+            const b = portTarget.bounds;
+            this._highlightGraphics.lineStyle({ width: 2, color: 0x2563EB, alpha: 0.85 });
+            this._highlightGraphics.drawRect(b.x, b.y, b.width, b.height);
+            drawPreview(this._previewGraphics, fromPt, previewEnd, 'bezier', null, {
+                head: 'none',
+                endTrim: PORT_LINE_STOP,
+            });
+            return;
+        }
+
+        const objectId = this._hitTest(e.clientX, e.clientY);
+        if (objectId && objectId !== sourceBoundId) {
             const bounds = this._objectBounds(objectId);
             if (bounds) {
                 // Рамку строим строго по логическим bounds — коннектор привязывается
@@ -220,6 +307,7 @@ export class ConnectorDragController {
         this._dragging        = false;
         this._sourceTerminal  = null;
         this.core?.pixi?.hoverLift?.setConnecting(false);
+        this._setPortHighlight(null);
         this._clearGraphics();
 
         if (!source) return;
@@ -278,6 +366,7 @@ export class ConnectorDragController {
         document.removeEventListener('pointermove', this._boundMove);
         document.removeEventListener('pointerup',   this._boundUp);
         this.core?.pixi?.hoverLift?.setConnecting(false);
+        this._setPortHighlight(null);
         if (this._pendingDupListener) {
             this.eventBus?.off(Events.Tool.DuplicateReady, this._pendingDupListener);
             this._pendingDupListener = null;

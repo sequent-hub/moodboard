@@ -43,7 +43,7 @@ export const CONNECTOR_STYLE_DEFAULTS = {
     stroke: 0x2563EB,
     width: 2,
     dash: false,
-    route: 'elbow',
+    route: 'bezier',
     head: { start: 'none', end: 'arrow' },
 };
 

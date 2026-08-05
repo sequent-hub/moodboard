@@ -21,3 +21,4 @@ export { UpdateFrameTypeCommand } from './UpdateFrameTypeCommand.js';
 export { CreateConnectorCommand } from './CreateConnectorCommand.js';
 export { UpdateConnectorCommand } from './UpdateConnectorCommand.js';
 export { UpdateShapeStyleCommand } from './UpdateShapeStyleCommand.js';
+export { UpdateGeneratorStateCommand } from './UpdateGeneratorStateCommand.js';

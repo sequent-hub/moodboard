@@ -1,0 +1,248 @@
+/* Элементы управления узла-генератора изображений.
+   Слой лежит поверх канваса; кликабельны только сами органы управления. */
+
+.mb-imgen-layer {
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+}
+
+/* Позицию и размер карточке проставляет слой инлайном по границам PIXI-объекта.
+   Базовое позиционирование держим здесь: без него у неразмеченной карточки
+   containing block для футера — весь слой на площадь холста, и панель
+   разъезжается по краям экрана. */
+.mb-imgen,
+.mb-imgen__scale {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* Панель лежит поверх результата без собственной подложки: пилюли висят прямо
+   над картинкой, читаемость держат их белый фон и тень. Клики по самой полосе
+   не перехватываем — за нижний край узла нужно уметь потянуть карточку. */
+.mb-imgen__footer {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 4px;
+    background: transparent;
+    pointer-events: none;
+}
+
+/* --- Пилюля со значением и выпадающим меню --- */
+
+.mb-imgen__control {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.mb-imgen__control--model {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.mb-imgen__pill {
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    height: 28px;
+    padding: 0 8px;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1;
+    color: #0F172A;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 20px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.mb-imgen__pill:hover {
+    border-color: #CBD5E1;
+    background: #F8FAFC;
+}
+
+.mb-imgen__pill:focus-visible {
+    outline: 2px solid #2563EB;
+    outline-offset: 1px;
+}
+
+.mb-imgen__pill[aria-expanded="true"] {
+    border-color: #2563EB;
+}
+
+.mb-imgen__pill-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    color: #64748B;
+}
+
+.mb-imgen__pill-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.mb-imgen__pill-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* --- Выпадающее меню --- */
+
+.mb-imgen__menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    display: none;
+    padding: 4px;
+    background: #FFFFFF;
+    border-radius: 10px;
+    box-shadow:
+        0 0 0 1px rgba(15, 23, 42, 0.08),
+        0 8px 24px -8px rgba(15, 23, 42, 0.25);
+    pointer-events: auto;
+    z-index: 5;
+}
+
+.mb-imgen__menu.is-open {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 100%;
+    width: max-content;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+/* Соотношение сторон стоит у правого края панели: сетка раскрывается влево,
+   иначе широкое меню уходит за карточку. */
+.mb-imgen__control--ratio .mb-imgen__menu {
+    left: auto;
+    right: 0;
+}
+
+.mb-imgen__menu--grid.is-open {
+    display: grid;
+    grid-template-columns: repeat(var(--mb-imgen-menu-columns, 5), auto);
+    gap: 2px;
+    max-height: none;
+}
+
+.mb-imgen__menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.2;
+    color: #334155;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.mb-imgen__menu-item:hover {
+    background: #F1F5F9;
+}
+
+.mb-imgen__menu-item[data-active="true"] {
+    background: #EEF2FF;
+    color: #1D4ED8;
+}
+
+.mb-imgen__menu-item-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    color: #64748B;
+}
+
+.mb-imgen__menu-item-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.mb-imgen__menu-item[data-active="true"] .mb-imgen__menu-item-icon {
+    color: #1D4ED8;
+}
+
+/* Сетка форматов: иконка сверху, подпись снизу — как в меню чата */
+.mb-imgen__menu--grid .mb-imgen__menu-item {
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 5px 4px 4px;
+    font-size: 10px;
+}
+
+.mb-imgen__menu--grid .mb-imgen__menu-item-icon svg {
+    width: 25px;
+    height: 24px;
+}
+
+/* --- Кнопка запуска --- */
+
+.mb-imgen__run {
+    pointer-events: auto;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    color: #FFFFFF;
+    background: #2563EB;
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
+    cursor: pointer;
+}
+
+.mb-imgen__run svg {
+    width: 16px;
+    height: 16px;
+}
+
+.mb-imgen__run:hover:not(:disabled) {
+    background: #1D4ED8;
+}
+
+.mb-imgen__run:focus-visible {
+    outline: 2px solid #2563EB;
+    outline-offset: 1px;
+}
+
+.mb-imgen__run:disabled,
+.mb-imgen__run--busy {
+    background: #94A3B8;
+    cursor: default;
+}
+
+.mb-imgen__run--busy svg {
+    animation: mb-imgen-spin 900ms linear infinite;
+}
+
+@keyframes mb-imgen-spin {
+    to { transform: rotate(-360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mb-imgen__run--busy svg { animation: none; }
+}

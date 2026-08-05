@@ -4,11 +4,22 @@ import { ConnectorBindingResolver, distanceToSegment } from '../../services/Conn
 import { buildPath, bezierControlPoints, sampleBezier, BEZIER_SAMPLES } from '../../services/ConnectorRouter.js';
 import { routeElbowAvoiding } from '../../services/ConnectorObstacleRouter.js';
 import { drawHead, getLineTrim, trimPolylineEnd } from './connectorHeadGeometry.js';
+import { PORT_LINE_STOP } from '../../services/ai/imageGeneratorContract.js';
 
 const HIT_TEST_SCREEN_PX = 8;
 const DASH_LEN       = 8;
 const GAP_LEN        = 5;
 const ELBOW_RADIUS   = 14;
+
+/**
+ * Глубина коннекторов в worldLayer: ниже любого объекта (объектам ZOrderManager
+ * раздаёт zIndex 0..N по порядку в state.objects) и выше фреймов (-100000).
+ * Маршруты bezier/straight не огибают препятствия — линия проходит под объектом
+ * и прячется за ним, а не пересекает его поверх. Тот же приём у связей mind-map
+ * (MindmapConnectionLayer). Превью-«резинка» рисуется на этой же глубине, иначе
+ * она шла бы поверх объектов и расходилась с итоговым коннектором.
+ */
+export const CONNECTOR_Z_INDEX = -1;
 
 function asArray(value) {
     return Array.isArray(value) ? value : [];
@@ -231,7 +242,7 @@ export class ConnectorLayer {
         if (!this.graphics) {
             this.graphics        = new PIXI.Graphics();
             this.graphics.name   = 'connector-layer';
-            this.graphics.zIndex = 3;
+            this.graphics.zIndex = CONNECTOR_Z_INDEX;
             const world = this.core?.pixi?.worldLayer || this.core?.pixi?.app?.stage;
             world?.addChild?.(this.graphics);
         }
@@ -255,6 +266,11 @@ export class ConnectorLayer {
             const isDash = !!style.dash;
             const route  = style.route  ?? 'straight';
             const head   = normalizeHead(style.head);
+
+            // Конец у именованного порта: линия упирается в подложку порта, наконечника
+            // там нет — стрелка перекрывала бы иконку порта. Выбор стиля не учитывается.
+            if (startTerm?.portId) head.start = 'none';
+            if (endTerm?.portId)   head.end   = 'none';
 
             let sx, sy, ex, ey, startDir = null, endDir = null;
 
@@ -305,6 +321,12 @@ export class ConnectorLayer {
             }
             if (head.start !== 'none') {
                 drawPts = trimPolylineEnd(drawPts.slice().reverse(), getLineTrim(head.start)).reverse();
+            }
+            if (endTerm?.portId) {
+                drawPts = trimPolylineEnd(drawPts, PORT_LINE_STOP);
+            }
+            if (startTerm?.portId) {
+                drawPts = trimPolylineEnd(drawPts.slice().reverse(), PORT_LINE_STOP).reverse();
             }
 
             const drawStart = drawPts[0];

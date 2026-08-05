@@ -12,6 +12,7 @@ import { NoteObject } from './NoteObject.js';
 import { FileObject } from './FileObject.js';
 import { MindmapObject } from './MindmapObject.js';
 import { ConnectorObject } from './ConnectorObject.js';
+import { ImageGeneratorObject } from './ImageGeneratorObject.js';
 
 /**
  * Фабрика объектов холста
@@ -34,6 +35,7 @@ export class ObjectFactory {
         ['file', FileObject],
         ['mindmap', MindmapObject],
         ['connector', ConnectorObject],
+        ['image-generator', ImageGeneratorObject],
     ]);
 
     /**

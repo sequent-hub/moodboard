@@ -26,6 +26,7 @@ export class ActionHandler {
             case 'comment':
             case 'file':
             case 'mindmap':
+            case 'image-generator':
                 // Для изображений и файлов используем только src.
                 return this.handleCreateObject(action.type, action.position, action.properties || {}, {});
 

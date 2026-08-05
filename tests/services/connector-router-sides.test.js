@@ -63,6 +63,37 @@ describe('resolveWithSide — выбор стороны', () => {
         expect(dir.x).toBeCloseTo(0);
         expect(dir.y).toBeCloseTo(-1);
     });
+
+    it('терминал порта с isExact приходит ровно в точку порта, без проекции на кромку', () => {
+        const target   = makeBox(200, 0, 100, 80);
+        const terminal = {
+            boundId: 'obj',
+            portId: 'prompt',
+            anchor: { x: -0.12, y: 0.75 },
+            isPrecise: true,
+            isExact: true,
+        };
+
+        const point = ConnectorBindingResolver.resolve(terminal, target, { x: 0, y: 40 });
+
+        expect(point.x).toBeCloseTo(188, 5);
+        expect(point.y).toBeCloseTo(60, 5);
+    });
+
+    it('порт вынесен за габарит (anchor.x < 0) → точка выхода остаётся снаружи', () => {
+        const target   = makeBox(200, 0, 100, 80);
+        const terminal = { boundId: 'obj', anchor: { x: -0.12, y: 0.75 }, isPrecise: true, isExact: false };
+
+        const { point, dir } = ConnectorBindingResolver.resolveWithSide(
+            terminal, target, { x: 0, y: 40 },
+        );
+
+        expect(dir.x).toBeCloseTo(-1);
+        expect(dir.y).toBeCloseTo(0);
+        // 200 + (-0.12 · 100) = 188 — на 12 px левее левой грани
+        expect(point.x).toBe(188);
+        expect(point.y).toBe(60);
+    });
 });
 
 // ---------------------------------------------------------------------------
