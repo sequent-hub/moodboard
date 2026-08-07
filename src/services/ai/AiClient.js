@@ -311,13 +311,22 @@ export class AiClient {
      * @param {string} [args.resolution]
      * @param {number} [args.duration]
      * @param {number} [args.seed]
-     * @param {File[]} [args.referenceImages]
+     * @param {File[]} [args.referenceImages] первый кадр
+     * @param {File} [args.lastFrame] последний кадр
      * @param {AbortSignal} [args.signal]
      * @returns {Promise<{jobId: string}>}
      */
-    async submitVideo({ provider, signal, referenceImages: files, ...payload }) {
-        const referenceImages = await filesToBase64(files);
-        const body = referenceImages ? { ...payload, referenceImages } : payload;
+    async submitVideo({ provider, signal, referenceImages: files, lastFrame: lastFrameFile, ...payload }) {
+        const referenceImages = await filesToBase64(await shrinkReferenceImages(files));
+        const [lastFrame] = await filesToBase64(
+            await shrinkReferenceImages(lastFrameFile ? [lastFrameFile] : [])
+        ) || [];
+
+        const body = {
+            ...payload,
+            ...(referenceImages ? { referenceImages } : {}),
+            ...(lastFrame ? { lastFrame } : {}),
+        };
         const res = await this._fetch(`${this._baseUrl}/${provider}/video`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },

@@ -6,8 +6,12 @@ import {
     getObjectPorts,
     findNearestPort,
     findPortTargetNear,
+    portTargetRule,
+    soleCompatiblePort,
     terminalForPort,
+    PORT_SNAP_CSS,
 } from '../../services/ConnectorPortRegistry.js';
+import { canConnectTerminals } from '../../services/ai/imageGeneratorContract.js';
 
 const HANDLE_SIZE   = 12;
 const ANCHOR_SNAP   = 16; // CSS px до магнита к середине грани
@@ -226,16 +230,46 @@ export class ConnectorHandlesLayer {
      * @param {number} clientX
      * @param {number} clientY
      */
-    _findPortTarget(clientX, clientY) {
+    _findPortTarget(clientX, clientY, rule = this._portRule()) {
         const view = this.core?.pixi?.app?.view;
         const world = this.core?.pixi?.worldLayer || this.core?.pixi?.app?.stage;
         if (!view || !world) return null;
 
         const viewRect = view.getBoundingClientRect();
         const worldPt = world.toLocal(new PIXI.Point(clientX - viewRect.left, clientY - viewRect.top));
-        const objects = this.core?.state?.getObjects ? this.core.state.getObjects() : [];
 
-        return findPortTargetNear(this.eventBus, objects, worldPt, world?.scale?.x || 1);
+        return findPortTargetNear(
+            this.eventBus,
+            this._objects(),
+            worldPt,
+            world?.scale?.x || 1,
+            null,
+            rule,
+        );
+    }
+
+    _objects() {
+        return this.core?.state?.getObjects ? this.core.state.getObjects() : [];
+    }
+
+    /** Терминал, который при перетаскивании остаётся на месте. */
+    _fixedTerminal() {
+        const connector = this._objects().find((obj) => obj?.id === this._activeConnectorId);
+        const fixedKey = this._drag?.endKey === 'start' ? 'end' : 'start';
+
+        return connector?.properties?.[fixedKey] || null;
+    }
+
+    /**
+     * Правило выбора порта: пара с неподвижным концом связи. Саму связь при
+     * проверке занятости пропускаем — иначе её собственный конец мешал бы
+     * вернуть ручку на тот же порт.
+     *
+     * @param {object|null} [fixedTerminal=this._fixedTerminal()]
+     * @returns {(port: object, targetId: string) => boolean}
+     */
+    _portRule(fixedTerminal = this._fixedTerminal()) {
+        return portTargetRule(this._objects(), fixedTerminal?.portId || null, this._activeConnectorId);
     }
 
     /**
@@ -266,13 +300,20 @@ export class ConnectorHandlesLayer {
 
         if (!this._drag) return;
         const { endKey } = this._drag;
+        // Неподвижный конец читаем до сброса drag: без endKey его уже не определить.
+        const fixedTerminal = this._fixedTerminal();
         this._drag = null;
         this._setPortHighlight(null);
 
         const connectorId = this._activeConnectorId;
         if (!connectorId) { this._render(); return; }
 
-        const terminal = this._resolveTerminal(e.clientX, e.clientY);
+        const terminal = this._resolveTerminal(e.clientX, e.clientY, fixedTerminal);
+
+        // Порт результата держит связь только со входом изображения: несовместимую
+        // перепривязку не сохраняем, ручка возвращается на место.
+        if (!canConnectTerminals(fixedTerminal, terminal)) { this._render(); return; }
+
         const updates  = endKey === 'start' ? { start: terminal } : { end: terminal };
 
         this.core.history.executeCommand(
@@ -287,15 +328,20 @@ export class ConnectorHandlesLayer {
      * на тот же объект, к которому привязан другой конец.
      *
      * Допущение: isExact=false всегда (матчит контракт ConnectorBindingResolver).
+     *
+     * @param {number} clientX
+     * @param {number} clientY
+     * @param {object|null} [fixedTerminal=this._fixedTerminal()] неподвижный конец связи
      */
-    _resolveTerminal(clientX, clientY) {
+    _resolveTerminal(clientX, clientY, fixedTerminal = this._fixedTerminal()) {
         const view     = this.core.pixi.app.view;
         const viewRect = view.getBoundingClientRect();
         const world    = this.core.pixi.worldLayer || this.core.pixi.app.stage;
         const worldPt  = world.toLocal(new PIXI.Point(clientX - viewRect.left, clientY - viewRect.top));
+        const rule     = this._portRule(fixedTerminal);
 
         // Приоритет -1: порт под курсором, даже если он вынесен за габарит карточки
-        const portTarget = this._findPortTarget(clientX, clientY);
+        const portTarget = this._findPortTarget(clientX, clientY, rule);
         if (portTarget) {
             return terminalForPort(portTarget.boundId, portTarget);
         }
@@ -319,13 +365,18 @@ export class ConnectorHandlesLayer {
                 const { width, height } = sizeData.size;
                 const scale = world?.scale?.x || 1;
 
-                // Приоритет 0: именованный порт объекта — он важнее середин граней
+                // Приоритет 0: именованный порт объекта — он важнее середин граней.
+                // Мимо иконки, но по телу карточки конец идёт в единственный
+                // подходящий порт: попадать в неё пикселем ручка не обязана.
+                const ports = getObjectPorts(this.eventBus, objectId);
                 const port = findNearestPort(
-                    getObjectPorts(this.eventBus, objectId),
+                    ports,
                     { x, y, width, height },
                     worldPt,
-                    scale
-                );
+                    scale,
+                    PORT_SNAP_CSS,
+                    (candidate) => rule(candidate, objectId),
+                ) || soleCompatiblePort(ports, rule, objectId);
                 if (port) {
                     return terminalForPort(objectId, port);
                 }

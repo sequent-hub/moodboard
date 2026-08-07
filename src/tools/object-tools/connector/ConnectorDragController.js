@@ -13,9 +13,18 @@ import {
     getObjectPorts,
     findNearestPort,
     findPortTargetNear,
+    portTargetRule,
+    soleCompatiblePort,
     terminalForPort,
+    PORT_SNAP_CSS,
 } from '../../../services/ConnectorPortRegistry.js';
-import { PORT_LINE_STOP } from '../../../services/ai/imageGeneratorContract.js';
+import {
+    PORT_LINE_STOP,
+    canConnectTerminals,
+    isSingleLinkOutputPort,
+} from '../../../services/ai/generatorPorts.js';
+import { findGeneratorDropCandidates } from '../../../services/ai/generatorNodeCatalog.js';
+import { GeneratorDropMenu } from '../../../ui/generator/GeneratorDropMenu.js';
 import { CONNECTOR_Z_INDEX } from '../../../ui/connectors/ConnectorLayer.js';
 
 /** Минимальное смещение (px) для старта drag. */
@@ -43,6 +52,7 @@ export class ConnectorDragController {
         this._sourceTerminal = null;
         this._previewGraphics = null;
         this._highlightGraphics = null;
+        this._dropMenu = null;
         this._dragging = false;
         this._pendingDupListener = null;
         this._startX = 0;
@@ -105,6 +115,20 @@ export class ConnectorDragController {
         return objectBounds(this.eventBus, objectId);
     }
 
+    _objects() {
+        return this.core?.state?.getObjects ? this.core.state.getObjects() : [];
+    }
+
+    /**
+     * Какие порты принимает связь этого жеста: зависит от порта, с которого её тянут.
+     *
+     * @param {object|null} [source=this._sourceTerminal] терминал-источник
+     * @returns {(port: object, targetId: string) => boolean}
+     */
+    _portRule(source = this._sourceTerminal) {
+        return portTargetRule(this._objects(), source?.portId || null);
+    }
+
     /**
      * Порт-цель рядом с точкой мира, минуя hit-test.
      *
@@ -113,16 +137,46 @@ export class ConnectorDragController {
      *
      * @param {{x: number, y: number}} worldPt
      * @param {string|null} excludeBoundId
+     * @param {object|null} [source=this._sourceTerminal] терминал-источник
      */
-    _findPortTarget(worldPt, excludeBoundId) {
-        const objects = this.core?.state?.getObjects ? this.core.state.getObjects() : [];
+    _findPortTarget(worldPt, excludeBoundId, source = this._sourceTerminal) {
         return findPortTargetNear(
             this.eventBus,
-            objects,
+            this._objects(),
             worldPt,
             this._world()?.scale?.x || 1,
             excludeBoundId || null,
+            this._portRule(source),
         );
+    }
+
+    /**
+     * Порт объекта под курсором: сначала ближайший к точке, затем — единственный,
+     * который принимает эту связь.
+     *
+     * Второй шаг делает цель размером с карточку: тянуть от порта результата
+     * прицельно в иконку входа шириной 32 world-px пользователь не обязан, а
+     * подходящий вход у генератора ровно один.
+     *
+     * @param {string} objectId
+     * @param {{x: number, y: number, width: number, height: number}} bounds
+     * @param {{x: number, y: number}} worldPt
+     * @param {object|null} source терминал-источник
+     * @returns {{portId: string, anchor: {x: number, y: number}}|null}
+     */
+    _portOnObject(objectId, bounds, worldPt, source) {
+        const rule = this._portRule(source);
+        const ports = getObjectPorts(this.eventBus, objectId);
+        const nearest = findNearestPort(
+            ports,
+            bounds,
+            worldPt,
+            this._world()?.scale?.x || 1,
+            PORT_SNAP_CSS,
+            (candidate) => rule(candidate, objectId),
+        );
+
+        return nearest || soleCompatiblePort(ports, rule, objectId);
     }
 
     /**
@@ -178,12 +232,17 @@ export class ConnectorDragController {
      *  - над кромкой объекта (≤10 CSS px) → isPrecise:true, точный якорь
      *  - над телом объекта              → isPrecise:false, центр {0.5,0.5}
      *  - над пустотой                   → свободная point
+     *
+     * @param {number} clientX
+     * @param {number} clientY
+     * @param {object|null} source терминал-источник: от его порта зависят допустимые цели
      */
-    _resolveEnd(clientX, clientY, sourceBoundId) {
+    _resolveEnd(clientX, clientY, source) {
         const worldPt  = this._toWorld(clientX, clientY);
+        const sourceBoundId = source?.boundId || null;
 
         // ПРИОРИТЕТ -1: порт под курсором, даже если он вынесен за габарит карточки
-        const portTarget = this._findPortTarget(worldPt, sourceBoundId);
+        const portTarget = this._findPortTarget(worldPt, sourceBoundId, source);
         if (portTarget) {
             return terminalForPort(portTarget.boundId, portTarget);
         }
@@ -194,12 +253,7 @@ export class ConnectorDragController {
             const bounds = this._objectBounds(objectId);
             if (bounds) {
                 // ПРИОРИТЕТ 0: именованный порт объекта, если он их объявляет
-                const port = findNearestPort(
-                    getObjectPorts(this.eventBus, objectId),
-                    bounds,
-                    worldPt,
-                    this._world()?.scale?.x || 1
-                );
+                const port = this._portOnObject(objectId, bounds, worldPt, source);
                 if (port) {
                     return terminalForPort(objectId, port);
                 }
@@ -280,6 +334,19 @@ export class ConnectorDragController {
                 // отстаёт от анимации, т.к. перерисовывается только на pointermove.
                 this._highlightGraphics.lineStyle({ width: 2, color: 0x2563EB, alpha: 0.85 });
                 this._highlightGraphics.drawRect(bounds.x, bounds.y, bounds.width, bounds.height);
+
+                // Порт, в который приземлится связь по телу карточки: превью должно
+                // показывать ту же точку, что получит _resolveEnd на отпускании.
+                const port = this._portOnObject(objectId, bounds, worldPt, this._sourceTerminal);
+                if (port) {
+                    this._setPortHighlight(objectId);
+                    drawPreview(this._previewGraphics, fromPt, {
+                        x: bounds.x + port.anchor.x * bounds.width,
+                        y: bounds.y + port.anchor.y * bounds.height,
+                    }, 'bezier', null, { head: 'none', endTrim: PORT_LINE_STOP });
+                    return;
+                }
+
                 // Подводим превью к коннектору, если курсор в зоне магнита
                 const snapAnchor = this._snapToAnchor(bounds, worldPt);
                 if (snapAnchor) {
@@ -316,8 +383,68 @@ export class ConnectorDragController {
             return;
         }
 
-        const end = this._resolveEnd(e.clientX, e.clientY, source.boundId);
+        const end = this._resolveEnd(e.clientX, e.clientY, source);
+
+        // Связь от порта результата существует только в паре со входом того же
+        // типа данных. В пустоте такого входа нет — предлагаем создать узел,
+        // который его объявляет, вместо молчаливого обрыва жеста.
+        if (!end.boundId && isSingleLinkOutputPort(source.portId)) {
+            this._openDropMenu(e.clientX, e.clientY, source, end.point);
+            return;
+        }
+
+        if (!canConnectTerminals(source, end)) return;
+
         createConnectorFromTerminals(this.core, this.eventBus, source, end);
+    }
+
+    /**
+     * Предлагает создать узел под свободный конец связи и соединяет его.
+     *
+     * @param {number} clientX
+     * @param {number} clientY
+     * @param {object} source терминал-источник
+     * @param {{x: number, y: number}} worldPoint точка отпускания в координатах мира
+     */
+    _openDropMenu(clientX, clientY, source, worldPoint) {
+        const candidates = findGeneratorDropCandidates(source.portId);
+        if (candidates.length === 0 || !worldPoint) return;
+
+        this._dropMenu = this._dropMenu || new GeneratorDropMenu();
+        this._dropMenu.open(clientX, clientY, candidates, (entry) => {
+            this._createNodeForDrop(source, worldPoint, entry);
+        });
+    }
+
+    /**
+     * @param {object} source терминал-источник
+     * @param {{x: number, y: number}} worldPoint точка отпускания в координатах мира
+     * @param {object} entry запись каталога с выбранным входным портом
+     */
+    _createNodeForDrop(source, worldPoint, entry) {
+        const { width, height } = entry.size;
+        // Карточка встаёт правее точки отпускания и по вертикали центрируется на
+        // выбранном входе: связь приходит ровно туда, где курсор её оставил.
+        const position = {
+            x: Math.round(worldPoint.x),
+            y: Math.round(worldPoint.y - entry.port.anchor.y * height),
+        };
+        const created = this.core?.createObject(entry.type, position, {
+            ...entry.createProperties(),
+            width,
+            height,
+        });
+        if (!created?.id) return;
+
+        // Якорь берём у созданного объекта: он пересчитывает порты по своей
+        // геометрии, и она может отличаться от размера, переданного в create.
+        const actual = getObjectPorts(this.eventBus, created.id)
+            .find((port) => port.id === entry.port.portId);
+        const port = actual?.anchor
+            ? { portId: actual.id, anchor: { x: actual.anchor.x, y: actual.anchor.y } }
+            : entry.port;
+
+        createConnectorFromTerminals(this.core, this.eventBus, source, terminalForPort(created.id, port));
     }
 
     // ─── Клик по якорю (без drag) ────────────────────────────────────────────
@@ -334,6 +461,10 @@ export class ConnectorDragController {
      * препятствия на стороне ConnectorLayer/ConnectorObstacleRouter.
      */
     _onAnchorClick(source) {
+        // Дубликат подключается к центру нового объекта, а выходной порт
+        // результата принимает только совместимый вход — соединять нечем.
+        if (isSingleLinkOutputPort(source?.portId)) return;
+
         const sourceBounds = this._objectBounds(source.boundId);
         if (!sourceBounds) return;
 
@@ -372,6 +503,8 @@ export class ConnectorDragController {
             this._pendingDupListener = null;
         }
         this._clearGraphics();
+        this._dropMenu?.destroy();
+        this._dropMenu = null;
         this._sourceTerminal = null;
         this.core     = null;
         this.eventBus = null;

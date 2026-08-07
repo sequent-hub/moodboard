@@ -469,7 +469,8 @@ export function setupObjectLifecycleFlow(core) {
                 instance.setStyle(updates.properties);
             }
 
-            if (object.type === 'image-generator' && updates.properties && typeof instance.applyProperties === 'function') {
+            const isGeneratorNode = object.type === 'image-generator' || object.type === 'video-generator';
+            if (isGeneratorNode && updates.properties && typeof instance.applyProperties === 'function') {
                 instance.applyProperties(object.properties);
             }
         }

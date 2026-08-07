@@ -15,6 +15,8 @@ import { ConnectorHandlesLayer } from '../../ui/connectors/ConnectorHandlesLayer
 import { HtmlHandlesLayer } from '../../ui/HtmlHandlesLayer.js';
 import { ImageGeneratorControlsLayer } from '../../ui/generator/ImageGeneratorControlsLayer.js';
 import { ImageGeneratorRunner } from '../../services/ai/ImageGeneratorRunner.js';
+import { VideoGeneratorControlsLayer } from '../../ui/generator/VideoGeneratorControlsLayer.js';
+import { VideoGeneratorRunner } from '../../services/ai/VideoGeneratorRunner.js';
 import { TextPropertiesPanel } from '../../ui/TextPropertiesPanel.js';
 import { MindmapPropertiesPanel } from '../../ui/MindmapPropertiesPanel.js';
 import { FramePropertiesPanel } from '../../ui/FramePropertiesPanel.js';
@@ -138,6 +140,12 @@ function initHtmlLayersAndPanels(board) {
 
     board.imageGeneratorRunner = new ImageGeneratorRunner({ core: board.coreMoodboard });
     board.imageGeneratorRunner.attach();
+
+    board.videoGeneratorControlsLayer = new VideoGeneratorControlsLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
+    board.videoGeneratorControlsLayer.attach();
+
+    board.videoGeneratorRunner = new VideoGeneratorRunner({ core: board.coreMoodboard });
+    board.videoGeneratorRunner.attach();
 
     board.htmlHandlesLayer = new HtmlHandlesLayer(board.canvasContainer, board.coreMoodboard.eventBus, board.coreMoodboard);
     board.htmlHandlesLayer.attach();

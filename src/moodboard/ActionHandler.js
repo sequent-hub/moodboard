@@ -27,6 +27,7 @@ export class ActionHandler {
             case 'file':
             case 'mindmap':
             case 'image-generator':
+            case 'video-generator':
                 // Для изображений и файлов используем только src.
                 return this.handleCreateObject(action.type, action.position, action.properties || {}, {});
 

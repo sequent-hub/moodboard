@@ -36,6 +36,7 @@ export class ToolbarStateController {
                 emoji: 'emoji',
                 mindmap: 'mindmap',
                 'image-generator': 'image-generator',
+                'video-generator': 'video-generator',
                 null: 'image'
             };
             btnId = placeButtonMap[this.toolbar.placeSelectedButtonId] || 'shapes';

@@ -9,7 +9,7 @@ import { drawHead, getLineTrim, trimPolylineEnd } from '../../../ui/connectors/c
  */
 
 /** Типы объектов, к которым можно привязать коннектор (из ConnectionAnchorsLayer). */
-export const ALLOWED_BIND_TYPES = new Set(['shape', 'note', 'image', 'text', 'simple-text', 'file', 'image-generator']);
+export const ALLOWED_BIND_TYPES = new Set(['shape', 'note', 'image', 'text', 'simple-text', 'file', 'image-generator', 'video-generator']);
 /** Радиус поиска ближайшего объекта при клике по якорю (world-px). */
 export const CLICK_FIND_RADIUS = 400;
 /** Зазор между дубликатом и источником при автосоздании (world-px). */

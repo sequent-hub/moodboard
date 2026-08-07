@@ -8,7 +8,16 @@ import {
     createConnectorFromTerminals,
     objectBounds,
 } from './connector/connectorGesture.js';
-import { getObjectPorts, findNearestPort, terminalForPort } from '../../services/ConnectorPortRegistry.js';
+import {
+    getObjectPorts,
+    findNearestPort,
+    portAvailabilityRule,
+    portTargetRule,
+    soleCompatiblePort,
+    terminalForPort,
+    PORT_SNAP_CSS,
+} from '../../services/ConnectorPortRegistry.js';
+import { canConnectTerminals } from '../../services/ai/imageGeneratorContract.js';
 import { CONNECTOR_Z_INDEX } from '../../ui/connectors/ConnectorLayer.js';
 
 /**
@@ -68,7 +77,8 @@ export class ConnectorTool extends BaseTool {
 
         if (hitData.result && hitData.result.object) {
             const objectId = hitData.result.object;
-            this._sourceTerminal = this._terminalForObject(objectId, worldPt);
+            // Начало жеста: пары портов ещё нет, проверяем только занятость.
+            this._sourceTerminal = this._terminalForObject(objectId, worldPt, portAvailabilityRule(this._objects()));
         } else {
             this._sourceTerminal = { point: worldPt };
         }
@@ -97,7 +107,8 @@ export class ConnectorTool extends BaseTool {
 
         let endTerminal;
         if (hitData.result && hitData.result.object) {
-            endTerminal = this._terminalForObject(hitData.result.object, worldPt);
+            const rule = portTargetRule(this._objects(), this._sourceTerminal?.portId || null);
+            endTerminal = this._terminalForObject(hitData.result.object, worldPt, rule);
         } else {
             endTerminal = { point: worldPt };
         }
@@ -105,7 +116,8 @@ export class ConnectorTool extends BaseTool {
         this._clearPreview();
         this._isDragging = false;
 
-        if (this.core && this._sourceTerminal) {
+        // Связь от порта результата допустима только со входом изображения.
+        if (this.core && this._sourceTerminal && canConnectTerminals(this._sourceTerminal, endTerminal)) {
             createConnectorFromTerminals(this.core, this.eventBus, this._sourceTerminal, endTerminal);
         }
 
@@ -119,13 +131,21 @@ export class ConnectorTool extends BaseTool {
      *
      * @param {string} objectId
      * @param {{x: number, y: number}} worldPt
+     * @param {((port: object, targetId: string) => boolean)|null} [rule=null] правило выбора порта
      * @returns {object}
      */
-    _terminalForObject(objectId, worldPt) {
+    _terminalForObject(objectId, worldPt, rule = null) {
         const ports = getObjectPorts(this.eventBus, objectId);
         if (ports.length > 0) {
             const bounds = objectBounds(this.eventBus, objectId);
-            const port = findNearestPort(ports, bounds, worldPt, this.world?.scale?.x || 1);
+            const port = findNearestPort(
+                ports,
+                bounds,
+                worldPt,
+                this.world?.scale?.x || 1,
+                PORT_SNAP_CSS,
+                rule ? (candidate) => rule(candidate, objectId) : null,
+            ) || soleCompatiblePort(ports, rule, objectId);
             if (port) return terminalForPort(objectId, port);
         }
 
@@ -135,6 +155,10 @@ export class ConnectorTool extends BaseTool {
             isPrecise: true,
             isExact: false,
         };
+    }
+
+    _objects() {
+        return this.core?.state?.getObjects ? this.core.state.getObjects() : [];
     }
 
     // ─── Превью ─────────────────────────────────────────────────────────────

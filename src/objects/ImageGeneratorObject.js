@@ -7,6 +7,7 @@ import {
     GENERATOR_MIN_BODY_HEIGHT,
     PORT_PROMPT,
     PORT_IMAGE_IN,
+    PORT_IMAGE_OUT,
     PORT_ICON_SIZE,
     PORT_CHIP_SIZE,
     RESULT_STATUS,
@@ -47,13 +48,19 @@ const PORT_CHIP_ANIM_SEC = 0.2;
  */
 const PORT_ICON_RASTER_SCALE = 4;
 
-/** Иконки входных портов: идентификатор порта → исходный SVG. */
+/**
+ * Иконки портов: идентификатор порта → исходный SVG.
+ *
+ * Порт результата отдаёт картинку, поэтому носит тот же глиф, что и вход
+ * изображения: тип данных один — знак один.
+ */
 const PORT_ICON_SOURCES = {
     [PORT_PROMPT]: TEXT_PORT_ICON,
     [PORT_IMAGE_IN]: IMAGE_PORT_ICON,
+    [PORT_IMAGE_OUT]: IMAGE_PORT_ICON,
 };
 
-/** Общие на все узлы текстуры иконок портов. */
+/** Общие на все узлы текстуры иконок портов. Ключ — сам SVG: один глиф на нескольких портах даёт один растр. */
 const portIconTextures = new Map();
 
 /**
@@ -61,10 +68,9 @@ const portIconTextures = new Map();
  * @returns {PIXI.Texture|null}
  */
 function getPortIconTexture(portId) {
-    if (portIconTextures.has(portId)) return portIconTextures.get(portId);
-
     const source = PORT_ICON_SOURCES[portId];
     if (!source) return null;
+    if (portIconTextures.has(source)) return portIconTextures.get(source);
 
     const raster = PORT_ICON_SIZE * PORT_ICON_RASTER_SCALE;
     const svg = source
@@ -73,7 +79,7 @@ function getPortIconTexture(portId) {
         .replace(/height="[^"]*"/, `height="${raster}"`);
 
     const texture = PIXI.Texture.from(`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`);
-    portIconTextures.set(portId, texture);
+    portIconTextures.set(source, texture);
     return texture;
 }
 
@@ -147,7 +153,7 @@ export class ImageGeneratorObject {
         this.portsGraphics = new PIXI.Graphics();
         this.container.addChild(this.portsGraphics);
 
-        // Входные порты — иконка на круглой подложке. Подложка отдельным
+        // Порт — иконка на круглой подложке. Подложка отдельным
         // объектом: анимация масштаба должна идти от её центра, а не от точки
         // порта, и не задевать иконку.
         this.portChips = new Map();
@@ -486,7 +492,10 @@ export class ImageGeneratorObject {
      * гасил бы подложку, зажжённую перетаскиванием, на своём update().
      *
      * Без portId подсветка идёт на все входные порты: жест коннектора наводится
-     * на узел целиком и заранее не знает, в какой порт попадёт связь.
+     * на узел целиком и заранее не знает, в какой порт попадёт связь. Порт
+     * результата в такую подсветку не входит — связь в него приходит только из
+     * входа изображения, и зажигать его на каждом наведении значило бы обещать
+     * привязку, которой не будет.
      *
      * @param {boolean} active
      * @param {string} [reason='connected'] источник подсветки
@@ -495,7 +504,9 @@ export class ImageGeneratorObject {
     setPortHighlight(active, reason = 'connected', portId = null) {
         const entries = portId
             ? [this.portChips?.get(portId)]
-            : Array.from(this.portChips?.values() || []);
+            : this.getConnectionPorts()
+                .filter((port) => port.kind === 'input')
+                .map((port) => this.portChips?.get(port.id));
 
         entries.forEach((entry) => {
             if (entry) this._applyPortHighlight(entry, active, reason);
@@ -535,7 +546,7 @@ export class ImageGeneratorObject {
             const x = port.anchor.x * this.width;
             const y = port.anchor.y * this.height;
 
-            // Входные порты рисуются иконкой с подложкой (_drawPortChip),
+            // Порт с объявленной иконкой рисуется чипом (_drawPortChip),
             // без кружка и ножки до кромки карточки.
             const chip = this.portChips?.get(port.id);
             if (chip) {

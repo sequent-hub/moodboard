@@ -99,6 +99,29 @@
     white-space: nowrap;
 }
 
+/* --- Меню под свободный конец связи --- */
+
+.mb-gen-drop {
+    position: fixed;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 180px;
+    padding: 4px;
+    font-family: inherit;
+    background: #FFFFFF;
+    border-radius: 10px;
+    box-shadow:
+        0 0 0 1px rgba(15, 23, 42, 0.08),
+        0 8px 24px -8px rgba(15, 23, 42, 0.25);
+    pointer-events: auto;
+    z-index: 3000;
+}
+
+.mb-gen-drop.is-open {
+    display: flex;
+}
+
 /* --- Выпадающее меню --- */
 
 .mb-imgen__menu {
@@ -204,14 +227,17 @@
     align-items: center;
     justify-content: center;
     flex: 0 0 auto;
+    /* Рамка не должна раздувать кнопку выше 28px соседних пилюль:
+       в bare-сборке пакета нет глобального reset на border-box. */
+    box-sizing: border-box;
     width: 28px;
     height: 28px;
     padding: 0;
-    color: #FFFFFF;
-    background: #2563EB;
-    border: none;
+    color: #64748B;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
     border-radius: 8px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
     cursor: pointer;
 }
 
@@ -221,7 +247,8 @@
 }
 
 .mb-imgen__run:hover:not(:disabled) {
-    background: #1D4ED8;
+    border-color: #CBD5E1;
+    background: #F8FAFC;
 }
 
 .mb-imgen__run:focus-visible {
@@ -231,7 +258,8 @@
 
 .mb-imgen__run:disabled,
 .mb-imgen__run--busy {
-    background: #94A3B8;
+    color: #94A3B8;
+    background: #FFFFFF;
     cursor: default;
 }
 

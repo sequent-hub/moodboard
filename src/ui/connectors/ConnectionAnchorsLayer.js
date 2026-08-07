@@ -2,11 +2,15 @@ import { Events } from '../../core/events/Events.js';
 import { HandlesPositioningService } from '../handles/HandlesPositioningService.js';
 import { ConnectorDragController } from '../../tools/object-tools/connector/ConnectorDragController.js';
 import { AnchorHoverGhost } from '../../tools/object-tools/connector/AnchorHoverGhost.js';
-import { getPortsFromPixi, portDomId } from '../../services/ConnectorPortRegistry.js';
+import { getPortsFromPixi, portAvailabilityRule, portDomId } from '../../services/ConnectorPortRegistry.js';
 import { IMAGE_GENERATOR_TYPE, PORT_CHIP_SIZE } from '../../services/ai/imageGeneratorContract.js';
-import { findIncomingConnections } from '../../services/ai/imageGeneratorInputs.js';
+import { VIDEO_GENERATOR_TYPE } from '../../services/ai/videoGeneratorContract.js';
+import { findIncomingConnections, findOutgoingConnections } from '../../services/ai/generatorConnections.js';
 
-const ALLOWED_TYPES = new Set(['shape', 'note', 'image', 'text', 'simple-text', 'file', 'image-generator']);
+const ALLOWED_TYPES = new Set(['shape', 'note', 'image', 'text', 'simple-text', 'file', 'image-generator', 'video-generator']);
+
+/** Типы узлов, у которых порт подсвечивается подложкой. */
+const PORT_NODE_TYPES = new Set([IMAGE_GENERATOR_TYPE, VIDEO_GENERATOR_TYPE]);
 
 /** Разделитель в ключе подсветки: в id объектов и портов не встречается. */
 const PORT_KEY_SEPARATOR = '::';
@@ -207,33 +211,39 @@ export class ConnectionAnchorsLayer {
         const targets = new Set();
         if (this.hoveredObjectId) targets.add(this.hoveredObjectId);
         if (selectedId) targets.add(selectedId);
-        
+
+        const objects = this.core?.state?.getObjects?.() || [];
+
         targets.forEach(id => {
-            this._renderAnchorsFor(id);
+            this._renderAnchorsFor(id, objects);
         });
 
         // Подложка порта — только у генераторов с реально подключённым
         // коннектором. Выделение и hover сами по себе её не зажигают.
-        this._syncPortHighlights(this._collectConnectedPortTargets());
+        this._syncPortHighlights(this._collectConnectedPortTargets(objects));
     }
 
     /**
-     * Входные порты генераторов, в которые приходит коннектор.
+     * Порты генераторов, к которым подключён коннектор.
      *
-     * Ключ — пара «объект + порт»: у узла входов несколько, и связь в один из них
+     * Ключ — пара «объект + порт»: у узла портов несколько, и связь в один из них
      * не должна зажигать подложку у соседнего.
      *
+     * @param {Array<object>} [objects] объекты состояния доски
      * @returns {Set<string>}
      */
-    _collectConnectedPortTargets() {
-        const objects = this.core?.state?.getObjects?.() || [];
+    _collectConnectedPortTargets(objects = this.core?.state?.getObjects?.() || []) {
         const connected = new Set();
 
-        objects.forEach((obj) => {
-            if (obj?.type !== IMAGE_GENERATOR_TYPE || !obj.id) return;
+        (objects || []).forEach((obj) => {
+            if (!obj?.id || !PORT_NODE_TYPES.has(obj.type)) return;
 
             findIncomingConnections(objects, obj.id).forEach((link) => {
                 connected.add(portHighlightKey(obj.id, link.portId));
+            });
+
+            findOutgoingConnections(objects, obj.id).forEach((link) => {
+                connected.add(portHighlightKey(obj.id, link.nodePortId));
             });
         });
 
@@ -289,7 +299,11 @@ export class ConnectionAnchorsLayer {
         }
     }
 
-    _renderAnchorsFor(id) {
+    /**
+     * @param {string} id
+     * @param {Array<object>} [objects] объекты состояния доски
+     */
+    _renderAnchorsFor(id, objects = this.core?.state?.getObjects?.() || []) {
         const req = { objectId: id, pixiObject: null };
         this.eventBus.emit(Events.Tool.GetObjectPixi, req);
         const mbType = req.pixiObject?._mb?.type;
@@ -386,8 +400,13 @@ export class ConnectionAnchorsLayer {
         // привязки: середины граней для него не имеют смысла.
         const ports = getPortsFromPixi(req.pixiObject);
         if (ports.length > 0) {
+            // Занятый порт результата точки не получает: с него допустима одна
+            // связь, и вторую не должно быть за что начать.
+            const isPortFree = portAvailabilityRule(objects);
+
             ports.forEach((port) => {
                 if (!port?.anchor || port.enabled === false) return;
+                if (!isPortFree(port, id)) return;
                 createDot(
                     port.id,
                     Math.round(port.anchor.x * width),

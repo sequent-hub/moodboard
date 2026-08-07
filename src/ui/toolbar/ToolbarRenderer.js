@@ -23,6 +23,7 @@ export class ToolbarRenderer {
             { id: 'pencil', iconName: 'pencil', title: 'Рисование', type: 'custom-draw' },
             { id: 'connector', iconName: 'connector', title: 'Коннектор', type: 'connector-add' },
             { id: 'image-generator', iconName: 'image-generator', title: 'Генератор изображений', type: 'image-generator-add' },
+            { id: 'video-generator', iconName: 'video-generator', title: 'Генератор видео', type: 'video-generator-add' },
             ...(this.toolbar.enableComments
                 ? [{ id: 'comments', iconName: 'comments', title: 'Комментарий', type: 'custom-comments' }]
                 : []),

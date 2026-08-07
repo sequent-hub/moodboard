@@ -7,6 +7,12 @@ import {
     GENERATOR_DEFAULT_WIDTH,
     createDefaultGeneratorProperties,
 } from '../../services/ai/imageGeneratorContract.js';
+import {
+    VIDEO_GENERATOR_TYPE,
+    VIDEO_DEFAULT_WIDTH,
+    VIDEO_DEFAULT_HEIGHT,
+    createDefaultVideoGeneratorProperties,
+} from '../../services/ai/videoGeneratorContract.js';
 
 /** Стартовая карточка квадратная: кадр занимает узел целиком. */
 const GENERATOR_DEFAULT_HEIGHT = GENERATOR_DEFAULT_WIDTH;
@@ -160,6 +166,28 @@ export class ToolbarActionRouter {
                     ...createDefaultGeneratorProperties(),
                     width: GENERATOR_DEFAULT_WIDTH,
                     height: GENERATOR_DEFAULT_HEIGHT,
+                }
+            });
+            return true;
+        }
+
+        if (toolType === 'video-generator-add') {
+            this.toolbar.animateButton(button);
+            this.toolbar.closeShapesPopup();
+            this.toolbar.closeDrawPopup();
+            this.toolbar.closeEmojiPopup();
+            this.toolbar.closeReactionsPopup();
+            this.toolbar.closeFramePopup();
+            this.toolbar.eventBus.emit(Events.Keyboard.ToolSelect, { tool: 'place' });
+            this.toolbar.placeSelectedButtonId = 'video-generator';
+            this.toolbar.setActiveToolbarButton('place');
+            this.toolbar.eventBus.emit(Events.Place.Set, {
+                type: VIDEO_GENERATOR_TYPE,
+                size: { width: VIDEO_DEFAULT_WIDTH, height: VIDEO_DEFAULT_HEIGHT },
+                properties: {
+                    ...createDefaultVideoGeneratorProperties(),
+                    width: VIDEO_DEFAULT_WIDTH,
+                    height: VIDEO_DEFAULT_HEIGHT,
                 }
             });
             return true;

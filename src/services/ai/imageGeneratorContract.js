@@ -11,6 +11,34 @@
  * новых параметров или новых портов не требует миграции сохранённых досок.
  */
 
+import {
+    PORT_PROMPT,
+    PORT_IMAGE_IN,
+    PORT_IMAGE_OUT,
+    PORT_OUTSET,
+    PORT_STACK_STEP,
+} from './generatorPorts.js';
+
+/**
+ * Идентификаторы портов, их геометрия и правило совместимости переехали в
+ * общий `generatorPorts.js`: связь соединяет узлы разных типов, и правило
+ * обязано знать про порты видео тоже. Реэкспорт оставлен, чтобы прежние
+ * импортёры контракта не менялись.
+ */
+export {
+    PORT_PROMPT,
+    PORT_IMAGE_IN,
+    PORT_IMAGE_OUT,
+    PORT_ICON_SIZE,
+    PORT_CHIP_SIZE,
+    PORT_STACK_GAP,
+    PORT_STACK_STEP,
+    PORT_OUTSET,
+    PORT_LINE_STOP,
+    canConnectPorts,
+    canConnectTerminals,
+} from './generatorPorts.js';
+
 export const IMAGE_GENERATOR_TYPE = 'image-generator';
 
 /**
@@ -34,39 +62,6 @@ export const GENERATOR_FOOTER_HEIGHT = 46;
 export const GENERATOR_MIN_WIDTH = 260;
 export const GENERATOR_MIN_BODY_HEIGHT = 160;
 export const GENERATOR_DEFAULT_WIDTH = 380;
-
-/** Идентификаторы портов. Зарезервированы: их нельзя переименовывать. */
-export const PORT_PROMPT = 'prompt';
-export const PORT_IMAGE_IN = 'image-in';
-export const PORT_IMAGE_OUT = 'image-out';
-
-/**
- * Входной порт: размер иконки и круглой подложки под ней, world-пиксели.
- * Мировые единицы, а не CSS — порт масштабируется вместе с узлом. Подложку
- * рисует ImageGeneratorObject, по её размеру слой якорей строит хит-зону
- * под старт коннектора, поэтому константы живут в общем контракте.
- */
-export const PORT_ICON_SIZE = 14;
-export const PORT_CHIP_SIZE = 32;
-
-/**
- * Зазор между краями подложек соседних портов одной грани, world-пиксели,
- * и посчитанный из него шаг между их центрами.
- */
-export const PORT_STACK_GAP = 14;
-export const PORT_STACK_STEP = PORT_CHIP_SIZE + PORT_STACK_GAP;
-
-/**
- * Насколько центр порта вынесен наружу от грани карточки, world-пиксели.
- * = радиус подложки + зазор 2px между краем подложки и гранью узла.
- */
-export const PORT_OUTSET = PORT_CHIP_SIZE / 2 + 2;
-
-/**
- * Насколько конец связи не доходит до центра порта, world-пиксели.
- * Линия упирается в край подложки, наконечник у порта не рисуется.
- */
-export const PORT_LINE_STOP = PORT_CHIP_SIZE / 2;
 
 /** Статусы одного результата генерации. */
 export const RESULT_STATUS = {
@@ -195,7 +190,6 @@ export function getVisibleResults(props) {
  * Входные порты идут слева столбиком снизу вверх: изображение — на уровне нижней
  * панели, текст — на шаг выше. Выходной — справа, на уровне панели.
  * Все вынесены наружу на PORT_OUTSET, поэтому anchor.x выходит за диапазон 0..1.
- * Выходной пока отключён: это заглушка под передачу результата дальше.
  *
  * @param {{width: number, height: number}} size
  * @returns {Array<{id: string, kind: string, dataType: string, label: string, enabled: boolean, anchor: {x: number, y: number}}>}
@@ -230,7 +224,7 @@ export function getGeneratorPorts(size = {}) {
             kind: 'output',
             dataType: 'image',
             label: 'Результат',
-            enabled: false,
+            enabled: true,
             anchor: { x: 1 + outset, y: footerCenterY },
         },
     ];

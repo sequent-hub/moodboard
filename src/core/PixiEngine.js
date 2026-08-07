@@ -332,7 +332,7 @@ export class PixiEngine {
             if (typeof mbInstance?.destroy === 'function') {
                 try { mbInstance.destroy(); } catch (_) {}
                 // Типы, чей instance.destroy() полностью берёт на себя PIXI-cleanup
-                if (mbMeta.type === 'frame' || mbMeta.type === 'image-generator') {
+                if (mbMeta.type === 'frame' || mbMeta.type === 'image-generator' || mbMeta.type === 'video-generator') {
                     handledByInstance = true;
                 }
             }

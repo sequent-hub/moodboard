@@ -1,5 +1,8 @@
 import { Events } from '../core/events/Events.js';
 import { IMAGE_GENERATOR_TYPE, getGeneratorPorts } from './ai/imageGeneratorContract.js';
+import { VIDEO_GENERATOR_TYPE, getVideoGeneratorPorts } from './ai/videoGeneratorContract.js';
+import { canConnectPorts, isSingleLinkOutputPort } from './ai/generatorPorts.js';
+import { isOutputPortBusy } from './ai/generatorConnections.js';
 
 /**
  * Реестр именованных портов объектов.
@@ -39,6 +42,10 @@ export function portDomId(objectId, portId) {
  */
 const PORTS_BY_TYPE = {
     [IMAGE_GENERATOR_TYPE]: (object) => getGeneratorPorts({
+        width: object.width ?? object.properties?.width,
+        height: object.height ?? object.properties?.height,
+    }),
+    [VIDEO_GENERATOR_TYPE]: (object) => getVideoGeneratorPorts({
         width: object.width ?? object.properties?.width,
         height: object.height ?? object.properties?.height,
     }),
@@ -112,9 +119,10 @@ export function getPortsFromPixi(pixiObject) {
  * @param {{x: number, y: number}} worldPoint
  * @param {number} worldScale текущий масштаб холста
  * @param {number} [thresholdCss=PORT_SNAP_CSS]
+ * @param {((port: object) => boolean)|null} [isPortAllowed=null] правило жеста: порт, который сейчас не принимает связь
  * @returns {{portId: string, anchor: {x: number, y: number}}|null}
  */
-export function findNearestPort(ports, bounds, worldPoint, worldScale = 1, thresholdCss = PORT_SNAP_CSS) {
+export function findNearestPort(ports, bounds, worldPoint, worldScale = 1, thresholdCss = PORT_SNAP_CSS, isPortAllowed = null) {
     if (!Array.isArray(ports) || ports.length === 0 || !bounds || !worldPoint) return null;
 
     const threshold = thresholdCss / Math.max(0.0001, worldScale);
@@ -123,6 +131,7 @@ export function findNearestPort(ports, bounds, worldPoint, worldScale = 1, thres
 
     ports.forEach((port) => {
         if (!port || port.enabled === false || !port.anchor) return;
+        if (isPortAllowed && !isPortAllowed(port)) return;
 
         const px = bounds.x + port.anchor.x * bounds.width;
         const py = bounds.y + port.anchor.y * bounds.height;
@@ -150,9 +159,10 @@ export function findNearestPort(ports, bounds, worldPoint, worldScale = 1, thres
  * @param {{x: number, y: number}} worldPoint
  * @param {number} [worldScale=1]
  * @param {string|null} [excludeBoundId] объект, к которому уже привязан другой конец связи
+ * @param {((port: object, targetId: string) => boolean)|null} [isPortAllowed=null] правило жеста
  * @returns {{boundId: string, portId: string, anchor: {x: number, y: number}, point: {x: number, y: number}, bounds: object}|null}
  */
-export function findPortTargetNear(eventBus, objects, worldPoint, worldScale = 1, excludeBoundId = null) {
+export function findPortTargetNear(eventBus, objects, worldPoint, worldScale = 1, excludeBoundId = null, isPortAllowed = null) {
     if (!eventBus || !Array.isArray(objects) || !worldPoint) return null;
 
     let best = null;
@@ -168,7 +178,14 @@ export function findPortTargetNear(eventBus, objects, worldPoint, worldScale = 1
         const bounds = portTargetBounds(eventBus, object.id, req.pixiObject);
         if (!bounds) return;
 
-        const port = findNearestPort(getPortsFromPixi(req.pixiObject), bounds, worldPoint, worldScale);
+        const port = findNearestPort(
+            getPortsFromPixi(req.pixiObject),
+            bounds,
+            worldPoint,
+            worldScale,
+            PORT_SNAP_CSS,
+            isPortAllowed ? (candidate) => isPortAllowed(candidate, object.id) : null,
+        );
         if (!port) return;
 
         const point = {
@@ -183,6 +200,31 @@ export function findPortTargetNear(eventBus, objects, worldPoint, worldScale = 1
     });
 
     return best;
+}
+
+/**
+ * Единственный порт объекта, который принимает связь этого жеста.
+ *
+ * Нужен, когда конец жеста пришёлся на тело карточки, а не на саму иконку порта:
+ * если правило оставило ровно один вариант, гадать не о чем — связь идёт в него.
+ * Два и больше подходящих порта выбор за пользователя не делают: там работает
+ * обычная привязка к грани.
+ *
+ * @param {Array<object>} ports
+ * @param {((port: object, targetId: string) => boolean)|null} isPortAllowed правило жеста
+ * @param {string} targetId
+ * @returns {{portId: string, anchor: {x: number, y: number}}|null}
+ */
+export function soleCompatiblePort(ports, isPortAllowed, targetId) {
+    if (!Array.isArray(ports) || typeof isPortAllowed !== 'function') return null;
+
+    const allowed = ports.filter((port) => (
+        port && port.enabled !== false && port.anchor && isPortAllowed(port, targetId)
+    ));
+    if (allowed.length !== 1) return null;
+
+    const port = allowed[0];
+    return { portId: port.id, anchor: { x: port.anchor.x, y: port.anchor.y } };
 }
 
 /**
@@ -242,4 +284,35 @@ export function terminalForPort(boundId, port) {
         isPrecise: true,
         isExact: true,
     };
+}
+
+/**
+ * Свободен ли порт — правило для конца связи, который только выбирают.
+ *
+ * Совместимость пары здесь не проверяется: у начала жеста второго конца ещё нет.
+ *
+ * @param {Array<object>} objects объекты состояния доски
+ * @param {string|null} [ignoreConnectorId=null] связь, конец которой перетаскивают
+ * @returns {(port: object, targetId: string) => boolean}
+ */
+export function portAvailabilityRule(objects, ignoreConnectorId = null) {
+    return (port, targetId) => {
+        if (!isSingleLinkOutputPort(port?.id)) return true;
+
+        return !isOutputPortBusy(objects, targetId, ignoreConnectorId, port.id);
+    };
+}
+
+/**
+ * Правило выбора порта-цели: порт свободен и совместим с портом на другом конце.
+ *
+ * @param {Array<object>} objects объекты состояния доски
+ * @param {string|null} sourcePortId порт на уже закреплённом конце связи
+ * @param {string|null} [ignoreConnectorId=null] связь, конец которой перетаскивают
+ * @returns {(port: object, targetId: string) => boolean}
+ */
+export function portTargetRule(objects, sourcePortId, ignoreConnectorId = null) {
+    const isFree = portAvailabilityRule(objects, ignoreConnectorId);
+
+    return (port, targetId) => canConnectPorts(sourcePortId || null, port?.id || null) && isFree(port, targetId);
 }

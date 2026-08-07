@@ -103,6 +103,12 @@ export function destroyMoodBoard(board) {
     safeDestroy(board.imageGeneratorRunner, 'imageGeneratorRunner');
     board.imageGeneratorRunner = null;
 
+    safeDestroy(board.videoGeneratorControlsLayer, 'videoGeneratorControlsLayer');
+    board.videoGeneratorControlsLayer = null;
+
+    safeDestroy(board.videoGeneratorRunner, 'videoGeneratorRunner');
+    board.videoGeneratorRunner = null;
+
     safeDestroy(board.htmlHandlesLayer, 'htmlHandlesLayer');
     board.htmlHandlesLayer = null;
 

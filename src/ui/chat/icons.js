@@ -83,6 +83,8 @@ export const ICONS = {
     users: svg('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 5.4a3.2 3.2 0 0 1 0 6"/><path d="M21 20c0-2.6-1.6-4.3-4-4.8"/>'),
     seed: svg('<path d="M9 4 7 20M17 4l-2 16M4 9h16M3 15h16"/>'),
     gauge: svg('<path d="M5 18a8 8 0 1 1 14 0"/><path d="M12 14l4-3"/>'),
+    clock: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>'),
+    resolution: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><rect x="6" y="8" width="7" height="5" rx="1"/>'),
     negative: svg('<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>'),
     chevronDown: svg('<path d="M6 9l6 6 6-6"/>'),
     trash: svg('<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/>'),

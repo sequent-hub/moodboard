@@ -7,6 +7,14 @@
  */
 
 import { PORT_PROMPT, PORT_IMAGE_IN, IMAGE_GENERATOR_TYPE, RESULT_STATUS } from './imageGeneratorContract.js';
+import { findIncomingConnections } from './generatorConnections.js';
+
+/**
+ * Обход связей общий для всех узлов с портами и живёт в
+ * `generatorConnections.js`. Реэкспорт оставлен, чтобы прежние импортёры
+ * этого модуля не менялись.
+ */
+export { findIncomingConnections, findOutgoingConnections, isOutputPortBusy } from './generatorConnections.js';
 
 /** Типы объектов, из которых узел умеет брать текст. */
 const TEXT_SOURCE_TYPES = new Set(['text', 'simple-text', 'note', 'shape']);
@@ -16,58 +24,6 @@ const IMAGE_SOURCE_TYPES = new Set(['image', 'revit-screenshot-img', 'model3d-sc
 
 /** Расширения, по которым файл считается картинкой, когда mimeType не заполнен. */
 const IMAGE_FILE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif']);
-
-/** Порты, в которые узел принимает данные. */
-const INPUT_PORTS = new Set([PORT_PROMPT, PORT_IMAGE_IN]);
-
-/**
- * Возвращает связи, входящие в указанный узел.
- *
- * Связь считается входящей, если один из её концов привязан к узлу.
- * Направление рисования пользователю не навязываем: коннектор от текста к узлу
- * и от узла к тексту дают один и тот же смысл.
- *
- * Связи без `portId` (нарисованные до появления портов или мимо порта) считаются
- * входом промта — иначе доска, сохранённая раньше, перестала бы работать.
- *
- * @param {Array<object>} objects
- * @param {string} nodeId
- * @param {string|null} [portId=null] конкретный порт или все входные
- * @returns {Array<{connector: object, sourceId: string, portId: string}>}
- */
-export function findIncomingConnections(objects, nodeId, portId = null) {
-    if (!Array.isArray(objects) || !nodeId) return [];
-
-    const links = [];
-
-    objects.forEach((obj) => {
-        if (obj?.type !== 'connector') return;
-
-        const start = obj.properties?.start;
-        const end = obj.properties?.end;
-
-        let terminalAtNode = null;
-        let otherTerminal = null;
-
-        if (end?.boundId === nodeId) {
-            terminalAtNode = end;
-            otherTerminal = start;
-        } else if (start?.boundId === nodeId) {
-            terminalAtNode = start;
-            otherTerminal = end;
-        }
-
-        if (!terminalAtNode || !otherTerminal?.boundId) return;
-
-        const linkPort = typeof terminalAtNode.portId === 'string' ? terminalAtNode.portId : PORT_PROMPT;
-        if (!INPUT_PORTS.has(linkPort)) return;
-        if (portId !== null && linkPort !== portId) return;
-
-        links.push({ connector: obj, sourceId: otherTerminal.boundId, portId: linkPort });
-    });
-
-    return links;
-}
 
 /**
  * Достаёт текст из объекта-источника.
